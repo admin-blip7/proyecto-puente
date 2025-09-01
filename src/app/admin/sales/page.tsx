@@ -1,7 +1,22 @@
 import { Header } from "@/components/shared/Header";
 import SalesHistoryClient from "@/components/admin/sales/SalesHistoryClient";
-import { Sale } from "@/types";
-import { subDays, parse } from 'date-fns';
+import { Sale, Product, SaleItem } from "@/types";
+import { subDays, isToday } from 'date-fns';
+
+const getProducts = async (): Promise<Product[]> => {
+    const categories = ["Bebidas", "Limpieza", "Snacks", "Panadería"];
+    return Array.from({ length: 12 }, (_, i) => ({
+      id: `prod_${i + 1}`,
+      name: `Product ${i + 1}`,
+      sku: `SKU00${i + 1}`,
+      price: parseFloat((Math.random() * 50 + 5).toFixed(2)),
+      cost: parseFloat((Math.random() * 30 + 2).toFixed(2)),
+      stock: Math.floor(Math.random() * 100),
+      category: categories[i % categories.length],
+      imageUrl: `https://picsum.photos/400/400?random=${i}`,
+      createdAt: new Date(),
+    }));
+};
 
 const getSales = async (): Promise<Sale[]> => {
     // Mock sales data
@@ -48,21 +63,51 @@ const getSales = async (): Promise<Sale[]> => {
     ];
 
     const now = new Date();
+    // Make first sale today
     return sales.map((sale, index) => ({
         ...sale,
         id: `sale_${index + 1}`,
-        createdAt: subDays(now, index),
+        createdAt: index === 0 ? now : subDays(now, index),
     }));
 };
+
+const calculateDailySummary = (sales: Sale[], products: Product[]) => {
+    const todaySales = sales.filter(sale => isToday(sale.createdAt));
+    
+    const totalRevenue = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+
+    const totalCost = todaySales.reduce((sum, sale) => {
+        const saleCost = sale.items.reduce((itemSum, item) => {
+            const product = products.find(p => p.id === item.productId);
+            return itemSum + (product ? product.cost * item.quantity : 0);
+        }, 0);
+        return sum + saleCost;
+    }, 0);
+
+    const totalProfit = totalRevenue - totalCost;
+
+    return {
+        dailyRevenue: totalRevenue,
+        dailyCost: totalCost,
+        dailyProfit: totalProfit,
+    };
+}
 
 
 export default async function SalesPage() {
     const initialSales = await getSales();
+    const products = await getProducts();
+    const { dailyCost, dailyProfit } = calculateDailySummary(initialSales, products);
+
     return (
         <div className="flex h-screen w-full flex-col">
             <Header />
             <main className="flex-1 overflow-hidden p-4 md:p-6">
-                <SalesHistoryClient initialSales={initialSales} />
+                <SalesHistoryClient 
+                    initialSales={initialSales}
+                    dailyCost={dailyCost}
+                    dailyProfit={dailyProfit}
+                />
             </main>
         </div>
     )
