@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, LogOut, Menu, StoreIcon, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, StoreIcon, X, History } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -41,16 +41,28 @@ export function Header() {
 
   const navLinks =
     userProfile?.role === "Admin" ? (
-      <Link
-        href="/admin"
-        className={cn(
-          "text-muted-foreground transition-colors hover:text-foreground",
-          pathname.startsWith("/admin") && "text-foreground"
-        )}
-        onClick={() => setMobileMenuOpen(false)}
-      >
-        Admin Panel
-      </Link>
+      <>
+        <Link
+            href="/admin"
+            className={cn(
+            "text-muted-foreground transition-colors hover:text-foreground",
+            pathname === "/admin" && "text-foreground"
+            )}
+            onClick={() => setMobileMenuOpen(false)}
+        >
+            Inventario
+        </Link>
+        <Link
+            href="/admin/sales"
+            className={cn(
+            "text-muted-foreground transition-colors hover:text-foreground",
+            pathname.startsWith("/admin/sales") && "text-foreground"
+            )}
+            onClick={() => setMobileMenuOpen(false)}
+        >
+            Historial de Ventas
+        </Link>
+      </>
     ) : null;
 
   return (
@@ -61,7 +73,7 @@ export function Header() {
       </Link>
       
       {/* Desktop Navigation */}
-      <nav className="ml-6 hidden md:flex items-center gap-4 text-sm font-medium">
+      <nav className="ml-6 hidden md:flex items-center gap-6 text-sm font-medium">
         {navLinks}
       </nav>
 
@@ -97,12 +109,20 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {userProfile.role === "Admin" && (
+                  <>
                   <DropdownMenuItem asChild>
                     <Link href="/admin">
                       <LayoutDashboard className="mr-2 h-4 w-4" />
-                      <span>Dashboard</span>
+                      <span>Inventario</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/sales">
+                      <History className="mr-2 h-4 w-4" />
+                      <span>Historial de Ventas</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut}>

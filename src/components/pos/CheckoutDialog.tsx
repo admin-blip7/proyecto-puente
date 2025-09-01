@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { CartItem, SaleItem } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ interface CheckoutDialogProps {
 
 export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalAmount, onSuccessfulSale }: CheckoutDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito'>('Efectivo');
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [saleSummary, setSaleSummary] = useState<string | null>(null);
   const [isSummaryOpen, setSummaryOpen] = useState(false);
@@ -47,7 +50,9 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         items: saleItems,
         totalAmount,
         paymentMethod,
-        cashierId: userProfile.uid
+        cashierId: userProfile.uid,
+        customerName: customerName || undefined,
+        customerPhone: customerPhone || undefined,
     };
 
     try {
@@ -66,6 +71,9 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         onSuccessfulSale();
         onOpenChange(false);
         setSummaryOpen(true);
+        setCustomerName("");
+        setCustomerPhone("");
+
     } catch (error) {
         console.error("Sale processing error:", error);
         toast({
@@ -89,6 +97,14 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <Label htmlFor="customer-name">Nombre del Cliente (Opcional)</Label>
+                <Input id="customer-name" placeholder="Ej: Juan Pérez" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="customer-phone">Teléfono del Cliente (Opcional)</Label>
+                <Input id="customer-phone" placeholder="Ej: 55 1234 5678" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            </div>
             <div className="flex justify-between items-center text-xl font-bold">
               <span>Total a Pagar:</span>
               <span className="text-primary">${totalAmount.toFixed(2)}</span>

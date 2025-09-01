@@ -23,6 +23,8 @@ const GenerateSalesSummaryInputSchema = z.object({
   totalAmount: z.number().describe('The total amount of the sale.'),
   paymentMethod: z.string().describe('The payment method used for the sale (e.g., "Cash", "Credit Card").'),
   cashierId: z.string().describe('The UID of the user who processed the sale.'),
+  customerName: z.string().optional().describe('The name of the customer.'),
+  customerPhone: z.string().optional().describe('The phone number of the customer.'),
 });
 export type GenerateSalesSummaryInput = z.infer<typeof GenerateSalesSummaryInputSchema>;
 
@@ -46,6 +48,7 @@ const generateSalesSummaryPrompt = ai.definePrompt({
   - The total amount of the sale.
   - Information about applicable sales tax, based on the current jurisdiction's tax laws. If sales tax should be applied, make sure to list the applicable sales tax rate and the total amount of sales tax that was added to the sale.
   - Payment method
+  - Customer information if provided.
 
   Make sure to follow all applicable tax laws in the jurisdiction where the sale occurred.
 
@@ -54,6 +57,8 @@ const generateSalesSummaryPrompt = ai.definePrompt({
   Total Amount: {{{totalAmount}}}
   Payment Method: {{{paymentMethod}}}
   Cashier ID: {{{cashierId}}}
+  {{#if customerName}}Customer Name: {{{customerName}}}{{/if}}
+  {{#if customerPhone}}Customer Phone: {{{customerPhone}}}{{/if}}
   `,
 });
 
