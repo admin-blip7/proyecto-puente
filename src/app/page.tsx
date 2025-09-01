@@ -1,6 +1,6 @@
 import POSClient from '@/components/pos/POSClient';
 import { Product } from '@/types';
-import { Header } from '@/components/shared/Header';
+import LeftSidebar from '@/components/shared/LeftSidebar';
 
 // Mock function to simulate fetching products.
 // In a real application, this would fetch from Firestore.
@@ -22,9 +22,9 @@ const getProducts = async (): Promise<Product[]> => {
 export default async function POSPage() {
   const initialProducts = await getProducts();
   return (
-    <div className="flex h-screen w-full flex-col">
-      <Header />
-      <main className="flex-1 overflow-hidden">
+    <div className="flex h-screen w-full bg-background">
+      <LeftSidebar />
+      <main className="flex-1 flex flex-col">
         <POSClient initialProducts={initialProducts} />
       </main>
     </div>

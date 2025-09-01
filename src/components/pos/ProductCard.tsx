@@ -1,8 +1,8 @@
 import { Product } from "@/types";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Star } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;
@@ -12,27 +12,29 @@ interface ProductCardProps {
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
   return (
-    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg">
-      <CardHeader className="p-0 relative h-48 w-full">
-        <Image
-          src={product.imageUrl}
-          alt={product.name}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover"
-          data-ai-hint={`${product.category} product`}
-        />
-      </CardHeader>
-      <CardContent className="p-4 flex-1 flex flex-col">
-        <CardTitle className="text-base font-semibold leading-tight mb-1">{product.name}</CardTitle>
-        <p className="text-sm text-muted-foreground">{product.category}</p>
-        <div className="flex-grow" />
-        <p className="text-xl font-bold text-primary mt-2">${product.price.toFixed(2)}</p>
+    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-xl rounded-2xl group">
+      <CardContent className="p-4 text-center">
+        <div className="relative h-40 w-40 mx-auto mb-4">
+            <Image
+            src={product.imageUrl}
+            alt={product.name}
+            fill
+            sizes="160px"
+            className="object-contain group-hover:scale-110 transition-transform duration-300"
+            data-ai-hint={`${product.category} product`}
+            />
+        </div>
+        <h3 className="text-lg font-bold tracking-tight">{product.name}</h3>
+        <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
+        <div className="flex items-center justify-center gap-1 mt-2">
+            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+            <span className="text-sm font-bold">5.0</span>
+        </div>
       </CardContent>
-      <CardFooter className="p-2 border-t">
+      <CardFooter className="p-4 flex justify-between items-center">
+        <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
         <Button
-          variant="ghost"
-          className="w-full text-primary hover:bg-primary/10 hover:text-primary"
+          className="rounded-lg"
           onClick={() => onAddToCart(product)}
           disabled={isOutOfStock}
         >
@@ -40,8 +42,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
             "Agotado"
           ) : (
             <>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Agregar
+              Add to cart
             </>
           )}
         </Button>

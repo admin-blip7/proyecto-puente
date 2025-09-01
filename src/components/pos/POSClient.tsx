@@ -7,6 +7,8 @@ import { Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
+import { Button } from "../ui/button";
+import { Header } from "../shared/Header";
 
 interface POSClientProps {
   initialProducts: Product[];
@@ -16,6 +18,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [products] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -52,37 +55,49 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     setCart([]);
   };
 
+  const categories = useMemo(() => ["All", ...Array.from(new Set(products.map(p => p.category)))], [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(
       (product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+        (activeCategory === "All" || product.category === activeCategory) &&
+        (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [products, searchQuery]);
+  }, [products, searchQuery, activeCategory]);
 
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-3 lg:grid-cols-4">
-      <div className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col h-full bg-background">
-        <div className="p-4 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar productos por nombre o SKU..."
-              className="pl-10 text-base"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+    <div className="grid h-full grid-cols-1 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="col-span-1 lg:col-span-2 xl:col-span-3 flex flex-col h-full bg-background px-6 pt-6">
+        <Header />
+        <div className="mt-6">
+          <h2 className="text-2xl font-bold tracking-tight">Find The Best Food</h2>
         </div>
-        <ScrollArea className="flex-1">
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        <div className="mt-4 flex items-center gap-2">
+            <ScrollArea className="w-full whitespace-nowrap">
+                 <div className="flex gap-2 pb-2">
+                    {categories.map(category => (
+                        <Button 
+                            key={category} 
+                            variant={activeCategory === category ? 'default' : 'outline'}
+                            onClick={() => setActiveCategory(category)}
+                            className="rounded-full"
+                        >
+                            {category}
+                        </Button>
+                    ))}
+                 </div>
+            </ScrollArea>
+        </div>
+        <ScrollArea className="flex-1 -mx-6">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
             ))}
           </div>
         </ScrollArea>
       </div>
-      <div className="col-span-1 flex flex-col h-full bg-card border-l">
+      <div className="col-span-1 flex flex-col h-full bg-card shadow-2xl rounded-l-2xl">
         <ShoppingCart
           cartItems={cart}
           onUpdateQuantity={updateQuantity}

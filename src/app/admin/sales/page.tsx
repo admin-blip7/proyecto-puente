@@ -1,7 +1,7 @@
-import { Header } from "@/components/shared/Header";
 import SalesHistoryClient from "@/components/admin/sales/SalesHistoryClient";
 import { Sale, Product, SaleItem } from "@/types";
 import { subDays, isToday } from 'date-fns';
+import LeftSidebar from "@/components/shared/LeftSidebar";
 
 const getProducts = async (): Promise<Product[]> => {
     const categories = ["Bebidas", "Limpieza", "Snacks", "Panadería"];
@@ -100,8 +100,8 @@ export default async function SalesPage() {
     const { dailyCost, dailyProfit } = calculateDailySummary(initialSales, products);
 
     return (
-        <div className="flex h-screen w-full flex-col">
-            <Header />
+        <div className="flex h-screen w-full flex-row">
+            <LeftSidebar />
             <main className="flex-1 overflow-hidden p-4 md:p-6">
                 <SalesHistoryClient 
                     initialSales={initialSales}
