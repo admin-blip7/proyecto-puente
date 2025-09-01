@@ -7,7 +7,7 @@ import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ShoppingCartIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 
@@ -128,6 +128,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="p-0 flex flex-col w-full sm:max-w-md">
+            <SheetTitle className="sr-only">My Order</SheetTitle>
              <ShoppingCart
                 cartItems={cart}
                 onUpdateQuantity={updateQuantity}
