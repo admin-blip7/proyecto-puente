@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
-import { MinusCircle, PlusCircle, Trash2 } from "lucide-react";
+import { MinusCircle, PlusCircle } from "lucide-react";
 import CheckoutDialog from "./CheckoutDialog";
 import { useState } from "react";
 import { Separator } from "../ui/separator";
@@ -14,9 +14,10 @@ interface ShoppingCartProps {
   cartItems: CartItem[];
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onClearCart: () => void;
+  isSheet?: boolean;
 }
 
-export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart }: ShoppingCartProps) {
+export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart, isSheet = false }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
 
   const itemsTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -34,41 +35,43 @@ export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart 
         <CardHeader className="p-6">
           <CardTitle className="text-2xl font-bold tracking-tight">My Order</CardTitle>
         </CardHeader>
-        <CardContent className="p-6 pt-0 flex-1">
-          <ScrollArea className="h-full -mr-6">
-            {cartItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                <p className="text-muted-foreground">Your cart is empty.</p>
-              </div>
-            ) : (
-              <div className="divide-y pr-6">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4 py-4">
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.name}
-                      width={56}
-                      height={56}
-                      className="rounded-lg object-cover h-14 w-14"
-                       data-ai-hint={`${item.category} product`}
-                    />
-                    <div className="flex-1 space-y-1">
-                      <p className="font-semibold leading-tight">{item.name}</p>
-                      <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
+        <CardContent className="p-0 flex-1">
+          <ScrollArea className="h-full">
+            <div className="px-6">
+                {cartItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                    <p className="text-muted-foreground">Your cart is empty.</p>
+                </div>
+                ) : (
+                <div className="divide-y">
+                    {cartItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-4 py-4">
+                        <Image
+                        src={item.imageUrl}
+                        alt={item.name}
+                        width={56}
+                        height={56}
+                        className="rounded-lg object-cover h-14 w-14"
+                        data-ai-hint={`${item.category} product`}
+                        />
+                        <div className="flex-1 space-y-1">
+                        <p className="font-semibold leading-tight">{item.name}</p>
+                        <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
+                                <MinusCircle className="w-5 h-5" />
+                            </Button>
+                            <span className="font-bold w-4 text-center">{item.quantity}</span>
+                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
+                                <PlusCircle className="w-5 h-5" />
+                            </Button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
-                            <MinusCircle className="w-5 h-5" />
-                        </Button>
-                        <span className="font-bold w-4 text-center">{item.quantity}</span>
-                        <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
-                            <PlusCircle className="w-5 h-5" />
-                        </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    ))}
+                </div>
+                )}
+            </div>
           </ScrollArea>
         </CardContent>
         {cartItems.length > 0 && (

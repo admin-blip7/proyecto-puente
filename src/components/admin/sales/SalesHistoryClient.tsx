@@ -29,7 +29,7 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-headline">Historial de Ventas</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
       </div>
 
        <div className="grid gap-4 md:grid-cols-2 mb-4">
@@ -60,40 +60,42 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
           <CardTitle>Transacciones Recientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-340px)]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID Venta</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Cajero</TableHead>
-                  <TableHead>Método de Pago</TableHead>
-                  <TableHead className="text-right">Monto Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">{sale.saleId}</TableCell>
-                    <TableCell>
-                      {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
-                    </TableCell>
-                    <TableCell>
-                        <div className="font-medium">{sale.customerName || 'N/A'}</div>
-                        <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
-                    </TableCell>
-                    <TableCell>{sale.cashierName}</TableCell>
-                    <TableCell>
-                      <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
-                        {sale.paymentMethod}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <ScrollArea className="h-[calc(100vh-370px)]">
+             <div className="relative w-full overflow-auto">
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>ID Venta</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Cajero</TableHead>
+                    <TableHead>Método de Pago</TableHead>
+                    <TableHead className="text-right">Monto Total</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {sales.map((sale) => (
+                    <TableRow key={sale.id}>
+                        <TableCell className="font-medium">{sale.saleId}</TableCell>
+                        <TableCell>
+                        {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                        </TableCell>
+                        <TableCell>
+                            <div className="font-medium">{sale.customerName || 'N/A'}</div>
+                            <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
+                        </TableCell>
+                        <TableCell>{sale.cashierName}</TableCell>
+                        <TableCell>
+                        <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
+                            {sale.paymentMethod}
+                        </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>

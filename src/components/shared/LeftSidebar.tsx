@@ -18,9 +18,7 @@ import {
 
 const navItems = [
     { href: '/', icon: Home, label: 'Home' },
-    { href: '/#', icon: ShoppingBag, label: 'Products' },
-    { href: '/#', icon: Clock, label: 'History' },
-    { href: '/#', icon: Bookmark, label: 'Favorites' },
+    { href: '/admin/sales', icon: Clock, label: 'History' },
     { href: '/admin', icon: PieChart, label: 'Admin Panel'},
 ];
 
@@ -38,7 +36,7 @@ export default function LeftSidebar() {
     const { userProfile, signOut } = useAuth();
 
     return (
-        <aside className="flex flex-col items-center justify-between w-20 bg-card p-4 shadow-2xl">
+        <aside className="flex flex-col items-center justify-between w-full md:w-20 bg-card p-4 h-full md:shadow-2xl">
             <div className="flex flex-col items-center gap-8">
                 <Link href="/">
                     <div className="bg-primary text-primary-foreground p-3 rounded-lg">
