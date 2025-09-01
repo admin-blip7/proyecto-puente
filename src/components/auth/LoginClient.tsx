@@ -29,7 +29,7 @@ export default function LoginClient() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "empleado@tienda.com",
+      email: "admin@tienda.com",
       password: "password",
     },
   });
@@ -38,7 +38,7 @@ export default function LoginClient() {
     setLoading(true);
     // Simulate a login delay
     setTimeout(() => {
-      if (values.email === "empleado@tienda.com" && values.password === "password") {
+      if (values.email === "admin@tienda.com" && values.password === "password") {
         // The AuthProvider will handle the redirect and state change.
         // We just need to trigger a state update. A "real" sign-in is not needed.
         // In this mock, we reload the page to make the provider re-evaluate.
@@ -74,7 +74,7 @@ export default function LoginClient() {
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="empleado@tienda.com" {...field} />
+                    <Input placeholder="admin@tienda.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,7 +99,7 @@ export default function LoginClient() {
           </form>
         </Form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Usuario: <strong>empleado@tienda.com</strong><br />
+          Usuario: <strong>admin@tienda.com</strong><br />
           Contraseña: <strong>password</strong>
         </p>
       </CardContent>

@@ -17,8 +17,8 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const MOCK_USER: User = {
   uid: 'mock-user-uid',
-  email: 'empleado@tienda.com',
-  displayName: 'Empleado de Tienda',
+  email: 'admin@tienda.com',
+  displayName: 'Admin de Tienda',
   photoURL: null,
   phoneNumber: null,
   providerId: 'password',
@@ -37,9 +37,9 @@ const MOCK_USER: User = {
 
 const MOCK_USER_PROFILE: UserProfile = {
   uid: 'mock-user-uid',
-  name: 'Empleado de Tienda',
-  email: 'empleado@tienda.com',
-  role: 'Cajero',
+  name: 'Admin de Tienda',
+  email: 'admin@tienda.com',
+  role: 'Admin',
 };
 
 
