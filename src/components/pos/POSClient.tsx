@@ -75,7 +75,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-3 xl:grid-cols-4">
       <div className="col-span-1 lg:col-span-2 xl:col-span-3 flex flex-col h-full bg-background px-4 sm:px-6 pt-6">
-        <Header />
+        <Header searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
         <div className="mt-6">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Find The Best Food</h2>
         </div>
