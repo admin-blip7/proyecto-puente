@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,40 +11,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { StoreIcon } from "lucide-react";
+import { useAuth } from "@/lib/hooks";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingrese un correo válido." }),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
+  password: z.string().min(1, { message: "La contraseña es requerida." }),
 });
 
 export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  // We get signOut to ensure we can re-render when auth state changes.
+  // The actual sign-in logic will be mocked in the provider.
+  const { signOut } = useAuth(); 
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "empleado@tienda.com",
+      password: "password",
     },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push("/");
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error de inicio de sesión",
-        description: "Credenciales incorrectas. Por favor, intente de nuevo.",
-      });
-      console.error("Login Error:", error);
-    } finally {
+    // Simulate a login delay
+    setTimeout(() => {
+      if (values.email === "empleado@tienda.com" && values.password === "password") {
+        // The AuthProvider will handle the redirect and state change.
+        // We just need to trigger a state update. A "real" sign-in is not needed.
+        // In this mock, we reload the page to make the provider re-evaluate.
+        window.location.href = "/";
+
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error de inicio de sesión",
+          description: "Credenciales incorrectas. Por favor, intente de nuevo.",
+        });
+      }
       setLoading(false);
-    }
+    }, 1000);
   };
 
   return (
@@ -92,6 +98,10 @@ export default function LoginClient() {
             </Button>
           </form>
         </Form>
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          Usuario: <strong>empleado@tienda.com</strong><br />
+          Contraseña: <strong>password</strong>
+        </p>
       </CardContent>
     </Card>
   );

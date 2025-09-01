@@ -1,9 +1,7 @@
 "use client";
 
 import { createContext, useState, useEffect, ReactNode } from "react";
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { User } from "firebase/auth";
 import { UserProfile } from "@/types";
 import { usePathname, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +15,34 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const MOCK_USER: User = {
+  uid: 'mock-user-uid',
+  email: 'empleado@tienda.com',
+  displayName: 'Empleado de Tienda',
+  photoURL: null,
+  phoneNumber: null,
+  providerId: 'password',
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  refreshToken: '',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => '',
+  getIdTokenResult: async () => ({} as any),
+  reload: async () => {},
+  toJSON: () => ({}),
+};
+
+const MOCK_USER_PROFILE: UserProfile = {
+  uid: 'mock-user-uid',
+  name: 'Empleado de Tienda',
+  email: 'empleado@tienda.com',
+  role: 'Cajero',
+};
+
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -25,44 +51,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      if (user) {
-        setUser(user);
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const profile = userDoc.data() as UserProfile;
-          setUserProfile(profile);
-          if (pathname === '/login') {
-            router.push('/');
-          }
-        } else {
-          // No profile, treat as logged out
-          setUserProfile(null);
-          if(pathname !== '/login') router.push('/login');
-        }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        if (pathname !== '/login') {
-            router.push('/login');
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    // Simulate user being logged in
+    setLoading(true);
+    setUser(MOCK_USER);
+    setUserProfile(MOCK_USER_PROFILE);
+    if (pathname === '/login') {
+      router.push('/');
+    }
+    setLoading(false);
   }, [router, pathname]);
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    // For mock, just clear state and redirect
     setUser(null);
     setUserProfile(null);
     router.push("/login");
   };
 
-  if (loading) {
+  if (loading && pathname !== '/login') {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="w-full max-w-sm space-y-4">
@@ -74,8 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  // A special case for login page to avoid redirect loop
+  if (pathname === '/login' && !user) {
+    return (
+        <AuthContext.Provider value={{ user, userProfile, loading, signOut }}>
+            {children}
+        </AuthContext.Provider>
+    )
+  }
+  
+  // If we are not on login page and not logged in, we do nothing to let the login page handle it
+  // This logic is simplified because we are mocking the auth state.
+  if (!user && pathname !== '/login') {
+      router.push('/login');
+      return null;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, userProfile, loading: false, signOut }}>
       {children}
     </AuthContext.Provider>
   );
