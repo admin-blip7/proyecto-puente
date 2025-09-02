@@ -86,8 +86,8 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
       paymentMethod,
       cashierId: userProfile.uid,
       cashierName: userProfile.name,
-      customerName: customerName || undefined,
-      customerPhone: customerPhone || undefined,
+      customerName: customerName || null,
+      customerPhone: customerPhone || null,
     }
 
     try {
