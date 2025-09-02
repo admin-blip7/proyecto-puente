@@ -219,3 +219,17 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
     }
     return processedItems;
 };
+
+export const deleteProducts = async (productIds: string[]): Promise<void> => {
+    try {
+        const batch = writeBatch(db);
+        productIds.forEach(id => {
+            const productRef = doc(db, PRODUCTS_COLLECTION, id);
+            batch.delete(productRef);
+        });
+        await batch.commit();
+    } catch (error) {
+        console.error("Error deleting products:", error);
+        throw new Error("Failed to delete products.");
+    }
+};

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Product } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddProductDialog from "./AddProductDialog";
 import {
@@ -17,6 +17,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { Badge } from "../ui/badge";
+import { Checkbox } from "../ui/checkbox";
+import DeleteProductsDialog from "./DeleteProductsDialog";
 
 interface InventoryClientProps {
   initialProducts: Product[];
@@ -25,10 +27,33 @@ interface InventoryClientProps {
 export default function InventoryClient({ initialProducts }: InventoryClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleProductAdded = (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
   };
+  
+  const handleProductsDeleted = (deletedIds: string[]) => {
+    setProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
+    setSelectedProductIds([]);
+  }
+
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedProductIds(products.map(p => p.id));
+    } else {
+      setSelectedProductIds([]);
+    }
+  }
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProductIds(prev => [...prev, productId]);
+    } else {
+      setSelectedProductIds(prev => prev.filter(id => id !== productId));
+    }
+  }
   
   const getOwnershipTypeVariant = (type: Product['ownershipType']) => {
     switch (type) {
@@ -37,15 +62,27 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         default: return 'outline';
     }
   }
+  
+  const numSelected = selectedProductIds.length;
 
   return (
     <>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Gestión de Inventario</h1>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Agregar Producto
-        </Button>
+        {numSelected > 0 ? (
+           <div className="flex items-center gap-4">
+             <span className="text-sm text-muted-foreground">{numSelected} producto(s) seleccionado(s)</span>
+             <Button variant="outline" onClick={() => setDeleteDialogOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4"/>
+                Eliminar
+             </Button>
+           </div>
+        ) : (
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Agregar Producto
+          </Button>
+        )}
       </div>
       <Card>
         <CardHeader>
@@ -57,6 +94,12 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 <Table>
                 <TableHeader>
                     <TableRow>
+                    <TableHead padding="checkbox">
+                        <Checkbox 
+                            checked={numSelected > 0 && numSelected === products.length ? true : (numSelected > 0 ? "indeterminate" : false)}
+                            onCheckedChange={handleSelectAll}
+                        />
+                    </TableHead>
                     <TableHead className="w-[80px]">Imagen</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>SKU</TableHead>
@@ -68,7 +111,13 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 </TableHeader>
                 <TableBody>
                     {products.map((product) => (
-                    <TableRow key={product.id}>
+                    <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) ? "selected" : ""}>
+                        <TableCell padding="checkbox">
+                            <Checkbox 
+                                checked={selectedProductIds.includes(product.id)}
+                                onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                            />
+                        </TableCell>
                         <TableCell>
                         <Image
                             src={product.imageUrl}
@@ -104,6 +153,12 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         isOpen={isAddDialogOpen}
         onOpenChange={setAddDialogOpen}
         onProductAdded={handleProductAdded}
+      />
+      <DeleteProductsDialog
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        productIds={selectedProductIds}
+        onProductsDeleted={handleProductsDeleted}
       />
     </>
   );
