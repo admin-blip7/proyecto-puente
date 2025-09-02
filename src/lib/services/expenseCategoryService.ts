@@ -27,12 +27,13 @@ const categoryFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): ExpenseCateg
 export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
     const q = query(
         collection(db, CATEGORIES_COLLECTION),
-        where("isActive", "==", true),
-        orderBy("name", "asc")
+        where("isActive", "==", true)
     );
     try {
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(categoryFromDoc);
+        const categories = querySnapshot.docs.map(categoryFromDoc);
+        // Sort client-side to avoid composite index requirement
+        return categories.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
         console.error("Error fetching expense categories: ", error);
         throw new Error("Failed to fetch expense categories.");
