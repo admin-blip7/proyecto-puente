@@ -122,7 +122,7 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
                 return {
                     id: doc.id,
                     name: data.name,
-                    price: data.price,
+                    price: Number(data.price || 0),
                     imageUrl: data.imageUrl,
                 };
             })
