@@ -37,6 +37,7 @@ export interface Warranty {
   productName: string;
   customerName?: string;
   customerPhone?: string;
+  reason: string;
   status: 'Pendiente' | 'En Revisión' | 'Resuelta' | 'Rechazada';
   reportedAt: Date;
   resolutionDetails?: string;

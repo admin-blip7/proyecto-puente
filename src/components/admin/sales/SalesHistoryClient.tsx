@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sale } from "@/types";
+import { Sale, Warranty } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -15,7 +15,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, TrendingUp } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface SalesHistoryClientProps {
   initialSales: Sale[];
@@ -25,6 +29,23 @@ interface SalesHistoryClientProps {
 
 export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfit }: SalesHistoryClientProps) {
   const [sales] = useState<Sale[]>(initialSales);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleOpenWarrantyDialog = (sale: Sale) => {
+    setSelectedSale(sale);
+    setWarrantyDialogOpen(true);
+  };
+
+  const handleWarrantyCreated = (warranty: Warranty) => {
+    toast({
+        title: "Garantía Registrada",
+        description: `Se ha creado la garantía para el producto ${warranty.productName}.`
+    });
+    setWarrantyDialogOpen(false);
+    setSelectedSale(null);
+  }
 
   return (
     <>
@@ -71,6 +92,7 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
                     <TableHead>Cajero</TableHead>
                     <TableHead>Método de Pago</TableHead>
                     <TableHead className="text-right">Monto Total</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -91,6 +113,22 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
                         </Badge>
                         </TableCell>
                         <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Abrir menú</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenWarrantyDialog(sale)}>
+                                    <ShieldPlus className="mr-2 h-4 w-4" />
+                                    <span>Registrar Garantía</span>
+                                </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
@@ -99,6 +137,14 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
           </ScrollArea>
         </CardContent>
       </Card>
+      {selectedSale && (
+        <CreateWarrantyDialog
+            isOpen={isWarrantyDialogOpen}
+            onOpenChange={setWarrantyDialogOpen}
+            sale={selectedSale}
+            onWarrantyCreated={handleWarrantyCreated}
+        />
+      )}
     </>
   );
 }

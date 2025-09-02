@@ -13,6 +13,7 @@ const warrantyFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Warranty => 
         productName: data.productName,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
+        reason: data.reason,
         status: data.status,
         reportedAt: data.reportedAt.toDate(),
         resolutionDetails: data.resolutionDetails,
@@ -32,16 +33,18 @@ export const getWarranties = async (): Promise<Warranty[]> => {
     }
 };
 
-export const addWarranty = async (warrantyData: Omit<Warranty, 'id' | 'reportedAt'>): Promise<Warranty> => {
+export const addWarranty = async (warrantyData: Omit<Warranty, 'id' | 'reportedAt' | 'status'>): Promise<Warranty> => {
     try {
         const docRef = await addDoc(collection(db, WARRANTIES_COLLECTION), {
             ...warrantyData,
+            status: 'Pendiente',
             reportedAt: serverTimestamp(),
         });
 
         return {
             id: docRef.id,
             ...warrantyData,
+            status: 'Pendiente',
             reportedAt: new Date(),
         };
 

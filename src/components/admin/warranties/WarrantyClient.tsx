@@ -57,6 +57,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                     <TableRow>
                         <TableHead>Producto</TableHead>
                         <TableHead>Cliente</TableHead>
+                        <TableHead>Motivo</TableHead>
                         <TableHead>Fecha de Reporte</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>ID Venta</TableHead>
@@ -70,6 +71,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                             <div className="font-medium">{warranty.customerName || 'N/A'}</div>
                             <div className="text-sm text-muted-foreground">{warranty.customerPhone}</div>
                         </TableCell>
+                        <TableCell>{warranty.reason}</TableCell>
                         <TableCell>
                             {format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: es })}
                         </TableCell>
