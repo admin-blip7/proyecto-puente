@@ -3,6 +3,8 @@
 import { Product, Sale } from "@/types";
 import LowStockAlerts from "./LowStockAlerts";
 import ProductABCAnalysis from "./ProductABCAnalysis";
+import DemandForecast from "./DemandForecast";
+import { Separator } from "@/components/ui/separator";
 
 interface IntelligenceClientProps {
     allProducts: Product[];
@@ -22,6 +24,7 @@ export default function IntelligenceClient({ allProducts, allSales }: Intelligen
 
             <LowStockAlerts products={allProducts} />
             <ProductABCAnalysis products={allProducts} sales={allSales} />
+            <DemandForecast products={allProducts} sales={allSales} />
 
         </div>
     )
