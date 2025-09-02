@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Product, StockEntryItem } from "@/types";
+import { useState, useMemo, useEffect } from "react";
+import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
 import PrintLabelsView from "./PrintLabelsView";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getConsignors } from "@/lib/services/consignorService";
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -26,9 +28,14 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
+    const [consignors, setConsignors] = useState<Consignor[]>([]);
 
     const { userProfile } = useAuth();
     const { toast } = useToast();
+
+    useEffect(() => {
+        getConsignors().then(setConsignors);
+    }, []);
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
@@ -53,6 +60,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 price: product.price,
                 cost: product.cost,
                 category: product.category,
+                ownershipType: product.ownershipType,
+                consignorId: product.consignorId,
                 isNew: false
             }];
         });
@@ -85,16 +94,27 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             price: 0,
             cost: 0,
             category: '',
+            ownershipType: 'Propio',
             isNew: true
         }]);
     };
 
-    const handleUpdateItem = (id: string, field: keyof StockEntryItem, value: string | number) => {
+    const handleUpdateItem = (id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {
-                const numericFields = ['quantity', 'price', 'cost'];
-                const parsedValue = numericFields.includes(field as string) ? parseFloat(value as string) || 0 : value;
-                return { ...item, [field]: parsedValue };
+                const updatedItem = { ...item, [field]: value };
+                // Reset consignor if ownership changes from Consigna
+                if (field === 'ownershipType' && value !== 'Consigna') {
+                    updatedItem.consignorId = undefined;
+                }
+                 // If changing to familiar, set price = cost
+                if (field === 'ownershipType' && value === 'Familiar') {
+                    updatedItem.price = updatedItem.cost;
+                }
+                if (field === 'cost' && updatedItem.ownershipType === 'Familiar') {
+                    updatedItem.price = parseFloat(value as string) || 0;
+                }
+                return updatedItem;
             }
             return item;
         }));
@@ -103,26 +123,40 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const handleRemoveItem = (id: string) => {
         setEntryList(prev => prev.filter(item => item.id !== id));
     };
+    
+    const validateEntryList = () => {
+        for (const item of entryList) {
+            if (!item.sku || !item.name || item.quantity <= 0) {
+                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre y cantidad.` });
+                return false;
+            }
+            if (item.ownershipType === 'Consigna' && !item.consignorId) {
+                toast({ variant: "destructive", title: "Error de Validación", description: `El producto en consigna "${item.name}" debe tener un consignador seleccionado.` });
+                return false;
+            }
+            if (item.ownershipType === 'Familiar' && item.price !== item.cost) {
+                toast({ variant: "destructive", title: "Error de Validación", description: `Para el producto familiar "${item.name}", el precio y el costo deben ser iguales.` });
+                return false;
+            }
+        }
+        return true;
+    }
 
     const handleProcessEntry = async () => {
         if (!userProfile) {
             toast({ variant: "destructive", title: "Error", description: "Debes iniciar sesión para procesar." });
             return;
         }
-        // Basic validation
-        for (const item of entryList) {
-            if (!item.sku || !item.name || item.quantity <= 0) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre y cantidad.` });
-                return;
-            }
+        if (!validateEntryList()) {
+            return;
         }
         
         setIsLoading(true);
         try {
             const result = await processStockEntry(entryList, userProfile.uid);
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
-            setProcessedItems(result); // Set items for label printing
-            setEntryList([]); // Clear the list
+            setProcessedItems(result);
+            setEntryList([]);
         } catch (error) {
             console.error(error);
             toast({ variant: "destructive", title: "Error", description: "No se pudo procesar el ingreso de mercancía." });
@@ -143,8 +177,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes o crea nuevos para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <Command className="w-full sm:w-80">
-                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <Command>
+                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <CommandInput 
                                     placeholder="Buscar producto por SKU o nombre..."
@@ -160,7 +194,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                 />
                             </PopoverTrigger>
                             <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                               <Command>
                                   <CommandList>
                                       <CommandEmpty>No se encontraron productos.</CommandEmpty>
                                       {filteredProducts.map(product => (
@@ -169,7 +202,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                           </CommandItem>
                                       ))}
                                   </CommandList>
-                                </Command>
                             </PopoverContent>
                         </Popover>
                     </Command>
@@ -191,37 +223,53 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[150px]">SKU</TableHead>
+                                    <TableHead className="w-[120px]">SKU</TableHead>
                                     <TableHead>Nombre Producto</TableHead>
-                                    <TableHead className="w-[120px]">Categoría</TableHead>
-                                    <TableHead className="w-[100px] text-right">Cantidad</TableHead>
-                                    <TableHead className="w-[120px] text-right">Precio Venta</TableHead>
-                                    <TableHead className="w-[120px] text-right">Costo</TableHead>
+                                    <TableHead className="w-[140px]">Tipo Propiedad</TableHead>
+                                    <TableHead className="w-[160px]">Consignador</TableHead>
+                                    <TableHead className="w-[90px] text-right">Cantidad</TableHead>
+                                    <TableHead className="w-[110px] text-right">Precio Venta</TableHead>
+                                    <TableHead className="w-[110px] text-right">Costo</TableHead>
                                     <TableHead className="w-[50px]"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {entryList.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
+                                        <TableCell colSpan={8} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
                                     </TableRow>
                                 ) : (
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Input value={item.sku} readOnly className="bg-muted/50" />
+                                                <Input value={item.sku} readOnly className="bg-muted/50 text-xs" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
                                             </TableCell>
+                                             <TableCell>
+                                                <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
+                                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                                    <SelectContent>
+                                                        {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
                                             <TableCell>
-                                                <Input value={item.category} onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)} disabled={!item.isNew} />
+                                                {item.ownershipType === 'Consigna' && (
+                                                    <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
+                                                        <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                                        <SelectContent>
+                                                            {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew} className="text-right" />
+                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew && item.ownershipType !== 'Familiar'} className="text-right" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
@@ -250,7 +298,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                             <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
                                     </div>
-
                                     <div className="space-y-1">
                                         <Label>Nombre Producto</Label>
                                         <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
@@ -258,21 +305,37 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>SKU</Label>
-                                            <Input value={item.sku} readOnly className="bg-muted/50" />
+                                            <Input value={item.sku} readOnly className="bg-muted/50 text-xs" />
                                         </div>
-                                        <div className="space-y-1">
-                                            <Label>Categoría</Label>
-                                            <Input value={item.category} onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)} disabled={!item.isNew} />
-                                        </div>
-                                    </div>
-                                     <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-1">
+                                         <div className="space-y-1">
                                             <Label>Cantidad</Label>
                                             <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                         </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Tipo de Propiedad</Label>
+                                        <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
+                                            <SelectTrigger><SelectValue/></SelectTrigger>
+                                            <SelectContent>
+                                                {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {item.ownershipType === 'Consigna' && (
+                                        <div className="space-y-1">
+                                            <Label>Consignador</Label>
+                                            <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
+                                                <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                                <SelectContent>
+                                                    {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>Precio Venta</Label>
-                                            <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew} className="text-right" />
+                                            <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew && item.ownershipType !== 'Familiar'} className="text-right" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Costo</Label>

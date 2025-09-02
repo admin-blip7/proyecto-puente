@@ -42,7 +42,7 @@ export const getProductById = async (productId: string): Promise<Product | null>
         const docRef = doc(db, PRODUCTS_COLLECTION, productId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            return productFromDoc(docSnap);
+            return productFromDoc(docSnap as DocumentData);
         }
         return null;
     } catch (error) {
@@ -89,7 +89,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 category: item.category,
                 imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
                 createdAt: serverTimestamp(),
-                type: 'Venta', // All new products from stock entry are for sale initially. Can be changed later.
+                type: 'Venta', // All new products from stock entry are for sale initially.
                 ownershipType: item.ownershipType,
                 consignorId: item.consignorId || null,
             };
@@ -110,10 +110,9 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
         } else {
             // Update existing product and log it
             if (!item.productId) continue;
-            const productRef = doc(db, PRODUCTS_COLLECTION, item.productId);
-
-            // Use a transaction to safely read and update the stock
+            
             await runTransaction(db, async (transaction) => {
+                const productRef = doc(db, PRODUCTS_COLLECTION, item.productId!);
                 const productDoc = await transaction.get(productRef);
                 if (!productDoc.exists()) {
                     throw `Product with ID ${item.productId} does not exist!`;
@@ -123,23 +122,24 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 
                 transaction.update(productRef, {
                     stock: newStock,
-                    cost: item.cost, // Update cost as well
+                    cost: item.cost,
+                    price: item.price,
                     ownershipType: item.ownershipType,
                     consignorId: item.consignorId || null,
                 });
+
+                const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+                 transaction.set(logRef, {
+                    productId: item.productId,
+                    productName: item.name,
+                    change: item.quantity,
+                    reason: "Ingreso de Mercancía",
+                    updatedBy: userId,
+                    createdAt: serverTimestamp(),
+                    metadata: { cost: item.cost }
+                });
             });
 
-
-            const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
-            batch.set(logRef, {
-                productId: item.productId,
-                productName: item.name,
-                change: item.quantity,
-                reason: "Ingreso de Mercancía",
-                updatedBy: userId,
-                createdAt: serverTimestamp(),
-                metadata: { cost: item.cost }
-            });
             processedItems.push(item);
         }
     }

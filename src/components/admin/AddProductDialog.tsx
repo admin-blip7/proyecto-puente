@@ -69,6 +69,13 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   });
 
   const ownershipType = form.watch("ownershipType");
+  const cost = form.watch("cost");
+
+  useEffect(() => {
+    if (ownershipType === 'Familiar') {
+      form.setValue('price', cost);
+    }
+  }, [cost, ownershipType, form]);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,9 +86,10 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      const newProductData = {
+      const newProductData: Omit<Product, 'id' | 'createdAt'> = {
         ...values,
-        imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`
+        imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
+        consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
       };
       const newProduct = await addProduct(newProductData);
       onProductAdded(newProduct);
@@ -148,7 +156,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                     <FormItem>
                     <FormLabel>Precio de Venta</FormLabel>
                     <FormControl>
-                        <Input type="number" step="0.01" {...field} />
+                        <Input type="number" step="0.01" {...field} disabled={ownershipType === 'Familiar'} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

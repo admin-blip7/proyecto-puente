@@ -40,8 +40,8 @@ export interface Sale {
   paymentMethod: 'Efectivo' | 'Tarjeta de Crédito';
   cashierId: string;
   cashierName?: string;
-  customerName?: string;
-  customerPhone?: string;
+  customerName: string | null;
+  customerPhone: string | null;
   createdAt: Date;
 }
 
