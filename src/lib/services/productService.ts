@@ -60,19 +60,35 @@ export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt'>)
     try {
         const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), {
             ...productData,
+            price: Number(productData.price) || 0,
+            cost: Number(productData.cost) || 0,
+            stock: Number(productData.stock) || 0,
+            reorderPoint: Number(productData.reorderPoint) || 0,
             createdAt: serverTimestamp(),
         });
 
+        // Asynchronously generate tags without blocking the return
         if (productData.name) {
-            // Asynchronously generate tags without blocking the return
-            suggestProductTags({ productName: productData.name, productDescription: "" })
+             getProducts().then(allProducts => {
+                const existingProductsForAI = allProducts.map(p => ({
+                    name: p.name,
+                    tags: p.compatibilityTags || [],
+                }));
+
+                suggestProductTags({
+                    productName: productData.name,
+                    productDescription: "", // Optional: add description if available
+                    existingProducts: existingProductsForAI,
+                })
                 .then(result => {
-                    if (result.suggestedTags.length > 0) {
+                    if (result.suggestedTags && result.suggestedTags.length > 0) {
                         updateDoc(docRef, { compatibilityTags: result.suggestedTags });
                     }
                 })
-                .catch(error => console.error("Error generating tags automatically:", error));
+                .catch(error => console.error(`Error generating AI tags for ${productData.name}:`, error));
+            }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
         }
+
 
         return {
             id: docRef.id,
