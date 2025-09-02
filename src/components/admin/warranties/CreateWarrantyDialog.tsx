@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Sale, Warranty } from "@/types";
 import { addWarranty } from "@/lib/services/warrantyService";
+import { Input } from "@/components/ui/input";
+import Image from "next/image";
+import { XCircle } from "lucide-react";
 
 interface CreateWarrantyDialogProps {
   isOpen: boolean;
@@ -43,6 +46,7 @@ interface CreateWarrantyDialogProps {
 const formSchema = z.object({
   productId: z.string().min(1, "Debe seleccionar un producto."),
   reason: z.string().min(10, "El motivo debe tener al menos 10 caracteres."),
+  images: z.custom<FileList>().optional(),
 });
 
 export default function CreateWarrantyDialog({
@@ -52,6 +56,7 @@ export default function CreateWarrantyDialog({
   onWarrantyCreated,
 }: CreateWarrantyDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -61,6 +66,25 @@ export default function CreateWarrantyDialog({
       reason: "",
     },
   });
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newPreviews = Array.from(files).map(file => URL.createObjectURL(file));
+      setImagePreviews(prev => [...prev, ...newPreviews]);
+      form.setValue("images", files);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImagePreviews(previews => previews.filter((_, i) => i !== index));
+    const currentFiles = Array.from(form.getValues("images") || []);
+    currentFiles.splice(index, 1);
+    const dataTransfer = new DataTransfer();
+    currentFiles.forEach(file => dataTransfer.items.add(file));
+    form.setValue("images", dataTransfer.files);
+  };
+
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
@@ -81,10 +105,15 @@ export default function CreateWarrantyDialog({
         reason: values.reason,
       };
 
-      const newWarranty = await addWarranty(newWarrantyData);
+      const imagesArray = values.images ? Array.from(values.images) : [];
+      const newWarranty = await addWarranty(newWarrantyData, imagesArray);
+      
       onWarrantyCreated(newWarranty);
-      form.reset();
-      onOpenChange(false);
+      toast({
+        title: "Garantía Registrada",
+        description: `La garantía para "${selectedItem.name}" ha sido creada.`,
+      });
+      handleDialogClose(false);
     } catch (error) {
       console.error("Error creating warranty:", error);
       toast({
@@ -100,17 +129,18 @@ export default function CreateWarrantyDialog({
   const handleDialogClose = (open: boolean) => {
       if (!open) {
           form.reset();
+          setImagePreviews([]);
       }
       onOpenChange(open);
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogClose}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Registrar Nueva Garantía</DialogTitle>
           <DialogDescription>
-            Seleccione un producto de la venta y describa el motivo de la garantía.
+            Seleccione un producto, describa el motivo y adjunte imágenes si es necesario.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -157,6 +187,45 @@ export default function CreateWarrantyDialog({
                 </FormItem>
               )}
             />
+
+            <FormField
+                control={form.control}
+                name="images"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Imágenes del Producto (Opcional)</FormLabel>
+                        <FormControl>
+                            <Input 
+                                type="file" 
+                                accept="image/*" 
+                                multiple 
+                                onChange={handleImageChange}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-4">
+                {imagePreviews.map((src, index) => (
+                  <div key={index} className="relative">
+                    <Image src={src} alt={`Preview ${index}`} width={100} height={100} className="rounded-md object-cover w-full aspect-square" />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                      onClick={() => removeImage(index)}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
 
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={() => handleDialogClose(false)} disabled={loading}>

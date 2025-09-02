@@ -15,6 +15,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
+import EditWarrantyDialog from "./EditWarrantyDialog";
 
 interface WarrantyClientProps {
   initialWarranties: Warranty[];
@@ -38,6 +41,21 @@ const getStatusVariant = (status: Warranty['status']) => {
 
 export default function WarrantyClient({ initialWarranties }: WarrantyClientProps) {
   const [warranties, setWarranties] = useState<Warranty[]>(initialWarranties);
+  const [selectedWarranty, setSelectedWarranty] = useState<Warranty | null>(null);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+
+  const handleOpenEditDialog = (warranty: Warranty) => {
+    setSelectedWarranty(warranty);
+    setEditDialogOpen(true);
+  };
+
+  const handleWarrantyUpdated = (updatedWarranty: Warranty) => {
+    setWarranties(prev => 
+      prev.map(w => w.id === updatedWarranty.id ? updatedWarranty : w)
+    );
+    setEditDialogOpen(false);
+    setSelectedWarranty(null);
+  }
 
   return (
     <>
@@ -61,6 +79,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                         <TableHead>Fecha de Reporte</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>ID Venta</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -71,7 +90,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                             <div className="font-medium">{warranty.customerName || 'N/A'}</div>
                             <div className="text-sm text-muted-foreground">{warranty.customerPhone}</div>
                         </TableCell>
-                        <TableCell>{warranty.reason}</TableCell>
+                        <TableCell className="max-w-[250px] truncate">{warranty.reason}</TableCell>
                         <TableCell>
                             {format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: es })}
                         </TableCell>
@@ -81,6 +100,12 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                             </Badge>
                         </TableCell>
                         <TableCell>{warranty.saleId}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(warranty)}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Editar Garantía</span>
+                          </Button>
+                        </TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
@@ -89,6 +114,14 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
           </ScrollArea>
         </CardContent>
       </Card>
+      {selectedWarranty && (
+        <EditWarrantyDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          warranty={selectedWarranty}
+          onWarrantyUpdated={handleWarrantyUpdated}
+        />
+      )}
     </>
   );
 }

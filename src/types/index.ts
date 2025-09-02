@@ -42,6 +42,7 @@ export interface Warranty {
   reportedAt: Date;
   resolutionDetails?: string;
   resolvedAt?: Date;
+  imageUrls?: string[];
 }
 
 export interface InventoryLog {
