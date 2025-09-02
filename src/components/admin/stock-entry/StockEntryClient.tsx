@@ -102,7 +102,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const handleUpdateItem = (id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {
-                const updatedItem = { ...item, [field]: value };
+                let updatedValue = value;
+                if (field === 'price' || field === 'cost' || field === 'quantity') {
+                    updatedValue = parseFloat(value as string) || 0;
+                }
+                const updatedItem = { ...item, [field]: updatedValue };
+                
                 // Reset consignor if ownership changes from Consigna
                 if (field === 'ownershipType' && value !== 'Consigna') {
                     updatedItem.consignorId = undefined;
@@ -112,7 +117,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     updatedItem.price = updatedItem.cost;
                 }
                 if (field === 'cost' && updatedItem.ownershipType === 'Familiar') {
-                    updatedItem.price = parseFloat(value as string) || 0;
+                    updatedItem.price = updatedValue as number;
                 }
                 return updatedItem;
             }

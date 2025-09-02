@@ -28,7 +28,7 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
       labels.push({
         name: item.name,
         sku: item.sku,
-        price: item.price,
+        price: Number(item.price) || 0,
       });
     }
   });
@@ -37,7 +37,7 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
     // Generate barcodes for all canvas elements
     labels.forEach((_, index) => {
       const canvas = document.getElementById(`barcode-${index}`) as HTMLCanvasElement;
-      if (canvas) {
+      if (canvas && _.sku) {
         JsBarcode(canvas, _.sku, {
           format: "CODE128",
           displayValue: false, // We'll display the text value separately
