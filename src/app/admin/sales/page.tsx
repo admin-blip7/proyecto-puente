@@ -56,6 +56,7 @@ export default async function SalesPage() {
             <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
                 <SalesHistoryClient 
                     initialSales={initialSales}
+                    products={products}
                     dailyCost={dailyCost}
                     dailyProfit={dailyProfit}
                 />

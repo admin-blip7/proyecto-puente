@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sale, Warranty } from "@/types";
+import { Sale, Warranty, Product } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -15,22 +15,27 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+
 
 interface SalesHistoryClientProps {
   initialSales: Sale[];
+  products: Product[];
   dailyCost: number;
   dailyProfit: number;
 }
 
-export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfit }: SalesHistoryClientProps) {
+export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
   const [sales] = useState<Sale[]>(initialSales);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const handleOpenWarrantyDialog = (sale: Sale) => {
@@ -45,6 +50,14 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
     });
     setWarrantyDialogOpen(false);
     setSelectedSale(null);
+  }
+
+  const toggleCollapsible = (saleId: string) => {
+    setOpenCollapsibles(prev => ({...prev, [saleId]: !prev[saleId]}));
+  }
+
+  const getProductCost = (productId: string) => {
+    return products.find(p => p.id === productId)?.cost || 0;
   }
 
   return (
@@ -86,6 +99,7 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
                 <Table>
                 <TableHeader>
                     <TableRow>
+                    <TableHead className="w-[50px]"></TableHead>
                     <TableHead>ID Venta</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Cliente</TableHead>
@@ -97,39 +111,88 @@ export default function SalesHistoryClient({ initialSales, dailyCost, dailyProfi
                 </TableHeader>
                 <TableBody>
                     {sales.map((sale) => (
-                    <TableRow key={sale.id}>
-                        <TableCell className="font-medium">{sale.saleId}</TableCell>
-                        <TableCell>
-                        {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
-                        </TableCell>
-                        <TableCell>
-                            <div className="font-medium">{sale.customerName || 'N/A'}</div>
-                            <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
-                        </TableCell>
-                        <TableCell>{sale.cashierName}</TableCell>
-                        <TableCell>
-                        <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
-                            {sale.paymentMethod}
-                        </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <span className="sr-only">Abrir menú</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleOpenWarrantyDialog(sale)}>
-                                    <ShieldPlus className="mr-2 h-4 w-4" />
-                                    <span>Registrar Garantía</span>
-                                </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
+                    <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
+                      <>
+                        <TableRow className="cursor-pointer">
+                            <TableCell>
+                              <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                      {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      <span className="sr-only">Toggle details</span>
+                                  </Button>
+                              </CollapsibleTrigger>
+                            </TableCell>
+                            <TableCell className="font-medium">{sale.saleId}</TableCell>
+                            <TableCell>
+                            {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                            </TableCell>
+                            <TableCell>
+                                <div className="font-medium">{sale.customerName || 'N/A'}</div>
+                                <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
+                            </TableCell>
+                            <TableCell>{sale.cashierName}</TableCell>
+                            <TableCell>
+                            <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
+                                {sale.paymentMethod}
+                            </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                        <span className="sr-only">Abrir menú</span>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
+                                        <ShieldPlus className="mr-2 h-4 w-4" />
+                                        <span>Registrar Garantía</span>
+                                    </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                        </TableRow>
+                        <CollapsibleContent asChild>
+                          <TableRow>
+                            <TableCell colSpan={8} className="p-0">
+                               <div className="p-4 bg-muted/50">
+                                  <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Producto</TableHead>
+                                        <TableHead className="text-right">Cantidad</TableHead>
+                                        <TableHead className="text-right">Precio Unit.</TableHead>
+                                        <TableHead className="text-right">Costo Unit.</TableHead>
+                                        <TableHead className="text-right">Ganancia</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {sale.items.map(item => {
+                                        const cost = getProductCost(item.productId);
+                                        const profit = (item.priceAtSale - cost) * item.quantity;
+                                        return (
+                                          <TableRow key={item.productId}>
+                                            <TableCell>{item.name}</TableCell>
+                                            <TableCell className="text-right">{item.quantity}</TableCell>
+                                            <TableCell className="text-right">${item.priceAtSale.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">${cost.toFixed(2)}</TableCell>
+                                            <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
+                                              ${profit.toFixed(2)}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                               </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
                     ))}
                 </TableBody>
                 </Table>
