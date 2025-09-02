@@ -16,6 +16,7 @@ export interface Product {
   ownershipType: OwnershipType;
   consignorId?: string;
   reorderPoint?: number;
+  comboProductIds?: string[];
 }
 
 export interface Consignor {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,8 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Product, Consignor, ownershipTypes, OwnershipType } from "@/types";
-import { addProduct } from "@/lib/services/productService";
+import { addProduct, getProducts } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "../ui/command";
+import { Badge } from "../ui/badge";
+import { X, PlusCircle } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
 
 interface AddProductDialogProps {
   isOpen: boolean;
@@ -32,6 +37,7 @@ const formSchema = z.object({
   type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
+  comboProductIds: z.array(z.string()).optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -53,6 +59,8 @@ const formSchema = z.object({
 export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const [consignors, setConsignors] = useState<Consignor[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [comboSearch, setComboSearch] = useState("");
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -67,11 +75,25 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       category: "",
       type: "Venta",
       ownershipType: "Propio",
+      comboProductIds: [],
     },
   });
 
   const ownershipType = form.watch("ownershipType");
   const cost = form.watch("cost");
+  const comboProductIds = form.watch("comboProductIds") || [];
+  
+  const comboProducts = useMemo(() => {
+    return allProducts.filter(p => comboProductIds.includes(p.id));
+  }, [allProducts, comboProductIds]);
+
+  const filteredComboOptions = useMemo(() => {
+    return allProducts.filter(p => 
+        !comboProductIds.includes(p.id) &&
+        p.name.toLowerCase().includes(comboSearch.toLowerCase())
+    );
+  }, [allProducts, comboProductIds, comboSearch]);
+
 
   useEffect(() => {
     if (ownershipType === 'Familiar') {
@@ -82,8 +104,17 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   useEffect(() => {
     if (isOpen) {
         getConsignors().then(setConsignors);
+        getProducts().then(setAllProducts);
     }
   }, [isOpen]);
+
+  const handleToggleComboProduct = (productId: string) => {
+    const currentIds = form.getValues("comboProductIds") || [];
+    const newIds = currentIds.includes(productId) 
+        ? currentIds.filter(id => id !== productId)
+        : [...currentIds, productId];
+    form.setValue("comboProductIds", newIds);
+  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
@@ -93,6 +124,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         reorderPoint: values.reorderPoint || 0,
         imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
         consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
+        comboProductIds: values.comboProductIds || [],
       };
       const newProduct = await addProduct(newProductData);
       onProductAdded(newProduct);
@@ -116,7 +148,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Agregar Nuevo Producto</DialogTitle>
           <DialogDescription>
@@ -124,183 +156,234 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre del Producto</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Coca-Cola 600ml" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="sku"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SKU (Código de Barras)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: 7501055300075" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <div className="grid grid-cols-2 gap-4">
-                <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Precio de Venta</FormLabel>
-                    <FormControl>
-                        <Input type="number" step="0.01" {...field} disabled={ownershipType === 'Familiar'} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="cost"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Costo de Compra</FormLabel>
-                    <FormControl>
-                        <Input type="number" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="stock"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Stock Inicial</FormLabel>
-                        <FormControl>
-                            <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="reorderPoint"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Punto de Reorden</FormLabel>
-                        <FormControl>
-                            <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
-             <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Categoría</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Ej: Bebidas" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-             <FormField
-                control={form.control}
-                name="ownershipType"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Tipo de Propiedad</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un tipo..." />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {ownershipTypes.map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-             />
-             {ownershipType === 'Consigna' && (
-                <FormField
-                    control={form.control}
-                    name="consignorId"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Consignador</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccione un consignador..." />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            {consignors.map(consignor => (
-                                <SelectItem key={consignor.id} value={consignor.id}>{consignor.name}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                 />
-             )}
-            <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                    <FormItem className="space-y-3">
-                    <FormLabel>Tipo de Producto</FormLabel>
-                    <FormControl>
-                        <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex space-x-4"
-                        >
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                            <RadioGroupItem value="Venta" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                            Para Venta
-                            </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                            <RadioGroupItem value="Refacción" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                            Para Reparación (Refacción)
-                            </FormLabel>
-                        </FormItem>
-                        </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <DialogFooter className="pt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <ScrollArea className="max-h-[70vh]">
+              <div className="space-y-4 py-4 pr-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="space-y-4">
+                      <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Nombre del Producto</FormLabel>
+                          <FormControl>
+                              <Input placeholder="Ej: Coca-Cola 600ml" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="sku"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>SKU (Código de Barras)</FormLabel>
+                          <FormControl>
+                              <Input placeholder="Ej: 7501055300075" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Precio de Venta</FormLabel>
+                              <FormControl>
+                                  <Input type="number" step="0.01" {...field} disabled={ownershipType === 'Familiar'} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="cost"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Costo de Compra</FormLabel>
+                              <FormControl>
+                                  <Input type="number" step="0.01" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                              control={form.control}
+                              name="stock"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Stock Inicial</FormLabel>
+                                  <FormControl>
+                                      <Input type="number" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="reorderPoint"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Punto de Reorden</FormLabel>
+                                  <FormControl>
+                                      <Input type="number" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </div>
+                      <FormField
+                          control={form.control}
+                          name="category"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Categoría</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="Ej: Bebidas" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                      <FormField
+                          control={form.control}
+                          name="ownershipType"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Tipo de Propiedad</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="Seleccione un tipo..." />
+                                  </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                  {ownershipTypes.map(type => (
+                                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  ))}
+                                  </SelectContent>
+                              </Select>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                      {ownershipType === 'Consigna' && (
+                          <FormField
+                              control={form.control}
+                              name="consignorId"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Consignador</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                      <SelectTrigger>
+                                          <SelectValue placeholder="Seleccione un consignador..." />
+                                      </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                      {consignors.map(consignor => (
+                                          <SelectItem key={consignor.id} value={consignor.id}>{consignor.name}</SelectItem>
+                                      ))}
+                                      </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      )}
+                      <FormField
+                          control={form.control}
+                          name="type"
+                          render={({ field }) => (
+                              <FormItem className="space-y-3">
+                              <FormLabel>Tipo de Producto</FormLabel>
+                              <FormControl>
+                                  <RadioGroup
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                  className="flex space-x-4"
+                                  >
+                                  <FormItem className="flex items-center space-x-2 space-y-0">
+                                      <FormControl>
+                                      <RadioGroupItem value="Venta" />
+                                      </FormControl>
+                                      <FormLabel className="font-normal">
+                                      Para Venta
+                                      </FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2 space-y-0">
+                                      <FormControl>
+                                      <RadioGroupItem value="Refacción" />
+                                      </FormControl>
+                                      <FormLabel className="font-normal">
+                                      Para Reparación (Refacción)
+                                      </FormLabel>
+                                  </FormItem>
+                                  </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                      />
+                  </div>
+                  <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+                      <h3 className="font-semibold text-lg">Armar Combo</h3>
+                      <p className="text-sm text-muted-foreground">Selecciona productos que se venderán comúnmente con este artículo.</p>
+                      <Popover>
+                          <PopoverTrigger asChild>
+                               <Button variant="outline" className="w-full justify-start">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Añadir Producto al Combo
+                                </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar producto..." value={comboSearch} onValueChange={setComboSearch}/>
+                                <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    {filteredComboOptions.map(product => (
+                                        <CommandItem key={product.id} onSelect={() => handleToggleComboProduct(product.id)}>
+                                            {product.name}
+                                        </CommandItem>
+                                    ))}
+                                </CommandList>
+                            </Command>
+                          </PopoverContent>
+                      </Popover>
+                      
+                       <div className="space-y-2">
+                            <Label>Productos en el combo ({comboProducts.length})</Label>
+                            {comboProducts.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {comboProducts.map(p => (
+                                        <Badge key={p.id} variant="secondary" className="text-sm">
+                                            {p.name}
+                                            <button type="button" onClick={() => handleToggleComboProduct(p.id)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20">
+                                                <X className="h-3 w-3"/>
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground italic">No hay productos en el combo.</p>
+                            )}
+                       </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+            <DialogFooter className="pt-6 border-t mt-4">
                 <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
                 </Button>

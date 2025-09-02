@@ -11,15 +11,18 @@ import { useState } from "react";
 import { Separator } from "../ui/separator";
 import QuickExpenseDialog from "./QuickExpenseDialog";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface ShoppingCartProps {
   cartItems: CartItem[];
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onClearCart: () => void;
   isSheet?: boolean;
+  selectedCartItem: CartItem | null;
+  onSelectItem: (item: CartItem) => void;
 }
 
-export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart, isSheet = false }: ShoppingCartProps) {
+export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart, isSheet = false, selectedCartItem, onSelectItem }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
   const { toast } = useToast();
@@ -57,7 +60,14 @@ export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart,
                 ) : (
                 <div className="divide-y">
                     {cartItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 py-4">
+                    <div 
+                      key={item.id} 
+                      className={cn(
+                        "flex items-center gap-4 py-4 cursor-pointer rounded-lg -mx-2 px-2",
+                        selectedCartItem?.id === item.id && "bg-primary/10"
+                      )}
+                      onClick={() => onSelectItem(item)}
+                    >
                         <Image
                         src={item.imageUrl}
                         alt={item.name}
@@ -71,11 +81,11 @@ export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart,
                         <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
                         </div>
                         <div className="flex items-center gap-1 sm:gap-2">
-                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}>
+                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={(e) => { e.stopPropagation(); onUpdateQuantity(item.id, item.quantity - 1);}}>
                                 <MinusCircle className="w-5 h-5" />
                             </Button>
                             <span className="font-bold w-4 text-center">{item.quantity}</span>
-                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
+                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={(e) => { e.stopPropagation(); onUpdateQuantity(item.id, item.quantity + 1);}}>
                                 <PlusCircle className="w-5 h-5" />
                             </Button>
                         </div>
