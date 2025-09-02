@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "../ui/badge";
 import { X } from "lucide-react";
+import { Label } from "../ui/label";
 
 interface BulkEditDialogProps {
   isOpen: boolean;
