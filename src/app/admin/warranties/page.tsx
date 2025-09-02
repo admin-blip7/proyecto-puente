@@ -1,5 +1,5 @@
 import LeftSidebar from "@/components/shared/LeftSidebar";
-import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { getWarranties } from "@/lib/services/warrantyService";
@@ -20,7 +20,8 @@ export default async function WarrantiesPage() {
                     </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
-                    <LeftSidebar />
+                      <SheetTitle className="sr-only">Warranties Menu</SheetTitle>
+                      <LeftSidebar />
                     </SheetContent>
                 </Sheet>
             </div>

@@ -2,7 +2,7 @@ import { Header } from "@/components/shared/Header";
 import InventoryClient from "@/components/admin/InventoryClient";
 import { Product } from "@/types";
 import LeftSidebar from "@/components/shared/LeftSidebar";
-import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { getProducts } from "@/lib/services/productService";
@@ -23,7 +23,8 @@ export default async function AdminPage() {
                     </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
-                    <LeftSidebar />
+                      <SheetTitle className="sr-only">Admin Menu</SheetTitle>
+                      <LeftSidebar />
                     </SheetContent>
                 </Sheet>
             </div>

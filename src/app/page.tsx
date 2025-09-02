@@ -1,7 +1,7 @@
 import POSClient from '@/components/pos/POSClient';
 import { Product } from '@/types';
 import LeftSidebar from '@/components/shared/LeftSidebar';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { getProducts } from '@/lib/services/productService';
@@ -21,6 +21,7 @@ export default async function POSPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-24">
+              <SheetTitle className="sr-only">Main Menu</SheetTitle>
               <LeftSidebar />
             </SheetContent>
           </Sheet>

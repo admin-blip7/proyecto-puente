@@ -2,7 +2,7 @@ import SalesHistoryClient from "@/components/admin/sales/SalesHistoryClient";
 import { Sale, Product } from "@/types";
 import { isToday } from 'date-fns';
 import LeftSidebar from "@/components/shared/LeftSidebar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { getSales } from "@/lib/services/salesService";
@@ -49,7 +49,8 @@ export default async function SalesPage() {
                     </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
-                    <LeftSidebar />
+                      <SheetTitle className="sr-only">Sales Menu</SheetTitle>
+                      <LeftSidebar />
                     </SheetContent>
                 </Sheet>
             </div>
