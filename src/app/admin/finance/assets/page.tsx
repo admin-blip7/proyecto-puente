@@ -1,22 +1,16 @@
+"use client"
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import FinanceDashboard from "@/components/admin/finance/FinanceDashboard";
-import { getExpenses } from "@/lib/services/financeService";
-import { getSales } from "@/lib/services/salesService";
-import { getRepairOrders } from "@/lib/services/repairService";
+import AssetClient from "@/components/admin/finance/assets/AssetClient";
 import { getAssets } from "@/lib/services/assetService";
-import { getProducts } from "@/lib/services/productService";
 
 
-export default async function FinancePage() {
-    const initialExpenses = await getExpenses();
-    const sales = await getSales();
-    const repairs = await getRepairOrders();
-    const assets = await getAssets();
-    const products = await getProducts();
-
+export default async function AssetsPage() {
+    const initialAssets = await getAssets();
+   
     return (
         <div className="flex h-screen w-full flex-row">
             <div className="hidden md:flex">
@@ -36,13 +30,7 @@ export default async function FinancePage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-               <FinanceDashboard 
-                initialExpenses={initialExpenses}
-                sales={sales}
-                repairs={repairs}
-                initialAssets={assets}
-                products={products}
-               />
+              <AssetClient initialAssets={initialAssets} />
             </main>
         </div>
     )

@@ -170,3 +170,30 @@ export interface Expense {
     paymentDate: Date;
     receiptUrl?: string;
 }
+
+export const assetCategories = [
+    "Mobiliario y Equipo de Oficina",
+    "Equipo de Cómputo",
+    "Herramientas y Equipo Técnico",
+    "Vehículos",
+    "Edificios e Instalaciones",
+    "Otro"
+] as const;
+export type AssetCategory = typeof assetCategories[number];
+
+export const depreciationMethods = ["Lineal"] as const;
+export type DepreciationMethod = typeof depreciationMethods[number];
+
+export interface FixedAsset {
+    id: string;
+    assetId: string;
+    name: string;
+    category: AssetCategory;
+    purchaseDate: Date;
+    purchaseCost: number;
+    usefulLifeYrs: number;
+    salvageValue: number;
+    currentValue: number;
+    depreciationMethod: DepreciationMethod;
+    lastDepreciationDate: Date;
+}

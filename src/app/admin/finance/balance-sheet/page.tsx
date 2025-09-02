@@ -2,20 +2,17 @@ import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import FinanceDashboard from "@/components/admin/finance/FinanceDashboard";
-import { getExpenses } from "@/lib/services/financeService";
-import { getSales } from "@/lib/services/salesService";
-import { getRepairOrders } from "@/lib/services/repairService";
+import BalanceSheetClient from "@/components/admin/finance/balance-sheet/BalanceSheetClient";
 import { getAssets } from "@/lib/services/assetService";
 import { getProducts } from "@/lib/services/productService";
 
 
-export default async function FinancePage() {
-    const initialExpenses = await getExpenses();
-    const sales = await getSales();
-    const repairs = await getRepairOrders();
+export default async function BalanceSheetPage() {
     const assets = await getAssets();
     const products = await getProducts();
+
+    const inventoryValue = products.reduce((total, p) => total + (p.stock * p.cost), 0);
+    const fixedAssetsValue = assets.reduce((total, a) => total + a.currentValue, 0);
 
     return (
         <div className="flex h-screen w-full flex-row">
@@ -36,12 +33,10 @@ export default async function FinancePage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-               <FinanceDashboard 
-                initialExpenses={initialExpenses}
-                sales={sales}
-                repairs={repairs}
-                initialAssets={assets}
-                products={products}
+               <BalanceSheetClient 
+                assets={assets}
+                inventoryValue={inventoryValue}
+                fixedAssetsValue={fixedAssetsValue}
                />
             </main>
         </div>
