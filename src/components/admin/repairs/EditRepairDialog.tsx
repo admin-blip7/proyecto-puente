@@ -131,20 +131,30 @@ export default function EditRepairDialog({
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4 border-t">
-                <FormField control={form.control} name="status" render={({ field }) => (
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Estado de la Reparación</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Seleccione un estado..." /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {repairStatuses.map((status) => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
+                      <FormLabel>Estado de la Reparación</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un estado..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {repairStatuses.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
-                )}/>
+                  )}
+                />
 
                 <FormField control={form.control} name="cost" render={({ field }) => (
                     <FormItem>
