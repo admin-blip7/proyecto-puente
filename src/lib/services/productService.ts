@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
-import { Product, StockEntryItem, SuggestedProduct } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit } from "firebase/firestore";
+import { Product, StockEntryItem, SuggestedProduct, BulkUpdateData } from "@/types";
+import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment } from "firebase/firestore";
 import { useAuth } from "../hooks";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
 
@@ -232,4 +232,61 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
         console.error("Error deleting products:", error);
         throw new Error("Failed to delete products.");
     }
+};
+
+export const bulkUpdateProducts = async (productIds: string[], updateData: BulkUpdateData): Promise<void> => {
+    await runTransaction(db, async (transaction) => {
+        for (const id of productIds) {
+            const productRef = doc(db, PRODUCTS_COLLECTION, id);
+            const productDoc = await transaction.get(productRef);
+
+            if (!productDoc.exists()) continue;
+
+            const currentData = productDoc.data();
+            let newData: { [key: string]: any } = {};
+
+            // Handle Price
+            if (updateData.price) {
+                let newPrice = currentData.price;
+                if (updateData.price.mode === 'fixed') {
+                    newPrice = updateData.price.value;
+                } else if (updateData.price.mode === 'amount') {
+                    newPrice += updateData.price.value;
+                } else if (updateData.price.mode === 'percent') {
+                    newPrice *= (1 + updateData.price.value / 100);
+                }
+                newData.price = Math.max(0, newPrice);
+            }
+
+            // Handle Cost
+            if (updateData.cost) {
+                 let newCost = currentData.cost;
+                if (updateData.cost.mode === 'fixed') {
+                    newCost = updateData.cost.value;
+                } else if (updateData.cost.mode === 'amount') {
+                    newCost += updateData.cost.value;
+                } else if (updateData.cost.mode === 'percent') {
+                    newCost *= (1 + updateData.cost.value / 100);
+                }
+                newData.cost = Math.max(0, newCost);
+            }
+
+            // Handle Tags
+            if (updateData.tagsToAdd && updateData.tagsToAdd.length > 0) {
+                newData.compatibilityTags = arrayUnion(...updateData.tagsToAdd);
+            }
+             if (updateData.tagsToRemove && updateData.tagsToRemove.length > 0) {
+                 if (newData.compatibilityTags) {
+                    // if we are already updating the tags, chain the update
+                     newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
+                 } else {
+                    newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
+                 }
+            }
+            
+            if (Object.keys(newData).length > 0) {
+                transaction.update(productRef, newData);
+            }
+        }
+    });
 };

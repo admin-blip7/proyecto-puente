@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Product } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddProductDialog from "./AddProductDialog";
 import {
@@ -19,6 +19,10 @@ import Image from "next/image";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import DeleteProductsDialog from "./DeleteProductsDialog";
+import BulkEditDialog from "./BulkEditDialog";
+import { getProducts } from "@/lib/services/productService";
+import { useToast } from "@/hooks/use-toast";
+
 
 interface InventoryClientProps {
   initialProducts: Product[];
@@ -29,6 +33,9 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isBulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
+  const { toast } = useToast();
+
 
   const handleProductAdded = (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
@@ -38,6 +45,25 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     setProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
     setSelectedProductIds([]);
   }
+  
+  const handleProductsUpdated = async () => {
+    try {
+        const updatedProducts = await getProducts();
+        setProducts(updatedProducts);
+        setSelectedProductIds([]);
+        toast({
+            title: "Productos Actualizados",
+            description: "La lista de productos ha sido refrescada con los nuevos datos."
+        })
+    } catch(error) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No se pudo refrescar la lista de productos."
+        })
+    }
+  }
+
 
   const handleSelectAll = (checked: boolean | "indeterminate") => {
     if (checked === true) {
@@ -70,9 +96,13 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Gestión de Inventario</h1>
         {numSelected > 0 ? (
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
              <span className="text-sm text-muted-foreground">{numSelected} producto(s) seleccionado(s)</span>
-             <Button variant="outline" onClick={() => setDeleteDialogOpen(true)}>
+             <Button variant="outline" onClick={() => setBulkEditDialogOpen(true)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Editar
+             </Button>
+             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
                 <Trash2 className="mr-2 h-4 w-4"/>
                 Eliminar
              </Button>
@@ -159,6 +189,12 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         onOpenChange={setDeleteDialogOpen}
         productIds={selectedProductIds}
         onProductsDeleted={handleProductsDeleted}
+      />
+      <BulkEditDialog
+        isOpen={isBulkEditDialogOpen}
+        onOpenChange={setBulkEditDialogOpen}
+        productIds={selectedProductIds}
+        onProductsUpdated={handleProductsUpdated}
       />
     </>
   );

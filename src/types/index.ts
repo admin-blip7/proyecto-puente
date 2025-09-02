@@ -200,3 +200,16 @@ export interface FixedAsset {
     depreciationMethod: DepreciationMethod;
     lastDepreciationDate: Date;
 }
+
+export interface BulkUpdateData {
+    price?: {
+        mode: 'fixed' | 'amount' | 'percent';
+        value: number;
+    };
+    cost?: {
+        mode: 'fixed' | 'amount' | 'percent';
+        value: number;
+    };
+    tagsToAdd?: string[];
+    tagsToRemove?: string[];
+}
