@@ -60,10 +60,9 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     <TableHead className="w-[80px]">Imagen</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>SKU</TableHead>
-                    <TableHead>Categoría</TableHead>
+                    <TableHead>Etiquetas</TableHead>
                     <TableHead>Propiedad</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Costo</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -82,13 +81,16 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>
-                            <Badge variant="secondary">{product.category}</Badge>
+                            <div className="flex flex-wrap gap-1">
+                                {product.compatibilityTags?.map(tag => (
+                                    <Badge key={tag} variant="outline">{tag}</Badge>
+                                ))}
+                            </div>
                         </TableCell>
                         <TableCell>
                             <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
                         </TableCell>
                         <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">${product.cost.toFixed(2)}</TableCell>
                         <TableCell className="text-right">{product.stock}</TableCell>
                     </TableRow>
                     ))}

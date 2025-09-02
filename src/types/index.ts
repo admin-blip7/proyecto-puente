@@ -17,6 +17,7 @@ export interface Product {
   consignorId?: string;
   reorderPoint?: number;
   comboProductIds?: string[];
+  compatibilityTags?: string[];
 }
 
 export interface Consignor {

@@ -24,6 +24,7 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         consignorId: data.consignorId,
         reorderPoint: data.reorderPoint,
         comboProductIds: data.comboProductIds || [],
+        compatibilityTags: data.compatibilityTags || [],
     };
 }
 
