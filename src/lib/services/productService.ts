@@ -2,6 +2,7 @@ import { db } from "@/lib/firebase";
 import { Product, StockEntryItem } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "../hooks";
+import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
 
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
@@ -62,6 +63,17 @@ export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt'>)
             createdAt: serverTimestamp(),
         });
 
+        if (productData.name) {
+            // Asynchronously generate tags without blocking the return
+            suggestProductTags({ productName: productData.name, productDescription: "" })
+                .then(result => {
+                    if (result.suggestedTags.length > 0) {
+                        updateDoc(docRef, { compatibilityTags: result.suggestedTags });
+                    }
+                })
+                .catch(error => console.error("Error generating tags automatically:", error));
+        }
+
         return {
             id: docRef.id,
             ...productData,
@@ -79,10 +91,11 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
     const processedItems: StockEntryItem[] = [];
 
     for (const item of entryItems) {
-        const productRef = item.productId ? doc(db, PRODUCTS_COLLECTION, item.productId) : doc(collection(db, PRODUCTS_COLLECTION));
+        const isNewProduct = !item.productId;
+        const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
 
         await runTransaction(db, async (transaction) => {
-            const productDoc = item.productId ? await transaction.get(productRef) : null;
+            const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
 
             if (productDoc && productDoc.exists()) {
                 // UPDATE EXISTING PRODUCT
@@ -111,6 +124,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     ownershipType: item.ownershipType,
                     consignorId: item.consignorId || null,
                     comboProductIds: [],
+                    compatibilityTags: [] // Start with empty tags
                 };
                 transaction.set(productRef, newProductData);
                 item.productId = productRef.id; // Assign new ID back to item
@@ -122,12 +136,36 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 productId: item.productId,
                 productName: item.name,
                 change: item.quantity,
-                reason: item.isNew ? "Creación de Producto" : "Ingreso de Mercancía",
+                reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
                 updatedBy: userId,
                 createdAt: serverTimestamp(),
                 metadata: { cost: item.cost }
             });
         });
+
+        // If it was a new product, now generate tags asynchronously
+        if (isNewProduct && item.productId) {
+             try {
+                const allProducts = await getProducts(); // Get context of existing products
+                const existingProductsForAI = allProducts.map(p => ({
+                    name: p.name,
+                    tags: p.compatibilityTags || [],
+                }));
+
+                const result = await suggestProductTags({
+                    productName: item.name,
+                    existingProducts: existingProductsForAI
+                });
+
+                if (result.suggestedTags.length > 0) {
+                    await updateDoc(productRef, { compatibilityTags: result.suggestedTags });
+                }
+            } catch (aiError) {
+                console.error(`Failed to generate AI tags for ${item.name}:`, aiError);
+                // Don't block the process, just log the error
+            }
+        }
+
         processedItems.push(item);
     }
     return processedItems;
