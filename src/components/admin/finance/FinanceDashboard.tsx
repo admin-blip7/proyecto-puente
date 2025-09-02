@@ -26,6 +26,8 @@ import AssetClient from "./assets/AssetClient";
 import BalanceSheetClient from "./balance-sheet/BalanceSheetClient";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ExpenseCategoryClient from "./categories/ExpenseCategoryClient";
+import { getExpenseCategories } from "@/lib/services/expenseCategoryService";
 
 
 interface FinanceDashboardProps {
@@ -52,6 +54,7 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
   const getCurrentTab = () => {
     if (pathname.includes('/assets')) return 'assets';
     if (pathname.includes('/balance-sheet')) return 'balance-sheet';
+    if (pathname.includes('/categories')) return 'categories';
     return 'dashboard';
   }
 
@@ -107,6 +110,7 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
           <TabsTrigger value="dashboard" asChild><Link href="/admin/finance">Dashboard</Link></TabsTrigger>
           <TabsTrigger value="assets" asChild><Link href="/admin/finance/assets">Activos Fijos</Link></TabsTrigger>
           <TabsTrigger value="balance-sheet" asChild><Link href="/admin/finance/balance-sheet">Balance General</Link></TabsTrigger>
+          <TabsTrigger value="categories" asChild><Link href="/admin/finance/categories">Categorías de Gastos</Link></TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
@@ -199,6 +203,9 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
         </TabsContent>
         <TabsContent value="balance-sheet">
              <BalanceSheetClient assets={initialAssets} inventoryValue={inventoryValue} fixedAssetsValue={fixedAssetsValue} />
+        </TabsContent>
+        <TabsContent value="categories">
+            <ExpenseCategoryClient />
         </TabsContent>
       </Tabs>
       

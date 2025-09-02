@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
-import { MinusCircle, PlusCircle } from "lucide-react";
+import { MinusCircle, PlusCircle, Receipt } from "lucide-react";
 import CheckoutDialog from "./CheckoutDialog";
 import { useState } from "react";
 import { Separator } from "../ui/separator";
+import QuickExpenseDialog from "./QuickExpenseDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShoppingCartProps {
   cartItems: CartItem[];
@@ -19,6 +21,8 @@ interface ShoppingCartProps {
 
 export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart, isSheet = false }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
+  const [isExpenseOpen, setExpenseOpen] = useState(false);
+  const { toast } = useToast();
 
   const itemsTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const discount = 0; // Placeholder for future discount logic
@@ -28,6 +32,14 @@ export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart,
     onClearCart();
     setCheckoutOpen(false);
   };
+
+  const handleExpenseAdded = () => {
+    toast({
+      title: "Gasto Registrado",
+      description: "El gasto ha sido registrado exitosamente desde la caja."
+    });
+    setExpenseOpen(false);
+  }
 
   return (
     <>
@@ -74,33 +86,50 @@ export default function ShoppingCart({ cartItems, onUpdateQuantity, onClearCart,
             </div>
           </ScrollArea>
         </CardContent>
-        {cartItems.length > 0 && (
-          <CardFooter className="flex-col gap-4 p-6 border-t mt-auto">
-            <div className="w-full flex justify-between text-muted-foreground">
-              <span>Items</span>
-              <span>${itemsTotal.toFixed(2)}</span>
-            </div>
-             <div className="w-full flex justify-between text-muted-foreground">
-              <span>Discount</span>
-              <span>-${discount.toFixed(2)}</span>
-            </div>
-            <Separator />
-            <div className="w-full flex justify-between text-lg font-bold">
-              <span>Total</span>
-              <span>${totalAmount.toFixed(2)}</span>
-            </div>
-            <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)}>
+        
+        <CardFooter className="flex-col gap-4 p-6 border-t mt-auto">
+          {cartItems.length > 0 && (
+            <>
+              <div className="w-full flex justify-between text-muted-foreground">
+                <span>Items</span>
+                <span>${itemsTotal.toFixed(2)}</span>
+              </div>
+              <div className="w-full flex justify-between text-muted-foreground">
+                <span>Discount</span>
+                <span>-${discount.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="w-full flex justify-between text-lg font-bold">
+                <span>Total</span>
+                <span>${totalAmount.toFixed(2)}</span>
+              </div>
+            </>
+          )}
+
+          <div className="w-full grid grid-cols-1 gap-2">
+            <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)} disabled={cartItems.length === 0}>
               Checkout
             </Button>
-          </CardFooter>
-        )}
+            <Button className="w-full" variant="outline" onClick={() => setExpenseOpen(true)}>
+              <Receipt className="mr-2" />
+              Registrar Gasto Rápido
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
+      
       <CheckoutDialog
         isOpen={isCheckoutOpen}
         onOpenChange={setCheckoutOpen}
         cartItems={cartItems}
         totalAmount={totalAmount}
         onSuccessfulSale={handleSuccessfulSale}
+      />
+
+      <QuickExpenseDialog 
+        isOpen={isExpenseOpen}
+        onOpenChange={setExpenseOpen}
+        onExpenseAdded={handleExpenseAdded}
       />
     </>
   );
