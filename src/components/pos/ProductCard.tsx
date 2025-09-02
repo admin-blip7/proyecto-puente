@@ -50,7 +50,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
             "Agotado"
           ) : (
             <>
-              Add to cart
+              Agregar
             </>
           )}
         </Button>

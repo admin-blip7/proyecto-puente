@@ -58,25 +58,12 @@ export default function ShoppingCart({
     setExpenseOpen(false);
   }
 
-  const selectedProductDetails = useMemo(() => {
-    if (!selectedCartItem) return null;
-    return cartItems.find(p => p.id === selectedCartItem.id);
-  }, [selectedCartItem, cartItems]);
-  
-  const comboProducts = useMemo(() => {
-    if (!selectedProductDetails || !selectedProductDetails.comboProductIds) return [];
-    // We need a way to get full product info for combo items, can't do it here easily.
-    // This part will be simplified for the cart view.
-    return selectedProductDetails.comboProductIds; 
-  }, [selectedProductDetails]);
-
-
   const renderCartContent = () => (
     <ScrollArea className="h-full">
       <div className="px-6">
         {cartItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <p className="text-muted-foreground">Your cart is empty.</p>
+            <p className="text-muted-foreground">Tu carrito está vacío.</p>
           </div>
         ) : (
           <div className="divide-y">
@@ -124,7 +111,7 @@ export default function ShoppingCart({
             {suggestedProducts.length > 0 ? (
                  suggestedProducts.map(p => (
                     <div key={p.id} className="flex items-center gap-2 text-sm">
-                      <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" />
+                      <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" data-ai-hint="product photo" />
                       <p className="flex-1 font-medium">{p.name}</p>
                       <Button variant="outline" size="sm" onClick={() => onAddToCart(p, 1)}>
                         <PlusCircle className="mr-2 h-4 w-4"/>
@@ -141,49 +128,6 @@ export default function ShoppingCart({
      </ScrollArea>
   );
 
-  const renderDesktopLayout = () => (
-     <div className="w-80 h-full p-4 space-y-4 bg-muted/30">
-        <h3 className="font-bold text-lg">Sugerencias</h3>
-        {selectedProductDetails && comboProducts.length > 0 && (
-          <Card>
-            <CardHeader className="p-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-5 w-5"/>
-                Combo para {selectedProductDetails.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-               <Button className="w-full" onClick={() => selectedProductDetails.comboProductIds?.forEach(id => onAddToCart({id} as Product, 1))}>
-                    <PlusCircle className="mr-2" />
-                    Añadir Combo al Carrito
-                </Button>
-            </CardContent>
-          </Card>
-        )}
-        {suggestedProducts.length > 0 && (
-          <Card>
-            <CardHeader className="p-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Wand2 className="h-5 w-5 text-primary"/>
-                Productos Sugeridos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 p-4 pt-0">
-              {suggestedProducts.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
-                  <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" />
-                  <p className="flex-1 font-medium">{p.name}</p>
-                  <Button variant="outline" size="sm" onClick={() => onAddToCart(p, 1)}>
-                    <PlusCircle className="mr-2 h-4 w-4"/>
-                    ${p.price.toFixed(2)}
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-     </div>
-  );
 
   return (
     <>
@@ -191,15 +135,15 @@ export default function ShoppingCart({
         <CardHeader className="p-6">
           <CardTitle className="text-2xl font-bold tracking-tight">Mi Pedido</CardTitle>
         </CardHeader>
-        <CardContent className="p-0 flex-1">
+        <CardContent className="p-0 flex-1 min-h-0">
           {isMobile ? (
-             <Tabs defaultValue="cart" className="w-full flex flex-col flex-1">
+             <Tabs defaultValue="cart" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2 mx-auto sticky top-0 px-6">
                     <TabsTrigger value="cart">Mi Pedido</TabsTrigger>
                     <TabsTrigger value="suggestions">Sugerencias</TabsTrigger>
                 </TabsList>
-                <TabsContent value="cart" className="flex-1">{renderCartContent()}</TabsContent>
-                <TabsContent value="suggestions" className="flex-1">{renderSuggestionsContent()}</TabsContent>
+                <TabsContent value="cart" className="flex-1 overflow-y-auto">{renderCartContent()}</TabsContent>
+                <TabsContent value="suggestions" className="flex-1 overflow-y-auto">{renderSuggestionsContent()}</TabsContent>
             </Tabs>
           ) : (
             renderCartContent()
@@ -236,8 +180,6 @@ export default function ShoppingCart({
           </div>
         </CardFooter>
       </Card>
-
-       {!isMobile && renderDesktopLayout()}
       
       <CheckoutDialog
         isOpen={isCheckoutOpen}

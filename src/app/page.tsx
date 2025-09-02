@@ -26,7 +26,7 @@ export default async function POSPage() {
             </SheetContent>
           </Sheet>
        </div>
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col overflow-hidden">
         <POSClient initialProducts={initialProducts} />
       </main>
     </div>

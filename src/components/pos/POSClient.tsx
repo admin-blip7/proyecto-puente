@@ -13,6 +13,7 @@ import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import Image from "next/image";
 import { getSuggestedProducts } from "@/lib/services/productService";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface POSClientProps {
   initialProducts: Product[];
@@ -26,6 +27,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
   const [suggestedProducts, setSuggestedProducts] = useState<SuggestedProduct[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const isMobile = useIsMobile();
 
   const fetchSuggestions = async (item: CartItem) => {
     if (!item?.compatibilityTags || item.compatibilityTags.length === 0) {
@@ -136,9 +138,55 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     return cart.reduce((total, item) => total + item.quantity, 0);
   }, [cart]);
 
+  const renderSuggestionsPanel = () => (
+     <div className="w-full h-full p-4 space-y-4 bg-muted/30 flex flex-col">
+        <h3 className="font-bold text-lg">Sugerencias</h3>
+        <ScrollArea className="flex-1">
+        {selectedProductDetails && comboProducts.length > 0 && (
+          <Card>
+            <CardHeader className="p-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-5 w-5"/>
+                Combo para {selectedProductDetails.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+               <Button className="w-full" onClick={() => addComboToCart(selectedProductDetails)}>
+                    <PlusCircle className="mr-2" />
+                    Añadir Combo al Carrito
+                </Button>
+            </CardContent>
+          </Card>
+        )}
+        {suggestedProducts.length > 0 && (
+          <Card className="mt-4">
+            <CardHeader className="p-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wand2 className="h-5 w-5 text-primary"/>
+                Productos Sugeridos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 pt-0">
+              {suggestedProducts.map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" data-ai-hint="product photo" />
+                  <p className="flex-1 font-medium">{p.name}</p>
+                  <Button variant="outline" size="sm" onClick={() => addToCart(p, 1)}>
+                    <PlusCircle className="mr-2 h-4 w-4"/>
+                    ${p.price.toFixed(2)}
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+         </ScrollArea>
+     </div>
+  );
+
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-12">
-      <div className="lg:col-span-8 flex flex-col h-full bg-background px-4 sm:px-6 pt-6">
+    <div className="grid h-full grid-cols-1 lg:grid-cols-12 overflow-hidden">
+      <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6">
         <Header searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
         <div className="mt-6">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
@@ -167,8 +215,8 @@ export default function POSClient({ initialProducts }: POSClientProps) {
           </div>
         </ScrollArea>
       </div>
-       <div className="hidden lg:flex lg:col-span-4 xl:col-span-4 flex-row h-full">
-         <div className="flex-1 flex flex-col h-full bg-card shadow-2xl rounded-l-2xl">
+       <div className="hidden lg:flex lg:col-span-5 flex-row h-full">
+         <div className="flex-1 flex flex-col h-full bg-card shadow-inner border-l">
             <ShoppingCart
               cartItems={cart}
               onUpdateQuantity={updateQuantity}
@@ -178,6 +226,9 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               suggestedProducts={suggestedProducts}
               onAddToCart={addToCart}
             />
+         </div>
+         <div className="w-80 h-full border-l">
+            {renderSuggestionsPanel()}
          </div>
        </div>
 
@@ -198,7 +249,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="p-0 flex flex-col w-full sm:max-w-md">
-            <SheetTitle className="sr-only">My Order</SheetTitle>
+            <SheetTitle className="sr-only">Mi Pedido</SheetTitle>
              <ShoppingCart
                 cartItems={cart}
                 onUpdateQuantity={updateQuantity}
