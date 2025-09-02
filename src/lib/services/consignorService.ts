@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
 import { Consignor } from "@/types";
-import { collection, getDocs, doc, DocumentData, QueryDocumentSnapshot, serverTimestamp, Transaction, updateDoc, increment } from "firebase/firestore";
+import { collection, getDocs, doc, DocumentData, QueryDocumentSnapshot, serverTimestamp, Transaction, updateDoc, increment, addDoc, deleteDoc } from "firebase/firestore";
 
 const CONSIGNORS_COLLECTION = "consignors";
 
@@ -24,6 +24,44 @@ export const getConsignors = async (): Promise<Consignor[]> => {
         return [];
     }
 }
+
+export const addConsignor = async (data: Omit<Consignor, 'id' | 'balanceDue'>): Promise<Consignor> => {
+    try {
+        const docRef = await addDoc(collection(db, CONSIGNORS_COLLECTION), {
+            ...data,
+            balanceDue: 0
+        });
+        return {
+            id: docRef.id,
+            ...data,
+            balanceDue: 0
+        };
+    } catch (error) {
+        console.error("Error adding consignor:", error);
+        throw new Error("Failed to add consignor.");
+    }
+};
+
+export const updateConsignorInfo = async (consignorId: string, data: Partial<Omit<Consignor, 'id' | 'balanceDue'>>): Promise<void> => {
+    try {
+        const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
+        await updateDoc(consignorRef, data);
+    } catch (error) {
+        console.error("Error updating consignor:", error);
+        throw new Error("Failed to update consignor.");
+    }
+}
+
+export const deleteConsignor = async (consignorId: string): Promise<void> => {
+    try {
+        const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
+        await deleteDoc(consignorRef);
+    } catch (error) {
+        console.error("Error deleting consignor:", error);
+        throw new Error("Failed to delete consignor.");
+    }
+}
+
 
 export const updateConsignorBalance = async (transaction: Transaction, consignorId: string, amountToAdd: number) => {
     const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);

@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, ShoppingBag, PieChart, Bookmark, Clock, Gift, ShieldCheck, Wrench, PackagePlus, Users } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,7 @@ import {
 
 const navItems = [
     { href: '/', icon: Home, label: 'Home' },
-    { href: '/admin/sales', icon: Clock, label: 'History' },
+    { href: '/admin/sales', icon: PieChart, label: 'History' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Warranties' },
     { href: '/admin/repairs', icon: Wrench, label: 'Repairs' },
     { href: '/admin', icon: PieChart, label: 'Admin Panel'},
@@ -45,7 +45,7 @@ export default function LeftSidebar() {
             <div className="flex flex-col items-center gap-8">
                 <Link href="/">
                     <div className="bg-primary text-primary-foreground p-3 rounded-lg">
-                        <Gift className="h-6 w-6" />
+                        <Users className="h-6 w-6" />
                     </div>
                 </Link>
                 <nav className="flex flex-col items-center gap-4">

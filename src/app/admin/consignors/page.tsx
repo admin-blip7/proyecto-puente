@@ -9,8 +9,6 @@ import { getSales } from "@/lib/services/salesService";
 
 export default async function ConsignorsPage() {
     const initialConsignors = await getConsignors();
-    const allProducts = await getProducts();
-    const allSales = await getSales();
 
     return (
         <div className="flex h-screen w-full flex-row">
@@ -33,8 +31,6 @@ export default async function ConsignorsPage() {
             <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
                <ConsignorClient 
                 initialConsignors={initialConsignors}
-                allProducts={allProducts}
-                allSales={allSales}
                />
             </main>
         </div>
