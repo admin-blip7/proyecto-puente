@@ -5,7 +5,7 @@ import { Product, StockEntryItem } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -127,27 +127,32 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 </CardHeader>
                 <CardContent className="flex items-center gap-4">
                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <div className="w-full sm:w-80">
-                                <Command>
-                                    <CommandInput 
-                                        placeholder="Buscar producto por SKU o nombre..."
-                                        value={searchQuery}
-                                        onValueChange={setSearchQuery}
-                                    />
-                                </Command>
-                            </div>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 w-80" align="start">
-                            <CommandList>
-                                {filteredProducts.length === 0 && searchQuery.length > 2 && <div className="p-4 text-sm">No se encontraron productos.</div>}
-                                {filteredProducts.map(product => (
-                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                        {product.name} ({product.sku})
-                                    </CommandItem>
-                                ))}
-                            </CommandList>
-                        </PopoverContent>
+                        <Command className="w-full sm:w-80">
+                            <PopoverTrigger asChild>
+                                <CommandInput 
+                                    placeholder="Buscar producto por SKU o nombre..."
+                                    value={searchQuery}
+                                    onValueChange={(value) => {
+                                        setSearchQuery(value);
+                                        if (value.length > 0 && !popoverOpen) {
+                                            setPopoverOpen(true);
+                                        } else if (value.length === 0 && popoverOpen) {
+                                            setPopoverOpen(false);
+                                        }
+                                    }}
+                                />
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0 w-80" align="start">
+                                <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    {filteredProducts.map(product => (
+                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                            {product.name} ({product.sku})
+                                        </CommandItem>
+                                    ))}
+                                </CommandList>
+                            </PopoverContent>
+                        </Command>
                     </Popover>
 
                     <Button onClick={handleAddNewProduct}>
