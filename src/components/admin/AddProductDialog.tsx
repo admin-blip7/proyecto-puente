@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Product } from "@/types";
+import { Product, Consignor, ownershipTypes, OwnershipType } from "@/types";
 import { addProduct } from "@/lib/services/productService";
+import { getConsignors } from "@/lib/services/consignorService";
 
 interface AddProductDialogProps {
   isOpen: boolean;
@@ -27,10 +29,29 @@ const formSchema = z.object({
   stock: z.coerce.number().int().min(0, "El stock debe ser un número entero positivo."),
   category: z.string().min(1, "La categoría es requerida."),
   type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
+  ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
+  consignorId: z.string().optional(),
+}).refine(data => {
+    if (data.ownershipType === 'Familiar') {
+        return data.price === data.cost;
+    }
+    return true;
+}, {
+    message: "Para productos 'Familiar', el precio y el costo deben ser iguales.",
+    path: ['price'],
+}).refine(data => {
+    if (data.ownershipType === 'Consigna') {
+        return !!data.consignorId;
+    }
+    return true;
+}, {
+    message: "Debe seleccionar un consignador para productos en consigna.",
+    path: ['consignorId'],
 });
 
 export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [consignors, setConsignors] = useState<Consignor[]>([]);
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -43,8 +64,17 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       stock: 0,
       category: "",
       type: "Venta",
+      ownershipType: "Propio",
     },
   });
+
+  const ownershipType = form.watch("ownershipType");
+
+  useEffect(() => {
+    if (isOpen) {
+        getConsignors().then(setConsignors);
+    }
+  }, [isOpen]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
@@ -75,7 +105,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Agregar Nuevo Producto</DialogTitle>
           <DialogDescription>
@@ -83,7 +113,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
             <FormField
               control={form.control}
               name="name"
@@ -166,6 +196,52 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                     )}
                 />
             </div>
+             <FormField
+                control={form.control}
+                name="ownershipType"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Tipo de Propiedad</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un tipo..." />
+                        </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                        {ownershipTypes.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    </FormItem>
+                )}
+             />
+             {ownershipType === 'Consigna' && (
+                <FormField
+                    control={form.control}
+                    name="consignorId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Consignador</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccione un consignador..." />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {consignors.map(consignor => (
+                                <SelectItem key={consignor.id} value={consignor.id}>{consignor.name}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                 />
+             )}
             <FormField
                 control={form.control}
                 name="type"
@@ -200,7 +276,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                     </FormItem>
                 )}
             />
-            <DialogFooter>
+            <DialogFooter className="pt-4">
                 <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
                 </Button>

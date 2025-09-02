@@ -1,3 +1,7 @@
+export type OwnershipType = 'Propio' | 'Consigna' | 'Familiar';
+
+export const ownershipTypes: OwnershipType[] = ['Propio', 'Consigna', 'Familiar'];
+
 export interface Product {
   id: string;
   name: string;
@@ -9,6 +13,15 @@ export interface Product {
   imageUrl: string;
   createdAt: Date;
   type: 'Venta' | 'Refacción';
+  ownershipType: OwnershipType;
+  consignorId?: string;
+}
+
+export interface Consignor {
+    id: string;
+    name: string;
+    contactInfo: string;
+    balanceDue: number;
 }
 
 export interface SaleItem {
@@ -84,6 +97,8 @@ export interface StockEntryItem {
   cost: number;
   category: string;
   isNew: boolean;
+  ownershipType: OwnershipType;
+  consignorId?: string;
 }
 
 // Types for Repair Orders Module

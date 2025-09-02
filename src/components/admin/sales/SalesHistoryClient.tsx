@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useMemo } from "react";
 import { Sale, Warranty, Product, SaleItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,6 +22,8 @@ import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 
 interface SalesHistoryClientProps {
@@ -36,6 +38,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
+  const [excludeFamiliar, setExcludeFamiliar] = useState(false);
   const { toast } = useToast();
 
   const handleOpenWarrantyDialog = (sale: Sale) => {
@@ -56,9 +59,42 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     setOpenCollapsibles(prev => ({...prev, [saleId]: !prev[saleId]}));
   }
 
-  const getProductCost = (productId: string) => {
-    return products.find(p => p.id === productId)?.cost || 0;
+  const getProduct = (productId: string) => {
+    return products.find(p => p.id === productId);
   }
+
+  const filteredSales = useMemo(() => {
+    if (!excludeFamiliar) return sales;
+    // Filter out sales that consist ENTIRELY of 'Familiar' products
+    return sales.filter(sale => {
+      return sale.items.some(item => {
+        const product = getProduct(item.productId);
+        return product?.ownershipType !== 'Familiar';
+      });
+    });
+  }, [sales, excludeFamiliar, products]);
+
+  const { dailyCost: filteredDailyCost, dailyProfit: filteredDailyProfit } = useMemo(() => {
+    const today = new Date();
+    const todaySales = sales.filter(sale => format(sale.createdAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
+
+    let dailyCost = 0;
+    let dailyProfit = 0;
+    
+    todaySales.forEach(sale => {
+        sale.items.forEach(item => {
+            const product = getProduct(item.productId);
+            if (product && (!excludeFamiliar || product.ownershipType !== 'Familiar')) {
+                const cost = product.cost || 0;
+                dailyCost += cost * item.quantity;
+                dailyProfit += (item.priceAtSale - cost) * item.quantity;
+            }
+        });
+    });
+
+    return { dailyCost, dailyProfit };
+
+  }, [sales, excludeFamiliar, products]);
 
   const renderSerials = (item: SaleItem) => {
     if (!item.serials || item.serials.length === 0) {
@@ -81,6 +117,10 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
+        <div className="flex items-center space-x-2">
+            <Switch id="exclude-familiar" checked={excludeFamiliar} onCheckedChange={setExcludeFamiliar} />
+            <Label htmlFor="exclude-familiar">Excluir ventas 'Familiar'</Label>
+        </div>
       </div>
 
        <div className="grid gap-4 md:grid-cols-2 mb-4">
@@ -90,7 +130,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${dailyCost.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${filteredDailyCost.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Costo de los productos vendidos hoy</p>
           </CardContent>
         </Card>
@@ -100,7 +140,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${dailyProfit.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${filteredDailyProfit.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Ganancia total de las ventas de hoy</p>
           </CardContent>
         </Card>
@@ -127,7 +167,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {sales.map((sale) => (
+                    {filteredSales.map((sale) => (
                       <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
                         <>
                           <TableRow className="cursor-pointer">
@@ -189,8 +229,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                             </TableHeader>
                                             <TableBody>
                                             {sale.items.map(item => {
-                                                const cost = getProductCost(item.productId);
-                                                const profit = (item.priceAtSale - cost) * item.quantity;
+                                                const product = getProduct(item.productId);
+                                                const cost = product?.cost || 0;
+                                                const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
                                                 return (
                                                 <TableRow key={item.productId}>
                                                     <TableCell>{item.name}</TableCell>

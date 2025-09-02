@@ -1,13 +1,13 @@
 import { db } from "@/lib/firebase";
 import { Product, StockEntryItem } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc } from "firebase/firestore";
 import { useAuth } from "../hooks";
 
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
 
 
-const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Product => {
+const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData): Product => {
     const data = doc.data();
     return {
         id: doc.id,
@@ -19,7 +19,9 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Product => {
         category: data.category,
         imageUrl: data.imageUrl,
         createdAt: data.createdAt.toDate(),
-        type: data.type || 'Venta', // Default to 'Venta' if not specified
+        type: data.type || 'Venta',
+        ownershipType: data.ownershipType || 'Propio',
+        consignorId: data.consignorId,
     };
 }
 
@@ -32,6 +34,20 @@ export const getProducts = async (): Promise<Product[]> => {
     } catch (error) {
         console.error("Error fetching products:", error);
         return [];
+    }
+};
+
+export const getProductById = async (productId: string): Promise<Product | null> => {
+    try {
+        const docRef = doc(db, PRODUCTS_COLLECTION, productId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return productFromDoc(docSnap);
+        }
+        return null;
+    } catch (error) {
+        console.error("Error fetching product by ID:", error);
+        return null;
     }
 };
 
@@ -74,6 +90,8 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
                 createdAt: serverTimestamp(),
                 type: 'Venta', // All new products from stock entry are for sale initially. Can be changed later.
+                ownershipType: item.ownershipType,
+                consignorId: item.consignorId || null,
             };
             batch.set(newProductRef, newProductData);
 
@@ -106,6 +124,8 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 transaction.update(productRef, {
                     stock: newStock,
                     cost: item.cost, // Update cost as well
+                    ownershipType: item.ownershipType,
+                    consignorId: item.consignorId || null,
                 });
             });
 

@@ -1,11 +1,14 @@
 import { db } from "@/lib/firebase";
-import { Sale, CartItem, SaleItem } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
+import { Sale, CartItem, Product } from "@/types";
+import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction } from "firebase/firestore";
 import { v4 as uuidv4 } from 'uuid';
+import { getProductById } from "./productService";
+import { updateConsignorBalance } from "./consignorService";
 
 
 const SALES_COLLECTION = "sales";
 const PRODUCTS_COLLECTION = "products";
+const INVENTORY_LOGS_COLLECTION = "inventory_logs";
 
 const saleFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Sale => {
     const data = doc.data();
@@ -38,28 +41,56 @@ export const getSales = async (): Promise<Sale[]> => {
 export const addSaleAndUpdateStock = async (
     saleData: Omit<Sale, 'id' | 'saleId' | 'createdAt'>,
     cartItems: CartItem[]
-): Promise<void> => {
-    const batch = writeBatch(db);
+): Promise<string> => {
+    const saleId = `SALE-${uuidv4().split('-')[0].toUpperCase()}`;
 
-    // 1. Add the sale document
-    const saleRef = doc(collection(db, SALES_COLLECTION));
-    batch.set(saleRef, {
-        ...saleData,
-        saleId: `SALE-${uuidv4().split('-')[0].toUpperCase()}`,
-        createdAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+        // 1. Add the sale document
+        const saleRef = doc(collection(db, SALES_COLLECTION));
+        transaction.set(saleRef, {
+            ...saleData,
+            saleId: saleId,
+            createdAt: serverTimestamp(),
+        });
+
+        // 2. Process each item in the cart
+        for (const item of cartItems) {
+            const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
+            const productDoc = await transaction.get(productRef);
+
+            if (!productDoc.exists()) {
+                throw new Error(`Producto ${item.name} no encontrado.`);
+            }
+
+            const productData = productDoc.data() as Product;
+
+            // Update stock
+            const newStock = productData.stock - item.quantity;
+            if (newStock < 0) {
+                throw new Error(`Stock insuficiente para ${item.name}.`);
+            }
+            transaction.update(productRef, { stock: newStock });
+            
+            // Add inventory log
+            const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+            transaction.set(logRef, {
+                productId: item.id,
+                productName: item.name,
+                change: -item.quantity,
+                reason: 'Venta',
+                updatedBy: saleData.cashierId,
+                createdAt: serverTimestamp(),
+                metadata: { saleId: saleId, cost: productData.cost }
+            });
+
+
+            // Handle consignation logic
+            if (productData.ownershipType === 'Consigna' && productData.consignorId) {
+                const amountDue = productData.cost * item.quantity;
+                await updateConsignorBalance(transaction, productData.consignorId, amountDue);
+            }
+        }
     });
 
-    // 2. Update stock for each product in the sale
-    for (const item of cartItems) {
-        const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
-        const newStock = item.stock - item.quantity;
-        batch.update(productRef, { stock: newStock });
-    }
-
-    try {
-        await batch.commit();
-    } catch (error) {
-        console.error("Error processing sale and updating stock: ", error);
-        throw new Error("Failed to process sale transaction.");
-    }
+    return saleId;
 };

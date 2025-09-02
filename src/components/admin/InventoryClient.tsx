@@ -29,6 +29,14 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const handleProductAdded = (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
   };
+  
+  const getOwnershipTypeVariant = (type: Product['ownershipType']) => {
+    switch (type) {
+        case 'Consigna': return 'destructive';
+        case 'Familiar': return 'secondary';
+        default: return 'outline';
+    }
+  }
 
   return (
     <>
@@ -53,6 +61,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     <TableHead>Nombre</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead>Propiedad</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
                     <TableHead className="text-right">Costo</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
@@ -74,6 +83,9 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>
                             <Badge variant="secondary">{product.category}</Badge>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
                         </TableCell>
                         <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                         <TableCell className="text-right">${product.cost.toFixed(2)}</TableCell>
