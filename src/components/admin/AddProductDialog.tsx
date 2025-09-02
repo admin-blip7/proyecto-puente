@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "@/types";
 import { addProduct } from "@/lib/services/productService";
@@ -25,6 +26,7 @@ const formSchema = z.object({
   cost: z.coerce.number().min(0, "El costo debe ser positivo."),
   stock: z.coerce.number().int().min(0, "El stock debe ser un número entero positivo."),
   category: z.string().min(1, "La categoría es requerida."),
+  type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
 });
 
 export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded }: AddProductDialogProps) {
@@ -40,6 +42,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       cost: 0,
       stock: 0,
       category: "",
+      type: "Venta",
     },
   });
 
@@ -163,6 +166,40 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                     )}
                 />
             </div>
+            <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                    <FormItem className="space-y-3">
+                    <FormLabel>Tipo de Producto</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex space-x-4"
+                        >
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                            <RadioGroupItem value="Venta" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                            Para Venta
+                            </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                            <RadioGroupItem value="Refacción" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                            Para Reparación (Refacción)
+                            </FormLabel>
+                        </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
             <DialogFooter>
                 <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar

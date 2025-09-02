@@ -8,6 +8,7 @@ export interface Product {
   category: string;
   imageUrl: string;
   createdAt: Date;
+  type: 'Venta' | 'Refacción';
 }
 
 export interface SaleItem {
@@ -51,11 +52,12 @@ export interface InventoryLog {
   productId: string;
   productName: string;
   change: number;
-  reason: 'Venta' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto';
+  reason: 'Venta' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto' | 'Uso en Reparación';
   updatedBy: string; // User ID
   createdAt: Date;
   metadata?: {
     saleId?: string;
+    repairOrderId?: string;
     cost?: number;
   };
 }
@@ -82,4 +84,38 @@ export interface StockEntryItem {
   cost: number;
   category: string;
   isNew: boolean;
+}
+
+// Types for Repair Orders Module
+export interface RepairPart {
+    productId: string;
+    name: string;
+    quantity: number;
+    cost: number;
+    price: number;
+}
+
+export const repairStatuses = ["Recibido", "En Diagnóstico", "Esperando Refacción", "En Reparación", "Listo para Entrega", "Completado", "Cancelado"] as const;
+
+export type RepairStatus = typeof repairStatuses[number];
+
+
+export interface RepairOrder {
+    id: string;
+    orderId: string;
+    status: RepairStatus;
+    customerName: string;
+    customerPhone: string;
+    deviceBrand: string;
+    deviceModel: string;
+    deviceSerialIMEI: string;
+    reportedIssue: string;
+    technicianNotes?: string;
+    partsUsed: RepairPart[];
+    laborCost: number;
+    totalCost: number; // Sum of partsUsed[].cost
+    totalPrice: number; // Sum of partsUsed[].price + laborCost
+    profit: number; // totalPrice - totalCost
+    createdAt: Date;
+    completedAt?: Date;
 }

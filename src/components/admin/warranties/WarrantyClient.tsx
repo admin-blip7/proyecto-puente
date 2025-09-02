@@ -18,26 +18,12 @@ import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import EditWarrantyDialog from "./EditWarrantyDialog";
+import { getWarrantyStatusVariant } from "@/lib/utils";
+
 
 interface WarrantyClientProps {
   initialWarranties: Warranty[];
 }
-
-const getStatusVariant = (status: Warranty['status']) => {
-    switch (status) {
-      case 'Pendiente':
-        return 'default';
-      case 'En Revisión':
-        return 'secondary';
-      case 'Resuelta':
-        return 'outline';
-      case 'Rechazada':
-        return 'destructive';
-      default:
-        return 'default';
-    }
-  };
-
 
 export default function WarrantyClient({ initialWarranties }: WarrantyClientProps) {
   const [warranties, setWarranties] = useState<Warranty[]>(initialWarranties);
@@ -95,7 +81,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                             {format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: es })}
                         </TableCell>
                         <TableCell>
-                            <Badge variant={getStatusVariant(warranty.status)}>
+                            <Badge variant={getWarrantyStatusVariant(warranty.status)}>
                                 {warranty.status}
                             </Badge>
                         </TableCell>

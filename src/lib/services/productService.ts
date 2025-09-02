@@ -19,6 +19,7 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Product => {
         category: data.category,
         imageUrl: data.imageUrl,
         createdAt: data.createdAt.toDate(),
+        type: data.type || 'Venta', // Default to 'Venta' if not specified
     };
 }
 
@@ -71,7 +72,8 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 stock: item.quantity,
                 category: item.category,
                 imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                type: 'Venta', // All new products from stock entry are for sale initially. Can be changed later.
             };
             batch.set(newProductRef, newProductData);
 
