@@ -1,9 +1,7 @@
-"use client"
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import FinanceDashboard from "@/components/admin/finance/FinanceDashboard";
 import AssetClient from "@/components/admin/finance/assets/AssetClient";
 import { getAssets } from "@/lib/services/assetService";
 
