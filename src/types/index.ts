@@ -86,10 +86,9 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-// Types for the new Stock Entry module
 export interface StockEntryItem {
-  id: string; // Can be a temporary UUID for new products
-  productId?: string; // Will exist for existing products
+  id: string; 
+  productId?: string;
   sku: string;
   name: string;
   quantity: number;
@@ -101,7 +100,6 @@ export interface StockEntryItem {
   consignorId?: string;
 }
 
-// Types for Repair Orders Module
 export interface RepairPart {
     productId: string;
     name: string;
@@ -128,9 +126,23 @@ export interface RepairOrder {
     technicianNotes?: string;
     partsUsed: RepairPart[];
     laborCost: number;
-    totalCost: number; // Sum of partsUsed[].cost
-    totalPrice: number; // Sum of partsUsed[].price + laborCost
-    profit: number; // totalPrice - totalCost
+    totalCost: number; 
+    totalPrice: number; 
+    profit: number;
     createdAt: Date;
     completedAt?: Date;
+}
+
+export const paymentMethods = ["Transferencia Bancaria", "Efectivo", "Depósito"] as const;
+export type PaymentMethod = typeof paymentMethods[number];
+
+export interface ConsignorPayment {
+    id: string;
+    paymentId: string;
+    consignorId: string;
+    amountPaid: number;
+    paymentDate: Date;
+    paymentMethod: PaymentMethod;
+    proofOfPaymentUrl: string;
+    notes?: string;
 }
