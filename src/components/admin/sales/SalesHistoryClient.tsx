@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { Sale, Warranty, Product } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -111,8 +111,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableHeader>
                 <TableBody>
                     {sales.map((sale) => (
-                    <Collapsible key={sale.id} asChild open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
-                      <tbody className="w-full">
+                    <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
+                      <Fragment>
                         <TableRow className="cursor-pointer">
                             <TableCell>
                               <CollapsibleTrigger asChild>
@@ -191,7 +191,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                             </TableCell>
                           </TableRow>
                         </CollapsibleContent>
-                      </tbody>
+                      </Fragment>
                     </Collapsible>
                     ))}
                 </TableBody>
