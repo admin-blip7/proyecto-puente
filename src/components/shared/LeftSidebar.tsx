@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, ShoppingBag, PieChart, Bookmark, Clock, Gift, ShieldCheck } from 'lucide-react';
+import { Home, Settings, ShoppingBag, PieChart, Bookmark, Clock, Gift, ShieldCheck, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ const navItems = [
     { href: '/', icon: Home, label: 'Home' },
     { href: '/admin/sales', icon: Clock, label: 'History' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Warranties' },
+    { href: '/admin/repairs', icon: Wrench, label: 'Repairs' },
     { href: '/admin', icon: PieChart, label: 'Admin Panel'},
 ];
 

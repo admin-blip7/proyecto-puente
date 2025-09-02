@@ -45,6 +45,20 @@ export interface Warranty {
   imageUrls?: string[];
 }
 
+export interface Repair {
+    id: string;
+    customerName: string;
+    customerPhone: string;
+    deviceModel: string;
+    deviceImei: string;
+    reportedIssue: string;
+    status: 'Ingresado' | 'En Diagnóstico' | 'Esperando Refacción' | 'Reparado' | 'Listo para Entrega' | 'Entregado';
+    technicianNotes?: string;
+    cost: number;
+    createdAt: Date;
+    completedAt?: Date;
+}
+
 export interface InventoryLog {
   id: string;
   productId: string;
