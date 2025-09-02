@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useState, useEffect, ReactNode } from "react";
-import { User } from "firebase/auth";
+import { User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { UserProfile } from "@/types";
 import { usePathname, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { auth, db } from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -15,34 +17,6 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USER: User = {
-  uid: 'mock-user-uid',
-  email: 'admin@tienda.com',
-  displayName: 'Admin de Tienda',
-  photoURL: null,
-  phoneNumber: null,
-  providerId: 'password',
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  refreshToken: '',
-  tenantId: null,
-  delete: async () => {},
-  getIdToken: async () => '',
-  getIdTokenResult: async () => ({} as any),
-  reload: async () => {},
-  toJSON: () => ({}),
-};
-
-const MOCK_USER_PROFILE: UserProfile = {
-  uid: 'mock-user-uid',
-  name: 'Admin de Tienda',
-  email: 'admin@tienda.com',
-  role: 'Admin',
-};
-
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -51,24 +25,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Simulate user being logged in
-    setLoading(true);
-    setUser(MOCK_USER);
-    setUserProfile(MOCK_USER_PROFILE);
-    if (pathname === '/login') {
-      router.push('/');
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
+      if (user) {
+        setUser(user);
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUserProfile(userDoc.data() as UserProfile);
+        } else {
+          // For now, let's create a mock profile if it doesn't exist
+          const mockProfile: UserProfile = {
+            uid: user.uid,
+            name: user.displayName || "New User",
+            email: user.email!,
+            role: "Admin", // Default to Admin for now
+          };
+          setUserProfile(mockProfile);
+        }
+
+        if (pathname === '/login') {
+          router.push('/');
+        }
+      } else {
+        setUser(null);
+        setUserProfile(null);
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [router, pathname]);
 
   const signOut = async () => {
-    // For mock, just clear state and redirect
-    setUser(null);
-    setUserProfile(null);
-    router.push("/login");
+    try {
+        await firebaseSignOut(auth);
+        router.push("/login");
+    } catch(error) {
+        console.error("Error signing out: ", error);
+    }
   };
 
-  if (loading && pathname !== '/login') {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="w-full max-w-sm space-y-4">
@@ -80,24 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  // A special case for login page to avoid redirect loop
-  if (pathname === '/login' && !user) {
-    return (
-        <AuthContext.Provider value={{ user, userProfile, loading, signOut }}>
-            {children}
-        </AuthContext.Provider>
-    )
-  }
-  
-  // If we are not on login page and not logged in, we do nothing to let the login page handle it
-  // This logic is simplified because we are mocking the auth state.
-  if (!user && pathname !== '/login') {
-      router.push('/login');
-      return null;
-  }
-
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading: false, signOut }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

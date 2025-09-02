@@ -5,26 +5,24 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { StoreIcon } from "lucide-react";
-import { useAuth } from "@/lib/hooks";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingrese un correo válido." }),
-  password: z.string().min(1, { message: "La contraseña es requerida." }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
 export default function LoginClient() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  // We get signOut to ensure we can re-render when auth state changes.
-  // The actual sign-in logic will be mocked in the provider.
-  const { signOut } = useAuth(); 
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -36,14 +34,22 @@ export default function LoginClient() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
-    // Simulate a login delay
-    setTimeout(() => {
-      if (values.email === "admin@tienda.com" && values.password === "password") {
-        // The AuthProvider will handle the redirect and state change.
-        // We just need to trigger a state update. A "real" sign-in is not needed.
-        // In this mock, we reload the page to make the provider re-evaluate.
-        window.location.href = "/";
-
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      router.push("/");
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        // If user not found, try to create a new user
+        try {
+          await createUserWithEmailAndPassword(auth, values.email, values.password);
+          router.push("/");
+        } catch (createError: any) {
+          toast({
+            variant: "destructive",
+            title: "Error de registro",
+            description: createError.message,
+          });
+        }
       } else {
         toast({
           variant: "destructive",
@@ -51,8 +57,9 @@ export default function LoginClient() {
           description: "Credenciales incorrectas. Por favor, intente de nuevo.",
         });
       }
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -99,8 +106,7 @@ export default function LoginClient() {
           </form>
         </Form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Usuario: <strong>admin@tienda.com</strong><br />
-          Contraseña: <strong>password</strong>
+          Intente con <strong>admin@tienda.com</strong> y <strong>password</strong>
         </p>
       </CardContent>
     </Card>
