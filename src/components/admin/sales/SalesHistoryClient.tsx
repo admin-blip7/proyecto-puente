@@ -111,88 +111,86 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableHeader>
                 <TableBody>
                     {sales.map((sale) => (
-                    <Fragment key={sale.id}>
-                      <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
-                        <TableRow className="cursor-pointer">
-                              <TableCell>
-                                <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                        <span className="sr-only">Toggle details</span>
-                                    </Button>
-                                </CollapsibleTrigger>
-                              </TableCell>
-                              <TableCell className="font-medium">{sale.saleId}</TableCell>
-                              <TableCell>
-                              {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
-                              </TableCell>
-                              <TableCell>
-                                  <div className="font-medium">{sale.customerName || 'N/A'}</div>
-                                  <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
-                              </TableCell>
-                              <TableCell>{sale.cashierName}</TableCell>
-                              <TableCell>
-                              <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
-                                  {sale.paymentMethod}
-                              </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
-                              <TableCell className="text-right">
-                                  <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                          <span className="sr-only">Abrir menú</span>
-                                          <MoreHorizontal className="h-4 w-4" />
+                      <Collapsible key={sale.id} asChild open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
+                        <Fragment>
+                          <TableRow className="cursor-pointer">
+                                <TableCell>
+                                  <CollapsibleTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                          {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                          <span className="sr-only">Toggle details</span>
                                       </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
-                                          <ShieldPlus className="mr-2 h-4 w-4" />
-                                          <span>Registrar Garantía</span>
-                                      </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                  </DropdownMenu>
-                              </TableCell>
-                          </TableRow>
-                      </Collapsible>
-                      {openCollapsibles[sale.id] && (
-                        <TableRow>
-                          <TableCell colSpan={8} className="p-0">
-                              <CollapsibleContent className="p-4 bg-muted/50">
-                                <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Producto</TableHead>
-                                      <TableHead className="text-right">Cantidad</TableHead>
-                                      <TableHead className="text-right">Precio Unit.</TableHead>
-                                      <TableHead className="text-right">Costo Unit.</TableHead>
-                                      <TableHead className="text-right">Ganancia</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {sale.items.map(item => {
-                                      const cost = getProductCost(item.productId);
-                                      const profit = (item.priceAtSale - cost) * item.quantity;
-                                      return (
-                                        <TableRow key={item.productId}>
-                                          <TableCell>{item.name}</TableCell>
-                                          <TableCell className="text-right">{item.quantity}</TableCell>
-                                          <TableCell className="text-right">${item.priceAtSale.toFixed(2)}</TableCell>
-                                          <TableCell className="text-right">${cost.toFixed(2)}</TableCell>
-                                          <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
-                                            ${profit.toFixed(2)}
-                                          </TableCell>
+                                  </CollapsibleTrigger>
+                                </TableCell>
+                                <TableCell className="font-medium">{sale.saleId}</TableCell>
+                                <TableCell>
+                                {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                                </TableCell>
+                                <TableCell>
+                                    <div className="font-medium">{sale.customerName || 'N/A'}</div>
+                                    <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
+                                </TableCell>
+                                <TableCell>{sale.cashierName}</TableCell>
+                                <TableCell>
+                                <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
+                                    {sale.paymentMethod}
+                                </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                            <span className="sr-only">Abrir menú</span>
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
+                                            <ShieldPlus className="mr-2 h-4 w-4" />
+                                            <span>Registrar Garantía</span>
+                                        </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell colSpan={8} className="p-0 border-0">
+                                    <CollapsibleContent className="p-4 bg-muted/50">
+                                    <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
+                                    <Table>
+                                        <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Producto</TableHead>
+                                            <TableHead className="text-right">Cantidad</TableHead>
+                                            <TableHead className="text-right">Precio Unit.</TableHead>
+                                            <TableHead className="text-right">Costo Unit.</TableHead>
+                                            <TableHead className="text-right">Ganancia</TableHead>
                                         </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              </CollapsibleContent>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
+                                        </TableHeader>
+                                        <TableBody>
+                                        {sale.items.map(item => {
+                                            const cost = getProductCost(item.productId);
+                                            const profit = (item.priceAtSale - cost) * item.quantity;
+                                            return (
+                                            <TableRow key={item.productId}>
+                                                <TableCell>{item.name}</TableCell>
+                                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                                <TableCell className="text-right">${item.priceAtSale.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right">${cost.toFixed(2)}</TableCell>
+                                                <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
+                                                ${profit.toFixed(2)}
+                                                </TableCell>
+                                            </TableRow>
+                                            );
+                                        })}
+                                        </TableBody>
+                                    </Table>
+                                    </CollapsibleContent>
+                                </TableCell>
+                            </TableRow>
+                        </Fragment>
+                      </Collapsible>
                     ))}
                 </TableBody>
                 </Table>
