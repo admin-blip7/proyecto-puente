@@ -93,7 +93,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {
                 const numericFields = ['quantity', 'price', 'cost'];
-                const parsedValue = numericFields.includes(field) ? parseFloat(value as string) || 0 : value;
+                const parsedValue = numericFields.includes(field as string) ? parseFloat(value as string) || 0 : value;
                 return { ...item, [field]: parsedValue };
             }
             return item;
@@ -209,7 +209,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Input value={item.sku} readOnly={!item.isNew} className="bg-muted/50" />
+                                                <Input value={item.sku} readOnly className="bg-muted/50" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
@@ -258,7 +258,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>SKU</Label>
-                                            <Input value={item.sku} readOnly={!item.isNew} className="bg-muted/50" />
+                                            <Input value={item.sku} readOnly className="bg-muted/50" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
