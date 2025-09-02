@@ -59,10 +59,26 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         setPopoverOpen(false);
     };
 
+    const generateUniqueSku = () => {
+        const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
+        let newSku = '';
+        let isUnique = false;
+        
+        while (!isUnique) {
+            newSku = Math.floor(100000 + Math.random() * 900000).toString();
+            if (!existingSkus.has(newSku)) {
+                isUnique = true;
+            }
+        }
+        return newSku;
+    };
+
+
     const handleAddNewProduct = () => {
+        const newSku = generateUniqueSku();
         setEntryList(prev => [...prev, {
             id: uuidv4(),
-            sku: '',
+            sku: newSku,
             name: '',
             quantity: 1,
             price: 0,
@@ -126,8 +142,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes o crea nuevos para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex items-center gap-4">
-                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <Command className="w-full sm:w-80">
+                    <Command className="w-full sm:w-80">
+                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <CommandInput 
                                     placeholder="Buscar producto por SKU o nombre..."
@@ -152,8 +168,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     ))}
                                 </CommandList>
                             </PopoverContent>
-                        </Command>
-                    </Popover>
+                        </Popover>
+                    </Command>
 
                     <Button onClick={handleAddNewProduct}>
                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -189,7 +205,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Input value={item.sku} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} disabled={!item.isNew} />
+                                                <Input value={item.sku} readOnly className="bg-muted/50" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
