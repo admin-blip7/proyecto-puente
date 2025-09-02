@@ -20,7 +20,6 @@ const navItems = [
     { href: '/', icon: Home, label: 'Home' },
     { href: '/admin/sales', icon: Clock, label: 'History' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Warranties' },
-    { href: '/admin/repairs', icon: Wrench, label: 'Repairs' },
     { href: '/admin', icon: PieChart, label: 'Admin Panel'},
 ];
 
