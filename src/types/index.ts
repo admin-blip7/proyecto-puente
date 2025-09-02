@@ -146,3 +146,27 @@ export interface ConsignorPayment {
     proofOfPaymentUrl: string;
     notes?: string;
 }
+
+
+export const expenseCategories = [
+    "Renta",
+    "Sueldos y Salarios",
+    "Servicios Públicos",
+    "Marketing y Publicidad",
+    "Software y Suscripciones",
+    "Impuestos",
+    "Insumos de Oficina",
+    "Otros"
+] as const;
+
+export type ExpenseCategory = typeof expenseCategories[number];
+
+export interface Expense {
+    id: string;
+    expenseId: string;
+    description: string;
+    category: ExpenseCategory;
+    amount: number;
+    paymentDate: Date;
+    receiptUrl?: string;
+}

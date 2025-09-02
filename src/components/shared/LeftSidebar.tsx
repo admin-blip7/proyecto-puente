@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ const navItems = [
     { href: '/admin', icon: PieChart, label: 'Admin Panel'},
     { href: '/admin/stock-entry', icon: PackagePlus, label: 'Stock Entry'},
     { href: '/admin/consignors', icon: Users, label: 'Consignors'},
-
+    { href: '/admin/finance', icon: Landmark, label: 'Finance'},
 ];
 
 const getInitials = (name: string) => {
