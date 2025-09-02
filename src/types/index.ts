@@ -15,6 +15,7 @@ export interface Product {
   type: 'Venta' | 'Refacción';
   ownershipType: OwnershipType;
   consignorId?: string;
+  reorderPoint?: number;
 }
 
 export interface Consignor {

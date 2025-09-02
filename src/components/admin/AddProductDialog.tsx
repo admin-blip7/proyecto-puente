@@ -27,6 +27,7 @@ const formSchema = z.object({
   price: z.coerce.number().min(0, "El precio debe ser positivo."),
   cost: z.coerce.number().min(0, "El costo debe ser positivo."),
   stock: z.coerce.number().int().min(0, "El stock debe ser un número entero positivo."),
+  reorderPoint: z.coerce.number().int().min(0, "El punto de reorden debe ser un número entero positivo.").optional(),
   category: z.string().min(1, "La categoría es requerida."),
   type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
@@ -62,6 +63,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       price: 0,
       cost: 0,
       stock: 0,
+      reorderPoint: 0,
       category: "",
       type: "Venta",
       ownershipType: "Propio",
@@ -88,6 +90,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
     try {
       const newProductData: Omit<Product, 'id' | 'createdAt'> = {
         ...values,
+        reorderPoint: values.reorderPoint || 0,
         imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
         consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
       };
@@ -192,18 +195,31 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                 />
                 <FormField
                     control={form.control}
-                    name="category"
+                    name="reorderPoint"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Categoría</FormLabel>
+                        <FormLabel>Punto de Reorden</FormLabel>
                         <FormControl>
-                            <Input placeholder="Ej: Bebidas" {...field} />
+                            <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                 />
             </div>
+             <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Categoría</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Ej: Bebidas" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
              <FormField
                 control={form.control}
                 name="ownershipType"

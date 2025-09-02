@@ -22,6 +22,7 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         type: data.type || 'Venta',
         ownershipType: data.ownershipType || 'Propio',
         consignorId: data.consignorId,
+        reorderPoint: data.reorderPoint,
     };
 }
 

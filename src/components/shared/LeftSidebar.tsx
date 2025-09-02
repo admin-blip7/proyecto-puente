@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ const navItems = [
     { href: '/admin/stock-entry', icon: PackagePlus, label: 'Stock Entry'},
     { href: '/admin/consignors', icon: Users, label: 'Consignors'},
     { href: '/admin/finance', icon: Landmark, label: 'Finance'},
+    { href: '/admin/intelligence', icon: BrainCircuit, label: 'Intelligence'},
 ];
 
 const getInitials = (name: string) => {
@@ -53,7 +54,8 @@ export default function LeftSidebar() {
                         <Link href={item.href} key={item.label}>
                             <Button variant="ghost" size="icon" className={cn(
                                 "rounded-lg w-12 h-12",
-                                pathname === item.href && 'bg-primary/10 text-primary'
+                                pathname.startsWith(item.href) && item.href !== '/' && 'bg-primary/10 text-primary',
+                                pathname === '/' && item.href === '/' && 'bg-primary/10 text-primary'
                             )}>
                                 <item.icon className="h-6 w-6" />
                             </Button>
