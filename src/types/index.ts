@@ -15,6 +15,7 @@ export interface SaleItem {
   name: string;
   quantity: number;
   priceAtSale: number;
+  serials?: string[];
 }
 
 export interface Sale {

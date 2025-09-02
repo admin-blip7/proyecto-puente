@@ -27,7 +27,8 @@ const saleFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Sale => {
 export const getSales = async (): Promise<Sale[]> => {
     try {
         const querySnapshot = await getDocs(collection(db, SALES_COLLECTION));
-        return querySnapshot.docs.map(saleFromDoc);
+        const sales = querySnapshot.docs.map(saleFromDoc);
+        return sales.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
     } catch (error) {
         console.error("Error fetching sales:", error);
         return [];

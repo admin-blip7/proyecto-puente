@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Fragment } from "react";
-import { Sale, Warranty, Product } from "@/types";
+import { Sale, Warranty, Product, SaleItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
@@ -32,7 +32,7 @@ interface SalesHistoryClientProps {
 }
 
 export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
-  const [sales] = useState<Sale[]>(initialSales);
+  const [sales, setSales] = useState<Sale[]>(initialSales);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
@@ -59,6 +59,23 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const getProductCost = (productId: string) => {
     return products.find(p => p.id === productId)?.cost || 0;
   }
+
+  const renderSerials = (item: SaleItem) => {
+    if (!item.serials || item.serials.length === 0) {
+      return <p className="text-xs text-muted-foreground italic">Sin series</p>;
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {item.serials.map((serial, index) => (
+          <Badge key={index} variant="outline" className="font-mono text-xs">
+            <Hash className="w-3 h-3 mr-1" />
+            {serial}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
 
   return (
     <>
@@ -163,6 +180,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                             <TableHeader>
                                             <TableRow>
                                                 <TableHead>Producto</TableHead>
+                                                <TableHead>Series/IMEIs</TableHead>
                                                 <TableHead className="text-right">Cantidad</TableHead>
                                                 <TableHead className="text-right">Precio Unit.</TableHead>
                                                 <TableHead className="text-right">Costo Unit.</TableHead>
@@ -176,6 +194,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                                 return (
                                                 <TableRow key={item.productId}>
                                                     <TableCell>{item.name}</TableCell>
+                                                    <TableCell>{renderSerials(item)}</TableCell>
                                                     <TableCell className="text-right">{item.quantity}</TableCell>
                                                     <TableCell className="text-right">${item.priceAtSale.toFixed(2)}</TableCell>
                                                     <TableCell className="text-right">${cost.toFixed(2)}</TableCell>
