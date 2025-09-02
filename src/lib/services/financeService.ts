@@ -59,25 +59,25 @@ export const addExpense = async (
 ): Promise<Expense> => {
     const expenseId = `EXP-${uuidv4().split('-')[0].toUpperCase()}`;
     
-    let receiptUrl: string | undefined = undefined;
+    const dataToSave: any = {
+      ...expenseData,
+      expenseId,
+      paymentDate: serverTimestamp(),
+    };
+
     if (receiptFile) {
-        receiptUrl = await uploadReceipt(receiptFile, expenseId);
+        dataToSave.receiptUrl = await uploadReceipt(receiptFile, expenseId);
     }
 
     try {
-        const docRef = await addDoc(collection(db, EXPENSES_COLLECTION), {
-            ...expenseData,
-            expenseId,
-            receiptUrl,
-            paymentDate: serverTimestamp(),
-        });
+        const docRef = await addDoc(collection(db, EXPENSES_COLLECTION), dataToSave);
         
         return {
             id: docRef.id,
             expenseId,
             ...expenseData,
             paymentDate: new Date(),
-            receiptUrl
+            receiptUrl: dataToSave.receiptUrl
         };
 
     } catch (error) {
