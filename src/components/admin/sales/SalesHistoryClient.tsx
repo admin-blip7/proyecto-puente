@@ -111,8 +111,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableHeader>
                 <TableBody>
                     {sales.map((sale) => (
-                    <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
-                      <>
+                    <Collapsible key={sale.id} asChild open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
+                      <tbody className="w-full">
                         <TableRow className="cursor-pointer">
                             <TableCell>
                               <CollapsibleTrigger asChild>
@@ -191,7 +191,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                             </TableCell>
                           </TableRow>
                         </CollapsibleContent>
-                      </>
+                      </tbody>
                     </Collapsible>
                     ))}
                 </TableBody>
