@@ -137,20 +137,20 @@ export default function EditRepairDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado de la Reparación</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un estado..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {repairStatuses.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione un estado..." />
+                            </SelectTrigger>
+                          <SelectContent>
+                            {repairStatuses.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {status}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

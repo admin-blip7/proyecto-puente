@@ -121,20 +121,20 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onRepairAdded }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Falla Común Reportada</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccione una falla..." />
                       </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {commonIssues.map((issue) => (
-                        <SelectItem key={issue} value={issue}>
-                          {issue}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectContent>
+                        {commonIssues.map((issue) => (
+                          <SelectItem key={issue} value={issue}>
+                            {issue}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
