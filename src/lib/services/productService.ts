@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
-import { Product, StockEntryItem } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc } from "firebase/firestore";
+import { Product, StockEntryItem, SuggestedProduct } from "@/types";
+import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit } from "firebase/firestore";
 import { useAuth } from "../hooks";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
 
@@ -101,6 +101,39 @@ export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt'>)
         throw new Error("Failed to add product.");
     }
 };
+
+export const getSuggestedProducts = async (tags: string[], excludeIds: string[]): Promise<SuggestedProduct[]> => {
+    if (tags.length === 0 || tags.length > 10) {
+        // Firestore limit for array-contains-any is 10
+        return [];
+    }
+
+    const q = query(
+        collection(db, PRODUCTS_COLLECTION),
+        where('compatibilityTags', 'array-contains-any', tags),
+        limit(10) // Limit the number of suggestions
+    );
+
+    try {
+        const querySnapshot = await getDocs(q);
+        const suggestedProducts = querySnapshot.docs
+            .map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    name: data.name,
+                    price: data.price,
+                    imageUrl: data.imageUrl,
+                };
+            })
+            .filter(p => !excludeIds.includes(p.id)); // Filter out items already in the cart
+
+        return suggestedProducts;
+    } catch (error) {
+        console.error("Error fetching suggested products: ", error);
+        return [];
+    }
+}
 
 
 export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {

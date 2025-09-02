@@ -20,6 +20,14 @@ export interface Product {
   compatibilityTags?: string[];
 }
 
+export interface SuggestedProduct {
+  id: string;
+  name: string;
+  price: number;
+  imageUrl: string;
+}
+
+
 export interface Consignor {
     id: string;
     name: string;

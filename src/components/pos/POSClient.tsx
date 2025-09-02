@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Product, CartItem } from "@/types";
+import { useState, useMemo, useEffect } from "react";
+import { Product, CartItem, SuggestedProduct } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { ShoppingCartIcon, PlusCircle, Package } from "lucide-react";
+import { ShoppingCartIcon, PlusCircle, Package, Wand2 } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import Image from "next/image";
+import { getSuggestedProducts } from "@/lib/services/productService";
 
 interface POSClientProps {
   initialProducts: Product[];
@@ -23,21 +24,52 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
+  const [suggestedProducts, setSuggestedProducts] = useState<SuggestedProduct[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const fetchSuggestions = async (item: CartItem) => {
+    if (!item?.compatibilityTags || item.compatibilityTags.length === 0) {
+        setSuggestedProducts([]);
+        return;
+    }
+    setIsLoadingSuggestions(true);
+    const cartIds = cart.map(cartItem => cartItem.id);
+    const suggestions = await getSuggestedProducts(item.compatibilityTags, cartIds);
+    setSuggestedProducts(suggestions);
+    setIsLoadingSuggestions(false);
+  }
+
+  useEffect(() => {
+    if (selectedCartItem) {
+        fetchSuggestions(selectedCartItem);
+    } else {
+        setSuggestedProducts([]);
+    }
+  }, [selectedCartItem, cart]);
+
+
+  const addToCart = (product: Product | SuggestedProduct, quantity: number = 1) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
+      
+      const fullProduct = products.find(p => p.id === product.id);
+      if (!fullProduct) return prevCart; // Should not happen
+
       if (existingItem) {
         const newQuantity = existingItem.quantity + quantity;
-        if (newQuantity <= product.stock) {
+        if (newQuantity <= fullProduct.stock) {
           return prevCart.map((item) =>
             item.id === product.id ? { ...item, quantity: newQuantity } : item
           );
         }
         return prevCart;
       }
-      if (quantity <= product.stock) {
-        return [...prevCart, { ...product, quantity: quantity }];
+      if (quantity <= fullProduct.stock) {
+        const newItem = { ...fullProduct, quantity: quantity };
+        if (prevCart.length === 0) {
+            setSelectedCartItem(newItem);
+        }
+        return [...prevCart, newItem];
       }
       return prevCart;
     });
@@ -63,7 +95,8 @@ export default function POSClient({ initialProducts }: POSClientProps) {
        if (newQuantity === 0) {
          const newCart = prevCart.filter((item) => item.id !== productId);
          if(selectedCartItem?.id === productId) {
-            setSelectedCartItem(newCart.length > 0 ? newCart[0] : null);
+            const newSelectedItem = newCart.length > 0 ? newCart[0] : null;
+            setSelectedCartItem(newSelectedItem);
          }
          return newCart;
        }
@@ -102,15 +135,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const totalCartItems = useMemo(() => {
     return cart.reduce((total, item) => total + item.quantity, 0);
   }, [cart]);
-
-  // Set first item as selected when cart is populated
-  useState(() => {
-      if (cart.length > 0 && !selectedCartItem) {
-          setSelectedCartItem(cart[0]);
-      } else if (cart.length === 0 && selectedCartItem) {
-          setSelectedCartItem(null);
-      }
-  });
 
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-12">
@@ -175,6 +199,28 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                     <PlusCircle className="mr-2" />
                     Añadir Combo al Carrito
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+             {suggestedProducts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Wand2 className="h-5 w-5 text-primary"/>
+                    Productos Sugeridos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {suggestedProducts.map(p => (
+                    <div key={p.id} className="flex items-center gap-2 text-sm">
+                      <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" />
+                      <p className="flex-1 font-medium">{p.name}</p>
+                      <Button variant="outline" size="sm" onClick={() => addToCart(p, 1)}>
+                        <PlusCircle className="mr-2 h-4 w-4"/>
+                        ${p.price.toFixed(2)}
+                      </Button>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}
