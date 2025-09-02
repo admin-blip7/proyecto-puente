@@ -137,11 +137,12 @@ export default function EditRepairDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado de la Reparación</FormLabel>
-                      <FormControl>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione un estado..." />
                             </SelectTrigger>
+                          </FormControl>
                           <SelectContent>
                             {repairStatuses.map((status) => (
                               <SelectItem key={status} value={status}>
@@ -150,7 +151,6 @@ export default function EditRepairDialog({
                             ))}
                           </SelectContent>
                         </Select>
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
