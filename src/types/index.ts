@@ -48,10 +48,15 @@ export interface Warranty {
 export interface InventoryLog {
   id: string;
   productId: string;
+  productName: string;
   change: number;
-  reason: 'Venta realizada' | 'Ajuste manual' | 'Devolución' | 'Abastecimiento';
-  updatedBy: string;
+  reason: 'Venta' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto';
+  updatedBy: string; // User ID
   createdAt: Date;
+  metadata?: {
+    saleId?: string;
+    cost?: number;
+  };
 }
 
 export interface UserProfile {
@@ -63,4 +68,17 @@ export interface UserProfile {
 
 export interface CartItem extends Product {
   quantity: number;
+}
+
+// Types for the new Stock Entry module
+export interface StockEntryItem {
+  id: string; // Can be a temporary UUID for new products
+  productId?: string; // Will exist for existing products
+  sku: string;
+  name: string;
+  quantity: number;
+  price: number;
+  cost: number;
+  category: string;
+  isNew: boolean;
 }
