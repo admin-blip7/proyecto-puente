@@ -30,6 +30,19 @@ export interface Sale {
   createdAt: Date;
 }
 
+export interface Warranty {
+  id: string;
+  saleId: string;
+  productId: string;
+  productName: string;
+  customerName?: string;
+  customerPhone?: string;
+  status: 'Pendiente' | 'En Revisión' | 'Resuelta' | 'Rechazada';
+  reportedAt: Date;
+  resolutionDetails?: string;
+  resolvedAt?: Date;
+}
+
 export interface InventoryLog {
   id: string;
   productId: string;
