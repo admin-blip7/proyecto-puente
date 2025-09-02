@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { CartItem, SaleItem } from "@/types";
+import { CartItem, SaleItem, UserProfile } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { generateSalesSummary, GenerateSalesSummaryInput } from '@/ai/flows/generate-sales-summary';
 import { Loader2 } from "lucide-react";
 import SaleSummaryDialog from "./SaleSummaryDialog";
+import { addSaleAndUpdateStock } from "@/lib/services/salesService";
 
 interface CheckoutDialogProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         priceAtSale: item.price
     }));
 
-    const saleData: GenerateSalesSummaryInput = {
+    const saleDataForSummary: GenerateSalesSummaryInput = {
         items: saleItems,
         totalAmount,
         paymentMethod,
@@ -54,11 +55,21 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         customerName: customerName || undefined,
         customerPhone: customerPhone || undefined,
     };
+    
+    const saleDataForDb = {
+      items: saleItems,
+      totalAmount,
+      paymentMethod,
+      cashierId: userProfile.uid,
+      cashierName: userProfile.name,
+      customerName: customerName || undefined,
+      customerPhone: customerPhone || undefined,
+    }
 
     try {
-        console.log("Processing sale:", saleData);
+        await addSaleAndUpdateStock(saleDataForDb, cartItems);
 
-        const result = await generateSalesSummary(saleData);
+        const result = await generateSalesSummary(saleDataForSummary);
         setSaleSummary(result.summary);
         
         toast({
@@ -89,46 +100,42 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-bold tracking-tight">Checkout</DialogTitle>
+            <DialogTitle className="font-bold tracking-tight">Finalizar Venta</DialogTitle>
             <DialogDescription>
-              Select payment method to complete the transaction.
+              Seleccione el método de pago para completar la transacción.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
              <div className="space-y-2">
-                <Label htmlFor="customer-name">Customer Name (Optional)</Label>
-                <Input id="customer-name" placeholder="E.g., John Doe" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <Label htmlFor="customer-name">Nombre del Cliente (Opcional)</Label>
+                <Input id="customer-name" placeholder="Ej: Juan Pérez" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
             </div>
              <div className="space-y-2">
-                <Label htmlFor="customer-phone">Customer Phone (Optional)</Label>
-                <Input id="customer-phone" placeholder="E.g., 555-123-4567" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <Label htmlFor="customer-phone">Teléfono del Cliente (Opcional)</Label>
+                <Input id="customer-phone" placeholder="Ej: 555-123-4567" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
             </div>
             <div className="flex justify-between items-center text-xl font-bold">
-              <span>Total to Pay:</span>
+              <span>Total a Pagar:</span>
               <span className="text-primary">${totalAmount.toFixed(2)}</span>
             </div>
-            <RadioGroup defaultValue="Efectivo" onValueChange={(value: 'Efectivo' | 'Tarjeta de Crédito') => setPaymentMethod(value)}>
+            <RadioGroup defaultValue="Efectivo" onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito')}>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Cash" id="cash" />
-                <Label htmlFor="cash">Cash</Label>
+                <RadioGroupItem value="Efectivo" id="cash" />
+                <Label htmlFor="cash">Efectivo</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Card" id="card" />
-                <Label htmlFor="card">Card</Label>
-              </div>
-               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="E-Wallet" id="e-wallet" />
-                <Label htmlFor="e-wallet">E-Wallet</Label>
+                <RadioGroupItem value="Tarjeta de Crédito" id="card" />
+                <Label htmlFor="card">Tarjeta de Crédito</Label>
               </div>
             </RadioGroup>
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleProcessSale} disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm Sale
+              Confirmar Venta
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,13 +6,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { StoreIcon } from "lucide-react";
+import { UserProfile } from "@/types";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingrese un correo válido." }),
@@ -35,13 +37,25 @@ export default function LoginClient() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
+      // Try to sign in
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push("/");
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
-        // If user not found, try to create a new user
+        // If user not found, create a new user
         try {
-          await createUserWithEmailAndPassword(auth, values.email, values.password);
+          const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+          const user = userCredential.user;
+          
+          // Create user profile in Firestore
+          const userProfile: UserProfile = {
+            uid: user.uid,
+            name: user.displayName || "Admin de Tienda",
+            email: user.email!,
+            role: "Admin",
+          };
+          await setDoc(doc(db, "users", user.uid), userProfile);
+          
           router.push("/");
         } catch (createError: any) {
           toast({

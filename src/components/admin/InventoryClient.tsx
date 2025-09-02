@@ -26,14 +26,8 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
 
-  const handleAddProduct = (newProduct: Omit<Product, 'id' | 'createdAt' | 'imageUrl'>) => {
-    const productToAdd: Product = {
-      ...newProduct,
-      id: `prod_${products.length + 2}`, // simple id generation
-      createdAt: new Date(),
-      imageUrl: `https://picsum.photos/400/400?random=${products.length + 2}`
-    };
-    setProducts(prev => [...prev, productToAdd]);
+  const handleProductAdded = (newProduct: Product) => {
+    setProducts(prev => [newProduct, ...prev]);
   };
 
   return (
@@ -95,7 +89,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
       <AddProductDialog
         isOpen={isAddDialogOpen}
         onOpenChange={setAddDialogOpen}
-        onAddProduct={handleAddProduct}
+        onProductAdded={handleProductAdded}
       />
     </>
   );

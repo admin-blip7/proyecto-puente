@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "@/types";
+import { addProduct } from "@/lib/services/productService";
 
 interface AddProductDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddProduct: (product: Omit<Product, 'id' | 'createdAt' | 'imageUrl'>) => void;
+  onProductAdded: (product: Product) => void;
 }
 
 const formSchema = z.object({
@@ -26,7 +27,7 @@ const formSchema = z.object({
   category: z.string().min(1, "La categoría es requerida."),
 });
 
-export default function AddProductDialog({ isOpen, onOpenChange, onAddProduct }: AddProductDialogProps) {
+export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   
@@ -45,7 +46,12 @@ export default function AddProductDialog({ isOpen, onOpenChange, onAddProduct }:
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      onAddProduct(values);
+      const newProductData = {
+        ...values,
+        imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`
+      };
+      const newProduct = await addProduct(newProductData);
+      onProductAdded(newProduct);
       toast({
         title: "Producto Agregado",
         description: `El producto "${values.name}" ha sido agregado exitosamente.`,
@@ -53,6 +59,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onAddProduct }:
       form.reset();
       onOpenChange(false);
     } catch (error) {
+      console.error("Error adding product:", error);
       toast({
         variant: "destructive",
         title: "Error",
