@@ -91,7 +91,7 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
             <CardTitle>Vista Previa de Impresión de Etiquetas</CardTitle>
             <CardDescription>Se han generado {labels.length} etiquetas. Revisa la vista previa y procede a imprimir.</CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-4">
+          <CardContent className="flex flex-wrap gap-4">
             <Button onClick={onDone} variant="outline">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Volver

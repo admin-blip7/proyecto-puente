@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
 import PrintLabelsView from "./PrintLabelsView";
+import { Label } from "@/components/ui/label";
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -58,7 +59,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         setSearchQuery("");
         setPopoverOpen(false);
     };
-
+    
     const generateUniqueSku = () => {
         const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
         let newSku = '';
@@ -141,7 +142,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardTitle>Ingreso de Mercancía</CardTitle>
                     <CardDescription>Busca productos existentes o crea nuevos para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex items-center gap-4">
+                <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                     <Command className="w-full sm:w-80">
                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                             <PopoverTrigger asChild>
@@ -158,20 +159,22 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     }}
                                 />
                             </PopoverTrigger>
-                            <PopoverContent className="p-0 w-80" align="start">
-                                <CommandList>
-                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                    {filteredProducts.map(product => (
-                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                            {product.name} ({product.sku})
-                                        </CommandItem>
-                                    ))}
-                                </CommandList>
+                            <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                               <Command>
+                                  <CommandList>
+                                      <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                      {filteredProducts.map(product => (
+                                          <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                              {product.name} ({product.sku})
+                                          </CommandItem>
+                                      ))}
+                                  </CommandList>
+                                </Command>
                             </PopoverContent>
                         </Popover>
                     </Command>
 
-                    <Button onClick={handleAddNewProduct}>
+                    <Button onClick={handleAddNewProduct} className="w-full sm:w-auto">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Crear Nuevo Producto
                     </Button>
@@ -183,7 +186,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardTitle>Lista de Ingreso</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="relative w-full overflow-auto">
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -205,7 +209,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Input value={item.sku} readOnly className="bg-muted/50" />
+                                                <Input value={item.sku} readOnly={!item.isNew} className="bg-muted/50" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
@@ -217,10 +221,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                 <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew} className="text-right" />
+                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew} className="text-right" />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
+                                                <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
                                             </TableCell>
                                             <TableCell>
                                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
@@ -233,9 +237,56 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                             </TableBody>
                         </Table>
                     </div>
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4">
+                       {entryList.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-10">La lista de ingreso está vacía.</p>
+                       ) : (
+                           entryList.map(item => (
+                            <Card key={item.id} className="relative">
+                                <CardContent className="p-4 space-y-3">
+                                    <div className="absolute top-2 right-2">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveItem(item.id)}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <Label>Nombre Producto</Label>
+                                        <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <Label>SKU</Label>
+                                            <Input value={item.sku} readOnly={!item.isNew} className="bg-muted/50" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Categoría</Label>
+                                            <Input value={item.category} onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value)} disabled={!item.isNew} />
+                                        </div>
+                                    </div>
+                                     <div className="grid grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <Label>Cantidad</Label>
+                                            <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Precio Venta</Label>
+                                            <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew} className="text-right" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Costo</Label>
+                                            <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                           ))
+                       )}
+                    </div>
                 </CardContent>
                 <CardFooter className="justify-end">
-                    <Button size="lg" onClick={handleProcessEntry} disabled={isLoading || entryList.length === 0}>
+                    <Button size="lg" className="w-full sm:w-auto" onClick={handleProcessEntry} disabled={isLoading || entryList.length === 0}>
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                         Confirmar y Procesar Ingreso
                     </Button>
