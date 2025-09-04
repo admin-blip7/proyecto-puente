@@ -168,16 +168,13 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableHeader>
                 <TableBody>
                     {filteredSales.map((sale) => (
-                      <Collapsible asChild key={sale.id} open={openCollapsibles[sale.id] || false} onOpenChange={() => toggleCollapsible(sale.id)}>
-                        <>
-                          <TableRow className="cursor-pointer">
+                      <Fragment key={sale.id}>
+                          <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(sale.id)}>
                                 <TableCell>
-                                  <CollapsibleTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                          {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                          <span className="sr-only">Toggle details</span>
-                                      </Button>
-                                  </CollapsibleTrigger>
+                                  <Button variant="ghost" size="icon">
+                                      {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      <span className="sr-only">Toggle details</span>
+                                  </Button>
                                 </TableCell>
                                 <TableCell className="font-medium">{sale.saleId}</TableCell>
                                 <TableCell>
@@ -197,7 +194,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                                             <span className="sr-only">Abrir menú</span>
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
@@ -211,9 +208,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                     </DropdownMenu>
                                 </TableCell>
                             </TableRow>
-                            <TableRow>
-                                <TableCell colSpan={8} className="p-0 border-0">
-                                    <CollapsibleContent>
+                            {openCollapsibles[sale.id] && (
+                              <TableRow>
+                                  <TableCell colSpan={8} className="p-0 border-0">
                                       <div className="p-4 bg-muted/50">
                                         <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
                                         <Table>
@@ -248,11 +245,10 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                             </TableBody>
                                         </Table>
                                       </div>
-                                    </CollapsibleContent>
-                                </TableCell>
-                            </TableRow>
-                        </>
-                      </Collapsible>
+                                  </TableCell>
+                              </TableRow>
+                            )}
+                        </Fragment>
                     ))}
                 </TableBody>
                 </Table>
