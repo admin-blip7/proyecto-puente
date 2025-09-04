@@ -20,6 +20,7 @@ import { Badge } from "../ui/badge";
 import { X, PlusCircle, Sparkles, Loader2, UploadCloud } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
+import { optimizeProductImage } from "@/ai/flows/optimize-product-image";
 import Image from "next/image";
 
 interface AddProductDialogProps {
@@ -41,6 +42,7 @@ const formSchema = z.object({
   consignorId: z.string().optional(),
   comboProductIds: z.array(z.string()).optional(),
   image: z.custom<FileList>().optional(),
+  optimizedImage: z.custom<File>().optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -65,6 +67,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [comboSearch, setComboSearch] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -121,12 +124,51 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
+        form.setValue("optimizedImage", undefined); // Reset optimized image if user selects a new one
       };
       reader.readAsDataURL(file);
     } else {
         setImagePreview(null);
     }
   };
+
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    var arr = dataurl.split(','),
+        mimeMatch = arr[0].match(/:(.*?);/),
+        mime = mimeMatch ? mimeMatch[1] : 'image/png',
+        bstr = atob(arr[1]), 
+        n = bstr.length, 
+        u8arr = new Uint8Array(n);
+        
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new File([u8arr], filename, {type:mime});
+  }
+
+  const handleOptimizeImage = async () => {
+    if (!imagePreview) {
+        toast({ variant: 'destructive', title: "Error", description: "Sube una imagen primero para optimizarla."});
+        return;
+    }
+    setIsOptimizing(true);
+    try {
+        const result = await optimizeProductImage({ photoDataUri: imagePreview });
+        if (result.optimizedImageUri) {
+            setImagePreview(result.optimizedImageUri);
+            const optimizedFile = dataURLtoFile(result.optimizedImageUri, `optimized-${form.getValues('sku') || 'product'}.png`);
+            form.setValue('optimizedImage', optimizedFile);
+            toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
+        }
+    } catch(error) {
+        console.error("Error optimizing image:", error);
+        toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo optimizar la imagen."});
+    } finally {
+        setIsOptimizing(false);
+    }
+  }
+
 
   const handleToggleComboProduct = (productId: string) => {
     const currentIds = form.getValues("comboProductIds") || [];
@@ -154,7 +196,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         compatibilityTags: [], // Tags will be generated automatically
       };
       
-      const imageFile = values.image?.[0];
+      const imageFile = values.optimizedImage || values.image?.[0];
 
       const newProduct = await addProduct(newProductData, imageFile);
 
@@ -326,9 +368,17 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                     <div className="space-y-2">
                         <FormLabel>Imagen del Producto</FormLabel>
                         <div className="flex items-center justify-center w-full">
-                            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted">
+                            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted relative">
                                 {imagePreview ? (
-                                    <Image src={imagePreview} alt="Vista previa" width={140} height={140} className="object-contain h-full" />
+                                    <>
+                                        <Image src={imagePreview} alt="Vista previa" fill className="object-contain p-2" />
+                                        {isOptimizing && (
+                                            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
+                                                <Loader2 className="animate-spin h-8 w-8"/>
+                                                <p className="text-sm mt-2">Optimizando...</p>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                         <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
@@ -358,7 +408,11 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                                     )}
                                 />
                             </label>
-                        </div> 
+                        </div>
+                        <Button type="button" onClick={handleOptimizeImage} disabled={!imagePreview || isOptimizing} className="w-full">
+                            {isOptimizing ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            {form.getValues('optimizedImage') ? 'Re-optimizar' : 'Mejorar con IA'}
+                        </Button>
                     </div>
 
                     <div className="space-y-4">
