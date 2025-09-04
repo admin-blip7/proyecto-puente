@@ -8,7 +8,8 @@ import { getWarranties } from "@/lib/services/warrantyService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, Bot, Cpu, Loader2 } from "lucide-react";
-import { analyzeProductQuality, ProductQualityOutput } from "@/ai/flows/analyze-product-quality";
+import { analyzeProductQuality } from "@/ai/flows/analyze-product-quality";
+import { ProductQualityOutput } from "@/ai/flows/types";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProductQualityAnalysisProps {

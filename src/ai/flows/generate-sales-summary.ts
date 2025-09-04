@@ -1,5 +1,4 @@
 'use server';
-
 /**
  * @fileOverview This file defines a Genkit flow for generating a sales summary.
  *
@@ -9,29 +8,12 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const GenerateSalesSummaryInputSchema = z.object({
-  items: z.array(
-    z.object({
-      productId: z.string(),
-      name: z.string(),
-      quantity: z.number(),
-      priceAtSale: z.number(),
-    })
-  ).describe('A list of the products sold, including productId, name, quantity and priceAtSale.'),
-  totalAmount: z.number().describe('The total amount of the sale.'),
-  paymentMethod: z.string().describe('The payment method used for the sale (e.g., "Cash", "Credit Card").'),
-  cashierId: z.string().describe('The UID of the user who processed the sale.'),
-  customerName: z.string().optional().describe('The name of the customer.'),
-  customerPhone: z.string().optional().describe('The phone number of the customer.'),
-});
-export type GenerateSalesSummaryInput = z.infer<typeof GenerateSalesSummaryInputSchema>;
-
-const GenerateSalesSummaryOutputSchema = z.object({
-  summary: z.string().describe('A printable summary of the sale including items purchased, total amount, and applicable sales tax information, based on the current jurisdiction\'s tax laws.'),
-});
-export type GenerateSalesSummaryOutput = z.infer<typeof GenerateSalesSummaryOutputSchema>;
+import {
+    GenerateSalesSummaryInputSchema,
+    GenerateSalesSummaryOutputSchema,
+    GenerateSalesSummaryInput,
+    GenerateSalesSummaryOutput
+} from './types';
 
 export async function generateSalesSummary(input: GenerateSalesSummaryInput): Promise<GenerateSalesSummaryOutput> {
   return generateSalesSummaryFlow(input);

@@ -1,5 +1,4 @@
 'use server';
-
 /**
  * @fileOverview This file defines a Genkit flow for analyzing product quality based on sales and warranty data.
  *
@@ -9,32 +8,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-
-const SaleDataItemSchema = z.object({
-    productId: z.string(),
-    quantity: z.number(),
-});
-
-const WarrantyDataItemSchema = z.object({
-    productId: z.string(),
-    reason: z.string(),
-});
-
-export const ProductQualityInputSchema = z.object({
-  productName: z.string(),
-  totalSold: z.number(),
-  totalWarranties: z.number(),
-  warrantyRate: z.number().describe("The percentage of sales that resulted in a warranty claim."),
-  commonReasons: z.array(z.string()).describe("A list of the most common reasons cited for warranty claims."),
-});
-export type ProductQualityInput = z.infer<typeof ProductQualityInputSchema>;
-
-export const ProductQualityOutputSchema = z.object({
-  analysis: z.string().describe("A brief, insightful text analysis of the product's quality based on the provided data."),
-  recommendation: z.string().describe("A clear, actionable recommendation for the business owner regarding this product (e.g., contact supplier, monitor, remove from sale)."),
-});
-export type ProductQualityOutput = z.infer<typeof ProductQualityOutputSchema>;
+import {
+    ProductQualityInputSchema,
+    ProductQualityOutputSchema,
+    ProductQualityInput,
+    ProductQualityOutput
+} from './types';
 
 
 export async function analyzeProductQuality(input: ProductQualityInput): Promise<ProductQualityOutput> {

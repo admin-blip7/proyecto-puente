@@ -1,5 +1,4 @@
 'use server';
-
 /**
  * @fileOverview This file defines a Genkit flow for forecasting product demand.
  *
@@ -9,30 +8,13 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import {
+    ForecastDemandInputSchema,
+    ForecastDemandOutputSchema,
+    ForecastDemandInput,
+    ForecastDemandOutput
+} from './types';
 
-const SalesDataItemSchema = z.object({
-    date: z.string().describe("The date of the sales data point (YYYY-MM-DD)."),
-    quantitySold: z.number().describe("The total quantity sold on that date."),
-});
-
-const ForecastDemandInputSchema = z.object({
-  productName: z.string().describe("The name of the product being analyzed."),
-  historicalSales: z.array(SalesDataItemSchema).describe("An array of historical sales data for the product."),
-});
-export type ForecastDemandInput = z.infer<typeof ForecastDemandInputSchema>;
-
-
-const ForecastedPointSchema = z.object({
-    date: z.string().describe("The future date for the forecast (YYYY-MM-DD)."),
-    predictedQuantity: z.number().describe("The predicted sales quantity for that date."),
-});
-
-const ForecastDemandOutputSchema = z.object({
-  analysisSummary: z.string().describe("A brief, insightful text summary of the sales trend analysis and the forecast outlook."),
-  forecast: z.array(ForecastedPointSchema).describe("An array of forecasted sales data points for the next 30 days."),
-});
-export type ForecastDemandOutput = z.infer<typeof ForecastDemandOutputSchema>;
 
 export async function forecastDemand(input: ForecastDemandInput): Promise<ForecastDemandOutput> {
   return forecastDemandFlow(input);

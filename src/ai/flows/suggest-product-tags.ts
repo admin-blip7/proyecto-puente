@@ -1,5 +1,4 @@
 'use server';
-
 /**
  * @fileOverview This file defines a Genkit flow for suggesting product compatibility tags using AI.
  *
@@ -9,24 +8,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-
-const ExistingProductSchema = z.object({
-  name: z.string(),
-  tags: z.array(z.string()),
-});
-
-const SuggestTagsInputSchema = z.object({
-  productName: z.string().describe("The name of the product for which to suggest tags."),
-  productDescription: z.string().optional().describe("The description of the product."),
-  existingProducts: z.array(ExistingProductSchema).describe("A list of existing products with their current tags to provide context."),
-});
-export type SuggestTagsInput = z.infer<typeof SuggestTagsInputSchema>;
-
-const SuggestTagsOutputSchema = z.object({
-  suggestedTags: z.array(z.string()).describe("An array of suggested compatibility tags. The tags should be short, in lowercase, and use hyphens instead of spaces (e.g., 'iphone-15-pro', 'carga-rapida', 'accesorios-samsung')."),
-});
-export type SuggestTagsOutput = z.infer<typeof SuggestTagsOutputSchema>;
+import {
+    SuggestTagsInputSchema,
+    SuggestTagsOutputSchema,
+    SuggestTagsInput,
+    SuggestTagsOutput
+} from './types';
 
 
 export async function suggestProductTags(input: SuggestTagsInput): Promise<SuggestTagsOutput> {

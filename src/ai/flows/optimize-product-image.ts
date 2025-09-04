@@ -1,5 +1,4 @@
 'use server';
-
 /**
  * @fileOverview An AI flow to optimize a product image for e-commerce.
  *
@@ -9,21 +8,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-
-const OptimizeImageInputSchema = z.object({
-    photoDataUri: z
-      .string()
-      .describe(
-        "A photo of a product, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-      ),
-});
-export type OptimizeImageInput = z.infer<typeof OptimizeImageInputSchema>;
-
-const OptimizeImageOutputSchema = z.object({
-    optimizedImageUri: z.string().describe("The generated e-commerce-ready image of the product as a data URI."),
-});
-export type OptimizeImageOutput = z.infer<typeof OptimizeImageOutputSchema>;
+import { 
+    OptimizeImageInputSchema,
+    OptimizeImageOutputSchema,
+    OptimizeImageInput,
+    OptimizeImageOutput
+} from './types';
 
 export async function optimizeProductImage(input: OptimizeImageInput): Promise<OptimizeImageOutput> {
     return optimizeProductImageFlow(input);

@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { Product, Sale } from "@/types";
-import { forecastDemand, ForecastDemandOutput } from "@/ai/flows/forecast-demand";
+import { forecastDemand } from "@/ai/flows/forecast-demand";
+import { ForecastDemandOutput } from "@/ai/flows/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
