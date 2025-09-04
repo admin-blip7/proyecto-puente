@@ -2,7 +2,7 @@
 
 import { db, storage } from "@/lib/firebase";
 import { Product, StockEntryItem, SuggestedProduct, BulkUpdateData } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../hooks";
@@ -115,18 +115,49 @@ export const addProduct = async (
             }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
         }
 
-        return {
+        const newProduct = {
             id: productDocRef.id,
             ...productData,
             imageUrl,
             createdAt: new Date(),
         };
 
+        // This is a workaround to return the full product object after creation, including the possibly modified properties.
+        const finalProduct = await getDoc(productDocRef);
+
+        return productFromDoc(finalProduct as DocumentData);
+
     } catch (error) {
         console.error("Error adding product: ", error);
         throw new Error("Failed to add product.");
     }
 };
+
+export const updateProduct = async (
+    productId: string,
+    productData: Partial<Omit<Product, 'id' | 'createdAt'>>,
+    imageFile?: File
+): Promise<Product> => {
+    const productDocRef = doc(db, PRODUCTS_COLLECTION, productId);
+    let dataToUpdate: Partial<Product> = { ...productData };
+
+    if (imageFile) {
+        dataToUpdate.imageUrl = await uploadProductImage(imageFile, productId);
+    }
+    
+    try {
+        await updateDoc(productDocRef, dataToUpdate);
+        const updatedDoc = await getDoc(productDocRef);
+        if (!updatedDoc.exists()) {
+            throw new Error("Product not found after update.");
+        }
+        return productFromDoc(updatedDoc as DocumentData);
+    } catch (error) {
+        console.error("Error updating product: ", error);
+        throw new Error("Failed to update product.");
+    }
+};
+
 
 export const getSuggestedProducts = async (tags: string[], excludeIds: string[]): Promise<SuggestedProduct[]> => {
     if (tags.length === 0 || tags.length > 10) {

@@ -20,8 +20,9 @@ import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import DeleteProductsDialog from "./DeleteProductsDialog";
 import BulkEditDialog from "./BulkEditDialog";
-import { getProducts } from "@/lib/services/productService";
+import { getProducts, updateProduct } from "@/lib/services/productService";
 import { useToast } from "@/hooks/use-toast";
+import EditProductDialog from "./EditProductDialog";
 
 
 interface InventoryClientProps {
@@ -34,6 +35,8 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isBulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { toast } = useToast();
 
 
@@ -45,8 +48,17 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     setProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
     setSelectedProductIds([]);
   }
+
+  const handleOpenEditDialog = (product: Product) => {
+    setSelectedProduct(product);
+    setEditDialogOpen(true);
+  }
   
-  const handleProductsUpdated = async () => {
+  const handleProductUpdated = (updatedProduct: Product) => {
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+  }
+
+  const handleRefreshData = async () => {
     try {
         const updatedProducts = await getProducts();
         setProducts(updatedProducts);
@@ -137,6 +149,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     <TableHead>Propiedad</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -171,6 +184,12 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         </TableCell>
                         <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                         <TableCell className="text-right">{product.stock}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(product)}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Editar</span>
+                          </Button>
+                        </TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
@@ -184,6 +203,14 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         onOpenChange={setAddDialogOpen}
         onProductAdded={handleProductAdded}
       />
+       {selectedProduct && (
+        <EditProductDialog
+            isOpen={isEditDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            product={selectedProduct}
+            onProductUpdated={handleProductUpdated}
+        />
+       )}
       <DeleteProductsDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
@@ -194,7 +221,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         isOpen={isBulkEditDialogOpen}
         onOpenChange={setBulkEditDialogOpen}
         productIds={selectedProductIds}
-        onProductsUpdated={handleProductsUpdated}
+        onProductsUpdated={handleRefreshData}
       />
     </>
   );
