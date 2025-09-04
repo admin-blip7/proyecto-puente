@@ -20,29 +20,30 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
   }
 
   return (
-    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-xl rounded-2xl group min-h-[350px]">
-      <CardContent className="p-4 text-center flex flex-col flex-1">
-        <div className="relative h-40 w-40 mx-auto mb-4">
+    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
+      <CardContent className="p-2 text-center flex flex-col flex-1">
+        <div className="relative h-20 w-20 mx-auto mb-2">
             <Image
             src={product.imageUrl}
             alt={product.name}
             fill
-            sizes="160px"
+            sizes="80px"
             className="object-contain group-hover:scale-110 transition-transform duration-300"
             data-ai-hint={`${product.category} product`}
             />
         </div>
-        <h3 className="text-lg font-bold tracking-tight flex-1">{product.name}</h3>
-        <p className="text-sm text-muted-foreground mt-1">{product.category}</p>
-        <div className={cn("flex items-center justify-center gap-1 mt-2 font-semibold", getStockColor())}>
-            <Package className="w-4 h-4" />
-            <span className="text-sm">{product.stock} en Stock</span>
+        <h3 className="text-sm font-semibold tracking-tight leading-tight flex-1">{product.name}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{product.category}</p>
+        <div className={cn("flex items-center justify-center gap-1 mt-1 font-medium", getStockColor())}>
+            <Package className="w-3 h-3" />
+            <span className="text-xs">{product.stock} en Stock</span>
         </div>
       </CardContent>
-      <CardFooter className="p-4 flex justify-between items-center mt-auto">
-        <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
+      <CardFooter className="p-2 flex flex-col items-stretch mt-auto">
+        <p className="text-base font-bold text-primary mb-2">${product.price.toFixed(2)}</p>
         <Button
-          className="rounded-lg"
+          size="sm"
+          className="rounded-md w-full text-xs"
           onClick={() => onAddToCart(product)}
           disabled={isOutOfStock}
         >
@@ -50,6 +51,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
             "Agotado"
           ) : (
             <>
+              <PlusCircle className="mr-1 h-3 w-3" />
               Agregar
             </>
           )}

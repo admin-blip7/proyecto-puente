@@ -290,7 +290,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             </ScrollArea>
         </div>
         <ScrollArea className="flex-1 -mx-4 sm:-mx-6">
-          <div className="p-4 sm:p-6 grid gap-4 sm:gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))'}}>
+          <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))'}}>
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} onAddToCart={() => addToCart(product)} />
             ))}
