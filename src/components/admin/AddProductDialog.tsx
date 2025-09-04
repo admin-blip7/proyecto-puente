@@ -17,9 +17,10 @@ import { getConsignors } from "@/lib/services/consignorService";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "../ui/command";
 import { Badge } from "../ui/badge";
-import { X, PlusCircle, Sparkles, Loader2 } from "lucide-react";
+import { X, PlusCircle, Sparkles, Loader2, UploadCloud } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
+import Image from "next/image";
 
 interface AddProductDialogProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ const formSchema = z.object({
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
   comboProductIds: z.array(z.string()).optional(),
+  image: z.custom<FileList>().optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -62,6 +64,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const [consignors, setConsignors] = useState<Consignor[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [comboSearch, setComboSearch] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -108,8 +111,22 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         getProducts().then(setAllProducts);
     } else {
         form.reset();
+        setImagePreview(null);
     }
   }, [isOpen, form]);
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+        setImagePreview(null);
+    }
+  };
 
   const handleToggleComboProduct = (productId: string) => {
     const currentIds = form.getValues("comboProductIds") || [];
@@ -122,19 +139,29 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      const newProductData: Omit<Product, 'id' | 'createdAt'> = {
-        ...values,
+      const newProductData: Omit<Product, 'id' | 'createdAt' | 'imageUrl'> = {
+        name: values.name,
+        sku: values.sku,
+        price: values.price,
+        cost: values.cost,
+        stock: values.stock,
+        category: values.category,
+        type: values.type,
+        ownershipType: values.ownershipType,
         reorderPoint: values.reorderPoint || 0,
-        imageUrl: `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
         consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
         comboProductIds: values.comboProductIds || [],
         compatibilityTags: [], // Tags will be generated automatically
       };
-      const newProduct = await addProduct(newProductData);
+      
+      const imageFile = values.image?.[0];
+
+      const newProduct = await addProduct(newProductData, imageFile);
+
       onProductAdded(newProduct);
       toast({
         title: "Producto Agregado",
-        description: `El producto "${values.name}" ha sido agregado. Las etiquetas de IA se generarán en segundo plano.`,
+        description: `El producto "${values.name}" ha sido agregado.`,
       });
       onOpenChange(false);
     } catch (error) {
@@ -295,6 +322,45 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                       />
                   </div>
                   <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+                     {/* Image Upload Section */}
+                    <div className="space-y-2">
+                        <FormLabel>Imagen del Producto</FormLabel>
+                        <div className="flex items-center justify-center w-full">
+                            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted">
+                                {imagePreview ? (
+                                    <Image src={imagePreview} alt="Vista previa" width={140} height={140} className="object-contain h-full" />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                        <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
+                                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click para subir</span> o arrastra</p>
+                                        <p className="text-xs text-muted-foreground">PNG, JPG (MAX. 2MB)</p>
+                                    </div>
+                                )}
+                                <FormField
+                                    control={form.control}
+                                    name="image"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl>
+                                                <Input 
+                                                    id="dropzone-file" 
+                                                    type="file" 
+                                                    className="hidden" 
+                                                    accept="image/png, image/jpeg"
+                                                    onChange={(e) => {
+                                                        field.onChange(e.target.files);
+                                                        handleImageChange(e);
+                                                    }}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </label>
+                        </div> 
+                    </div>
+
                     <div className="space-y-4">
                       <h3 className="font-semibold text-lg">Armar Combo</h3>
                       <p className="text-sm text-muted-foreground">Selecciona productos que se venderán comúnmente con este artículo.</p>

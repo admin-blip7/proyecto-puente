@@ -1,13 +1,16 @@
 'use server';
 
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { Product, StockEntryItem, SuggestedProduct, BulkUpdateData } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../hooks";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
 
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
+const STORAGE_PRODUCT_IMAGES_PATH = "product-images";
 
 
 const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData): Product => {
@@ -57,17 +60,38 @@ export const getProductById = async (productId: string): Promise<Product | null>
     }
 };
 
+const uploadProductImage = async (file: File, productId: string): Promise<string> => {
+    const filePath = `${STORAGE_PRODUCT_IMAGES_PATH}/${productId}/${file.name}`;
+    const storageRef = ref(storage, filePath);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+};
 
-export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt'>): Promise<Product> => {
+
+export const addProduct = async (
+    productData: Omit<Product, 'id' | 'createdAt' | 'imageUrl'>,
+    imageFile?: File
+): Promise<Product> => {
+    
+    const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
+    let imageUrl = `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`;
+
+    if (imageFile) {
+        imageUrl = await uploadProductImage(imageFile, productDocRef.id);
+    }
+    
     try {
-        const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), {
+        const dataToSave = {
             ...productData,
             price: Number(productData.price) || 0,
             cost: Number(productData.cost) || 0,
             stock: Number(productData.stock) || 0,
             reorderPoint: Number(productData.reorderPoint) || 0,
+            imageUrl: imageUrl,
             createdAt: serverTimestamp(),
-        });
+        };
+
+        await setDoc(productDocRef, dataToSave);
 
         // Asynchronously generate tags without blocking the return
         if (productData.name) {
@@ -84,17 +108,17 @@ export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt'>)
                 })
                 .then(result => {
                     if (result.suggestedTags && result.suggestedTags.length > 0) {
-                        updateDoc(docRef, { compatibilityTags: result.suggestedTags });
+                        updateDoc(productDocRef, { compatibilityTags: result.suggestedTags });
                     }
                 })
                 .catch(error => console.error(`Error generating AI tags for ${productData.name}:`, error));
             }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
         }
 
-
         return {
-            id: docRef.id,
+            id: productDocRef.id,
             ...productData,
+            imageUrl,
             createdAt: new Date(),
         };
 
