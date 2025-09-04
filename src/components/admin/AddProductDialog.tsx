@@ -125,7 +125,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       const newProductData: Omit<Product, 'id' | 'createdAt'> = {
         ...values,
         reorderPoint: values.reorderPoint || 0,
-        imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
+        imageUrl: `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
         consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
         comboProductIds: values.comboProductIds || [],
         compatibilityTags: [], // Tags will be generated automatically

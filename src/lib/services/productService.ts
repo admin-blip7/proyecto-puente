@@ -1,3 +1,5 @@
+'use server';
+
 import { db } from "@/lib/firebase";
 import { Product, StockEntryItem, SuggestedProduct, BulkUpdateData } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment } from "firebase/firestore";
@@ -167,7 +169,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: `https://picsum.photos/400/400?random=${Math.random()}`,
+                    imageUrl: `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,
