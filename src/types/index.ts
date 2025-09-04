@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type OwnershipType = 'Propio' | 'Consigna' | 'Familiar';
 
 export const ownershipTypes: OwnershipType[] = ['Propio', 'Consigna', 'Familiar'];
@@ -232,3 +234,39 @@ export interface CashSession {
     actualCashCount?: number;
     difference?: number;
 }
+
+export const TicketSettingsSchema = z.object({
+  header: z.object({
+    showLogo: z.boolean(),
+    logoUrl: z.string().url().or(z.literal("")),
+    show: z.object({
+        storeName: z.boolean(),
+        address: z.boolean(),
+        phone: z.boolean(),
+        rfc: z.boolean(),
+        website: z.boolean(),
+    }),
+    storeName: z.string(),
+    address: z.string(),
+    phone: z.string(),
+    rfc: z.string(),
+    website: z.string(),
+  }),
+  body: z.object({
+    showQuantity: z.boolean(),
+    showUnitPrice: z.boolean(),
+    showTotal: z.boolean(),
+    fontSize: z.enum(["xs", "sm", "base"]),
+  }),
+  footer: z.object({
+    showSubtotal: z.boolean(),
+    showTaxes: z.boolean(),
+    showDiscounts: z.boolean(),
+    thankYouMessage: z.string(),
+    additionalInfo: z.string(),
+    showQrCode: z.boolean(),
+    qrCodeUrl: z.string().url().or(z.literal("")),
+  }),
+});
+
+export type TicketSettings = z.infer<typeof TicketSettingsSchema>;

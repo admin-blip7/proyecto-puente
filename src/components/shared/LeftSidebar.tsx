@@ -26,6 +26,7 @@ const navItems = [
     { href: '/admin/consignors', icon: Users, label: 'Consignors'},
     { href: '/admin/finance', icon: Landmark, label: 'Finance'},
     { href: '/admin/intelligence', icon: BrainCircuit, label: 'Intelligence'},
+    { href: '/admin/settings', icon: Settings, label: 'Settings'},
 ];
 
 const getInitials = (name: string) => {
@@ -97,9 +98,6 @@ export default function LeftSidebar() {
                     </DropdownMenuContent>
                     </DropdownMenu>
                  )}
-                 <Button variant="ghost" size="icon" className="rounded-lg w-12 h-12">
-                    <Settings className="h-6 w-6" />
-                </Button>
             </div>
         </aside>
     )
