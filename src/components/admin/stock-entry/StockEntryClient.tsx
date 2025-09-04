@@ -46,7 +46,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognition = new SpeechRecognition();
-                recognition.continuous = false;
+                recognition.continuous = true;
                 recognition.lang = 'es-MX';
                 recognition.interimResults = false;
 
@@ -59,7 +59,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 };
 
                 recognition.onresult = async (event) => {
-                    const transcript = event.results[0][0].transcript;
+                    const transcript = event.results[event.results.length - 1][0].transcript.trim();
                     toast({ title: "Comando reconocido", description: transcript });
                     try {
                         const result = await parseStockEntryCommand({ command: transcript });
