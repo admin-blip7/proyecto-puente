@@ -60,9 +60,7 @@ export const getCurrentOpenSession = async (userId: string): Promise<CashSession
     const q = query(
         collection(db, CASH_SESSIONS_COLLECTION),
         where("status", "==", "Abierto"),
-        where("openedBy", "==", userId),
-        orderBy("openedAt", "desc"),
-        limit(1)
+        where("openedBy", "==", userId)
     );
 
     try {
@@ -70,6 +68,7 @@ export const getCurrentOpenSession = async (userId: string): Promise<CashSession
         if (querySnapshot.empty) {
             return null;
         }
+        // Assuming a user can only have one open session at a time
         return sessionFromDoc(querySnapshot.docs[0]);
     } catch (error) {
         console.error("Error fetching open session: ", error);
