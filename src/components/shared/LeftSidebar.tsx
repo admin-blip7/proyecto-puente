@@ -18,10 +18,10 @@ import {
 
 const navItems = [
     { href: '/', icon: Home, label: 'Home' },
+    { href: '/admin', icon: PieChart, label: 'Admin Panel'},
     { href: '/admin/sales', icon: PieChart, label: 'History' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Warranties' },
     { href: '/admin/repairs', icon: Wrench, label: 'Repairs' },
-    { href: '/admin', icon: PieChart, label: 'Admin Panel'},
     { href: '/admin/stock-entry', icon: PackagePlus, label: 'Stock Entry'},
     { href: '/admin/consignors', icon: Users, label: 'Consignors'},
     { href: '/admin/finance', icon: Landmark, label: 'Finance'},
@@ -54,8 +54,7 @@ export default function LeftSidebar() {
                         <Link href={item.href} key={item.label}>
                             <Button variant="ghost" size="icon" className={cn(
                                 "rounded-lg w-12 h-12",
-                                pathname.startsWith(item.href) && item.href !== '/' && 'bg-primary/10 text-primary',
-                                pathname === '/' && item.href === '/' && 'bg-primary/10 text-primary'
+                                pathname === item.href && 'bg-primary/10 text-primary',
                             )}>
                                 <item.icon className="h-6 w-6" />
                             </Button>
