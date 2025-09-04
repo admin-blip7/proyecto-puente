@@ -28,6 +28,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ExpenseCategoryClient from "./categories/ExpenseCategoryClient";
 import { getExpenseCategories } from "@/lib/services/expenseCategoryService";
+import { addExpense } from "@/lib/services/financeService";
+import { useToast } from "@/hooks/use-toast";
 
 
 interface FinanceDashboardProps {
@@ -46,15 +48,21 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
     to: new Date(),
   });
   const pathname = usePathname();
+  const { toast } = useToast();
 
   const handleExpenseAdded = (newExpense: Expense) => {
     setExpenses(prev => [newExpense, ...prev].sort((a,b) => b.paymentDate.getTime() - a.paymentDate.getTime()));
+     toast({
+        title: "Gasto Registrado",
+        description: `Se registró un gasto de $${newExpense.amount.toFixed(2)}.`,
+      });
   };
   
   const getCurrentTab = () => {
     if (pathname.includes('/assets')) return 'assets';
     if (pathname.includes('/balance-sheet')) return 'balance-sheet';
     if (pathname.includes('/categories')) return 'categories';
+    if (pathname.includes('/cash-history')) return 'cash-history';
     return 'dashboard';
   }
 
@@ -106,11 +114,12 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
       </div>
       
       <Tabs value={getCurrentTab()}>
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 grid grid-cols-2 sm:grid-cols-5 h-auto">
           <TabsTrigger value="dashboard" asChild><Link href="/admin/finance">Dashboard</Link></TabsTrigger>
           <TabsTrigger value="assets" asChild><Link href="/admin/finance/assets">Activos Fijos</Link></TabsTrigger>
           <TabsTrigger value="balance-sheet" asChild><Link href="/admin/finance/balance-sheet">Balance General</Link></TabsTrigger>
-          <TabsTrigger value="categories" asChild><Link href="/admin/finance/categories">Categorías de Gastos</Link></TabsTrigger>
+          <TabsTrigger value="categories" asChild><Link href="/admin/finance/categories">Categorías</Link></TabsTrigger>
+          <TabsTrigger value="cash-history" asChild><Link href="/admin/finance/cash-history">Cortes de Caja</Link></TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
@@ -198,15 +207,7 @@ export default function FinanceDashboard({ initialExpenses, sales, repairs, init
                 </CardContent>
             </Card>
         </TabsContent>
-        <TabsContent value="assets">
-            <AssetClient initialAssets={initialAssets} />
-        </TabsContent>
-        <TabsContent value="balance-sheet">
-             <BalanceSheetClient assets={initialAssets} inventoryValue={inventoryValue} fixedAssetsValue={fixedAssetsValue} />
-        </TabsContent>
-        <TabsContent value="categories">
-            <ExpenseCategoryClient />
-        </TabsContent>
+        {/* The content for these tabs is managed by their respective pages */}
       </Tabs>
       
       <AddExpenseDialog

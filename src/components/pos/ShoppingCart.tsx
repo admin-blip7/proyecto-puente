@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
-import { MinusCircle, PlusCircle, Receipt, Wand2, Package } from "lucide-react";
+import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut } from "lucide-react";
 import CheckoutDialog from "./CheckoutDialog";
 import { useState, useMemo } from "react";
 import { Separator } from "../ui/separator";
@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/lib/hooks";
+import { addExpense } from "@/lib/services/financeService";
 
 interface ShoppingCartProps {
   cartItems: CartItem[];
@@ -24,6 +26,7 @@ interface ShoppingCartProps {
   onSelectItem: (item: CartItem) => void;
   suggestedProducts: SuggestedProduct[];
   onAddToCart: (product: Product | SuggestedProduct, quantity?: number) => void;
+  onCloseSession: () => void;
 }
 
 export default function ShoppingCart({ 
@@ -34,11 +37,13 @@ export default function ShoppingCart({
   selectedCartItem, 
   onSelectItem,
   suggestedProducts,
-  onAddToCart
+  onAddToCart,
+  onCloseSession
 }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
   const { toast } = useToast();
+  const { userProfile } = useAuth();
   const isMobile = useIsMobile();
 
   const itemsTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -50,12 +55,19 @@ export default function ShoppingCart({
     setCheckoutOpen(false);
   };
 
-  const handleExpenseAdded = () => {
-    toast({
-      title: "Gasto Registrado",
-      description: "El gasto ha sido registrado exitosamente desde la caja."
-    });
-    setExpenseOpen(false);
+  const handleExpenseAdded = async (description: string, amount: number, category: string) => {
+    if (!userProfile) return;
+    try {
+        await addExpense({ description, amount, category }, undefined, userProfile.uid);
+        toast({
+            title: "Gasto Registrado",
+            description: "El gasto ha sido registrado exitosamente desde la caja."
+        });
+        setExpenseOpen(false);
+    } catch(error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo registrar el gasto."})
+    }
   }
 
   const renderCartContent = () => (
@@ -132,8 +144,12 @@ export default function ShoppingCart({
   return (
     <>
       <Card className="flex flex-col h-full border-0 shadow-none rounded-none">
-        <CardHeader className="p-6">
+        <CardHeader className="p-6 flex flex-row items-center justify-between">
           <CardTitle className="text-2xl font-bold tracking-tight">Mi Pedido</CardTitle>
+          <Button variant="outline" size="sm" onClick={onCloseSession}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Hacer Corte
+          </Button>
         </CardHeader>
         <CardContent className="p-0 flex-1 min-h-0">
           {isMobile ? (

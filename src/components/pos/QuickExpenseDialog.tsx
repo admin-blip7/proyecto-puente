@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 interface QuickExpenseDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onExpenseAdded: () => void;
+  onExpenseAdded: (description: string, amount: number, category: string) => Promise<void>;
 }
 
 const formSchema = z.object({
@@ -38,7 +38,7 @@ export default function QuickExpenseDialog({ isOpen, onOpenChange, onExpenseAdde
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { description: "", amount: 0 },
+    defaultValues: { description: "", amount: 0, category: "Retiro de Caja" },
   });
 
   useEffect(() => {
@@ -67,16 +67,10 @@ export default function QuickExpenseDialog({ isOpen, onOpenChange, onExpenseAdde
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      await addExpense(values);
-      onExpenseAdded();
+      await onExpenseAdded(values.description, values.amount, values.category);
       handleDialogClose(false);
     } catch (error) {
-      console.error("Error registering quick expense:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo registrar el gasto.",
-      });
+      // Error is handled by the parent component's toast
     } finally {
       setLoading(false);
     }
@@ -84,7 +78,7 @@ export default function QuickExpenseDialog({ isOpen, onOpenChange, onExpenseAdde
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
-      form.reset();
+      form.reset({ description: "", amount: 0, category: "Retiro de Caja" });
     }
     onOpenChange(open);
   };

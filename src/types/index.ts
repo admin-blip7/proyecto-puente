@@ -213,3 +213,22 @@ export interface BulkUpdateData {
     tagsToAdd?: string[];
     tagsToRemove?: string[];
 }
+
+export interface CashSession {
+    id: string;
+    sessionId: string;
+    status: 'Abierto' | 'Cerrado';
+    openedBy: string;
+    openedByName: string;
+    openedAt: Date;
+    startingFloat: number;
+    closedBy?: string;
+    closedByName?: string;
+    closedAt?: Date;
+    totalCashSales: number;
+    totalCardSales: number;
+    totalCashPayouts: number; // Gastos rápidos
+    expectedCashInDrawer: number;
+    actualCashCount?: number;
+    difference?: number;
+}

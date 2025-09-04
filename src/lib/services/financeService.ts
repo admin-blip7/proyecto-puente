@@ -11,12 +11,17 @@ import {
   orderBy,
   DocumentData,
   QueryDocumentSnapshot,
+  runTransaction,
+  limit,
+  increment,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 
 const EXPENSES_COLLECTION = "expenses";
 const STORAGE_RECEIPTS_PATH = "receipts";
+const CASH_SESSIONS_COLLECTION = "cash_sessions";
+
 
 const expenseFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Expense => {
     const data = doc.data();
@@ -55,11 +60,12 @@ const uploadReceipt = async (file: File, expenseId: string): Promise<string> => 
 
 export const addExpense = async (
     expenseData: Omit<Expense, 'id' | 'expenseId' | 'paymentDate' | 'receiptUrl'>,
-    receiptFile?: File
+    receiptFile?: File,
+    userId?: string
 ): Promise<Expense> => {
     const expenseId = `EXP-${uuidv4().split('-')[0].toUpperCase()}`;
     
-    const dataToSave: any = {
+    let dataToSave: any = {
       ...expenseData,
       expenseId,
       paymentDate: serverTimestamp(),
@@ -68,20 +74,37 @@ export const addExpense = async (
     if (receiptFile) {
         dataToSave.receiptUrl = await uploadReceipt(receiptFile, expenseId);
     }
+    
+    await runTransaction(db, async (transaction) => {
+        // 1. Create the expense document
+        const expenseRef = doc(collection(db, EXPENSES_COLLECTION));
+        transaction.set(expenseRef, dataToSave);
+        dataToSave.id = expenseRef.id;
 
-    try {
-        const docRef = await addDoc(collection(db, EXPENSES_COLLECTION), dataToSave);
-        
-        return {
-            id: docRef.id,
-            expenseId,
-            ...expenseData,
-            paymentDate: new Date(),
-            receiptUrl: dataToSave.receiptUrl
-        };
+        // 2. If it's a quick expense from POS, update the cash session
+        if (userId && expenseData.category === 'Retiro de Caja') {
+            const activeSessionQuery = query(
+                collection(db, CASH_SESSIONS_COLLECTION),
+                where("status", "==", "Abierto"),
+                where("openedBy", "==", userId),
+                orderBy("openedAt", "desc"),
+                limit(1)
+            );
+            const activeSessionSnapshot = await getDocs(activeSessionQuery);
+            if (!activeSessionSnapshot.empty) {
+                const sessionRef = activeSessionSnapshot.docs[0].ref;
+                transaction.update(sessionRef, {
+                    totalCashPayouts: increment(expenseData.amount)
+                });
+            }
+        }
+    });
 
-    } catch (error) {
-        console.error("Error adding expense: ", error);
-        throw new Error("Failed to add expense.");
-    }
+    return {
+        id: dataToSave.id,
+        expenseId,
+        ...expenseData,
+        paymentDate: new Date(),
+        receiptUrl: dataToSave.receiptUrl,
+    };
 };

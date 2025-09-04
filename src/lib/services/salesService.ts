@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
-import { Sale, CartItem, Product } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction } from "firebase/firestore";
+import { Sale, CartItem, Product, CashSession } from "@/types";
+import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction, query, where, limit, orderBy, increment } from "firebase/firestore";
 import { v4 as uuidv4 } from 'uuid';
 import { getProductById } from "./productService";
 import { updateConsignorBalance } from "./consignorService";
@@ -9,6 +9,7 @@ import { updateConsignorBalance } from "./consignorService";
 const SALES_COLLECTION = "sales";
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
+const CASH_SESSIONS_COLLECTION = "cash_sessions";
 
 const saleFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Sale => {
     const data = doc.data();
@@ -45,12 +46,27 @@ export const addSaleAndUpdateStock = async (
     const saleId = `SALE-${uuidv4().split('-')[0].toUpperCase()}`;
 
     await runTransaction(db, async (transaction) => {
+        // 0. Find the active cash session
+        const activeSessionQuery = query(
+            collection(db, CASH_SESSIONS_COLLECTION),
+            where("status", "==", "Abierto"),
+            where("openedBy", "==", saleData.cashierId),
+            orderBy("openedAt", "desc"),
+            limit(1)
+        );
+        const activeSessionSnapshot = await getDocs(activeSessionQuery);
+        let activeSessionRef = null;
+        if (!activeSessionSnapshot.empty) {
+            activeSessionRef = activeSessionSnapshot.docs[0].ref;
+        }
+
         // 1. Add the sale document
         const saleRef = doc(collection(db, SALES_COLLECTION));
         transaction.set(saleRef, {
             ...saleData,
             saleId: saleId,
             createdAt: serverTimestamp(),
+            sessionId: activeSessionRef ? activeSessionRef.id : null,
         });
 
         // 2. Process each item in the cart
@@ -88,6 +104,15 @@ export const addSaleAndUpdateStock = async (
             if (productData.ownershipType === 'Consigna' && productData.consignorId) {
                 const amountDue = productData.cost * item.quantity;
                 await updateConsignorBalance(transaction, productData.consignorId, amountDue);
+            }
+        }
+        
+        // 3. Update active cash session totals
+        if (activeSessionRef) {
+            if (saleData.paymentMethod === 'Efectivo') {
+                transaction.update(activeSessionRef, { totalCashSales: increment(saleData.totalAmount) });
+            } else {
+                transaction.update(activeSessionRef, { totalCardSales: increment(saleData.totalAmount) });
             }
         }
     });

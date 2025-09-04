@@ -1,19 +1,26 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Product, CartItem, SuggestedProduct } from "@/types";
+import { Product, CartItem, SuggestedProduct, CashSession } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { ShoppingCartIcon, PlusCircle, Package, Wand2 } from "lucide-react";
+import { ShoppingCartIcon, PlusCircle, Package, Wand2, Lock, Unlock } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import Image from "next/image";
 import { getSuggestedProducts } from "@/lib/services/productService";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getCurrentOpenSession, openCashSession, closeCashSession } from "@/lib/services/cashSessionService";
+import { useAuth } from "@/lib/hooks";
+import { useToast } from "@/hooks/use-toast";
+import OpenCashDrawerDialog from "./OpenCashDrawerDialog";
+import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
+import { Skeleton } from "../ui/skeleton";
+
 
 interface POSClientProps {
   initialProducts: Product[];
@@ -27,7 +34,20 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
   const [suggestedProducts, setSuggestedProducts] = useState<SuggestedProduct[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [activeSession, setActiveSession] = useState<CashSession | null | undefined>(undefined); // undefined means loading
+  const [isOpeningDrawer, setOpeningDrawer] = useState(false);
+  const [isClosingDrawer, setClosingDrawer] = useState(false);
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
   const isMobile = useIsMobile();
+
+
+  useEffect(() => {
+    if (userProfile) {
+      getCurrentOpenSession(userProfile.uid).then(setActiveSession);
+    }
+  }, [userProfile]);
+
 
   const fetchSuggestions = async (item: CartItem) => {
     if (!item?.compatibilityTags || item.compatibilityTags.length === 0) {
@@ -138,6 +158,31 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     return cart.reduce((total, item) => total + item.quantity, 0);
   }, [cart]);
 
+  const handleOpenDrawer = async (startingFloat: number) => {
+    if (!userProfile) return;
+    try {
+        const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat);
+        setActiveSession(newSession);
+        setOpeningDrawer(false);
+        toast({ title: "Turno Abierto", description: "La caja está lista para registrar ventas."})
+    } catch(error) {
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo abrir el turno de caja."})
+    }
+  }
+
+  const handleCloseDrawer = async (actualCash: number) => {
+    if (!userProfile || !activeSession) return;
+    try {
+        const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
+        setActiveSession(null);
+        setClosingDrawer(false);
+        toast({ title: "Turno Cerrado", description: `Diferencia de caja: $${closedSession.difference?.toFixed(2)}.`})
+    } catch(error) {
+        toast({ variant: 'destructive', title: "Error", description: "No se pudo cerrar el turno de caja."})
+    }
+  }
+
+
   const renderSuggestionsPanel = () => (
      <div className="w-full h-full p-4 space-y-4 bg-muted/30 flex flex-col">
         <h3 className="font-bold text-lg">Sugerencias</h3>
@@ -183,8 +228,45 @@ export default function POSClient({ initialProducts }: POSClientProps) {
          </ScrollArea>
      </div>
   );
+  
+  if (activeSession === undefined) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <div className="space-y-4 w-full max-w-lg p-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-48 w-full" />
+            </div>
+        </div>
+    )
+  }
+
+  if (!activeSession) {
+    return (
+        <>
+            <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-4">
+                    <Lock className="h-16 w-16 mx-auto text-muted-foreground" />
+                    <h2 className="text-2xl font-bold">Caja Cerrada</h2>
+                    <p className="text-muted-foreground">Debes abrir un turno para poder empezar a vender.</p>
+                    <Button size="lg" onClick={() => setOpeningDrawer(true)}>
+                        <Unlock className="mr-2"/>
+                        Abrir Turno
+                    </Button>
+                </div>
+            </div>
+            <OpenCashDrawerDialog 
+                isOpen={isOpeningDrawer}
+                onOpenChange={setOpeningDrawer}
+                onConfirm={handleOpenDrawer}
+            />
+        </>
+    )
+  }
+
 
   return (
+    <>
     <div className="grid h-full grid-cols-1 lg:grid-cols-12 overflow-hidden">
       <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6">
         <Header searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
@@ -225,6 +307,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               onSelectItem={setSelectedCartItem}
               suggestedProducts={suggestedProducts}
               onAddToCart={addToCart}
+              onCloseSession={() => setClosingDrawer(true)}
             />
          </div>
          <div className="w-80 h-full border-l">
@@ -259,10 +342,18 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 onSelectItem={setSelectedCartItem}
                 suggestedProducts={suggestedProducts}
                 onAddToCart={addToCart}
+                onCloseSession={() => setClosingDrawer(true)}
              />
           </SheetContent>
         </Sheet>
       </div>
     </div>
+     <CloseCashDrawerDialog
+        isOpen={isClosingDrawer}
+        onOpenChange={setClosingDrawer}
+        session={activeSession}
+        onConfirm={handleCloseDrawer}
+      />
+    </>
   );
 }
