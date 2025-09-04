@@ -95,3 +95,15 @@ export const SuggestTagsOutputSchema = z.object({
   suggestedTags: z.array(z.string()).describe("An array of suggested compatibility tags. The tags should be short, in lowercase, and use hyphens instead of spaces (e.g., 'iphone-15-pro', 'carga-rapida', 'accesorios-samsung')."),
 });
 export type SuggestTagsOutput = z.infer<typeof SuggestTagsOutputSchema>;
+
+// Types for: parse-stock-entry-command
+export const StockEntryCommandInputSchema = z.object({
+  command: z.string().describe('The transcribed voice command from the user.'),
+});
+export type StockEntryCommandInput = z.infer<typeof StockEntryCommandInputSchema>;
+
+export const StockEntryCommandOutputSchema = z.object({
+  quantity: z.number().describe('The extracted quantity of the product.'),
+  productName: z.string().describe('The extracted name of the product.'),
+});
+export type StockEntryCommandOutput = z.infer<typeof StockEntryCommandOutputSchema>;

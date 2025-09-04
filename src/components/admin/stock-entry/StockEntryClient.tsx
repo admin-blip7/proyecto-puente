@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
@@ -17,6 +17,9 @@ import PrintLabelsView from "./PrintLabelsView";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
+import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
+import { cn } from "@/lib/utils";
+
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -29,13 +32,63 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [isLoading, setIsLoading] = useState(false);
     const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
     const [consignors, setConsignors] = useState<Consignor[]>([]);
+    const [isListening, setIsListening] = useState(false);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
 
     const { userProfile } = useAuth();
     const { toast } = useToast();
 
     useEffect(() => {
         getConsignors().then(setConsignors);
-    }, []);
+        
+        // Setup Speech Recognition
+        if (typeof window !== 'undefined') {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'es-MX';
+                recognition.interimResults = false;
+
+                recognition.onstart = () => setIsListening(true);
+                recognition.onend = () => setIsListening(false);
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error', event.error);
+                    toast({ variant: 'destructive', title: "Error de Voz", description: "No se pudo iniciar el reconocimiento de voz." });
+                    setIsListening(false);
+                };
+
+                recognition.onresult = async (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    toast({ title: "Comando reconocido", description: transcript });
+                    try {
+                        const result = await parseStockEntryCommand({ command: transcript });
+                        if (result.productName && result.quantity) {
+                            handleAddNewProduct(result.productName, result.quantity);
+                            toast({ title: "Producto Agregado", description: `${result.quantity} x ${result.productName}` });
+                        }
+                    } catch (error) {
+                        console.error('Error parsing command', error);
+                        toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo interpretar el comando." });
+                    }
+                };
+                recognitionRef.current = recognition;
+            }
+        }
+    }, [toast]);
+
+    const handleMicClick = () => {
+        if (!recognitionRef.current) {
+             toast({ variant: 'destructive', title: "No Soportado", description: "El reconocimiento de voz no es compatible con este navegador." });
+            return;
+        }
+        if (isListening) {
+            recognitionRef.current.stop();
+        } else {
+            recognitionRef.current.start();
+        }
+    };
+
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
@@ -84,13 +137,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     };
 
 
-    const handleAddNewProduct = () => {
+    const handleAddNewProduct = (name: string = '', quantity: number = 1) => {
         const newSku = generateUniqueSku();
         setEntryList(prev => [...prev, {
             id: uuidv4(),
             sku: newSku,
-            name: '',
-            quantity: 1,
+            name: name,
+            quantity: quantity,
             price: 0,
             cost: 0,
             category: '',
@@ -179,7 +232,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             <Card>
                 <CardHeader>
                     <CardTitle>Ingreso de Mercancía</CardTitle>
-                    <CardDescription>Busca productos existentes o crea nuevos para agregarlos a la lista de ingreso.</CardDescription>
+                    <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                     <Command>
@@ -211,10 +264,20 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                         </Popover>
                     </Command>
 
-                    <Button onClick={handleAddNewProduct} className="w-full sm:w-auto">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Crear Nuevo Producto
-                    </Button>
+                     <div className="flex w-full sm:w-auto items-center gap-2">
+                        <Button onClick={() => handleAddNewProduct()} className="w-full">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Crear Nuevo
+                        </Button>
+                        <Button
+                            onClick={handleMicClick}
+                            size="icon"
+                            variant={isListening ? "destructive" : "outline"}
+                            className={cn("transition-all", isListening && "animate-pulse")}
+                            >
+                            {isListening ? <MicOff /> : <Mic />}
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
