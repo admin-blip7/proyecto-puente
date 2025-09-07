@@ -252,7 +252,8 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
         // If it was a new product, now generate tags asynchronously
         if (isNewProduct && item.productId) {
              try {
-                const allProducts = await getProducts(); // Get context of existing products
+                // We run this outside the transaction to avoid read-after-write errors.
+                const allProducts = await getProducts(); 
                 const existingProductsForAI = allProducts.map(p => ({
                     name: p.name,
                     tags: p.compatibilityTags || [],
@@ -264,6 +265,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 });
 
                 if (result.suggestedTags.length > 0) {
+                    // This is a separate write, not part of the transaction.
                     await updateDoc(productRef, { compatibilityTags: result.suggestedTags });
                 }
             } catch (aiError) {
@@ -347,3 +349,4 @@ export const bulkUpdateProducts = async (productIds: string[], updateData: BulkU
         }
     });
 };
+
