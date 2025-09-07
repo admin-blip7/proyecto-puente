@@ -196,20 +196,23 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
     const processedItems: StockEntryItem[] = [];
 
+    // The AI tag generation should happen outside any transaction.
+    // We can run it after the transaction successfully commits.
+    const newProductsForTagging: { id: string; name: string }[] = [];
+
     for (const item of entryItems) {
         const isNewProduct = !item.productId;
         const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
 
         await runTransaction(db, async (transaction) => {
+            // --- READ PHASE ---
             const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
 
+            // --- WRITE PHASE ---
             if (productDoc && productDoc.exists()) {
                 // UPDATE EXISTING PRODUCT
-                const currentStock = productDoc.data().stock || 0;
-                const newStock = currentStock + item.quantity;
-                
                 transaction.update(productRef, {
-                    stock: newStock,
+                    stock: increment(item.quantity),
                     cost: item.cost,
                     price: item.price,
                     ownershipType: item.ownershipType,
@@ -230,10 +233,11 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     ownershipType: item.ownershipType,
                     consignorId: item.consignorId || null,
                     comboProductIds: [],
-                    compatibilityTags: [] // Start with empty tags
+                    compatibilityTags: []
                 };
                 transaction.set(productRef, newProductData);
-                item.productId = productRef.id; // Assign new ID back to item
+                item.productId = productRef.id;
+                newProductsForTagging.push({ id: productRef.id, name: item.name });
             }
 
             // INVENTORY LOG for both new and existing
@@ -249,33 +253,36 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
             });
         });
 
-        // If it was a new product, now generate tags asynchronously
-        if (isNewProduct && item.productId) {
-             try {
-                // We run this outside the transaction to avoid read-after-write errors.
-                const allProducts = await getProducts(); 
-                const existingProductsForAI = allProducts.map(p => ({
-                    name: p.name,
-                    tags: p.compatibilityTags || [],
-                }));
-
-                const result = await suggestProductTags({
-                    productName: item.name,
-                    existingProducts: existingProductsForAI
-                });
-
-                if (result.suggestedTags.length > 0) {
-                    // This is a separate write, not part of the transaction.
-                    await updateDoc(productRef, { compatibilityTags: result.suggestedTags });
-                }
-            } catch (aiError) {
-                console.error(`Failed to generate AI tags for ${item.name}:`, aiError);
-                // Don't block the process, just log the error
-            }
-        }
-
         processedItems.push(item);
     }
+    
+    // Asynchronously generate tags for all new products after transactions are complete
+    if (newProductsForTagging.length > 0) {
+        try {
+            const allProducts = await getProducts();
+            const existingProductsForAI = allProducts.map(p => ({
+                name: p.name,
+                tags: p.compatibilityTags || [],
+            }));
+
+            for (const newProd of newProductsForTagging) {
+                suggestProductTags({
+                    productName: newProd.name,
+                    existingProducts: existingProductsForAI
+                })
+                .then(result => {
+                    if (result.suggestedTags.length > 0) {
+                        const productRef = doc(db, PRODUCTS_COLLECTION, newProd.id);
+                        updateDoc(productRef, { compatibilityTags: result.suggestedTags });
+                    }
+                })
+                .catch(aiError => console.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
+            }
+        } catch (error) {
+            console.error("Error fetching products for AI tagging:", error);
+        }
+    }
+
     return processedItems;
 };
 
@@ -295,12 +302,14 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
 
 export const bulkUpdateProducts = async (productIds: string[], updateData: BulkUpdateData): Promise<void> => {
     await runTransaction(db, async (transaction) => {
-        for (const id of productIds) {
-            const productRef = doc(db, PRODUCTS_COLLECTION, id);
-            const productDoc = await transaction.get(productRef);
+        // --- READ PHASE ---
+        const productDocs = await Promise.all(productIds.map(id => transaction.get(doc(db, PRODUCTS_COLLECTION, id))));
 
+        // --- WRITE PHASE ---
+        for (const productDoc of productDocs) {
             if (!productDoc.exists()) continue;
 
+            const productRef = productDoc.ref;
             const currentData = productDoc.data();
             let newData: { [key: string]: any } = {};
 

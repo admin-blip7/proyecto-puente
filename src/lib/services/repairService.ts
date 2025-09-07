@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
 import { RepairOrder, RepairPart, Product } from "@/types";
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, DocumentData, QueryDocumentSnapshot, runTransaction, writeBatch } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, DocumentData, QueryDocumentSnapshot, runTransaction, writeBatch, increment } from "firebase/firestore";
 
 const REPAIRS_COLLECTION = "repair_orders";
 const PRODUCTS_COLLECTION = "products";
@@ -99,18 +99,20 @@ export const addPartToRepairOrder = async (
     userId: string
   ): Promise<RepairOrder> => {
     const productRef = doc(db, PRODUCTS_COLLECTION, part.id);
+    const orderRef = doc(db, REPAIRS_COLLECTION, order.id);
   
     return runTransaction(db, async (transaction) => {
+      // --- READ PHASE ---
       const productDoc = await transaction.get(productRef);
+      
       if (!productDoc.exists() || productDoc.data().stock < quantity) {
         throw new Error("Stock insuficiente o producto no encontrado.");
       }
-  
-      // Descontar stock
+      
+      // --- WRITE PHASE ---
       const newStock = productDoc.data().stock - quantity;
       transaction.update(productRef, { stock: newStock });
   
-      // Registrar en inventory_logs
       const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
       transaction.set(logRef, {
         productId: part.id,
@@ -122,8 +124,6 @@ export const addPartToRepairOrder = async (
         metadata: { repairOrderId: order.orderId, cost: part.cost }
       });
   
-      // Actualizar la orden de reparación
-      const orderRef = doc(db, REPAIRS_COLLECTION, order.id);
       const existingPartIndex = order.partsUsed.findIndex(p => p.productId === part.id);
       let newPartsUsed = [...order.partsUsed];
   
@@ -155,3 +155,4 @@ export const addPartToRepairOrder = async (
       return { ...order, ...updatedOrderData };
     });
   };
+
