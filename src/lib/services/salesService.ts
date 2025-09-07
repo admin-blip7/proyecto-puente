@@ -1,3 +1,4 @@
+
 import { db } from "@/lib/firebase";
 import { Sale, CartItem, Product, CashSession } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction, query, where, limit, orderBy, increment } from "firebase/firestore";
@@ -10,6 +11,7 @@ const SALES_COLLECTION = "sales";
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
 const CASH_SESSIONS_COLLECTION = "cash_sessions";
+const CONSIGNORS_COLLECTION = "consignors";
 
 const saleFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Sale => {
     const data = doc.data();
@@ -135,3 +137,4 @@ export const addSaleAndUpdateStock = async (
 
     return saleId;
 };
+
