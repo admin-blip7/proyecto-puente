@@ -270,3 +270,23 @@ export const TicketSettingsSchema = z.object({
 });
 
 export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
+
+export const LabelSettingsSchema = z.object({
+    width: z.coerce.number().positive(),
+    height: z.coerce.number().positive(),
+    margin: z.coerce.number().min(0),
+    gap: z.coerce.number().min(0),
+    fontSize: z.coerce.number().positive(),
+    barcodeHeight: z.coerce.number().positive(),
+    includeLogo: z.boolean(),
+    logoUrl: z.string().url().or(z.literal("")),
+    storeName: z.string(),
+    content: z.object({
+        showProductName: z.boolean(),
+        showSku: z.boolean(),
+        showPrice: z.boolean(),
+        showStoreName: z.boolean(),
+    }),
+});
+
+export type LabelSettings = z.infer<typeof LabelSettingsSchema>;

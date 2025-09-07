@@ -3,11 +3,14 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import TicketDesignerClient from "@/components/admin/settings/TicketDesignerClient";
-import { getTicketSettings } from "@/lib/services/settingsService";
+import { getTicketSettings, getLabelSettings } from "@/lib/services/settingsService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import LabelDesignerClient from "@/components/admin/settings/LabelDesignerClient";
 
 
 export default async function SettingsPage() {
-    const initialSettings = await getTicketSettings();
+    const initialTicketSettings = await getTicketSettings();
+    const initialLabelSettings = await getLabelSettings();
    
     return (
         <div className="flex h-screen w-full flex-row">
@@ -28,7 +31,18 @@ export default async function SettingsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-              <TicketDesignerClient initialSettings={initialSettings} />
+              <Tabs defaultValue="tickets" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="tickets">Diseño de Tickets</TabsTrigger>
+                    <TabsTrigger value="labels">Diseño de Etiquetas</TabsTrigger>
+                </TabsList>
+                <TabsContent value="tickets" className="mt-6">
+                    <TicketDesignerClient initialSettings={initialTicketSettings} />
+                </TabsContent>
+                <TabsContent value="labels" className="mt-6">
+                    <LabelDesignerClient initialSettings={initialLabelSettings} />
+                </TabsContent>
+              </Tabs>
             </main>
         </div>
     )

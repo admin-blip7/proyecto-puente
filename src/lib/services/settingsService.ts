@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { TicketSettings, TicketSettingsSchema } from "@/types";
+import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema } from "@/types";
 import {
   doc,
   getDoc,
@@ -9,9 +9,12 @@ import {
 
 const SETTINGS_COLLECTION = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
+const LABEL_SETTINGS_DOC_ID = "label_design";
 
-// Default settings in case nothing is in the database
-const defaultSettings: TicketSettings = {
+
+// --- TICKET SETTINGS ---
+
+const defaultTicketSettings: TicketSettings = {
     header: {
         showLogo: true,
         logoUrl: "",
@@ -51,30 +54,26 @@ export const getTicketSettings = async (): Promise<TicketSettings> => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-            // Validate data from Firestore against the Zod schema
             const parsed = TicketSettingsSchema.safeParse(docSnap.data());
             if (parsed.success) {
                 return parsed.data;
             } else {
                 console.warn("Invalid ticket settings in Firestore, returning defaults.", parsed.error);
-                return defaultSettings;
+                return defaultTicketSettings;
             }
         } else {
-            // If document doesn't exist, create it with defaults
-            await setDoc(docRef, { ...defaultSettings, lastUpdated: serverTimestamp() });
-            return defaultSettings;
+            await setDoc(docRef, { ...defaultTicketSettings, lastUpdated: serverTimestamp() });
+            return defaultTicketSettings;
         }
     } catch (error) {
         console.error("Error fetching ticket settings: ", error);
-        // Return defaults on error to prevent app crash
-        return defaultSettings;
+        return defaultTicketSettings;
     }
 }
 
 
 export const saveTicketSettings = async (settings: TicketSettings): Promise<void> => {
     try {
-        // Validate settings with Zod before saving
         const validatedSettings = TicketSettingsSchema.parse(settings);
         const settingsRef = doc(db, SETTINGS_COLLECTION, TICKET_SETTINGS_DOC_ID);
         await setDoc(settingsRef, {
@@ -85,5 +84,64 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
     } catch (error) {
         console.error("Error saving ticket settings: ", error);
         throw new Error("Failed to save ticket settings.");
+    }
+};
+
+
+// --- LABEL SETTINGS ---
+
+const defaultLabelSettings: LabelSettings = {
+    width: 66.7, // 2.625 inches in mm
+    height: 25.4, // 1 inch in mm
+    margin: 10,
+    gap: 0,
+    fontSize: 9,
+    barcodeHeight: 30,
+    includeLogo: false,
+    logoUrl: "",
+    storeName: "Nombre de tu Tienda",
+    content: {
+        showProductName: true,
+        showSku: true,
+        showPrice: true,
+        showStoreName: false,
+    },
+};
+
+export const getLabelSettings = async (): Promise<LabelSettings> => {
+    try {
+        const docRef = doc(db, SETTINGS_COLLECTION, LABEL_SETTINGS_DOC_ID);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const parsed = LabelSettingsSchema.safeParse(docSnap.data());
+            if (parsed.success) {
+                return parsed.data;
+            } else {
+                console.warn("Invalid label settings in Firestore, returning defaults.", parsed.error);
+                return defaultLabelSettings;
+            }
+        } else {
+            await setDoc(docRef, { ...defaultLabelSettings, lastUpdated: serverTimestamp() });
+            return defaultLabelSettings;
+        }
+    } catch (error) {
+        console.error("Error fetching label settings: ", error);
+        return defaultLabelSettings;
+    }
+}
+
+export const saveLabelSettings = async (settings: LabelSettings): Promise<void> => {
+    try {
+        const validatedSettings = LabelSettingsSchema.parse(settings);
+        const settingsRef = doc(db, SETTINGS_COLLECTION, LABEL_SETTINGS_DOC_ID);
+        await setDoc(settingsRef, {
+            ...validatedSettings,
+            lastUpdated: serverTimestamp()
+        }, { merge: true });
+
+    } catch (error) {
+        console.error("Error saving label settings: ", error);
+        throw new Error("Failed to save label settings.");
     }
 };
