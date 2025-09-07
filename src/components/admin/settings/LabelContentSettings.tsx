@@ -3,7 +3,7 @@
 import { useFormContext } from "react-hook-form";
 import { LabelSettings } from "@/types";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormDescription, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
