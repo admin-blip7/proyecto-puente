@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { CartItem, SaleItem, UserProfile } from "@/types";
+import { CartItem, Sale, SaleItem, UserProfile } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
-import { generateSalesSummary } from '@/ai/flows/generate-sales-summary';
-import { GenerateSalesSummaryInput } from '@/ai/flows/types';
 import { Loader2 } from "lucide-react";
 import SaleSummaryDialog from "./SaleSummaryDialog";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
@@ -31,7 +29,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [serials, setSerials] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
-  const [saleSummary, setSaleSummary] = useState<string | null>(null);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [isSummaryOpen, setSummaryOpen] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -71,15 +69,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         priceAtSale: item.price,
         serials: serials[item.id] || [],
     }));
-
-    const saleDataForSummary: GenerateSalesSummaryInput = {
-        items: saleItems,
-        totalAmount,
-        paymentMethod,
-        cashierId: userProfile.uid,
-        customerName: customerName || undefined,
-        customerPhone: customerPhone || undefined,
-    };
     
     const saleDataForDb = {
       items: saleItems,
@@ -92,10 +81,9 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     }
 
     try {
-        await addSaleAndUpdateStock(saleDataForDb, cartItems);
+        const newSale = await addSaleAndUpdateStock(saleDataForDb, cartItems);
 
-        const result = await generateSalesSummary(saleDataForSummary);
-        setSaleSummary(result.summary);
+        setLastSale(newSale);
         
         toast({
             title: "Venta Exitosa",
@@ -221,11 +209,11 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         </DialogContent>
       </Dialog>
 
-      {saleSummary && (
+      {lastSale && (
         <SaleSummaryDialog
           isOpen={isSummaryOpen}
           onOpenChange={setSummaryOpen}
-          summary={saleSummary}
+          sale={lastSale}
         />
       )}
     </>
