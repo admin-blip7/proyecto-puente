@@ -16,8 +16,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddEditConsignorDialog from "./AddEditConsignorDialog";
 import DeleteConsignorDialog from "./DeleteConsignorDialog";
+import RegisterPaymentDialog from "./RegisterPaymentDialog";
 import { DollarSign, MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 interface ConsignorClientProps {
   initialConsignors: Consignor[];
@@ -28,6 +29,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   const [selectedConsignor, setSelectedConsignor] = useState<Consignor | null>(null);
   const [isAddEditDialogOpen, setAddEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const handleOpenAddDialog = () => {
     setSelectedConsignor(null);
@@ -43,6 +45,11 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
     setSelectedConsignor(consignor);
     setDeleteDialogOpen(true);
   };
+  
+  const handleOpenPaymentDialog = (consignor: Consignor) => {
+    setSelectedConsignor(consignor);
+    setPaymentDialogOpen(true);
+  };
 
   const handleConsignorAdded = (newConsignor: Consignor) => {
     setConsignors(prev => [newConsignor, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
@@ -54,6 +61,14 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   
   const handleConsignorDeleted = (consignorId: string) => {
       setConsignors(prev => prev.filter(c => c.id !== consignorId));
+  };
+  
+  const handlePaymentRegistered = (consignorId: string, amountPaid: number) => {
+      setConsignors(prev => prev.map(c => 
+        c.id === consignorId 
+            ? { ...c, balanceDue: c.balanceDue - amountPaid } 
+            : c
+      ));
   };
 
 
@@ -70,7 +85,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
         <CardHeader>
           <CardTitle>Lista de Consignadores</CardTitle>
            <CardDescription>
-            Agrega, edita o elimina la información de tus consignadores.
+            Agrega, edita, elimina o registra pagos a tus consignadores.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,6 +120,11 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleOpenPaymentDialog(consignor)}>
+                                            <DollarSign className="mr-2 h-4 w-4" />
+                                            <span>Registrar Pago</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => handleOpenEditDialog(consignor)}>
                                             <Edit className="mr-2 h-4 w-4" />
                                             <span>Editar</span>
@@ -133,12 +153,20 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
         onConsignorUpdated={handleConsignorUpdated}
       />
       {selectedConsignor && (
-        <DeleteConsignorDialog
-            isOpen={isDeleteDialogOpen}
-            onOpenChange={setDeleteDialogOpen}
-            consignor={selectedConsignor}
-            onConsignorDeleted={handleConsignorDeleted}
-        />
+        <>
+            <DeleteConsignorDialog
+                isOpen={isDeleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
+                consignor={selectedConsignor}
+                onConsignorDeleted={handleConsignorDeleted}
+            />
+            <RegisterPaymentDialog 
+                isOpen={isPaymentDialogOpen}
+                onOpenChange={setPaymentDialogOpen}
+                consignor={selectedConsignor}
+                onPaymentRegistered={handlePaymentRegistered}
+            />
+        </>
       )}
     </>
   );
