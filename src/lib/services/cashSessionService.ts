@@ -43,12 +43,13 @@ const sessionFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): CashSession =
 export const getAllClosedSessions = async (): Promise<CashSession[]> => {
     const q = query(
         collection(db, CASH_SESSIONS_COLLECTION),
-        where("status", "==", "Cerrado"),
-        orderBy("closedAt", "desc")
+        where("status", "==", "Cerrado")
     );
     try {
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(sessionFromDoc);
+        const sessions = querySnapshot.docs.map(sessionFromDoc);
+        // Sort client-side to avoid composite index
+        return sessions.sort((a,b) => (b.closedAt?.getTime() || 0) - (a.closedAt?.getTime() || 0));
     } catch (error) {
         console.error("Error fetching closed cash sessions: ", error);
         throw new Error("Failed to fetch closed sessions.");
@@ -57,8 +58,6 @@ export const getAllClosedSessions = async (): Promise<CashSession[]> => {
 
 
 export const getCurrentOpenSession = async (userId: string): Promise<CashSession | null> => {
-    // Simplified query to avoid composite index requirement.
-    // A user should only have one open session at a time.
     const q = query(
         collection(db, CASH_SESSIONS_COLLECTION),
         where("status", "==", "Abierto"),
