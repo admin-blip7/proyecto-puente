@@ -19,20 +19,20 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
 
   useEffect(() => {
     try {
-        if (document.getElementById('barcode-preview')) {
-            JsBarcode('#barcode-preview', sampleItem.sku, {
-                format: "CODE128",
-                displayValue: false,
-                height: 30,
-                width: 1.5,
-                margin: 0,
-            });
-        }
+      if (document.getElementById('barcode-preview')) {
+          JsBarcode('#barcode-preview', sampleItem.sku, {
+              format: "CODE128",
+              displayValue: false,
+              height: settings.barcodeHeight,
+              width: 1.5,
+              margin: 0,
+          });
+      }
     } catch(e) {
         // Can fail if SKU is invalid during typing
         console.error(e);
     }
-  }, [sampleItem.sku]);
+  }, [settings.barcodeHeight, sampleItem.sku]);
 
   const labelStyle: React.CSSProperties = {
     width: `${settings.width}mm`,
