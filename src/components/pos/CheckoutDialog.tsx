@@ -141,7 +141,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                                 {Array.from({ length: item.quantity }).map((_, index) => (
                                     <Input 
-                                        key={index}
+                                        key={`${item.id}-${index}`}
                                         placeholder={`Serie/IMEI #${index + 1}`}
                                         value={serials[item.id]?.[index] || ''}
                                         onChange={(e) => handleSerialChange(item.id, index, e.target.value)}

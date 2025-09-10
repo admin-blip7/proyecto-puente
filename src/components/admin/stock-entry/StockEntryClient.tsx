@@ -380,26 +380,28 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                             <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                         </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label>Tipo de Propiedad</Label>
-                                        <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
-                                            <SelectTrigger><SelectValue placeholder="Tipo Propiedad" /></SelectTrigger>
-                                            <SelectContent>
-                                                {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {item.ownershipType === 'Consigna' && (
+                                    <div className="grid grid-cols-1 gap-2">
                                         <div className="space-y-1">
-                                            <Label>Consignador</Label>
-                                            <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
-                                                <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                            <Label>Tipo de Propiedad</Label>
+                                            <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
+                                                <SelectTrigger><SelectValue placeholder="Tipo Propiedad" /></SelectTrigger>
                                                 <SelectContent>
-                                                    {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                    {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                    )}
+                                        {item.ownershipType === 'Consigna' && (
+                                            <div className="space-y-1">
+                                                <Label>Consignador</Label>
+                                                <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
+                                                    <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                                    <SelectContent>
+                                                        {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                    </div>
                                      <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>Precio Venta</Label>
