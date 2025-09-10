@@ -383,7 +383,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     <div className="space-y-1">
                                         <Label>Tipo de Propiedad</Label>
                                         <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
-                                            <SelectTrigger><SelectValue/></SelectTrigger>
+                                            <SelectTrigger><SelectValue placeholder="Tipo Propiedad" /></SelectTrigger>
                                             <SelectContent>
                                                 {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                                             </SelectContent>
