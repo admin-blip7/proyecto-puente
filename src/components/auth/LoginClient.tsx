@@ -7,22 +7,41 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, sendPasswordResetEmail } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { StoreIcon } from "lucide-react";
+import { StoreIcon, Eye, EyeOff, Loader2 } from "lucide-react";
 import { UserProfile } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingrese un correo válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
+const resetFormSchema = z.object({
+    resetEmail: z.string().email({ message: "Por favor ingrese un correo válido." })
+})
+
 export default function LoginClient() {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResetLoading, setResetLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+
   const router = useRouter();
   const { toast } = useToast();
 
@@ -34,6 +53,30 @@ export default function LoginClient() {
     },
   });
 
+  const handlePasswordReset = async () => {
+    if (!resetEmail) {
+        toast({ variant: "destructive", title: "Error", description: "El campo de correo no puede estar vacío."});
+        return;
+    }
+    setResetLoading(true);
+    try {
+        await sendPasswordResetEmail(auth, resetEmail);
+        toast({
+            title: "Correo Enviado",
+            description: "Si existe una cuenta con ese correo, recibirás instrucciones para restablecer tu contraseña."
+        });
+    } catch(error: any) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No se pudo enviar el correo de restablecimiento."
+        })
+    } finally {
+        setResetLoading(false);
+    }
+  }
+
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
@@ -41,8 +84,8 @@ export default function LoginClient() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push("/");
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found') {
-        // If user not found, create a new user
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // If user not found, create a new user (for demo purposes)
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
           const user = userCredential.user;
@@ -107,21 +150,66 @@ export default function LoginClient() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
+                   <div className="relative">
+                        <FormControl>
+                            <Input 
+                                type={showPassword ? "text" : "password"} 
+                                placeholder="••••••••" 
+                                {...field} 
+                            />
+                        </FormControl>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+                            onClick={() => setShowPassword(prev => !prev)}
+                        >
+                            {showPassword ? <EyeOff /> : <Eye />}
+                        </Button>
+                   </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+              {loading ? <><Loader2 className="animate-spin mr-2"/> Iniciando...</> : "Iniciar Sesión"}
             </Button>
           </form>
         </Form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Intente con <strong>admin@tienda.com</strong> y <strong>password</strong>
-        </p>
+        <div className="mt-4 text-center">
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="link" className="text-sm text-muted-foreground px-1">
+                        ¿Olvidaste tu contraseña?
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Restablecer Contraseña</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Ingresa tu correo electrónico y te enviaremos un enlace para que puedas restablecer tu contraseña.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="reset-email">Correo electrónico</Label>
+                        <Input 
+                            id="reset-email"
+                            type="email" 
+                            placeholder="tu@correo.com"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handlePasswordReset} disabled={isResetLoading}>
+                       {isResetLoading ? <><Loader2 className="animate-spin mr-2"/> Enviando...</> : "Enviar Correo"}
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   );

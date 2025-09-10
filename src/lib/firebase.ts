@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore, setDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -17,4 +17,4 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage, setDoc };
+export { app, auth, db, storage, setDoc, sendPasswordResetEmail };
