@@ -23,6 +23,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </AuthProvider>
+        <div id="portal-root" />
       </body>
     </html>
   );
