@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { CashSession } from "@/types";
+import { Account, CashSession } from "@/types";
 import {
   collection,
   query,
@@ -13,10 +13,14 @@ import {
   updateDoc,
   DocumentData,
   QueryDocumentSnapshot,
+  runTransaction,
+  increment,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 
 const CASH_SESSIONS_COLLECTION = "cash_sessions";
+const ACCOUNTS_COLLECTION = "accounts";
+
 
 const sessionFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): CashSession => {
     const data = doc.data();
@@ -133,7 +137,29 @@ export const closeCashSession = async (
     };
 
     try {
-        await updateDoc(sessionRef, closingData);
+         await runTransaction(db, async (transaction) => {
+            // Find default accounts
+            const cashAccountQuery = query(collection(db, ACCOUNTS_COLLECTION), where("name", "==", "Caja Chica"), limit(1));
+            const bankAccountQuery = query(collection(db, ACCOUNTS_COLLECTION), where("name", "==", "Banco Principal"), limit(1));
+            
+            const cashAccountSnapshot = await getDocs(cashAccountQuery);
+            const bankAccountSnapshot = await getDocs(bankAccountQuery);
+
+            const cashAccountRef = !cashAccountSnapshot.empty ? cashAccountSnapshot.docs[0].ref : null;
+            const bankAccountRef = !bankAccountSnapshot.empty ? bankAccountSnapshot.docs[0].ref : null;
+
+            // 1. Close the session
+            transaction.update(sessionRef, closingData);
+
+            // 2. Update account balances
+            if (cashAccountRef && session.totalCashSales > 0) {
+                transaction.update(cashAccountRef, { currentBalance: increment(session.totalCashSales) });
+            }
+            if (bankAccountRef && session.totalCardSales > 0) {
+                transaction.update(bankAccountRef, { currentBalance: increment(session.totalCardSales) });
+            }
+        });
+
         return {
             ...session,
             ...closingData,

@@ -56,6 +56,7 @@ export interface Sale {
   customerName: string | null;
   customerPhone: string | null;
   createdAt: Date;
+  sessionId?: string;
 }
 
 export interface Warranty {

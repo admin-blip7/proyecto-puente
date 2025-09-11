@@ -10,6 +10,7 @@ import { getProducts } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
 import { getConsignorPayments } from "@/lib/services/paymentService";
 import { getAllClosedSessions } from "@/lib/services/cashSessionService";
+import { getAccounts } from "@/lib/services/accountService";
 
 
 export default async function FinancePage() {
@@ -19,6 +20,7 @@ export default async function FinancePage() {
     const products = await getProducts();
     const consignors = await getConsignors();
     const cashSessions = await getAllClosedSessions();
+    const accounts = await getAccounts();
 
     // Fetch all payments for all consignors
     const consignorPayments = (await Promise.all(
@@ -52,6 +54,7 @@ export default async function FinancePage() {
                 initialConsignors={consignors}
                 initialConsignorPayments={consignorPayments}
                 initialCashSessions={cashSessions}
+                initialAccounts={accounts}
                />
             </main>
         </div>

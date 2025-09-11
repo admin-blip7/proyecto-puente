@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -13,22 +13,34 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from "@/components/ui/collapsible";
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
   
 
-const navItems = [
-    { href: '/', icon: Home, label: 'Home' },
-    { href: '/admin', icon: PieChart, label: 'Admin Panel'},
-    { href: '/admin/sales', icon: PieChart, label: 'History' },
-    { href: '/admin/warranties', icon: ShieldCheck, label: 'Warranties' },
-    { href: '/admin/repairs', icon: Wrench, label: 'Repairs' },
-    { href: '/admin/stock-entry', icon: PackagePlus, label: 'Stock Entry'},
-    { href: '/admin/consignors', icon: Users, label: 'Consignors'},
-    { href: '/admin/finance', icon: Landmark, label: 'Finance'},
-    { href: '/admin/intelligence', icon: BrainCircuit, label: 'Intelligence'},
-    { href: '/admin/settings', icon: Settings, label: 'Settings'},
+const mainNavItems = [
+    { href: '/', icon: Home, label: 'Punto de Venta' },
+    { href: '/admin', icon: PackagePlus, label: 'Inventario'},
+    { href: '/admin/sales', icon: PieChart, label: 'Ventas' },
+    { href: '/admin/repairs', icon: Wrench, label: 'Reparaciones' },
+    { href: '/admin/warranties', icon: ShieldCheck, label: 'Garantías' },
+    { href: '/admin/stock-entry', icon: PackagePlus, label: 'Ingresar Stock'},
+    { href: '/admin/consignors', icon: Users, label: 'Consignadores'},
+    { href: '/admin/intelligence', icon: BrainCircuit, label: 'Inteligencia'},
+    { href: '/admin/settings', icon: Settings, label: 'Ajustes'},
 ];
+
+const financeNavItems = [
+    { href: '/admin/finance/accounts', icon: Banknote, label: 'Cuentas' },
+    { href: '/admin/finance/balance-sheet', icon: Scale, label: 'Balance General' },
+    { href: '/admin/finance/assets', icon: Building, label: 'Activos Fijos' },
+    { href: '/admin/finance/categories', icon: PieChart, label: 'Categorías Gastos' },
+    { href: '/admin/finance/cash-history', icon: Landmark, label: 'Cortes de Caja' },
+]
 
 const getInitials = (name: string) => {
     if (!name) return "";
@@ -42,6 +54,7 @@ const getInitials = (name: string) => {
 export default function LeftSidebar() {
     const pathname = usePathname();
     const { userProfile, signOut } = useAuth();
+    const isFinanceRoute = pathname.startsWith('/admin/finance');
 
     return (
         <aside className="flex flex-col items-center justify-between w-full md:w-20 bg-card p-4 h-full md:shadow-2xl">
@@ -53,7 +66,7 @@ export default function LeftSidebar() {
                         </div>
                     </Link>
                     <nav className="flex flex-col items-center gap-4">
-                        {navItems.map((item) => (
+                        {mainNavItems.map((item) => (
                             <Tooltip key={item.label}>
                                 <TooltipTrigger asChild>
                                     <Link href={item.href}>
@@ -70,6 +83,44 @@ export default function LeftSidebar() {
                                 </TooltipContent>
                             </Tooltip>
                         ))}
+                         <Collapsible>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <CollapsibleTrigger asChild>
+                                        <Button variant="ghost" size="icon" className={cn(
+                                            "rounded-lg w-12 h-12",
+                                            isFinanceRoute && 'bg-primary/10 text-primary',
+                                        )}>
+                                            <Landmark className="h-6 w-6" />
+                                        </Button>
+                                    </CollapsibleTrigger>
+                                </TooltipTrigger>
+                                 <TooltipContent side="right" sideOffset={5}>
+                                    <p>Finanzas</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <CollapsibleContent>
+                               <div className="flex flex-col items-center gap-2 mt-2">
+                                {financeNavItems.map(item => (
+                                     <Tooltip key={item.label}>
+                                        <TooltipTrigger asChild>
+                                            <Link href={item.href}>
+                                                <Button variant="ghost" size="icon" className={cn(
+                                                    "rounded-lg w-10 h-10",
+                                                    pathname === item.href && 'bg-primary/20 text-primary',
+                                                )}>
+                                                    <item.icon className="h-5 w-5" />
+                                                </Button>
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right" sideOffset={5}>
+                                            <p>{item.label}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ))}
+                               </div>
+                            </CollapsibleContent>
+                        </Collapsible>
                     </nav>
                 </div>
                 <div className="flex flex-col items-center gap-4">
