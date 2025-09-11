@@ -33,6 +33,7 @@ const expenseFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Expense => {
         amount: data.amount,
         paymentDate: data.paymentDate.toDate(),
         receiptUrl: data.receiptUrl,
+        sessionId: data.sessionId,
     }
 }
 
@@ -75,28 +76,35 @@ export const addExpense = async (
         dataToSave.receiptUrl = await uploadReceipt(receiptFile, expenseId);
     }
     
+    // Get active session outside transaction if userId is provided
+    let activeSessionRef = null;
+    if (userId) {
+        const activeSessionQuery = query(
+            collection(db, CASH_SESSIONS_COLLECTION),
+            where("status", "==", "Abierto"),
+            where("openedBy", "==", userId),
+            orderBy("openedAt", "desc"),
+            limit(1)
+        );
+        const activeSessionSnapshot = await getDocs(activeSessionQuery);
+        if (!activeSessionSnapshot.empty) {
+            activeSessionRef = activeSessionSnapshot.docs[0].ref;
+            dataToSave.sessionId = activeSessionRef.id;
+        }
+    }
+
+
     await runTransaction(db, async (transaction) => {
         // 1. Create the expense document
         const expenseRef = doc(collection(db, EXPENSES_COLLECTION));
         transaction.set(expenseRef, dataToSave);
         dataToSave.id = expenseRef.id;
 
-        // 2. If it's a quick expense from POS, update the cash session
-        if (userId && expenseData.category === 'Retiro de Caja') {
-            const activeSessionQuery = query(
-                collection(db, CASH_SESSIONS_COLLECTION),
-                where("status", "==", "Abierto"),
-                where("openedBy", "==", userId),
-                orderBy("openedAt", "desc"),
-                limit(1)
-            );
-            const activeSessionSnapshot = await getDocs(activeSessionQuery);
-            if (!activeSessionSnapshot.empty) {
-                const sessionRef = activeSessionSnapshot.docs[0].ref;
-                transaction.update(sessionRef, {
-                    totalCashPayouts: increment(expenseData.amount)
-                });
-            }
+        // 2. If it's a quick expense from POS and a session is active, update the session
+        if (activeSessionRef) {
+            transaction.update(activeSessionRef, {
+                totalCashPayouts: increment(expenseData.amount)
+            });
         }
     });
 
@@ -106,5 +114,6 @@ export const addExpense = async (
         ...expenseData,
         paymentDate: new Date(),
         receiptUrl: dataToSave.receiptUrl,
+        sessionId: dataToSave.sessionId,
     };
 };

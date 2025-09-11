@@ -174,6 +174,7 @@ export interface Expense {
     amount: number;
     paymentDate: Date;
     receiptUrl?: string;
+    sessionId?: string;
 }
 
 export const assetCategories = [
