@@ -6,16 +6,24 @@ import FinanceDashboard from "@/components/admin/finance/FinanceDashboard";
 import { getExpenses } from "@/lib/services/financeService";
 import { getSales } from "@/lib/services/salesService";
 import { getRepairOrders } from "@/lib/services/repairService";
-import { getAssets } from "@/lib/services/assetService";
 import { getProducts } from "@/lib/services/productService";
+import { getConsignors } from "@/lib/services/consignorService";
+import { getConsignorPayments } from "@/lib/services/paymentService";
+import { getAllClosedSessions } from "@/lib/services/cashSessionService";
 
 
 export default async function FinancePage() {
-    const initialExpenses = await getExpenses();
+    const expenses = await getExpenses();
     const sales = await getSales();
     const repairs = await getRepairOrders();
-    const assets = await getAssets();
     const products = await getProducts();
+    const consignors = await getConsignors();
+    const cashSessions = await getAllClosedSessions();
+
+    // Fetch all payments for all consignors
+    const consignorPayments = (await Promise.all(
+        consignors.map(c => getConsignorPayments(c.id))
+    )).flat();
 
     return (
         <div className="flex h-screen w-full flex-row">
@@ -37,11 +45,13 @@ export default async function FinancePage() {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
                <FinanceDashboard 
-                initialExpenses={initialExpenses}
-                sales={sales}
-                repairs={repairs}
-                initialAssets={assets}
-                products={products}
+                initialExpenses={expenses}
+                initialSales={sales}
+                initialRepairs={repairs}
+                initialProducts={products}
+                initialConsignors={consignors}
+                initialConsignorPayments={consignorPayments}
+                initialCashSessions={cashSessions}
                />
             </main>
         </div>
