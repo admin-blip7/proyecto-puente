@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronDown } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -13,11 +13,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-  } from "@/components/ui/collapsible";
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
   
@@ -86,45 +81,36 @@ export default function LeftSidebar() {
                                 </TooltipContent>
                             </Tooltip>
                         ))}
-                         <Collapsible className="w-full">
+                         <DropdownMenu>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <CollapsibleTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="lg" className={cn(
-                                            "rounded-lg w-full h-14 group",
+                                            "rounded-lg w-full h-14 relative",
                                             isFinanceRoute && 'bg-primary/10 text-primary',
                                         )}>
                                             <Landmark className="h-6 w-6" />
-                                            <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2 transition-transform group-data-[state=open]:rotate-180"/>
+                                            <ChevronRight className="h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2" />
                                         </Button>
-                                    </CollapsibleTrigger>
+                                    </DropdownMenuTrigger>
                                 </TooltipTrigger>
-                                 <TooltipContent side="right" sideOffset={5}>
+                                <TooltipContent side="right" sideOffset={5}>
                                     <p>Finanzas</p>
                                 </TooltipContent>
                             </Tooltip>
-                            <CollapsibleContent>
-                               <div className="flex flex-col items-center gap-1 mt-2 pl-4">
+                            <DropdownMenuContent side="right" align="start" sideOffset={5} className="w-56">
+                                <DropdownMenuLabel>Módulo de Finanzas</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
                                 {financeNavItems.map(item => (
-                                     <Tooltip key={item.label}>
-                                        <TooltipTrigger asChild>
-                                            <Link href={item.href} className="w-full">
-                                                <Button variant="ghost" size="icon" className={cn(
-                                                    "rounded-full w-10 h-10",
-                                                    pathname === item.href && 'bg-primary/20 text-primary',
-                                                )}>
-                                                    <item.icon className="h-5 w-5" />
-                                                </Button>
-                                            </Link>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="right" sideOffset={5}>
-                                            <p>{item.label}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
+                                    <Link href={item.href} key={item.href} passHref>
+                                        <DropdownMenuItem className={cn(pathname === item.href && "bg-accent")}>
+                                            <item.icon className="mr-2 h-4 w-4" />
+                                            <span>{item.label}</span>
+                                        </DropdownMenuItem>
+                                    </Link>
                                 ))}
-                               </div>
-                            </CollapsibleContent>
-                        </Collapsible>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                           <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Link href={settingsNavItem.href} className="w-full">
