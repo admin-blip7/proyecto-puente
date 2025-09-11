@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Debt, Account } from '@/types';
 import { Button } from '@/components/ui/button';
-import { BrainCircuit, CreditCard, Landmark, MoreHorizontal, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { BrainCircuit, CreditCard, Landmark, MoreHorizontal, PlusCircle, Edit, Trash2, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -15,6 +15,7 @@ import {
 import DebtStrategyDialog from './DebtStrategyDialog';
 import AddEditDebtDialog from './AddEditDebtDialog';
 import DeleteDebtDialog from './DeleteDebtDialog';
+import AddDebtPaymentDialog from './AddDebtPaymentDialog';
 
 interface DebtClientProps {
     initialDebts: Debt[];
@@ -27,6 +28,7 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
     const [isStrategyOpen, setStrategyOpen] = useState(false);
     const [isAddEditOpen, setAddEditOpen] = useState(false);
     const [isDeleteOpen, setDeleteOpen] = useState(false);
+    const [isPaymentOpen, setPaymentOpen] = useState(false);
 
     const totalDebt = debts.reduce((sum, debt) => sum + debt.currentBalance, 0);
     const creditCardDebts = debts.filter(d => d.debtType === 'Tarjeta de Crédito');
@@ -46,6 +48,11 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
         setSelectedDebt(debt);
         setDeleteOpen(true);
     }
+
+    const handleOpenPaymentDialog = (debt: Debt) => {
+        setSelectedDebt(debt);
+        setPaymentOpen(true);
+    }
     
     const handleDebtAdded = (newDebt: Debt) => {
         setDebts(prev => [...prev, newDebt].sort((a,b) => a.creditorName.localeCompare(b.creditorName)));
@@ -57,6 +64,14 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
     
     const handleDebtDeleted = (debtId: string) => {
         setDebts(prev => prev.filter(d => d.id !== debtId));
+    }
+    
+    const handlePaymentAdded = (debtId: string, amount: number) => {
+        setDebts(prev => prev.map(d => 
+            d.id === debtId 
+                ? { ...d, currentBalance: d.currentBalance - amount }
+                : d
+        ));
     }
 
 
@@ -105,7 +120,10 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Registrar Pago</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenPaymentDialog(debt)}>
+                                                    <DollarSign className="mr-2 h-4 w-4" />
+                                                    Registrar Pago
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleOpenEditDialog(debt)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     <span>Editar</span>
@@ -158,7 +176,10 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Registrar Pago</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenPaymentDialog(debt)}>
+                                                    <DollarSign className="mr-2 h-4 w-4" />
+                                                    Registrar Pago
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleOpenEditDialog(debt)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     <span>Editar</span>
@@ -192,12 +213,21 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
             />
 
             {selectedDebt && (
+              <>
                 <DeleteDebtDialog
                     isOpen={isDeleteOpen}
                     onOpenChange={setDeleteOpen}
                     debt={selectedDebt}
                     onDebtDeleted={handleDebtDeleted}
                 />
+                <AddDebtPaymentDialog
+                    isOpen={isPaymentOpen}
+                    onOpenChange={setPaymentOpen}
+                    debt={selectedDebt}
+                    accounts={initialAccounts}
+                    onPaymentAdded={handlePaymentAdded}
+                />
+              </>
             )}
         </>
     )

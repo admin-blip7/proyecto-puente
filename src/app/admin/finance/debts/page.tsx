@@ -3,12 +3,12 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import DebtClient from "@/components/admin/finance/debts/DebtClient";
-// import { getDebts } from "@/lib/services/debtService";
-// import { getAccounts } from "@/lib/services/accountService";
+import { getDebts } from "@/lib/services/debtService";
+import { getAccounts } from "@/lib/services/accountService";
 
 export default async function DebtsPage() {
-    // const initialDebts = await getDebts();
-    // const initialAccounts = await getAccounts();
+    const initialDebts = await getDebts();
+    const initialAccounts = await getAccounts();
    
     return (
         <div className="flex h-screen w-full flex-row">
@@ -30,8 +30,8 @@ export default async function DebtsPage() {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
               <DebtClient 
-                initialDebts={[]}
-                initialAccounts={[]}
+                initialDebts={initialDebts}
+                initialAccounts={initialAccounts}
               />
             </main>
         </div>

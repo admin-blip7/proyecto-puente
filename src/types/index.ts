@@ -331,6 +331,7 @@ export interface DebtPayment {
     paymentDate: Date;
     paidFromAccountId: string;
     proofUrl?: string;
+    notes?: string;
 }
 
 export interface SavingsGoal {
