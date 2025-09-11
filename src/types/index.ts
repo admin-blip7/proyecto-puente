@@ -305,13 +305,24 @@ export interface Account {
     currentBalance: number;
 }
 
+
+export const debtTypes = ['Tarjeta de Crédito', 'Préstamo Personal', 'Proveedor', 'Otro'] as const;
+export type DebtType = typeof debtTypes[number];
+
 export interface Debt {
     id: string;
     creditorName: string;
-    initialAmount: number;
-    remainingAmount: number;
+    debtType: DebtType;
+    currentBalance: number;
     createdAt: Date;
+    // Fields for Credit Cards
+    totalLimit?: number;
+    closingDate?: number; // Day of the month (1-31)
+    paymentDueDate?: number; // Day of the month (1-31)
+    interestRate?: number; // Annual interest rate as percentage
+    cat?: number;
 }
+
 
 export interface DebtPayment {
     id: string;

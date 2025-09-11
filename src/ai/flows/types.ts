@@ -107,3 +107,34 @@ export const StockEntryCommandOutputSchema = z.object({
   productName: z.string().describe('The extracted name of the product.'),
 });
 export type StockEntryCommandOutput = z.infer<typeof StockEntryCommandOutputSchema>;
+
+// Types for: generate-debt-strategy
+const DebtSchema = z.object({
+  id: z.string(),
+  creditorName: z.string().describe("Name of the creditor, e.g., the bank or card issuer."),
+  currentBalance: z.number().describe("The current outstanding balance on the card."),
+  interestRate: z.number().optional().describe("The annual interest rate (APR) of the card as a percentage."),
+});
+
+export const GenerateDebtStrategyInputSchema = z.object({
+  creditCardDebts: z.array(DebtSchema).describe("An array of credit card debt objects to analyze."),
+});
+export type GenerateDebtStrategyInput = z.infer<typeof GenerateDebtStrategyInputSchema>;
+
+const StrategyActionSchema = z.object({
+  debtId: z.string().describe("The ID of the debt to prioritize."),
+  creditorName: z.string().describe("The name of the creditor for this debt."),
+  reason: z.string().describe("A brief explanation of why this debt is prioritized in this step."),
+});
+
+const StrategySchema = z.object({
+  name: z.string().describe("The name of the strategy (e.g., 'Método Bola de Nieve')."),
+  description: z.string().describe("A detailed explanation of the strategy, its pros, and cons."),
+  plan: z.array(StrategyActionSchema).describe("An ordered list of actions to take for this strategy."),
+});
+
+export const GenerateDebtStrategyOutputSchema = z.object({
+  snowball: StrategySchema.describe("The Snowball Method strategy, focusing on paying off the smallest debts first for psychological wins."),
+  avalanche: StrategySchema.describe("The Avalanche Method strategy, focusing on paying off the highest-interest debts first to save money."),
+});
+export type GenerateDebtStrategyOutput = z.infer<typeof GenerateDebtStrategyOutputSchema>;

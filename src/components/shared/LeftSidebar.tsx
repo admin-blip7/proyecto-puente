@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,7 @@ const mainNavItems = [
 const financeNavItems = [
     { href: '/admin/finance', icon: Landmark, label: 'Dashboard Financiero' },
     { href: '/admin/finance/accounts', icon: Banknote, label: 'Cuentas' },
+    { href: '/admin/finance/debts', icon: CreditCard, label: 'Gestión de Deudas'},
     { href: '/admin/finance/balance-sheet', icon: Scale, label: 'Balance General' },
     { href: '/admin/finance/assets', icon: Building, label: 'Activos Fijos' },
     { href: '/admin/finance/categories', icon: PieChart, label: 'Categorías Gastos' },

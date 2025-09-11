@@ -7,3 +7,4 @@ import '@/ai/flows/analyze-product-quality.ts';
 import '@/ai/flows/suggest-product-tags.ts';
 import '@/ai/flows/optimize-product-image.ts';
 import '@/ai/flows/parse-stock-entry-command.ts';
+import '@/ai/flows/generate-debt-strategy.ts';
