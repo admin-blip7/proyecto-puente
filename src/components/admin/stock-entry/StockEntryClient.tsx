@@ -9,7 +9,7 @@ import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Wand2 } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
@@ -20,6 +20,8 @@ import { getConsignors } from "@/lib/services/consignorService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import Image from "next/image";
+import { generateProductImage } from "@/ai/flows/generate-product-image";
 
 
 interface StockEntryClientProps {
@@ -34,6 +36,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
     const [consignors, setConsignors] = useState<Consignor[]>([]);
     const [isListening, setIsListening] = useState(false);
+    const [generatingImageId, setGeneratingImageId] = useState<string | null>(null);
+
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -91,14 +95,24 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             recognitionRef.current.start();
         }
     };
-
+    
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) return [];
-        const lowercasedQuery = searchQuery.toLowerCase();
-        return allProducts.filter(p => 
-            p.name.toLowerCase().includes(lowercasedQuery) ||
-            p.sku.toLowerCase().includes(lowercasedQuery)
-        );
+        if (!searchQuery) {
+            return [];
+        }
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        const searchTerms = lowerCaseQuery.split(' ').filter(term => term);
+
+        return allProducts.filter(p => {
+            const name = p.name.toLowerCase();
+            const sku = p.sku.toLowerCase();
+
+            // Check if all search terms are in the product name or if sku matches
+            return (
+                searchTerms.every(term => name.includes(term)) ||
+                sku.includes(lowerCaseQuery)
+            );
+        });
     }, [searchQuery, allProducts]);
 
 
@@ -119,6 +133,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 category: product.category,
                 ownershipType: product.ownershipType,
                 consignorId: product.consignorId,
+                imageUrl: product.imageUrl,
                 isNew: false
             }];
         });
@@ -180,6 +195,25 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         }));
     };
 
+    const handleGenerateImage = async (itemId: string, productName: string) => {
+        if (!productName) {
+            toast({ variant: 'destructive', title: "Error", description: "Por favor, escribe un nombre para el producto primero."});
+            return;
+        }
+        setGeneratingImageId(itemId);
+        try {
+            const result = await generateProductImage({ productName });
+            handleUpdateItem(itemId, 'imageUrl', result.imageUrl);
+            toast({ title: "Imagen Generada", description: "La IA ha creado una imagen para tu producto."});
+        } catch(error) {
+            toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo generar la imagen."});
+            console.error("Image generation error:", error);
+        } finally {
+            setGeneratingImageId(null);
+        }
+    }
+
+
     const handleRemoveItem = (id: string) => {
         setEntryList(prev => prev.filter(item => item.id !== id));
     };
@@ -237,20 +271,19 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                     <div className="relative w-full" ref={searchContainerRef}>
+                     <div ref={searchContainerRef} className="relative w-full">
                         <Input
                             placeholder="Buscar producto por SKU o nombre..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onFocus={() => setPopoverOpen(true)}
-                            className="w-full"
                         />
                         {popoverOpen && filteredProducts.length > 0 && (
-                            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                             <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                                 <PopoverTrigger asChild>
-                                    <div className="absolute w-full" />
+                                    <div/>
                                 </PopoverTrigger>
-                                <PopoverContent className="p-0 w-full" align="start">
+                                <PopoverContent className="p-0" style={{width: 'var(--radix-popover-trigger-width)'}} align="start">
                                     <Command>
                                         <CommandList>
                                             <CommandEmpty>No se encontraron productos.</CommandEmpty>
@@ -294,6 +327,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[80px]">Imagen</TableHead>
                                     <TableHead className="w-[120px]">SKU</TableHead>
                                     <TableHead>Nombre Producto</TableHead>
                                     <TableHead className="w-[140px]">Tipo Propiedad</TableHead>
@@ -307,16 +341,35 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                             <TableBody>
                                 {entryList.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
+                                        <TableCell colSpan={9} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
                                     </TableRow>
                                 ) : (
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
+                                                <Image 
+                                                    src={item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`} 
+                                                    alt={item.name} 
+                                                    width={40} 
+                                                    height={40} 
+                                                    className="rounded-md object-cover" 
+                                                />
+                                            </TableCell>
+                                            <TableCell>
                                                 <Input value={item.sku} readOnly={!item.isNew} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} className={cn(!item.isNew && "bg-muted/50 text-xs")} />
                                             </TableCell>
                                             <TableCell>
-                                                <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                                <div className="flex items-center gap-2">
+                                                    <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        onClick={() => handleGenerateImage(item.id, item.name)}
+                                                        disabled={generatingImageId === item.id || !item.isNew}
+                                                    >
+                                                        {generatingImageId === item.id ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                              <TableCell>
                                                 <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -369,9 +422,28 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                             <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label>Nombre Producto</Label>
-                                        <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                    <div className="flex gap-4 items-start">
+                                        <Image 
+                                            src={item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`} 
+                                            alt={item.name} 
+                                            width={64} 
+                                            height={64} 
+                                            className="rounded-md object-cover border"
+                                        />
+                                        <div className="flex-1 space-y-1">
+                                            <Label>Nombre Producto</Label>
+                                            <div className="flex items-center gap-1">
+                                                <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => handleGenerateImage(item.id, item.name)}
+                                                    disabled={generatingImageId === item.id || !item.isNew}
+                                                >
+                                                    {generatingImageId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">

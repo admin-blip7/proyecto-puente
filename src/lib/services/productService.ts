@@ -253,7 +253,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
+                    imageUrl: item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,

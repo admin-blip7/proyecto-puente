@@ -113,6 +113,7 @@ export interface StockEntryItem {
   isNew: boolean;
   ownershipType: OwnershipType;
   consignorId?: string;
+  imageUrl?: string;
 }
 
 export interface RepairPart {

@@ -138,3 +138,14 @@ export const GenerateDebtStrategyOutputSchema = z.object({
   avalanche: StrategySchema.describe("The Avalanche Method strategy, focusing on paying off the highest-interest debts first to save money."),
 });
 export type GenerateDebtStrategyOutput = z.infer<typeof GenerateDebtStrategyOutputSchema>;
+
+// Types for: generate-product-image
+export const GenerateProductImageInputSchema = z.object({
+    productName: z.string().describe("The name of the product to generate an image for."),
+});
+export type GenerateProductImageInput = z.infer<typeof GenerateProductImageInputSchema>;
+
+export const GenerateProductImageOutputSchema = z.object({
+    imageUrl: z.string().describe("The generated e-commerce-ready image of the product as a data URI."),
+});
+export type GenerateProductImageOutput = z.infer<typeof GenerateProductImageOutputSchema>;
