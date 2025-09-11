@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -24,23 +24,26 @@ import {
 
 const mainNavItems = [
     { href: '/', icon: Home, label: 'Punto de Venta' },
-    { href: '/admin', icon: PackagePlus, label: 'Inventario'},
+    { href: '/admin', icon: Package, label: 'Inventario'},
+    { href: '/admin/stock-entry', icon: PackagePlus, label: 'Ingresar Stock'},
     { href: '/admin/sales', icon: PieChart, label: 'Ventas' },
     { href: '/admin/repairs', icon: Wrench, label: 'Reparaciones' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Garantías' },
-    { href: '/admin/stock-entry', icon: PackagePlus, label: 'Ingresar Stock'},
     { href: '/admin/consignors', icon: Users, label: 'Consignadores'},
     { href: '/admin/intelligence', icon: BrainCircuit, label: 'Inteligencia'},
-    { href: '/admin/settings', icon: Settings, label: 'Ajustes'},
 ];
 
 const financeNavItems = [
+    { href: '/admin/finance', icon: Landmark, label: 'Dashboard Financiero' },
     { href: '/admin/finance/accounts', icon: Banknote, label: 'Cuentas' },
     { href: '/admin/finance/balance-sheet', icon: Scale, label: 'Balance General' },
     { href: '/admin/finance/assets', icon: Building, label: 'Activos Fijos' },
     { href: '/admin/finance/categories', icon: PieChart, label: 'Categorías Gastos' },
     { href: '/admin/finance/cash-history', icon: Landmark, label: 'Cortes de Caja' },
 ]
+
+const settingsNavItem = { href: '/admin/settings', icon: Settings, label: 'Ajustes' };
+
 
 const getInitials = (name: string) => {
     if (!name) return "";
@@ -57,21 +60,21 @@ export default function LeftSidebar() {
     const isFinanceRoute = pathname.startsWith('/admin/finance');
 
     return (
-        <aside className="flex flex-col items-center justify-between w-full md:w-20 bg-card p-4 h-full md:shadow-2xl">
+        <aside className="flex flex-col items-center justify-between w-full md:w-24 bg-card p-2 md:p-4 h-full md:shadow-2xl">
             <TooltipProvider>
-                <div className="flex flex-col items-center gap-8">
+                <div className="flex flex-col items-center gap-2 w-full">
                     <Link href="/">
-                        <div className="bg-primary text-primary-foreground p-3 rounded-lg">
+                        <div className="bg-primary text-primary-foreground p-3 rounded-lg mb-4">
                             <Landmark className="h-6 w-6" />
                         </div>
                     </Link>
-                    <nav className="flex flex-col items-center gap-4">
+                    <nav className="flex flex-col items-center gap-2 w-full">
                         {mainNavItems.map((item) => (
                             <Tooltip key={item.label}>
                                 <TooltipTrigger asChild>
-                                    <Link href={item.href}>
-                                        <Button variant="ghost" size="icon" className={cn(
-                                            "rounded-lg w-12 h-12",
+                                    <Link href={item.href} className="w-full">
+                                        <Button variant="ghost" size="lg" className={cn(
+                                            "rounded-lg w-full h-14",
                                             pathname === item.href && 'bg-primary/10 text-primary',
                                         )}>
                                             <item.icon className="h-6 w-6" />
@@ -83,15 +86,16 @@ export default function LeftSidebar() {
                                 </TooltipContent>
                             </Tooltip>
                         ))}
-                         <Collapsible>
+                         <Collapsible className="w-full">
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <CollapsibleTrigger asChild>
-                                        <Button variant="ghost" size="icon" className={cn(
-                                            "rounded-lg w-12 h-12",
+                                        <Button variant="ghost" size="lg" className={cn(
+                                            "rounded-lg w-full h-14 group",
                                             isFinanceRoute && 'bg-primary/10 text-primary',
                                         )}>
                                             <Landmark className="h-6 w-6" />
+                                            <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2 transition-transform group-data-[state=open]:rotate-180"/>
                                         </Button>
                                     </CollapsibleTrigger>
                                 </TooltipTrigger>
@@ -100,13 +104,13 @@ export default function LeftSidebar() {
                                 </TooltipContent>
                             </Tooltip>
                             <CollapsibleContent>
-                               <div className="flex flex-col items-center gap-2 mt-2">
+                               <div className="flex flex-col items-center gap-1 mt-2 pl-4">
                                 {financeNavItems.map(item => (
                                      <Tooltip key={item.label}>
                                         <TooltipTrigger asChild>
-                                            <Link href={item.href}>
+                                            <Link href={item.href} className="w-full">
                                                 <Button variant="ghost" size="icon" className={cn(
-                                                    "rounded-lg w-10 h-10",
+                                                    "rounded-full w-10 h-10",
                                                     pathname === item.href && 'bg-primary/20 text-primary',
                                                 )}>
                                                     <item.icon className="h-5 w-5" />
@@ -121,9 +125,24 @@ export default function LeftSidebar() {
                                </div>
                             </CollapsibleContent>
                         </Collapsible>
+                          <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Link href={settingsNavItem.href} className="w-full">
+                                        <Button variant="ghost" size="lg" className={cn(
+                                            "rounded-lg w-full h-14",
+                                            pathname === settingsNavItem.href && 'bg-primary/10 text-primary',
+                                        )}>
+                                            <settingsNavItem.icon className="h-6 w-6" />
+                                        </Button>
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" sideOffset={5}>
+                                    <p>{settingsNavItem.label}</p>
+                                </TooltipContent>
+                            </Tooltip>
                     </nav>
                 </div>
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-4 mt-auto">
                     {userProfile && (
                         <DropdownMenu>
                         <DropdownMenuTrigger asChild>
