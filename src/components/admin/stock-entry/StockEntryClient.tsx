@@ -91,16 +91,23 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) return [];
-        
+        if (!searchQuery) return allProducts; // Show all if search is empty
+
         const lowercasedQuery = searchQuery.toLowerCase();
+        const searchTerms = lowercasedQuery.split(' ').filter(term => term);
 
         return allProducts.filter(p => {
-            const keywords = p.searchKeywords || [];
+            const productKeywords = p.searchKeywords || [];
+            
+            // Check if SKU starts with the query
             if (p.sku.toLowerCase().startsWith(lowercasedQuery)) {
                 return true;
             }
-            return keywords.some(keyword => keyword.includes(lowercasedQuery));
+            
+            // Check if all search terms are found in the product's keywords
+            return searchTerms.every(term => 
+                productKeywords.some(keyword => keyword.includes(term))
+            );
         });
     }, [searchQuery, allProducts]);
 
@@ -243,33 +250,31 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                         <PopoverTrigger asChild>
-                             <div className="relative w-full">
-                                <Command className="w-full">
-                                    <CommandInput
-                                        placeholder="Buscar producto por SKU o nombre..."
-                                        value={searchQuery}
-                                        onValueChange={(search) => {
-                                            setSearchQuery(search);
-                                            if(search.length > 0 && !popoverOpen) {
-                                                setPopoverOpen(true);
-                                            } else if (search.length === 0) {
-                                                setPopoverOpen(false);
-                                            }
-                                        }}
-                                        className="w-full"
-                                    />
-                                </Command>
+                            <div className="w-full">
+                                <Input
+                                    placeholder="Buscar producto por SKU o nombre..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full"
+                                />
                             </div>
                         </PopoverTrigger>
                         <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                            <CommandList>
-                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                {filteredProducts.slice(0, 50).map(product => ( // Limit results for performance
-                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                        {product.name} ({product.sku})
-                                    </CommandItem>
-                                ))}
-                            </CommandList>
+                            <Command>
+                                <CommandInput
+                                    placeholder="Buscar producto..."
+                                    value={searchQuery}
+                                    onValueChange={setSearchQuery}
+                                />
+                                <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    {filteredProducts.slice(0, 50).map(product => (
+                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                            {product.name} ({product.sku})
+                                        </CommandItem>
+                                    ))}
+                                </CommandList>
+                            </Command>
                         </PopoverContent>
                     </Popover>
                     
