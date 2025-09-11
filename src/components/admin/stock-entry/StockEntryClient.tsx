@@ -91,9 +91,11 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) return allProducts; // Show all products if search is empty
-        const lowercasedQuery = searchQuery.toLowerCase();
+        if (!searchQuery) return [];
         
+        const lowercasedQuery = searchQuery.toLowerCase();
+        const queryTerms = lowercasedQuery.split(' ').filter(term => term.length > 0);
+
         return allProducts.filter(p => {
             const lowercasedName = p.name.toLowerCase();
             const lowercasedSku = p.sku.toLowerCase();
@@ -104,7 +106,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             }
 
             // Check if all search terms are in the product name
-            const queryTerms = lowercasedQuery.split(' ').filter(term => term.length > 0);
             return queryTerms.every(term => lowercasedName.includes(term));
         });
     }, [searchQuery, allProducts]);
@@ -246,27 +247,32 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                         <PopoverTrigger asChild>
-                            <div className="w-full">
-                                <Command>
-                                    <CommandInput 
-                                        placeholder="Buscar producto por SKU o nombre..."
-                                        value={searchQuery}
-                                        onValueChange={setSearchQuery}
-                                    />
-                                </Command>
-                            </div>
+                            <Input
+                                placeholder="Buscar producto por SKU o nombre..."
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    if(e.target.value.length > 0 && !popoverOpen) {
+                                        setPopoverOpen(true);
+                                    } else if (e.target.value.length === 0) {
+                                        setPopoverOpen(false);
+                                    }
+                                }}
+                            />
                         </PopoverTrigger>
                         <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                            <CommandList>
-                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                {filteredProducts.slice(0, 50).map(product => ( // Limit results for performance
-                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                        {product.name} ({product.sku})
-                                    </CommandItem>
-                                ))}
-                            </CommandList>
+                             <Command>
+                                <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    {filteredProducts.slice(0, 50).map(product => ( // Limit results for performance
+                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                            {product.name} ({product.sku})
+                                        </CommandItem>
+                                    ))}
+                                </CommandList>
+                            </Command>
                         </PopoverContent>
                     </Popover>
                     
