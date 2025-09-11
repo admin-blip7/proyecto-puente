@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getConsignors } from "@/lib/services/consignorService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 
 interface StockEntryClientProps {
@@ -34,9 +35,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [consignors, setConsignors] = useState<Consignor[]>([]);
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const searchContainerRef = useRef<HTMLDivElement>(null);
 
     const { userProfile } = useAuth();
     const { toast } = useToast();
+    
+    useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
 
     useEffect(() => {
         getConsignors().then(setConsignors);
@@ -91,22 +95,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
         const lowercasedQuery = searchQuery.toLowerCase();
-        
-        // Handle multiple words in search
-        const searchTerms = lowercasedQuery.split(' ').filter(term => term);
-
-        return allProducts.filter(p => {
-            const productNameLower = p.name.toLowerCase();
-            const skuLower = p.sku.toLowerCase();
-
-            // Check if all search terms are found in the product name
-            const nameMatch = searchTerms.every(term => productNameLower.includes(term));
-            
-            // Check if query matches SKU
-            const skuMatch = skuLower.includes(lowercasedQuery);
-
-            return nameMatch || skuMatch;
-        });
+        return allProducts.filter(p => 
+            p.name.toLowerCase().includes(lowercasedQuery) ||
+            p.sku.toLowerCase().includes(lowercasedQuery)
+        );
     }, [searchQuery, allProducts]);
 
 
@@ -245,27 +237,20 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <div 
+                     <div className="relative w-full" ref={searchContainerRef}>
+                        <Input
+                            placeholder="Buscar producto por SKU o nombre..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onFocus={() => setPopoverOpen(true)}
                             className="w-full"
-                            onBlur={(e) => {
-                                // If the new focused element is not part of the popover, close it.
-                                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                    setTimeout(() => setPopoverOpen(false), 100);
-                                }
-                            }}
-                        >
-                            <PopoverTrigger asChild>
-                                <Input
-                                    placeholder="Buscar producto por SKU o nombre..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onFocus={() => setPopoverOpen(true)}
-                                    className="w-full"
-                                />
-                            </PopoverTrigger>
-                            {popoverOpen && filteredProducts.length > 0 && (
-                                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                        />
+                        {popoverOpen && filteredProducts.length > 0 && (
+                            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <div className="absolute w-full" />
+                                </PopoverTrigger>
+                                <PopoverContent className="p-0 w-full" align="start">
                                     <Command>
                                         <CommandList>
                                             <CommandEmpty>No se encontraron productos.</CommandEmpty>
@@ -277,9 +262,9 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         </CommandList>
                                     </Command>
                                 </PopoverContent>
-                            )}
-                        </div>
-                    </Popover>
+                            </Popover>
+                        )}
+                    </div>
                     
 
                      <div className="flex w-full sm:w-auto items-center gap-2">
