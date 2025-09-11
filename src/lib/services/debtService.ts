@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { Debt } from "@/types";
+import { Debt, DebtType } from "@/types";
 import {
   collection,
   getDocs,
@@ -33,7 +33,7 @@ const debtFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Debt => {
 };
 
 export const getDebts = async (): Promise<Debt[]> => {
-  const q = query(collection(db, DEBTS_COLLECTION), orderBy("createdAt", "desc"));
+  const q = query(collection(db, DEBTS_COLLECTION), orderBy("debtType"), orderBy("creditorName"));
   try {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(debtFromDoc);
@@ -64,7 +64,7 @@ export const addDebt = async (
 
 export const updateDebt = async (
   debtId: string,
-  dataToUpdate: Partial<Omit<Debt, "id">>
+  dataToUpdate: Partial<Omit<Debt, "id" | 'createdAt'>>
 ): Promise<void> => {
   try {
     const debtRef = doc(db, DEBTS_COLLECTION, debtId);

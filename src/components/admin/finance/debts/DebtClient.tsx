@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Debt, Account } from '@/types';
 import { Button } from '@/components/ui/button';
-import { BrainCircuit, CreditCard, Landmark, MoreHorizontal, PlusCircle } from 'lucide-react';
+import { BrainCircuit, CreditCard, Landmark, MoreHorizontal, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -13,6 +13,8 @@ import {
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu"
 import DebtStrategyDialog from './DebtStrategyDialog';
+import AddEditDebtDialog from './AddEditDebtDialog';
+import DeleteDebtDialog from './DeleteDebtDialog';
 
 interface DebtClientProps {
     initialDebts: Debt[];
@@ -21,11 +23,41 @@ interface DebtClientProps {
 
 export default function DebtClient({ initialDebts, initialAccounts }: DebtClientProps) {
     const [debts, setDebts] = useState<Debt[]>(initialDebts);
+    const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
     const [isStrategyOpen, setStrategyOpen] = useState(false);
+    const [isAddEditOpen, setAddEditOpen] = useState(false);
+    const [isDeleteOpen, setDeleteOpen] = useState(false);
 
     const totalDebt = debts.reduce((sum, debt) => sum + debt.currentBalance, 0);
     const creditCardDebts = debts.filter(d => d.debtType === 'Tarjeta de Crédito');
     const otherDebts = debts.filter(d => d.debtType !== 'Tarjeta de Crédito');
+
+    const handleOpenAddDialog = () => {
+        setSelectedDebt(null);
+        setAddEditOpen(true);
+    }
+    
+    const handleOpenEditDialog = (debt: Debt) => {
+        setSelectedDebt(debt);
+        setAddEditOpen(true);
+    }
+
+    const handleOpenDeleteDialog = (debt: Debt) => {
+        setSelectedDebt(debt);
+        setDeleteOpen(true);
+    }
+    
+    const handleDebtAdded = (newDebt: Debt) => {
+        setDebts(prev => [...prev, newDebt].sort((a,b) => a.creditorName.localeCompare(b.creditorName)));
+    }
+
+    const handleDebtUpdated = (updatedDebt: Debt) => {
+        setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+    }
+    
+    const handleDebtDeleted = (debtId: string) => {
+        setDebts(prev => prev.filter(d => d.id !== debtId));
+    }
 
 
     return (
@@ -36,13 +68,13 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                     <p className="text-muted-foreground">Administra tus tarjetas de crédito, préstamos y otras deudas.</p>
                 </div>
                 <div className='flex items-center gap-2'>
-                     <Button variant="outline" onClick={() => setStrategyOpen(true)}>
+                     <Button variant="outline" onClick={() => setStrategyOpen(true)} disabled={creditCardDebts.length === 0}>
                         <BrainCircuit className="mr-2 h-4 w-4" />
-                        Generar Estrategia de Pago
+                        Generar Estrategia
                     </Button>
-                    <Button>
+                    <Button onClick={handleOpenAddDialog}>
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        Registrar Nueva Deuda
+                        Registrar Deuda
                     </Button>
                 </div>
             </div>
@@ -64,7 +96,7 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                             const usage = debt.totalLimit ? (debt.currentBalance / debt.totalLimit) * 100 : 0;
                             return (
                                 <Card key={debt.id}>
-                                    <CardHeader className='flex-row items-center justify-between'>
+                                    <CardHeader className='flex-row items-center justify-between pb-2'>
                                         <CardTitle className='text-lg'>{debt.creditorName}</CardTitle>
                                          <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -73,8 +105,15 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Pagar</DropdownMenuItem>
-                                                <DropdownMenuItem>Editar</DropdownMenuItem>
+                                                <DropdownMenuItem>Registrar Pago</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenEditDialog(debt)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    <span>Editar</span>
+                                                </DropdownMenuItem>
+                                                 <DropdownMenuItem onClick={() => handleOpenDeleteDialog(debt)} className="text-destructive">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    <span>Eliminar</span>
+                                                </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </CardHeader>
@@ -110,8 +149,26 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                         <p className='font-semibold'>{debt.creditorName}</p>
                                         <p className='text-sm text-muted-foreground'>{debt.debtType}</p>
                                     </div>
-                                    <div className='text-right'>
+                                    <div className='flex items-center gap-4'>
                                         <p className='font-semibold text-lg'>${debt.currentBalance.toFixed(2)}</p>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem>Registrar Pago</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenEditDialog(debt)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    <span>Editar</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenDeleteDialog(debt)} className="text-destructive">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    <span>Eliminar</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </div>
                             ))}
@@ -125,6 +182,23 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                 onOpenChange={setStrategyOpen}
                 debts={creditCardDebts}
             />
+
+            <AddEditDebtDialog
+                isOpen={isAddEditOpen}
+                onOpenChange={setAddEditOpen}
+                debt={selectedDebt}
+                onDebtAdded={handleDebtAdded}
+                onDebtUpdated={handleDebtUpdated}
+            />
+
+            {selectedDebt && (
+                <DeleteDebtDialog
+                    isOpen={isDeleteOpen}
+                    onOpenChange={setDeleteOpen}
+                    debt={selectedDebt}
+                    onDebtDeleted={handleDebtDeleted}
+                />
+            )}
         </>
     )
 }
