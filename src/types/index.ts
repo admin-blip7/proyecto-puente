@@ -317,11 +317,10 @@ export interface Debt {
     debtType: DebtType;
     currentBalance: number;
     createdAt: Date;
-    // Fields for Credit Cards
     totalLimit?: number;
-    closingDate?: number; // Day of the month (1-31)
-    paymentDueDate?: number; // Day of the month (1-31)
-    interestRate?: number; // Annual interest rate as percentage
+    closingDate?: number; 
+    paymentDueDate?: number; 
+    interestRate?: number; 
     cat?: number;
 }
 

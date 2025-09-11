@@ -18,14 +18,15 @@ const generateSearchKeywords = (name: string): string[] => {
     const parts = lowerCaseName.split(' ').filter(p => p);
     const keywords = new Set<string>(parts);
 
-    // Add progressive combinations
     for (let i = 0; i < parts.length; i++) {
-        let currentCombination = parts[i];
-        for (let j = i + 1; j < parts.length; j++) {
-            currentCombination += ` ${parts[j]}`;
-            keywords.add(currentCombination);
+        for (let j = i; j < parts.length; j++) {
+            const subArray = parts.slice(i, j + 1);
+            if (subArray.length > 1 || i === j) { // Add single words and combinations
+                keywords.add(subArray.join(' '));
+            }
         }
     }
+    
     return Array.from(keywords);
 }
 
@@ -143,7 +144,6 @@ export const addProduct = async (
             createdAt: new Date(),
         };
 
-        // This is a workaround to return the full product object after creation, including the possibly modified properties.
         const finalProduct = await getDoc(productDocRef);
 
         return productFromDoc(finalProduct as DocumentData);
@@ -186,14 +186,13 @@ export const updateProduct = async (
 
 export const getSuggestedProducts = async (tags: string[], excludeIds: string[]): Promise<SuggestedProduct[]> => {
     if (tags.length === 0 || tags.length > 10) {
-        // Firestore limit for array-contains-any is 10
         return [];
     }
 
     const q = query(
         collection(db, PRODUCTS_COLLECTION),
         where('compatibilityTags', 'array-contains-any', tags),
-        limit(10) // Limit the number of suggestions
+        limit(10)
     );
 
     try {
@@ -208,7 +207,7 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
                     imageUrl: data.imageUrl,
                 };
             })
-            .filter(p => !excludeIds.includes(p.id)); // Filter out items already in the cart
+            .filter(p => !excludeIds.includes(p.id)); 
 
         return suggestedProducts;
     } catch (error) {
@@ -220,9 +219,6 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 
 export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
     const processedItems: StockEntryItem[] = [];
-
-    // The AI tag generation should happen outside any transaction.
-    // We can run it after the transaction successfully commits.
     const newProductsForTagging: { id: string; name: string }[] = [];
 
     for (const item of entryItems) {
@@ -230,12 +226,9 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
         const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
 
         await runTransaction(db, async (transaction) => {
-            // --- READ PHASE ---
             const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
 
-            // --- WRITE PHASE ---
             if (productDoc && productDoc.exists()) {
-                // UPDATE EXISTING PRODUCT
                 transaction.update(productRef, {
                     stock: increment(item.quantity),
                     cost: item.cost,
@@ -244,7 +237,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     consignorId: item.consignorId || null,
                 });
             } else {
-                // CREATE NEW PRODUCT
                 const searchKeywords = generateSearchKeywords(item.name);
                 const newProductData = {
                     name: item.name,
@@ -267,7 +259,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 newProductsForTagging.push({ id: productRef.id, name: item.name });
             }
 
-            // INVENTORY LOG for both new and existing
             const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
             transaction.set(logRef, {
                 productId: item.productId,
@@ -283,7 +274,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
         processedItems.push(item);
     }
     
-    // Asynchronously generate tags for all new products after transactions are complete
     if (newProductsForTagging.length > 0) {
         try {
             const allProducts = await getProducts();
@@ -329,10 +319,8 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
 
 export const bulkUpdateProducts = async (productIds: string[], updateData: BulkUpdateData): Promise<void> => {
     await runTransaction(db, async (transaction) => {
-        // --- READ PHASE ---
         const productDocs = await Promise.all(productIds.map(id => transaction.get(doc(db, PRODUCTS_COLLECTION, id))));
 
-        // --- WRITE PHASE ---
         for (const productDoc of productDocs) {
             if (!productDoc.exists()) continue;
 
@@ -340,7 +328,6 @@ export const bulkUpdateProducts = async (productIds: string[], updateData: BulkU
             const currentData = productDoc.data();
             let newData: { [key: string]: any } = {};
 
-            // Handle Price
             if (updateData.price) {
                 let newPrice = currentData.price;
                 if (updateData.price.mode === 'fixed') {
@@ -353,7 +340,6 @@ export const bulkUpdateProducts = async (productIds: string[], updateData: BulkU
                 newData.price = Math.max(0, newPrice);
             }
 
-            // Handle Cost
             if (updateData.cost) {
                  let newCost = currentData.cost;
                 if (updateData.cost.mode === 'fixed') {
@@ -366,13 +352,11 @@ export const bulkUpdateProducts = async (productIds: string[], updateData: BulkU
                 newData.cost = Math.max(0, newCost);
             }
 
-            // Handle Tags
             if (updateData.tagsToAdd && updateData.tagsToAdd.length > 0) {
                 newData.compatibilityTags = arrayUnion(...updateData.tagsToAdd);
             }
              if (updateData.tagsToRemove && updateData.tagsToRemove.length > 0) {
                  if (newData.compatibilityTags) {
-                    // if we are already updating the tags, chain the update
                      newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
                  } else {
                     newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
