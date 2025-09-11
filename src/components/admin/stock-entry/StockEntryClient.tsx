@@ -88,15 +88,27 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         }
     };
 
-
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
         const lowercasedQuery = searchQuery.toLowerCase();
-        return allProducts.filter(p => 
-            p.name.toLowerCase().includes(lowercasedQuery) ||
-            p.sku.toLowerCase().includes(lowercasedQuery)
-        );
+        
+        // Handle multiple words in search
+        const searchTerms = lowercasedQuery.split(' ').filter(term => term);
+
+        return allProducts.filter(p => {
+            const productNameLower = p.name.toLowerCase();
+            const skuLower = p.sku.toLowerCase();
+
+            // Check if all search terms are found in the product name
+            const nameMatch = searchTerms.every(term => productNameLower.includes(term));
+            
+            // Check if query matches SKU
+            const skuMatch = skuLower.includes(lowercasedQuery);
+
+            return nameMatch || skuMatch;
+        });
     }, [searchQuery, allProducts]);
+
 
     const handleSelectProduct = (product: Product) => {
         setEntryList(prev => {
@@ -233,9 +245,17 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <div className="w-full">
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                        <div 
+                            className="w-full"
+                            onBlur={(e) => {
+                                // If the new focused element is not part of the popover, close it.
+                                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                    setTimeout(() => setPopoverOpen(false), 100);
+                                }
+                            }}
+                        >
+                            <PopoverTrigger asChild>
                                 <Input
                                     placeholder="Buscar producto por SKU o nombre..."
                                     value={searchQuery}
@@ -243,20 +263,22 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     onFocus={() => setPopoverOpen(true)}
                                     className="w-full"
                                 />
-                            </div>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                            <Command>
-                                <CommandList>
-                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                    {filteredProducts.slice(0, 50).map(product => (
-                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                            {product.name} ({product.sku})
-                                        </CommandItem>
-                                    ))}
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
+                            </PopoverTrigger>
+                            {popoverOpen && filteredProducts.length > 0 && (
+                                <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                                    <Command>
+                                        <CommandList>
+                                            <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                            {filteredProducts.slice(0, 50).map(product => (
+                                                <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                                    {product.name} ({product.sku})
+                                                </CommandItem>
+                                            ))}
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            )}
+                        </div>
                     </Popover>
                     
 
