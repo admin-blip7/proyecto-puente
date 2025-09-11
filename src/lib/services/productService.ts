@@ -41,7 +41,7 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         stock: Number(data.stock || 0),
         category: data.category,
         imageUrl: data.imageUrl,
-        createdAt: data.createdAt.toDate(),
+        createdAt: data.createdAt?.toDate(),
         type: data.type || 'Venta',
         ownershipType: data.ownershipType || 'Propio',
         consignorId: data.consignorId,

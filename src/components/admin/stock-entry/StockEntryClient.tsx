@@ -46,7 +46,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognition = new SpeechRecognition();
-                recognition.continuous = true;
+                recognition.continuous = false; // Set to false to process one command at a time
                 recognition.lang = 'es-MX';
                 recognition.interimResults = false;
 
@@ -91,20 +91,20 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) return [];
+        if (!searchQuery) return allProducts; // Show all products if search is empty
         const lowercasedQuery = searchQuery.toLowerCase();
-        const queryTerms = lowercasedQuery.split(' ').filter(term => term);
-
+        
         return allProducts.filter(p => {
             const lowercasedName = p.name.toLowerCase();
             const lowercasedSku = p.sku.toLowerCase();
 
-            // Check if SKU matches
-            if (lowercasedSku.includes(lowercasedQuery)) {
+            // Check if SKU starts with the query
+            if (lowercasedSku.startsWith(lowercasedQuery)) {
                 return true;
             }
 
             // Check if all search terms are in the product name
+            const queryTerms = lowercasedQuery.split(' ').filter(term => term.length > 0);
             return queryTerms.every(term => lowercasedName.includes(term));
         });
     }, [searchQuery, allProducts]);
@@ -246,34 +246,30 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                     <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <Command>
-                         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <CommandInput 
-                                    placeholder="Buscar producto por SKU o nombre..."
-                                    value={searchQuery}
-                                    onValueChange={(value) => {
-                                        setSearchQuery(value);
-                                        if (value.length > 0 && !popoverOpen) {
-                                            setPopoverOpen(true);
-                                        } else if (value.length === 0 && popoverOpen) {
-                                            setPopoverOpen(false);
-                                        }
-                                    }}
-                                />
-                            </PopoverTrigger>
-                            <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                                  <CommandList>
-                                      <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                      {filteredProducts.map(product => (
-                                          <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                              {product.name} ({product.sku})
-                                          </CommandItem>
-                                      ))}
-                                  </CommandList>
-                            </PopoverContent>
-                        </Popover>
-                    </Command>
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <div className="w-full">
+                                <Command>
+                                    <CommandInput 
+                                        placeholder="Buscar producto por SKU o nombre..."
+                                        value={searchQuery}
+                                        onValueChange={setSearchQuery}
+                                    />
+                                </Command>
+                            </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                            <CommandList>
+                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                {filteredProducts.slice(0, 50).map(product => ( // Limit results for performance
+                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                        {product.name} ({product.sku})
+                                    </CommandItem>
+                                ))}
+                            </CommandList>
+                        </PopoverContent>
+                    </Popover>
+                    
 
                      <div className="flex w-full sm:w-auto items-center gap-2">
                         <Button onClick={() => handleAddNewProduct()} className="w-full">
@@ -321,10 +317,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     entryList.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Input value={item.sku} readOnly className="bg-muted/50 text-xs" />
+                                                <Input value={item.sku} readOnly={!item.isNew} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} className={cn(!item.isNew && "bg-muted/50 text-xs")} />
                                             </TableCell>
                                             <TableCell>
-                                                <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
+                                                <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                             </TableCell>
                                              <TableCell>
                                                 <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -348,7 +344,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                 <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                             </TableCell>
                                             <TableCell>
-                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew && item.ownershipType !== 'Familiar'} className="text-right" />
+                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
                                             </TableCell>
                                             <TableCell>
                                                 <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
@@ -379,12 +375,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     </div>
                                     <div className="space-y-1">
                                         <Label>Nombre Producto</Label>
-                                        <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} disabled={!item.isNew} />
+                                        <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>SKU</Label>
-                                            <Input value={item.sku} readOnly className="bg-muted/50 text-xs" />
+                                            <Input value={item.sku} readOnly={!item.isNew} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} className={cn(!item.isNew && "bg-muted/50 text-xs")} />
                                         </div>
                                          <div className="space-y-1">
                                             <Label>Cantidad</Label>
@@ -416,7 +412,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                      <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <Label>Precio Venta</Label>
-                                            <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={!item.isNew && item.ownershipType !== 'Familiar'} className="text-right" />
+                                            <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Costo</Label>
