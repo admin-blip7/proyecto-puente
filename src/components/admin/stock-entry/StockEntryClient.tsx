@@ -41,12 +41,11 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     useEffect(() => {
         getConsignors().then(setConsignors);
         
-        // Setup Speech Recognition
         if (typeof window !== 'undefined') {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognition = new SpeechRecognition();
-                recognition.continuous = false; // Set to false to process one command at a time
+                recognition.continuous = false;
                 recognition.lang = 'es-MX';
                 recognition.interimResults = false;
 
@@ -91,24 +90,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) return allProducts; // Show all if search is empty
-
+        if (!searchQuery) return [];
         const lowercasedQuery = searchQuery.toLowerCase();
-        const searchTerms = lowercasedQuery.split(' ').filter(term => term);
-
-        return allProducts.filter(p => {
-            const productKeywords = p.searchKeywords || [];
-            
-            // Check if SKU starts with the query
-            if (p.sku.toLowerCase().startsWith(lowercasedQuery)) {
-                return true;
-            }
-            
-            // Check if all search terms are found in the product's keywords
-            return searchTerms.every(term => 
-                productKeywords.some(keyword => keyword.includes(term))
-            );
-        });
+        return allProducts.filter(p => 
+            p.name.toLowerCase().includes(lowercasedQuery) ||
+            p.sku.toLowerCase().includes(lowercasedQuery)
+        );
     }, [searchQuery, allProducts]);
 
     const handleSelectProduct = (product: Product) => {
@@ -174,11 +161,9 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 }
                 const updatedItem = { ...item, [field]: updatedValue };
                 
-                // Reset consignor if ownership changes from Consigna
                 if (field === 'ownershipType' && value !== 'Consigna') {
                     updatedItem.consignorId = undefined;
                 }
-                 // If changing to familiar, set price = cost
                 if (field === 'ownershipType' && value === 'Familiar') {
                     updatedItem.price = updatedItem.cost;
                 }
@@ -255,17 +240,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     placeholder="Buscar producto por SKU o nombre..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setPopoverOpen(true)}
                                     className="w-full"
                                 />
                             </div>
                         </PopoverTrigger>
                         <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                             <Command>
-                                <CommandInput
-                                    placeholder="Buscar producto..."
-                                    value={searchQuery}
-                                    onValueChange={setSearchQuery}
-                                />
                                 <CommandList>
                                     <CommandEmpty>No se encontraron productos.</CommandEmpty>
                                     {filteredProducts.slice(0, 50).map(product => (
