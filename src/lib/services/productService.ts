@@ -12,6 +12,23 @@ const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
 const STORAGE_PRODUCT_IMAGES_PATH = "product-images";
 
+const generateSearchKeywords = (name: string): string[] => {
+    if (!name) return [];
+    const lowerCaseName = name.toLowerCase();
+    const parts = lowerCaseName.split(' ').filter(p => p);
+    const keywords = new Set<string>(parts);
+
+    // Add progressive combinations
+    for (let i = 0; i < parts.length; i++) {
+        let currentCombination = parts[i];
+        for (let j = i + 1; j < parts.length; j++) {
+            currentCombination += ` ${parts[j]}`;
+            keywords.add(currentCombination);
+        }
+    }
+    return Array.from(keywords);
+}
+
 
 const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData): Product => {
     const data = doc.data();
@@ -31,6 +48,7 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         reorderPoint: Number(data.reorderPoint || 0),
         comboProductIds: data.comboProductIds || [],
         compatibilityTags: data.compatibilityTags || [],
+        searchKeywords: data.searchKeywords || [],
     };
 }
 
@@ -81,6 +99,7 @@ export const addProduct = async (
     }
     
     try {
+        const searchKeywords = generateSearchKeywords(productData.name);
         const dataToSave = {
             ...productData,
             price: Number(productData.price) || 0,
@@ -89,6 +108,7 @@ export const addProduct = async (
             reorderPoint: Number(productData.reorderPoint) || 0,
             imageUrl: imageUrl,
             createdAt: serverTimestamp(),
+            searchKeywords: searchKeywords,
         };
 
         await setDoc(productDocRef, dataToSave);
@@ -119,6 +139,7 @@ export const addProduct = async (
             id: productDocRef.id,
             ...productData,
             imageUrl,
+            searchKeywords,
             createdAt: new Date(),
         };
 
@@ -144,9 +165,13 @@ export const updateProduct = async (
     if (imageFile) {
         dataToUpdate.imageUrl = await uploadProductImage(imageFile, productId);
     }
+
+    if (productData.name) {
+        dataToUpdate.searchKeywords = generateSearchKeywords(productData.name);
+    }
     
     try {
-        await updateDoc(productDocRef, dataToUpdate);
+        await updateDoc(productDocRef, dataToUpdate as DocumentData);
         const updatedDoc = await getDoc(productDocRef);
         if (!updatedDoc.exists()) {
             throw new Error("Product not found after update.");
@@ -220,6 +245,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                 });
             } else {
                 // CREATE NEW PRODUCT
+                const searchKeywords = generateSearchKeywords(item.name);
                 const newProductData = {
                     name: item.name,
                     sku: item.sku,
@@ -233,7 +259,8 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     ownershipType: item.ownershipType,
                     consignorId: item.consignorId || null,
                     comboProductIds: [],
-                    compatibilityTags: []
+                    compatibilityTags: [],
+                    searchKeywords: searchKeywords,
                 };
                 transaction.set(productRef, newProductData);
                 item.productId = productRef.id;
@@ -358,4 +385,3 @@ export const bulkUpdateProducts = async (productIds: string[], updateData: BulkU
         }
     });
 };
-

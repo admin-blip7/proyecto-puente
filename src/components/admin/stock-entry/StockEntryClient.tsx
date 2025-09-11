@@ -92,10 +92,21 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
-        return allProducts.filter(p => 
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.sku.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const lowercasedQuery = searchQuery.toLowerCase();
+        const queryTerms = lowercasedQuery.split(' ').filter(term => term);
+
+        return allProducts.filter(p => {
+            const lowercasedName = p.name.toLowerCase();
+            const lowercasedSku = p.sku.toLowerCase();
+
+            // Check if SKU matches
+            if (lowercasedSku.includes(lowercasedQuery)) {
+                return true;
+            }
+
+            // Check if all search terms are in the product name
+            return queryTerms.every(term => lowercasedName.includes(term));
+        });
     }, [searchQuery, allProducts]);
 
     const handleSelectProduct = (product: Product) => {

@@ -20,6 +20,7 @@ export interface Product {
   reorderPoint?: number;
   comboProductIds?: string[];
   compatibilityTags?: string[];
+  searchKeywords?: string[];
 }
 
 export interface SuggestedProduct {
