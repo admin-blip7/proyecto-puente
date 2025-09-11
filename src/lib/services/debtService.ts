@@ -33,7 +33,7 @@ const debtFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Debt => {
 };
 
 export const getDebts = async (): Promise<Debt[]> => {
-  const q = query(collection(db, DEBTS_COLLECTION), orderBy("debtType"), orderBy("creditorName"));
+  const q = query(collection(db, DEBTS_COLLECTION), orderBy("creditorName"));
   try {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(debtFromDoc);
