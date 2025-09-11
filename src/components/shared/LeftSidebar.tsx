@@ -49,7 +49,7 @@ export default function LeftSidebar() {
                 <div className="flex flex-col items-center gap-8">
                     <Link href="/">
                         <div className="bg-primary text-primary-foreground p-3 rounded-lg">
-                            <Users className="h-6 w-6" />
+                            <Landmark className="h-6 w-6" />
                         </div>
                     </Link>
                     <nav className="flex flex-col items-center gap-4">

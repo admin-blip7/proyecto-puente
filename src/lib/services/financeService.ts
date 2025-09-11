@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 const EXPENSES_COLLECTION = "expenses";
 const STORAGE_RECEIPTS_PATH = "receipts";
 const CASH_SESSIONS_COLLECTION = "cash_sessions";
+const ACCOUNTS_COLLECTION = "accounts";
 
 
 const expenseFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Expense => {
@@ -31,6 +32,7 @@ const expenseFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Expense => {
         description: data.description,
         category: data.category,
         amount: data.amount,
+        paidFromAccountId: data.paidFromAccountId,
         paymentDate: data.paymentDate.toDate(),
         receiptUrl: data.receiptUrl,
         sessionId: data.sessionId,
@@ -66,6 +68,10 @@ export const addExpense = async (
 ): Promise<Expense> => {
     const expenseId = `EXP-${uuidv4().split('-')[0].toUpperCase()}`;
     
+    if (!expenseData.paidFromAccountId) {
+        throw new Error("La cuenta de origen del pago es requerida.");
+    }
+    
     let dataToSave: any = {
       ...expenseData,
       expenseId,
@@ -99,8 +105,12 @@ export const addExpense = async (
         const expenseRef = doc(collection(db, EXPENSES_COLLECTION));
         transaction.set(expenseRef, dataToSave);
         dataToSave.id = expenseRef.id;
+        
+        // 2. Decrement the account balance
+        const accountRef = doc(db, ACCOUNTS_COLLECTION, expenseData.paidFromAccountId);
+        transaction.update(accountRef, { currentBalance: increment(-expenseData.amount) });
 
-        // 2. If it's a quick expense from POS and a session is active, update the session
+        // 3. If it's a quick expense from POS and a session is active, update the session
         if (activeSessionRef) {
             transaction.update(activeSessionRef, {
                 totalCashPayouts: increment(expenseData.amount)

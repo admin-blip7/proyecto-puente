@@ -172,6 +172,7 @@ export interface Expense {
     description: string;
     category: string;
     amount: number;
+    paidFromAccountId: string;
     paymentDate: Date;
     receiptUrl?: string;
     sessionId?: string;
@@ -291,3 +292,38 @@ export const LabelSettingsSchema = z.object({
 });
 
 export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
+
+// Types for Finance Module
+export const accountTypes = ["Banco", "Efectivo", "Billetera Digital", "Otro"] as const;
+export type AccountType = typeof accountTypes[number];
+
+export interface Account {
+    id: string;
+    name: string;
+    type: AccountType;
+    currentBalance: number;
+}
+
+export interface Debt {
+    id: string;
+    creditorName: string;
+    initialAmount: number;
+    remainingAmount: number;
+    createdAt: Date;
+}
+
+export interface DebtPayment {
+    id: string;
+    debtId: string;
+    amountPaid: number;
+    paymentDate: Date;
+    paidFromAccountId: string;
+    proofUrl?: string;
+}
+
+export interface SavingsGoal {
+    id: string;
+    goalName: string;
+    targetAmount: number;
+    currentAmount: number;
+}

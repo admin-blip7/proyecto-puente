@@ -9,14 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Expense, ExpenseCategory } from "@/types";
+import { Expense, ExpenseCategory, Account } from "@/types";
 import { addExpense } from "@/lib/services/financeService";
 import { addExpenseCategory, getExpenseCategories } from "@/lib/services/expenseCategoryService";
+import { getAccounts } from "@/lib/services/accountService";
 import { Loader2 } from "lucide-react";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronsUpDown, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface AddExpenseDialogProps {
   isOpen: boolean;
@@ -28,12 +30,14 @@ const formSchema = z.object({
   description: z.string().min(5, "La descripción es requerida."),
   amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
   category: z.string({ required_error: "Debe seleccionar una categoría." }),
+  paidFromAccountId: z.string({ required_error: "Debe seleccionar una cuenta."}),
   receipt: z.custom<FileList>().optional(),
 });
 
 export default function AddExpenseDialog({ isOpen, onOpenChange, onExpenseAdded }: AddExpenseDialogProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [openCategoryPopover, setOpenCategoryPopover] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
 
@@ -52,6 +56,7 @@ export default function AddExpenseDialog({ isOpen, onOpenChange, onExpenseAdded 
   useEffect(() => {
     if (isOpen) {
       getExpenseCategories().then(setCategories);
+      getAccounts().then(setAccounts);
     }
   }, [isOpen]);
 
@@ -81,6 +86,7 @@ export default function AddExpenseDialog({ isOpen, onOpenChange, onExpenseAdded 
           description: values.description,
           amount: values.amount,
           category: values.category,
+          paidFromAccountId: values.paidFromAccountId
       };
 
       const newExpense = await addExpense(expenseData, receiptFile);
@@ -228,6 +234,31 @@ export default function AddExpenseDialog({ isOpen, onOpenChange, onExpenseAdded 
                   )}
                 />
             </div>
+
+            <FormField
+                control={form.control}
+                name="paidFromAccountId"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Pagado desde la Cuenta</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una cuenta..." />
+                        </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                        {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                                {account.name} (${account.currentBalance.toFixed(2)})
+                            </SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
             
              <FormField
                 control={form.control}
