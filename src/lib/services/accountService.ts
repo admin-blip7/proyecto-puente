@@ -1,4 +1,3 @@
-"use client";
 import { db } from "@/lib/firebase";
 import { Account, AccountType } from "@/types";
 import {
