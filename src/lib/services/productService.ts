@@ -16,17 +16,18 @@ const generateSearchKeywords = (name: string): string[] => {
     if (!name) return [];
     const lowerCaseName = name.toLowerCase();
     const parts = lowerCaseName.split(' ').filter(p => p);
-    const keywords = new Set<string>(parts);
+    const keywords = new Set<string>();
 
     for (let i = 0; i < parts.length; i++) {
+        let currentCombination = '';
         for (let j = i; j < parts.length; j++) {
-            const subArray = parts.slice(i, j + 1);
-            if (subArray.length > 1 || i === j) { // Add single words and combinations
-                keywords.add(subArray.join(' '));
-            }
+            currentCombination += (j > i ? ' ' : '') + parts[j];
+            keywords.add(currentCombination);
         }
     }
     
+    parts.forEach(p => keywords.add(p));
+
     return Array.from(keywords);
 }
 
@@ -217,7 +218,7 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 }
 
 
-export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
+export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile?: File})[], userId: string): Promise<StockEntryItem[]> => {
     const processedItems: StockEntryItem[] = [];
     const newProductsForTagging: { id: string; name: string }[] = [];
 
@@ -227,6 +228,11 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
 
         await runTransaction(db, async (transaction) => {
             const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
+            
+            let imageUrl = item.imageUrl;
+            if (item.imageFile) {
+                imageUrl = await uploadProductImage(item.imageFile, productRef.id);
+            }
 
             if (productDoc && productDoc.exists()) {
                 transaction.update(productRef, {
@@ -245,7 +251,7 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
+                    imageUrl: imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,
