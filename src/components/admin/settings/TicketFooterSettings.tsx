@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
 export default function TicketFooterSettings() {
-  const { control } = useFormContext<TicketSettings>();
+  const { control, watch } = useFormContext<TicketSettings>();
   const totals = [
     { id: "showSubtotal", label: "Subtotal" },
     { id: "showTaxes", label: "Impuestos (IVA)" },
@@ -90,6 +90,7 @@ export default function TicketFooterSettings() {
                     </FormItem>
                 )}
             />
+            {watch('footer.showQrCode') && (
              <FormField
                 control={control}
                 name="footer.qrCodeUrl"
@@ -102,6 +103,7 @@ export default function TicketFooterSettings() {
                     </FormItem>
                 )}
             />
+            )}
         </div>
       </AccordionContent>
     </AccordionItem>

@@ -11,11 +11,11 @@ interface PrintableTicketProps {
   sale: Sale | null; // Null for preview mode
 }
 
-const sampleSale = {
+const sampleSale: Sale = {
   items: [
-    { name: "Mica Hidrogel iPhone 15 Pro Max", quantity: 1, priceAtSale: 250.00 },
-    { name: "Cable USB-C 2m Carga Rápida", quantity: 2, priceAtSale: 180.00 },
-    { name: "Adaptador de Corriente 20W", quantity: 1, priceAtSale: 450.00 },
+    { productId: '1', name: "Mica Hidrogel iPhone 15 Pro Max", quantity: 1, priceAtSale: 250.00 },
+    { productId: '2', name: "Cable USB-C 2m Carga Rápida", quantity: 2, priceAtSale: 180.00 },
+    { productId: '3', name: "Adaptador de Corriente 20W", quantity: 1, priceAtSale: 450.00 },
   ],
   totalAmount: 1179.60,
   saleId: "SALE-PREVIEW",
@@ -23,9 +23,9 @@ const sampleSale = {
   cashierName: "Admin",
   paymentMethod: "Efectivo" as const,
   customerName: "Cliente de Muestra",
+  customerPhone: "555-123-4567",
   id: "preview",
   cashierId: "preview",
-  customerPhone: null,
 };
 
 const getCalculatedTotals = (items: Sale['items']) => {
@@ -120,7 +120,7 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
         )}
         <div className="flex justify-between font-bold text-lg border-t border-dashed border-black pt-1">
             <span>TOTAL:</span>
-            <span>${total.toFixed(2)}</span>
+            <span>${displaySale.totalAmount.toFixed(2)}</span>
         </div>
       </div>
       
@@ -136,4 +136,3 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
     </div>
   );
 }
-

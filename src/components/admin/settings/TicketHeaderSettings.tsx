@@ -22,7 +22,7 @@ export default function TicketHeaderSettings() {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setLogoPreview(base64String);
-        setValue("header.logoUrl", base64String);
+        setValue("header.logoUrl", base64String, { shouldDirty: true });
       };
       reader.readAsDataURL(file);
     }
@@ -55,7 +55,7 @@ export default function TicketHeaderSettings() {
                     </FormItem>
                 )}
             />
-            {logoPreview && (
+            {logoPreview && watch('header.showLogo') && (
                 <div className="flex justify-center">
                     <Image src={logoPreview} alt="Logo Preview" width={80} height={80} className="object-contain" />
                 </div>

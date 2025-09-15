@@ -55,7 +55,7 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
             .pt-1 { padding-top: 0.25rem; }
             .flex { display: flex; }
             .justify-between { justify-content: space-between; }
-            .justify-center { justify-center; }
+            .justify-center { justify-content: center; }
             .mt-4 { margin-top: 1rem; }
             .pt-2 { padding-top: 0.5rem; }
             .text-xs { font-size: 0.75rem; }
@@ -76,20 +76,20 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline">Recibo de Venta</DialogTitle>
           <DialogDescription>
             Este es el recibo para el cliente.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh] my-4 bg-muted rounded-lg flex justify-center p-4">
+        <ScrollArea className="max-h-[60vh] my-4 bg-muted rounded-lg flex items-center justify-center p-4">
             {isLoading || !settings ? (
                 <div className="flex items-center justify-center h-48">
                     <Loader2 className="animate-spin" />
                 </div>
             ) : (
-                <div ref={printAreaRef}>
+                <div ref={printAreaRef} className="flex justify-center">
                     <PrintableTicket settings={settings} sale={sale} />
                 </div>
             )}

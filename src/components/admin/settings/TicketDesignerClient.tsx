@@ -58,7 +58,7 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
             <h1 className="text-2xl font-bold tracking-tight">Diseñador de Tickets</h1>
             <p className="text-muted-foreground">Personaliza el contenido y la apariencia de tus tickets de venta.</p>
         </div>
-        <Button onClick={form.handleSubmit(onSubmit)} disabled={loading}>
+        <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isDirty}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Diseño
         </Button>
