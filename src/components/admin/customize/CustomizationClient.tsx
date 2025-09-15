@@ -42,15 +42,17 @@ export default function CustomizationClient({ initialSettings }: CustomizationCl
 
   const handleSave = async (type: 'logo' | 'default_product_image') => {
     if (type === 'logo') {
+      if (!logoFile) return;
       setIsSavingLogo(true);
     } else {
+      if (!defaultImageFile) return;
       setIsSavingDefaultImage(true);
     }
 
     try {
       const updatedSettings = await saveBrandingSettings({}, {
-        logo: type === 'logo' ? logoFile : undefined,
-        default_product_image: type === 'default_product_image' ? defaultImageFile : undefined
+        logo: type === 'logo' ? logoFile : null,
+        default_product_image: type === 'default_product_image' ? defaultImageFile : null
       });
       
       // Update local and global context state

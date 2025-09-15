@@ -46,7 +46,7 @@ export const getBrandingSettings = async (): Promise<BrandingSettings> => {
 
 export const saveBrandingSettings = async (
     settings: Partial<BrandingSettings>,
-    files: { logo?: File, default_product_image?: File }
+    files: { logo?: File | null, default_product_image?: File | null }
 ): Promise<BrandingSettings> => {
     try {
         const settingsRef = doc(db, SETTINGS_COLLECTION, BRANDING_SETTINGS_DOC_ID);
