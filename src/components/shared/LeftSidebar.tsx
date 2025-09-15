@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ import {
   } from "@/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+  import { useBranding } from '../brand/BrandingProvider';
+import Image from 'next/image';
   
 
 const mainNavItems = [
@@ -39,6 +41,7 @@ const financeNavItems = [
 ]
 
 const settingsNavItem = { href: '/admin/settings', icon: Settings, label: 'Ajustes' };
+const customizeNavItem = { href: '/admin/customize', icon: Palette, label: 'Personalizar Tienda' };
 
 
 const getInitials = (name: string) => {
@@ -53,15 +56,21 @@ const getInitials = (name: string) => {
 export default function LeftSidebar() {
     const pathname = usePathname();
     const { userProfile, signOut } = useAuth();
+    const { settings } = useBranding();
     const isFinanceRoute = pathname.startsWith('/admin/finance');
+    const isAdmin = userProfile?.role === 'Admin';
 
     return (
         <aside className="flex flex-col items-center justify-between w-full md:w-24 bg-card p-2 md:p-4 h-full md:shadow-2xl">
             <TooltipProvider>
                 <div className="flex flex-col items-center gap-2 w-full">
                     <Link href="/">
-                        <div className="bg-primary text-primary-foreground p-3 rounded-lg mb-4">
-                            <Landmark className="h-6 w-6" />
+                        <div className="bg-primary text-primary-foreground p-3 rounded-lg mb-4 relative h-14 w-14 flex items-center justify-center">
+                            {settings.logo_url ? (
+                                <Image src={settings.logo_url} alt="Logo de la tienda" fill className="object-contain" />
+                            ) : (
+                                <Landmark className="h-6 w-6" />
+                            )}
                         </div>
                     </Link>
                     <nav className="flex flex-col items-center gap-2 w-full">
@@ -127,6 +136,24 @@ export default function LeftSidebar() {
                                     <p>{settingsNavItem.label}</p>
                                 </TooltipContent>
                             </Tooltip>
+                        
+                        {isAdmin && (
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Link href={customizeNavItem.href} className="w-full">
+                                        <Button variant="ghost" size="lg" className={cn(
+                                            "rounded-lg w-full h-14",
+                                            pathname === customizeNavItem.href && 'bg-primary/10 text-primary',
+                                        )}>
+                                            <customizeNavItem.icon className="h-6 w-6" />
+                                        </Button>
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" sideOffset={5}>
+                                    <p>{customizeNavItem.label}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
                     </nav>
                 </div>
                 <div className="flex flex-col items-center gap-4 mt-auto">

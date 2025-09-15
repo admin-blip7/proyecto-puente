@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBranding } from "../brand/BrandingProvider";
 
 interface ProductCardProps {
   product: Product;
@@ -12,6 +13,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
+  const { settings } = useBranding();
   
   const getStockColor = () => {
     if (isOutOfStock) return "text-red-600";
@@ -19,12 +21,14 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
     return "text-black";
   }
 
+  const imageUrl = product.imageUrl || settings.default_product_image_url;
+
   return (
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
       <CardContent className="p-2 text-center flex flex-col flex-1">
         <div className="relative h-20 w-20 mx-auto mb-2">
             <Image
-            src={product.imageUrl}
+            src={imageUrl}
             alt={product.name}
             fill
             sizes="80px"

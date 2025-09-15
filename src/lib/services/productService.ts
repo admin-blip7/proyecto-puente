@@ -15,18 +15,18 @@ const STORAGE_PRODUCT_IMAGES_PATH = "product-images";
 const generateSearchKeywords = (name: string): string[] => {
     if (!name) return [];
     const lowerCaseName = name.toLowerCase();
-    const parts = lowerCaseName.split(' ').filter(p => p);
-    const keywords = new Set<string>();
+    const parts = lowerCaseName.split(' ').filter(p => p.length > 1); // Ignore single letters
+    const keywords = new Set<string>(parts);
 
+    // Add combinations
     for (let i = 0; i < parts.length; i++) {
-        let currentCombination = '';
-        for (let j = i; j < parts.length; j++) {
-            currentCombination += (j > i ? ' ' : '') + parts[j];
-            keywords.add(currentCombination);
+        for (let j = i + 1; j < parts.length; j++) {
+            keywords.add(`${parts[i]} ${parts[j]}`);
         }
     }
     
-    parts.forEach(p => keywords.add(p));
+    // Add full name
+    keywords.add(lowerCaseName);
 
     return Array.from(keywords);
 }
@@ -89,12 +89,12 @@ const uploadProductImage = async (file: File, productId: string): Promise<string
 
 
 export const addProduct = async (
-    productData: Omit<Product, 'id' | 'createdAt' | 'imageUrl'>,
+    productData: Omit<Product, 'id' | 'createdAt' | 'imageUrl' | 'searchKeywords'>,
     imageFile?: File
 ): Promise<Product> => {
     
     const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
-    let imageUrl = `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`;
+    let imageUrl = "";
 
     if (imageFile) {
         imageUrl = await uploadProductImage(imageFile, productDocRef.id);
@@ -137,7 +137,7 @@ export const addProduct = async (
             }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
         }
 
-        const newProduct = {
+        const newProduct: Product = {
             id: productDocRef.id,
             ...productData,
             imageUrl,
@@ -251,7 +251,7 @@ export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`,
+                    imageUrl: imageUrl || "",
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,

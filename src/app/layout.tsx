@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { Inter } from 'next/font/google'
+import { BrandingProvider } from '@/components/brand/BrandingProvider';
 
 export const metadata: Metadata = {
   title: 'Storefront Swift',
@@ -20,8 +21,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${inter.variable} antialiased`}>
         <AuthProvider>
-          {children}
-          <Toaster />
+          <BrandingProvider>
+            {children}
+            <Toaster />
+          </BrandingProvider>
         </AuthProvider>
         <div id="portal-root" />
       </body>

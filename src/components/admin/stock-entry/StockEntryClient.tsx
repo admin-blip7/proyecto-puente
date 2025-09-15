@@ -24,6 +24,7 @@ import Image from "next/image";
 import { generateProductImage } from "@/ai/flows/generate-product-image";
 import { optimizeProductImage } from "@/ai/flows/optimize-product-image";
 import CameraCaptureDialog from "../CameraCaptureDialog";
+import { useBranding } from "@/components/brand/BrandingProvider";
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -48,6 +49,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
     const { userProfile } = useAuth();
     const { toast } = useToast();
+    const { settings: brandingSettings } = useBranding();
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
 
@@ -110,9 +112,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         return allProducts.filter(p => {
             const name = p.name.toLowerCase();
             const sku = p.sku.toLowerCase();
-            const searchKeywords = p.searchKeywords || [];
-            
-            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery) || searchKeywords.some(kw => kw.includes(lowerCaseQuery));
+            const keywords = p.searchKeywords || [];
+            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery) || keywords.some(kw => kw.includes(lowerCaseQuery));
         });
     }, [searchQuery, allProducts]);
 
@@ -340,52 +341,49 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                         <CardTitle>Ingreso de Mercancía</CardTitle>
                         <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                        <div ref={searchContainerRef} className="relative w-full">
-                            <Input
-                                placeholder="Buscar producto por SKU o nombre..."
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    if (!popoverOpen) setPopoverOpen(true);
-                                }}
-                                onFocus={() => setPopoverOpen(true)}
-                            />
-                            {popoverOpen && filteredProducts.length > 0 && (
-                                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                                    <PopoverTrigger asChild>
-                                        <div/>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-0" style={{width: 'var(--radix-popover-trigger-width)'}} align="start">
-                                        <Command>
-                                            <CommandList>
-                                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                                {filteredProducts.slice(0, 50).map(product => (
-                                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                                        {product.name} ({product.sku})
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                            )}
-                        </div>
-                        
-
-                        <div className="flex w-full sm:w-auto items-center gap-2">
-                            <Button onClick={() => handleAddNewProduct()} className="w-full">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Crear Nuevo
-                            </Button>
-                            <Button
-                                onClick={handleMicClick}
-                                size="icon"
-                                variant={isListening ? "destructive" : "outline"}
-                                className={cn("transition-all", isListening && "animate-pulse")}
-                                >
-                                {isListening ? <MicOff /> : <Mic />}
-                            </Button>
+                    <CardContent>
+                       <div ref={searchContainerRef} className="flex flex-col sm:flex-row items-center gap-4">
+                            <div className="relative w-full">
+                                <Input
+                                    placeholder="Buscar producto por SKU o nombre..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onFocus={() => setPopoverOpen(true)}
+                                />
+                                {popoverOpen && filteredProducts.length > 0 && (
+                                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <div/>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                                            <Command>
+                                                <CommandList>
+                                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                                    {filteredProducts.slice(0, 50).map(product => (
+                                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
+                                                            {product.name} ({product.sku})
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
+                            </div>
+                            <div className="flex w-full sm:w-auto items-center gap-2">
+                                <Button onClick={() => handleAddNewProduct()} className="w-full">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Crear Nuevo
+                                </Button>
+                                <Button
+                                    onClick={handleMicClick}
+                                    size="icon"
+                                    variant={isListening ? "destructive" : "outline"}
+                                    className={cn("transition-all", isListening && "animate-pulse")}
+                                    >
+                                    {isListening ? <MicOff /> : <Mic />}
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -421,7 +419,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                             <TableRow key={item.id}>
                                                 <TableCell>
                                                     <Image 
-                                                        src={item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`} 
+                                                        src={item.imageUrl || brandingSettings.default_product_image_url} 
                                                         alt={item.name} 
                                                         width={40} 
                                                         height={40} 
@@ -499,7 +497,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         <div className="flex gap-4 items-start">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Image 
-                                                    src={item.imageUrl || `https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen`} 
+                                                    src={item.imageUrl || brandingSettings.default_product_image_url} 
                                                     alt={item.name} 
                                                     width={64} 
                                                     height={64} 

@@ -20,7 +20,7 @@ export interface Product {
   reorderPoint?: number;
   comboProductIds?: string[];
   compatibilityTags?: string[];
-  searchKeywords: string[];
+  searchKeywords?: string[];
 }
 
 export interface SuggestedProduct {
@@ -295,6 +295,13 @@ export const LabelSettingsSchema = z.object({
 });
 
 export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
+
+export const BrandingSettingsSchema = z.object({
+  logo_url: z.string().url().or(z.literal("")),
+  default_product_image_url: z.string().url().or(z.literal("")),
+});
+export type BrandingSettings = z.infer<typeof BrandingSettingsSchema>;
+
 
 // Types for Finance Module
 export const accountTypes = ["Banco", "Efectivo", "Billetera Digital", "Otro"] as const;
