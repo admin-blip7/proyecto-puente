@@ -3,7 +3,7 @@
 import { useFormContext } from "react-hook-form";
 import { LabelSettings } from "@/types";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FormControl, FormField, FormItem, FormLabel, FormDescription, FormMessage } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -23,7 +23,7 @@ export default function LabelContentSettings() {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setLogoPreview(base64String);
-        setValue("logoUrl", base64String);
+        setValue("logoUrl", base64String, { shouldDirty: true });
       };
       reader.readAsDataURL(file);
     }
@@ -55,37 +55,28 @@ export default function LabelContentSettings() {
                     </FormItem>
                 )}
             />
-            {logoPreview && (
-                <div className="flex justify-center">
-                    <Image src={logoPreview} alt="Logo Preview" width={40} height={40} className="object-contain" />
-                </div>
+            {watch('includeLogo') && (
+                <>
+                    {logoPreview && (
+                        <div className="flex justify-center">
+                            <Image src={logoPreview} alt="Logo Preview" width={40} height={40} className="object-contain" />
+                        </div>
+                    )}
+                    <Button asChild variant="outline" className="w-full">
+                        <label htmlFor="label-logo-upload" className="cursor-pointer">
+                            <Upload className="mr-2 h-4 w-4" />
+                            Subir Logo para Etiqueta
+                            <input 
+                                id="label-logo-upload" 
+                                type="file" 
+                                className="sr-only" 
+                                accept="image/png, image/jpeg" 
+                                onChange={handleImageUpload} 
+                            />
+                        </label>
+                    </Button>
+                </>
             )}
-             <FormField
-                control={control}
-                name="logoUrl"
-                render={({ field }) => (
-                     <FormItem>
-                        <FormControl>
-                            <div className="relative">
-                                <Button asChild variant="outline" className="w-full">
-                                    <label htmlFor="label-logo-upload" className="cursor-pointer">
-                                        <Upload className="mr-2 h-4 w-4" />
-                                        Subir Logo
-                                    </label>
-                                </Button>
-                                <Input 
-                                    id="label-logo-upload" 
-                                    type="file" 
-                                    className="sr-only" 
-                                    accept="image/png, image/jpeg" 
-                                    onChange={handleImageUpload} 
-                                />
-                            </div>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-             />
         </div>
 
         <div className="space-y-2">
@@ -115,18 +106,20 @@ export default function LabelContentSettings() {
             </div>
         </div>
 
-        <FormField
-            control={control}
-            name="storeName"
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Nombre de la Tienda (si está visible)</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Escribe el nombre de tu tienda..." {...field} />
-                    </FormControl>
-                </FormItem>
-            )}
-        />
+        {watch('content.showStoreName') && (
+            <FormField
+                control={control}
+                name="storeName"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Nombre de la Tienda</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Escribe el nombre de tu tienda..." {...field} />
+                        </FormControl>
+                    </FormItem>
+                )}
+            />
+        )}
       </AccordionContent>
     </AccordionItem>
   );

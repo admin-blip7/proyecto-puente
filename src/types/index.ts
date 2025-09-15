@@ -284,8 +284,8 @@ export const LabelSettingsSchema = z.object({
     fontSize: z.coerce.number().positive(),
     barcodeHeight: z.coerce.number().positive(),
     includeLogo: z.boolean(),
-    logoUrl: z.string().url().or(z.literal("")),
-    storeName: z.string(),
+    logoUrl: z.string().url().or(z.literal("")).optional(),
+    storeName: z.string().optional(),
     content: z.object({
         showProductName: z.boolean(),
         showSku: z.boolean(),

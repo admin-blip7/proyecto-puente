@@ -57,7 +57,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
             <h1 className="text-2xl font-bold tracking-tight">Diseñador de Etiquetas</h1>
             <p className="text-muted-foreground">Personaliza el diseño de las etiquetas para tus productos.</p>
         </div>
-        <Button onClick={form.handleSubmit(onSubmit)} disabled={loading}>
+        <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isDirty}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Diseño
         </Button>

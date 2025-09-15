@@ -2,7 +2,7 @@
 
 import { LabelSettings } from "@/types";
 import JsBarcode from 'jsbarcode';
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 
 interface LabelPreviewProps {
@@ -16,23 +16,26 @@ const sampleItem = {
 }
 
 export default function LabelPreview({ settings }: LabelPreviewProps) {
+    const previewRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
   useEffect(() => {
     try {
-      if (document.getElementById('barcode-preview')) {
-          JsBarcode('#barcode-preview', sampleItem.sku, {
-              format: "CODE128",
-              displayValue: false,
-              height: settings.barcodeHeight,
-              width: 1.5,
-              margin: 0,
-          });
-      }
+        previewRefs.current.forEach((canvas, index) => {
+            if (canvas) {
+                JsBarcode(canvas, sampleItem.sku, {
+                    format: "CODE128",
+                    displayValue: false,
+                    height: settings.barcodeHeight,
+                    width: 1.5,
+                    margin: 0,
+                });
+            }
+        })
     } catch(e) {
         // Can fail if SKU is invalid during typing
         console.error(e);
     }
-  }, [settings.barcodeHeight, sampleItem.sku]);
+  }, [settings.barcodeHeight, sampleItem.sku, settings.width]); // Re-run on width change too
 
   const labelStyle: React.CSSProperties = {
     width: `${settings.width}mm`,
@@ -48,7 +51,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
             minHeight: "100mm",
         }}
     >
-      {[...Array(3)].map((_, index) => (
+      {[...Array(9)].map((_, index) => (
         <div 
             key={index}
             style={labelStyle}
@@ -60,7 +63,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
             {settings.content.showStoreName && <p className="font-bold leading-tight">{settings.storeName}</p>}
             {settings.content.showProductName && <p className="font-bold leading-tight text-center">{sampleItem.name}</p>}
 
-            <svg id={index === 0 ? 'barcode-preview' : `barcode-preview-${index}`} className="w-full"></svg>
+            <canvas ref={el => previewRefs.current[index] = el} className="w-full"></canvas>
             
             {settings.content.showSku && <p className="tracking-widest" style={{ fontSize: `${settings.fontSize-1}px` }}>{sampleItem.sku}</p>}
             {settings.content.showPrice && <p className="font-bold" style={{ fontSize: `${settings.fontSize+2}px`}}>${sampleItem.price.toFixed(2)}</p>}
