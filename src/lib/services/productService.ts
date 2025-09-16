@@ -94,7 +94,7 @@ export const addProduct = async (
 ): Promise<Product> => {
     
     const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
-    let imageUrl = "";
+    let imageUrl = "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen";
 
     if (imageFile) {
         imageUrl = await uploadProductImage(imageFile, productDocRef.id);
@@ -136,18 +136,9 @@ export const addProduct = async (
                 .catch(error => console.error(`Error generating AI tags for ${productData.name}:`, error));
             }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
         }
-
-        const newProduct: Product = {
-            id: productDocRef.id,
-            ...productData,
-            imageUrl,
-            searchKeywords,
-            createdAt: new Date(),
-        };
-
-        const finalProduct = await getDoc(productDocRef);
-
-        return productFromDoc(finalProduct as DocumentData);
+        
+        const finalProductDoc = await getDoc(productDocRef);
+        return productFromDoc(finalProductDoc as DocumentData);
 
     } catch (error) {
         console.error("Error adding product: ", error);
@@ -161,7 +152,7 @@ export const updateProduct = async (
     imageFile?: File
 ): Promise<Product> => {
     const productDocRef = doc(db, PRODUCTS_COLLECTION, productId);
-    let dataToUpdate: Partial<Product> = { ...productData };
+    let dataToUpdate: DocumentData = { ...productData };
 
     if (imageFile) {
         dataToUpdate.imageUrl = await uploadProductImage(imageFile, productId);
@@ -172,7 +163,7 @@ export const updateProduct = async (
     }
     
     try {
-        await updateDoc(productDocRef, dataToUpdate as DocumentData);
+        await updateDoc(productDocRef, dataToUpdate);
         const updatedDoc = await getDoc(productDocRef);
         if (!updatedDoc.exists()) {
             throw new Error("Product not found after update.");
@@ -229,7 +220,7 @@ export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile
         await runTransaction(db, async (transaction) => {
             const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
             
-            let imageUrl = item.imageUrl;
+            let imageUrl = item.imageUrl || "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen";
             if (item.imageFile) {
                 imageUrl = await uploadProductImage(item.imageFile, productRef.id);
             }
@@ -251,7 +242,7 @@ export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: imageUrl || "",
+                    imageUrl: imageUrl,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,

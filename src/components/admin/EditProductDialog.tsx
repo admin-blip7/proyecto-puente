@@ -45,6 +45,7 @@ const formSchema = z.object({
   comboProductIds: z.array(z.string()).optional(),
   image: z.custom<File>().optional(),
   optimizedImage: z.custom<File>().optional(),
+  imageUrl: z.string().optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -75,12 +76,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    // Set default values directly from the product prop to ensure form state is stable
-    defaultValues: {
-        ...product,
-        reorderPoint: product.reorderPoint || 0,
-        comboProductIds: product.comboProductIds || [],
-    },
+    defaultValues: product,
   });
 
   const { watch, setValue, getValues, reset, formState: { isDirty } } = form;
@@ -108,7 +104,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
   }, [cost, ownershipType, setValue]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && product) {
         getConsignors().then(setConsignors);
         getProducts().then(setAllProducts);
         // Reset form to product values when dialog opens or product changes
@@ -185,23 +181,26 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      const updatedProductData: Partial<Omit<Product, 'id' | 'createdAt'>> = {
-        name: values.name,
-        sku: values.sku,
-        price: values.price,
-        cost: values.cost,
-        stock: values.stock,
-        category: values.category,
-        type: values.type,
-        ownershipType: values.ownershipType,
-        reorderPoint: values.reorderPoint || 0,
-        consignorId: values.ownershipType === 'Consigna' ? values.consignorId : undefined,
-        comboProductIds: values.comboProductIds || [],
-      };
+      // Create a new object with only the fields that have changed
+      const changedData: Partial<Product> = {};
+      const formKeys = Object.keys(values) as (keyof typeof values)[];
       
+      for(const key of formKeys) {
+        if (values[key] !== product[key as keyof Product]) {
+            (changedData as any)[key] = values[key];
+        }
+      }
+
+      // Ensure that consignorId is cleared if ownershipType changes from Consigna
+      if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
+          changedData.consignorId = undefined;
+      }
+      
+      // Select the correct image file to upload
       const imageFile = values.optimizedImage || values.image;
 
-      const updatedProduct = await updateProduct(product.id, updatedProductData, imageFile);
+      // Pass only the changed data to the update function
+      const updatedProduct = await updateProduct(product.id, changedData, imageFile);
 
       onProductUpdated(updatedProduct);
       toast({
@@ -297,7 +296,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
                                 name="stock"
                                 render={({ field }) => (
                                     <FormItem>
-                                    <FormLabel>Stock Inicial</FormLabel>
+                                    <FormLabel>Stock Actual</FormLabel>
                                     <FormControl>
                                         <Input type="number" {...field} />
                                     </FormControl>
