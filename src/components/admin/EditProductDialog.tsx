@@ -75,9 +75,15 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    // Set default values directly from the product prop to ensure form state is stable
+    defaultValues: {
+        ...product,
+        reorderPoint: product.reorderPoint || 0,
+        comboProductIds: product.comboProductIds || [],
+    },
   });
 
-  const { watch, setValue, getValues, reset } = form;
+  const { watch, setValue, getValues, reset, formState: { isDirty } } = form;
 
   const ownershipType = watch("ownershipType");
   const cost = watch("cost");
@@ -97,7 +103,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
 
   useEffect(() => {
     if (ownershipType === 'Familiar') {
-      setValue('price', cost);
+      setValue('price', cost, { shouldDirty: true });
     }
   }, [cost, ownershipType, setValue]);
 
@@ -105,15 +111,13 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
     if (isOpen) {
         getConsignors().then(setConsignors);
         getProducts().then(setAllProducts);
-        // Set form values from product prop
+        // Reset form to product values when dialog opens or product changes
         reset({
           ...product,
           reorderPoint: product.reorderPoint || 0,
+          comboProductIds: product.comboProductIds || [],
         });
         setImagePreview(product.imageUrl);
-    } else {
-        reset();
-        setImagePreview(null);
     }
   }, [isOpen, product, reset]);
   
@@ -122,13 +126,13 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        setValue("image", file);
-        setValue("optimizedImage", undefined);
+        setValue("image", file, { shouldDirty: true });
+        setValue("optimizedImage", undefined, { shouldDirty: true });
       };
       reader.readAsDataURL(file);
     } else {
         setImagePreview(null);
-        setValue("image", undefined);
+        setValue("image", undefined, { shouldDirty: true });
     }
   };
 
@@ -158,7 +162,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
         if (result.optimizedImageUri) {
             setImagePreview(result.optimizedImageUri);
             const optimizedFile = dataURLtoFile(result.optimizedImageUri, `optimized-${getValues('sku') || 'product'}.png`);
-            setValue('optimizedImage', optimizedFile);
+            setValue('optimizedImage', optimizedFile, { shouldDirty: true });
             toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
         }
     } catch(error) {
@@ -175,7 +179,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
     const newIds = currentIds.includes(productId) 
         ? currentIds.filter(id => id !== productId)
         : [...currentIds, productId];
-    setValue("comboProductIds", newIds);
+    setValue("comboProductIds", newIds, { shouldDirty: true });
   }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -503,7 +507,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
                   <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
                   Cancelar
                   </Button>
-                  <Button type="submit" disabled={loading}>
+                  <Button type="submit" disabled={loading || !isDirty}>
                   {loading ? "Guardando..." : "Guardar Cambios"}
                   </Button>
               </DialogFooter>
