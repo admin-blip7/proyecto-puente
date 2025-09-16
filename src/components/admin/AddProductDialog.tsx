@@ -165,7 +165,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
             toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
         }
     } catch(error) {
-        console.error("Error optimizing image:", error);
+        console.error("ERROR CAPTURADO (optimizando imagen):", error);
         toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo optimizar la imagen."});
     } finally {
         setIsOptimizing(false);
@@ -210,7 +210,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       });
       onOpenChange(false);
     } catch (error) {
-      console.error("Error adding product:", error);
+      console.error("ERROR CAPTURADO (agregando producto):", error);
       toast({
         variant: "destructive",
         title: "Error",

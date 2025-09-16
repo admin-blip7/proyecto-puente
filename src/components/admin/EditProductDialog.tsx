@@ -162,7 +162,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
             toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
         }
     } catch(error) {
-        console.error("Error optimizing image:", error);
+        console.error("ERROR CAPTURADO (optimizando imagen):", error);
         toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo optimizar la imagen."});
     } finally {
         setIsOptimizing(false);
@@ -181,25 +181,22 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      // Create a new object with only the fields that have changed
       const changedData: Partial<Product> = {};
       const formKeys = Object.keys(values) as (keyof typeof values)[];
       
-      for(const key of formKeys) {
-        if (values[key] !== product[key as keyof Product]) {
+      formKeys.forEach(key => {
+        // A more robust check for deep array comparison might be needed for comboProductIds if order matters
+        if (JSON.stringify(values[key]) !== JSON.stringify(product[key as keyof Product])) {
             (changedData as any)[key] = values[key];
         }
-      }
-
-      // Ensure that consignorId is cleared if ownershipType changes from Consigna
+      });
+      
       if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
-          changedData.consignorId = undefined;
+          changedData.consignorId = null;
       }
       
-      // Select the correct image file to upload
       const imageFile = values.optimizedImage || values.image;
 
-      // Pass only the changed data to the update function
       const updatedProduct = await updateProduct(product.id, changedData, imageFile);
 
       onProductUpdated(updatedProduct);
@@ -209,7 +206,7 @@ export default function EditProductDialog({ isOpen, onOpenChange, product, onPro
       });
       onOpenChange(false);
     } catch (error) {
-      console.error("Error updating product:", error);
+      console.error("ERROR CAPTURADO (actualizando producto):", error);
       toast({
         variant: "destructive",
         title: "Error",
