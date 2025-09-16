@@ -26,20 +26,32 @@ const generateProductImageFlow = ai.defineFlow(
       outputSchema: GenerateProductImageOutputSchema,
     },
     async (input) => {
-        const { media } = await ai.generate({
-            model: 'googleai/imagen-4.0-fast-generate-001',
-            prompt: `Professional e-commerce product photo of a "${input.productName}", studio lighting, clean white background, centered`,
-            config: {
-              responseModalities: ['IMAGE'],
-            },
-        });
+        console.log("Petición recibida para generar imagen. Datos:", input);
 
-        if (!media?.url) {
-            throw new Error('Image generation failed to return an image.');
+        if (!input.productName) {
+          console.error("Error: El nombre del producto está vacío.");
+          throw new Error("Bad Request: productName is required.");
         }
-        
-        return {
-            imageUrl: media.url,
-        };
+
+        try {
+            const { media } = await ai.generate({
+                model: 'googleai/imagen-4.0-fast-generate-001',
+                prompt: `Professional e-commerce product photo of a "${input.productName}", studio lighting, clean white background, centered`,
+                config: {
+                  responseModalities: ['IMAGE'],
+                },
+            });
+
+            if (!media?.url) {
+                throw new Error('Image generation failed to return an image.');
+            }
+            
+            return {
+                imageUrl: media.url,
+            };
+        } catch (error) {
+            console.error("ERROR AL LLAMAR AL MODELO DE IA:", error);
+            throw error;
+        }
     }
 );
