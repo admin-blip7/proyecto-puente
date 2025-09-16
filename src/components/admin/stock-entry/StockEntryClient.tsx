@@ -5,11 +5,11 @@ import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } fro
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Wand2, Upload, Camera } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Wand2, Upload, Camera, ChevronsUpDown, Check } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
@@ -41,6 +41,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const { toast } = useToast();
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
+    
+    const existingCategories = useMemo(() => {
+        const categories = new Set(allProducts.map(p => p.category));
+        return Array.from(categories).sort();
+    }, [allProducts]);
+
 
     useEffect(() => {
         getConsignors().then(setConsignors);
@@ -190,8 +196,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     
     const validateEntryList = () => {
         for (const item of entryList) {
-            if (!item.sku || !item.name || item.quantity <= 0) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre y cantidad.` });
+            if (!item.sku || !item.name || !item.category || item.quantity <= 0) {
+                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre, categoría y cantidad.` });
                 return false;
             }
             if (item.ownershipType === 'Consigna' && !item.consignorId) {
@@ -297,18 +303,19 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     <TableRow>
                                         <TableHead className="w-[120px]">SKU</TableHead>
                                         <TableHead>Nombre Producto</TableHead>
+                                        <TableHead>Categoría</TableHead>
                                         <TableHead className="w-[140px]">Tipo Propiedad</TableHead>
                                         <TableHead className="w-[160px]">Consignador</TableHead>
                                         <TableHead className="w-[90px] text-right">Cantidad</TableHead>
-                                        <TableHead className="w-[110px] text-right">Precio Venta</TableHead>
                                         <TableHead className="w-[110px] text-right">Costo</TableHead>
+                                        <TableHead className="w-[110px] text-right">Precio Venta</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {entryList.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={8} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
+                                            <TableCell colSpan={9} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
                                         </TableRow>
                                     ) : (
                                         entryList.map(item => (
@@ -318,6 +325,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                 </TableCell>
                                                 <TableCell>
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                                </TableCell>
+                                                 <TableCell>
+                                                    <CategoryComboBox 
+                                                        value={item.category}
+                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                        categories={existingCategories}
+                                                    />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -341,10 +355,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                     <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
+                                                    <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
+                                                    <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
@@ -373,6 +387,14 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         <div className="space-y-1">
                                             <Label>Nombre Producto</Label>
                                             <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Categoría</Label>
+                                             <CategoryComboBox 
+                                                value={item.category}
+                                                onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                categories={existingCategories}
+                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
@@ -407,13 +429,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
+                                             <div className="space-y-1">
+                                                <Label>Costo</Label>
+                                                <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
+                                            </div>
                                             <div className="space-y-1">
                                                 <Label>Precio Venta</Label>
                                                 <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>Costo</Label>
-                                                <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
                                             </div>
                                         </div>
                                     </CardContent>
@@ -432,4 +454,67 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             </div>
         </>
     );
+}
+
+
+function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
+  const [open, setOpen] = useState(false)
+  const [inputValue, setInputValue] = useState(value)
+
+  const handleSelect = (currentValue: string) => {
+    const newValue = currentValue === inputValue ? "" : currentValue
+    setInputValue(newValue)
+    onChange(newValue)
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {inputValue || "Seleccionar..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput 
+            placeholder="Buscar o crear categoría..."
+            onValueChange={setInputValue}
+            value={inputValue}
+            />
+          <CommandList>
+            <CommandEmpty>
+                <Button variant="ghost" className="w-full justify-start" onClick={() => handleSelect(inputValue)}>
+                    <PlusCircle className="mr-2 h-4 w-4"/>
+                    Crear "{inputValue}"
+                </Button>
+            </CommandEmpty>
+            <CommandGroup>
+              {categories.map((category) => (
+                <CommandItem
+                  key={category}
+                  value={category}
+                  onSelect={handleSelect}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === category ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {category}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
 }
