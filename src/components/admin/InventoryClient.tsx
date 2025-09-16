@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Trash2, Edit } from "lucide-react";
@@ -20,10 +21,8 @@ import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import DeleteProductsDialog from "./DeleteProductsDialog";
 import BulkEditDialog from "./BulkEditDialog";
-import { getProducts, updateProduct } from "@/lib/services/productService";
+import { getProducts } from "@/lib/services/productService";
 import { useToast } from "@/hooks/use-toast";
-import EditProductDialog from "./EditProductDialog";
-
 
 interface InventoryClientProps {
   initialProducts: Product[];
@@ -35,9 +34,8 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isBulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
-  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
 
   const handleProductAdded = (newProduct: Product) => {
@@ -49,15 +47,10 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     setSelectedProductIds([]);
   }
 
-  const handleOpenEditDialog = (product: Product) => {
-    setSelectedProduct(product);
-    setEditDialogOpen(true);
+  const handleOpenEditPage = (productId: string) => {
+    router.push(`/admin/inventory/edit/${productId}`);
   }
   
-  const handleProductUpdated = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-  }
-
   const handleRefreshData = async () => {
     try {
         const updatedProducts = await getProducts();
@@ -163,7 +156,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         </TableCell>
                         <TableCell>
                         <Image
-                            src={product.imageUrl}
+                            src={product.imageUrl || "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen"}
                             alt={product.name}
                             width={40}
                             height={40}
@@ -185,7 +178,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                         <TableCell className="text-right">{product.stock}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(product)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditPage(product.id)}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Editar</span>
                           </Button>
@@ -203,14 +196,6 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         onOpenChange={setAddDialogOpen}
         onProductAdded={handleProductAdded}
       />
-       {selectedProduct && (
-        <EditProductDialog
-            isOpen={isEditDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            product={selectedProduct}
-            onProductUpdated={handleProductUpdated}
-        />
-       )}
       <DeleteProductsDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
