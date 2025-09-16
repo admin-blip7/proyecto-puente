@@ -63,21 +63,6 @@ export const GenerateSalesSummaryOutputSchema = z.object({
 });
 export type GenerateSalesSummaryOutput = z.infer<typeof GenerateSalesSummaryOutputSchema>;
 
-// Types for: optimize-product-image
-export const OptimizeImageInputSchema = z.object({
-    photoDataUri: z
-      .string()
-      .describe(
-        "A photo of a product, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-      ),
-});
-export type OptimizeImageInput = z.infer<typeof OptimizeImageInputSchema>;
-
-export const OptimizeImageOutputSchema = z.object({
-    optimizedImageUri: z.string().describe("The generated e-commerce-ready image of the product as a data URI."),
-});
-export type OptimizeImageOutput = z.infer<typeof OptimizeImageOutputSchema>;
-
 // Types for: suggest-product-tags
 const ExistingProductSchema = z.object({
   name: z.string(),
@@ -138,14 +123,3 @@ export const GenerateDebtStrategyOutputSchema = z.object({
   avalanche: StrategySchema.describe("The Avalanche Method strategy, focusing on paying off the highest-interest debts first to save money."),
 });
 export type GenerateDebtStrategyOutput = z.infer<typeof GenerateDebtStrategyOutputSchema>;
-
-// Types for: generate-product-image
-export const GenerateProductImageInputSchema = z.object({
-    productName: z.string().describe("The name of the product to generate an image for."),
-});
-export type GenerateProductImageInput = z.infer<typeof GenerateProductImageInputSchema>;
-
-export const GenerateProductImageOutputSchema = z.object({
-    imageUrl: z.string().describe("The generated e-commerce-ready image of the product as a data URI."),
-});
-export type GenerateProductImageOutput = z.infer<typeof GenerateProductImageOutputSchema>;

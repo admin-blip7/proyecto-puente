@@ -42,7 +42,6 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         cost: Number(data.cost || 0),
         stock: Number(data.stock || 0),
         category: data.category,
-        imageUrl: data.imageUrl,
         createdAt: data.createdAt?.toDate(),
         type: data.type || 'Venta',
         ownershipType: data.ownershipType || 'Propio',
@@ -80,25 +79,11 @@ export const getProductById = async (productId: string): Promise<Product | null>
     }
 };
 
-const uploadProductImage = async (file: File, productId: string): Promise<string> => {
-    const filePath = `${STORAGE_PRODUCT_IMAGES_PATH}/${productId}/${file.name}`;
-    const storageRef = ref(storage, filePath);
-    await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
-};
-
-
 export const addProduct = async (
-    productData: Omit<Product, 'id' | 'createdAt' | 'imageUrl' | 'searchKeywords'>,
-    imageFile?: File
+    productData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords'>
 ): Promise<Product> => {
     
     const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
-    let imageUrl = "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen";
-
-    if (imageFile) {
-        imageUrl = await uploadProductImage(imageFile, productDocRef.id);
-    }
     
     try {
         const searchKeywords = generateSearchKeywords(productData.name);
@@ -108,7 +93,6 @@ export const addProduct = async (
             cost: Number(productData.cost) || 0,
             stock: Number(productData.stock) || 0,
             reorderPoint: Number(productData.reorderPoint) || 0,
-            imageUrl: imageUrl,
             createdAt: serverTimestamp(),
             searchKeywords: searchKeywords,
         };
@@ -148,15 +132,10 @@ export const addProduct = async (
 
 export const updateProduct = async (
     productId: string,
-    productData: Partial<Omit<Product, 'id' | 'createdAt'>>,
-    imageFile?: File
+    productData: Partial<Omit<Product, 'id' | 'createdAt'>>
 ): Promise<Product> => {
     const productDocRef = doc(db, PRODUCTS_COLLECTION, productId);
     let dataToUpdate: DocumentData = { ...productData };
-
-    if (imageFile) {
-        dataToUpdate.imageUrl = await uploadProductImage(imageFile, productId);
-    }
 
     if (productData.name) {
         dataToUpdate.searchKeywords = generateSearchKeywords(productData.name);
@@ -196,7 +175,6 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
                     id: doc.id,
                     name: data.name,
                     price: Number(data.price || 0),
-                    imageUrl: data.imageUrl,
                 };
             })
             .filter(p => !excludeIds.includes(p.id)); 
@@ -209,7 +187,7 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 }
 
 
-export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile?: File})[], userId: string): Promise<StockEntryItem[]> => {
+export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
     const processedItems: StockEntryItem[] = [];
     const newProductsForTagging: { id: string; name: string }[] = [];
 
@@ -220,11 +198,6 @@ export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile
         await runTransaction(db, async (transaction) => {
             const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
             
-            let imageUrl = item.imageUrl || "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen";
-            if (item.imageFile) {
-                imageUrl = await uploadProductImage(item.imageFile, productRef.id);
-            }
-
             if (productDoc && productDoc.exists()) {
                 transaction.update(productRef, {
                     stock: increment(item.quantity),
@@ -242,7 +215,6 @@ export const processStockEntry = async (entryItems: (StockEntryItem & {imageFile
                     cost: item.cost,
                     stock: item.quantity,
                     category: item.category,
-                    imageUrl: imageUrl,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,

@@ -16,7 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import Image from "next/image";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import DeleteProductsDialog from "./DeleteProductsDialog";
@@ -135,7 +134,6 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                             onCheckedChange={handleSelectAll}
                         />
                     </TableHead>
-                    <TableHead className="w-[80px]">Imagen</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Etiquetas</TableHead>
@@ -153,15 +151,6 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                                 checked={selectedProductIds.includes(product.id)}
                                 onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
                             />
-                        </TableCell>
-                        <TableCell>
-                        <Image
-                            src={product.imageUrl || "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen"}
-                            alt={product.name}
-                            width={40}
-                            height={40}
-                            className="rounded-md object-cover"
-                        />
                         </TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>

@@ -4,7 +4,6 @@ import { CartItem, SuggestedProduct, Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import Image from "next/image";
 import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut } from "lucide-react";
 import CheckoutDialog from "./CheckoutDialog";
 import { useState, useMemo } from "react";
@@ -88,14 +87,6 @@ export default function ShoppingCart({
                 )}
                 onClick={() => onSelectItem(item)}
               >
-                <Image
-                  src={item.imageUrl}
-                  alt={item.name}
-                  width={56}
-                  height={56}
-                  className="rounded-lg object-cover h-14 w-14"
-                  data-ai-hint={`${item.category} product`}
-                />
                 <div className="flex-1 space-y-1">
                   <p className="font-semibold leading-tight">{item.name}</p>
                   <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
@@ -123,7 +114,6 @@ export default function ShoppingCart({
             {suggestedProducts.length > 0 ? (
                  suggestedProducts.map(p => (
                     <div key={p.id} className="flex items-center gap-2 text-sm">
-                      <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" data-ai-hint="product photo" />
                       <p className="flex-1 font-medium">{p.name}</p>
                       <Button variant="outline" size="sm" onClick={() => onAddToCart(p, 1)}>
                         <PlusCircle className="mr-2 h-4 w-4"/>

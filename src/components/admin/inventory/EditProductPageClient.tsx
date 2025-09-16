@@ -13,10 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { updateProduct } from "@/lib/services/productService";
-import { Loader2, Save, Sparkles, UploadCloud, Camera, Package, DollarSign, Info, Image as ImageIcon } from "lucide-react";
-import Image from "next/image";
-import CameraCaptureDialog from "../CameraCaptureDialog";
-import { optimizeProductImage } from "@/ai/flows/optimize-product-image";
+import { Loader2, Save, Package, DollarSign, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ComboProductSelector from "./ComboProductSelector";
 
@@ -33,9 +30,6 @@ const formSchema = z.object({
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
   comboProductIds: z.array(z.string()).optional(),
-  image: z.custom<File>().optional(),
-  optimizedImage: z.custom<File>().optional(),
-  imageUrl: z.string().optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -54,7 +48,7 @@ const formSchema = z.object({
     path: ['consignorId'],
 });
 
-type Section = "general" | "pricing" | "image" | "details";
+type Section = "general" | "pricing" | "details";
 
 interface EditProductPageClientProps {
   product: Product;
@@ -64,9 +58,6 @@ interface EditProductPageClientProps {
 
 export default function EditProductPageClient({ product, consignors, allProducts }: EditProductPageClientProps) {
   const [loading, setLoading] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isCameraOpen, setCameraOpen] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(product.imageUrl);
   const [activeSection, setActiveSection] = useState<Section>("general");
   const { toast } = useToast();
   const router = useRouter();
@@ -81,58 +72,6 @@ export default function EditProductPageClient({ product, consignors, allProducts
   });
 
   const { watch, setValue, getValues, formState: { isDirty } } = form;
-
-  const handleImageChange = (file: File | null) => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        setValue("image", file, { shouldDirty: true });
-        setValue("optimizedImage", undefined, { shouldDirty: true });
-      };
-      reader.readAsDataURL(file);
-    } else {
-        setImagePreview(null);
-        setValue("image", undefined, { shouldDirty: true });
-    }
-  };
-
-  const dataURLtoFile = (dataurl: string, filename: string): File => {
-    var arr = dataurl.split(','),
-        mimeMatch = arr[0].match(/:(.*?);/),
-        mime = mimeMatch ? mimeMatch[1] : 'image/png',
-        bstr = atob(arr[1]), 
-        n = bstr.length, 
-        u8arr = new Uint8Array(n);
-        
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    
-    return new File([u8arr], filename, {type:mime});
-  }
-
-  const handleOptimizeImage = async () => {
-    if (!imagePreview) {
-        toast({ variant: 'destructive', title: "Error", description: "Sube o toma una imagen primero para optimizarla."});
-        return;
-    }
-    setIsOptimizing(true);
-    try {
-        const result = await optimizeProductImage({ photoDataUri: imagePreview });
-        if (result.optimizedImageUri) {
-            setImagePreview(result.optimizedImageUri);
-            const optimizedFile = dataURLtoFile(result.optimizedImageUri, `optimized-${getValues('sku') || 'product'}.png`);
-            setValue('optimizedImage', optimizedFile, { shouldDirty: true });
-            toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
-        }
-    } catch(error) {
-        console.error("ERROR CAPTURADO (optimizando imagen):", error);
-        toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo optimizar la imagen."});
-    } finally {
-        setIsOptimizing(false);
-    }
-  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!isDirty) {
@@ -155,9 +94,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
           (dataToUpdate as any).consignorId = null;
       }
       
-      const imageFile = values.optimizedImage || values.image;
-
-      await updateProduct(product.id, dataToUpdate, imageFile);
+      await updateProduct(product.id, dataToUpdate);
 
       toast({
         title: "Producto Actualizado",
@@ -180,7 +117,6 @@ export default function EditProductPageClient({ product, consignors, allProducts
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: 'general', label: 'Información General', icon: Info },
     { id: 'pricing', label: 'Precios y Stock', icon: DollarSign },
-    { id: 'image', label: 'Imágenes y Combos', icon: ImageIcon },
     { id: 'details', label: 'Categorías y Tipos', icon: Package },
   ];
 
@@ -287,51 +223,6 @@ export default function EditProductPageClient({ product, consignors, allProducts
                             </div>
                         )}
 
-                        {activeSection === 'image' && (
-                             <div className="space-y-6">
-                                <div className="space-y-2">
-                                <FormLabel>Imagen del Producto</FormLabel>
-                                <div className="flex items-center justify-center w-full h-40 border-2 border-dashed rounded-lg bg-card relative">
-                                    {imagePreview ? (
-                                        <>
-                                            <Image src={imagePreview} alt="Vista previa" fill className="object-contain p-2" />
-                                            {(isOptimizing || loading) && (
-                                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                                                    <Loader2 className="animate-spin h-8 w-8"/>
-                                                    <p className="text-sm mt-2">{loading ? "Guardando..." : "Optimizando..."}</p>
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">Sin imagen</p>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button asChild variant="outline">
-                                        <label htmlFor="dropzone-file-edit" className="cursor-pointer w-full">
-                                            <UploadCloud className="mr-2 h-4 w-4" /> Subir Archivo
-                                        </label>
-                                    </Button>
-                                    <Input 
-                                        id="dropzone-file-edit" 
-                                        type="file" 
-                                        className="hidden" 
-                                        accept="image/png, image/jpeg"
-                                        onChange={(e) => handleImageChange(e.target.files ? e.target.files[0] : null)}
-                                    />
-                                    <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
-                                        <Camera className="mr-2 h-4 w-4" /> Tomar Foto
-                                    </Button>
-                                </div>
-                                <Button type="button" onClick={handleOptimizeImage} disabled={!imagePreview || isOptimizing || loading} className="w-full">
-                                    {isOptimizing ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                    {getValues('optimizedImage') ? 'Re-optimizar' : 'Mejorar con IA'}
-                                </Button>
-                                </div>
-                                <ComboProductSelector form={form} allProducts={allProducts} />
-                            </div>
-                        )}
-
                         {activeSection === 'details' && (
                              <div className="space-y-4">
                                 <FormField
@@ -387,17 +278,13 @@ export default function EditProductPageClient({ product, consignors, allProducts
                                         )}
                                     />
                                 )}
+                                <ComboProductSelector form={form} allProducts={allProducts} />
                             </div>
                         )}
                     </form>
                  </Form>
             </main>
         </div>
-        <CameraCaptureDialog 
-            isOpen={isCameraOpen}
-            onOpenChange={setCameraOpen}
-            onPhotoTaken={handleImageChange}
-        />
     </div>
   );
 }

@@ -12,7 +12,6 @@ export interface Product {
   cost: number;
   stock: number;
   category: string;
-  imageUrl: string;
   createdAt: Date;
   type: 'Venta' | 'Refacción';
   ownershipType: OwnershipType;
@@ -27,7 +26,6 @@ export interface SuggestedProduct {
   id: string;
   name: string;
   price: number;
-  imageUrl: string;
 }
 
 
@@ -113,7 +111,6 @@ export interface StockEntryItem {
   isNew: boolean;
   ownershipType: OwnershipType;
   consignorId?: string;
-  imageUrl?: string;
 }
 
 export interface RepairPart {

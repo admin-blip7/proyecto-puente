@@ -11,7 +11,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ShoppingCartIcon, PlusCircle, Package, Wand2, Lock, Unlock } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import Image from "next/image";
 import { getSuggestedProducts } from "@/lib/services/productService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentOpenSession, openCashSession, closeCashSession } from "@/lib/services/cashSessionService";
@@ -214,7 +213,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             <CardContent className="space-y-2 p-4 pt-0">
               {suggestedProducts.map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-sm">
-                  <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md" data-ai-hint="product photo" />
                   <p className="flex-1 font-medium">{p.name}</p>
                   <Button variant="outline" size="sm" onClick={() => addToCart(p, 1)}>
                     <PlusCircle className="mr-2 h-4 w-4"/>

@@ -20,9 +20,6 @@ import { Badge } from "../ui/badge";
 import { X, PlusCircle, Sparkles, Loader2, UploadCloud, Camera } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
-import { optimizeProductImage } from "@/ai/flows/optimize-product-image";
-import Image from "next/image";
-import CameraCaptureDialog from "./CameraCaptureDialog";
 
 interface AddProductDialogProps {
   isOpen: boolean;
@@ -42,8 +39,6 @@ const formSchema = z.object({
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
   comboProductIds: z.array(z.string()).optional(),
-  image: z.custom<File>().optional(),
-  optimizedImage: z.custom<File>().optional(),
 }).refine(data => {
     if (data.ownershipType === 'Familiar') {
         return data.price === data.cost;
@@ -67,9 +62,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const [consignors, setConsignors] = useState<Consignor[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [comboSearch, setComboSearch] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isCameraOpen, setCameraOpen] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -116,62 +108,8 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         getProducts().then(setAllProducts);
     } else {
         form.reset();
-        setImagePreview(null);
     }
   }, [isOpen, form]);
-  
-  const handleImageChange = (file: File | null) => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        form.setValue("image", file);
-        form.setValue("optimizedImage", undefined); 
-      };
-      reader.readAsDataURL(file);
-    } else {
-        setImagePreview(null);
-        form.setValue("image", undefined);
-    }
-  };
-
-  const dataURLtoFile = (dataurl: string, filename: string): File => {
-    var arr = dataurl.split(','),
-        mimeMatch = arr[0].match(/:(.*?);/),
-        mime = mimeMatch ? mimeMatch[1] : 'image/png',
-        bstr = atob(arr[1]), 
-        n = bstr.length, 
-        u8arr = new Uint8Array(n);
-        
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    
-    return new File([u8arr], filename, {type:mime});
-  }
-
-  const handleOptimizeImage = async () => {
-    if (!imagePreview) {
-        toast({ variant: 'destructive', title: "Error", description: "Sube o toma una imagen primero para optimizarla."});
-        return;
-    }
-    setIsOptimizing(true);
-    try {
-        const result = await optimizeProductImage({ photoDataUri: imagePreview });
-        if (result.optimizedImageUri) {
-            setImagePreview(result.optimizedImageUri);
-            const optimizedFile = dataURLtoFile(result.optimizedImageUri, `optimized-${form.getValues('sku') || 'product'}.png`);
-            form.setValue('optimizedImage', optimizedFile);
-            toast({ title: "Imagen Optimizada", description: "La imagen ha sido mejorada por la IA."});
-        }
-    } catch(error) {
-        console.error("ERROR CAPTURADO (optimizando imagen):", error);
-        toast({ variant: 'destructive', title: "Error de IA", description: "No se pudo optimizar la imagen."});
-    } finally {
-        setIsOptimizing(false);
-    }
-  }
-
 
   const handleToggleComboProduct = (productId: string) => {
     const currentIds = form.getValues("comboProductIds") || [];
@@ -184,7 +122,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      const newProductData: Omit<Product, 'id' | 'createdAt' | 'imageUrl'> = {
+      const newProductData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords'> = {
         name: values.name,
         sku: values.sku,
         price: values.price,
@@ -199,9 +137,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         compatibilityTags: [], // Tags will be generated automatically
       };
       
-      const imageFile = values.optimizedImage || values.image;
-
-      const newProduct = await addProduct(newProductData, imageFile);
+      const newProduct = await addProduct(newProductData);
 
       onProductAdded(newProduct);
       toast({
@@ -368,46 +304,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                         />
                     </div>
                     <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-                      <div className="space-y-2">
-                        <FormLabel>Imagen del Producto</FormLabel>
-                        <div className="flex items-center justify-center w-full h-40 border-2 border-dashed rounded-lg bg-card relative">
-                            {imagePreview ? (
-                                <>
-                                    <Image src={imagePreview} alt="Vista previa" fill className="object-contain p-2" />
-                                    {isOptimizing && (
-                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                                            <Loader2 className="animate-spin h-8 w-8"/>
-                                            <p className="text-sm mt-2">Optimizando...</p>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">Sin imagen</p>
-                            )}
-                        </div>
-                         <div className="grid grid-cols-2 gap-2">
-                            <Button asChild variant="outline">
-                                <label htmlFor="dropzone-file" className="cursor-pointer w-full">
-                                    <UploadCloud className="mr-2 h-4 w-4" /> Subir Archivo
-                                </label>
-                            </Button>
-                             <Input 
-                                id="dropzone-file" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/png, image/jpeg"
-                                onChange={(e) => handleImageChange(e.target.files ? e.target.files[0] : null)}
-                            />
-                            <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
-                                <Camera className="mr-2 h-4 w-4" /> Tomar Foto
-                            </Button>
-                        </div>
-                        <Button type="button" onClick={handleOptimizeImage} disabled={!imagePreview || isOptimizing} className="w-full">
-                            {isOptimizing ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                            {form.getValues('optimizedImage') ? 'Re-optimizar' : 'Mejorar con IA'}
-                        </Button>
-                    </div>
-
                       <div className="space-y-4">
                         <h3 className="font-semibold text-lg">Armar Combo</h3>
                         <p className="text-sm text-muted-foreground">Selecciona productos que se venderán comúnmente con este artículo.</p>
@@ -515,11 +411,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
           </Form>
         </DialogContent>
       </Dialog>
-      <CameraCaptureDialog 
-        isOpen={isCameraOpen}
-        onOpenChange={setCameraOpen}
-        onPhotoTaken={handleImageChange}
-      />
     </>
   );
 }
