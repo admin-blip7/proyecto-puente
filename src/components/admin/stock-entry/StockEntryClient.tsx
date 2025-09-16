@@ -9,7 +9,7 @@ import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandG
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Wand2, Upload, Camera, ChevronsUpDown, Check } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Check, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
@@ -460,6 +460,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState(value)
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value])
 
   const handleSelect = (currentValue: string) => {
     const newValue = currentValue === inputValue ? "" : currentValue
