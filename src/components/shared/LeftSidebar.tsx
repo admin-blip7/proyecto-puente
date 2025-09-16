@@ -15,7 +15,6 @@ import {
   } from "@/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-  import { useBranding } from '../brand/BrandingProvider';
 import Image from 'next/image';
   
 
@@ -41,7 +40,6 @@ const financeNavItems = [
 ]
 
 const settingsNavItem = { href: '/admin/settings', icon: Settings, label: 'Ajustes' };
-const customizeNavItem = { href: '/admin/customize', icon: Palette, label: 'Personalizar Tienda' };
 
 
 const getInitials = (name: string) => {
@@ -56,7 +54,6 @@ const getInitials = (name: string) => {
 export default function LeftSidebar() {
     const pathname = usePathname();
     const { userProfile, signOut } = useAuth();
-    const { settings } = useBranding();
     const isFinanceRoute = pathname.startsWith('/admin/finance');
     const isAdmin = userProfile?.role === 'Admin';
 
@@ -66,11 +63,7 @@ export default function LeftSidebar() {
                 <div className="flex flex-col items-center gap-2 w-full">
                     <Link href="/">
                         <div className="bg-primary text-primary-foreground p-3 rounded-lg mb-4 relative h-14 w-14 flex items-center justify-center">
-                            {settings.logo_url ? (
-                                <Image src={settings.logo_url} alt="Logo de la tienda" fill className="object-contain" />
-                            ) : (
-                                <Landmark className="h-6 w-6" />
-                            )}
+                            <Landmark className="h-6 w-6" />
                         </div>
                     </Link>
                     <nav className="flex flex-col items-center gap-2 w-full">
@@ -136,24 +129,6 @@ export default function LeftSidebar() {
                                     <p>{settingsNavItem.label}</p>
                                 </TooltipContent>
                             </Tooltip>
-                        
-                        {isAdmin && (
-                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Link href={customizeNavItem.href} className="w-full">
-                                        <Button variant="ghost" size="lg" className={cn(
-                                            "rounded-lg w-full h-14",
-                                            pathname === customizeNavItem.href && 'bg-primary/10 text-primary',
-                                        )}>
-                                            <customizeNavItem.icon className="h-6 w-6" />
-                                        </Button>
-                                    </Link>
-                                </TooltipTrigger>
-                                <TooltipContent side="right" sideOffset={5}>
-                                    <p>{customizeNavItem.label}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        )}
                     </nav>
                 </div>
                 <div className="flex flex-col items-center gap-4 mt-auto">

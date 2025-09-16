@@ -1,5 +1,5 @@
 import { db, storage } from "@/lib/firebase";
-import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema, BrandingSettings, BrandingSettingsSchema } from "@/types";
+import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema } from "@/types";
 import {
   doc,
   getDoc,
@@ -12,72 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 const SETTINGS_COLLECTION = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
 const LABEL_SETTINGS_DOC_ID = "label_design";
-const BRANDING_SETTINGS_DOC_ID = "branding";
 
-
-// --- BRANDING SETTINGS ---
-const defaultBrandingSettings: BrandingSettings = {
-    logo_url: "",
-    default_product_image_url: "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen"
-};
-
-export const getBrandingSettings = async (): Promise<BrandingSettings> => {
-    try {
-        const docRef = doc(db, SETTINGS_COLLECTION, BRANDING_SETTINGS_DOC_ID);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const parsed = BrandingSettingsSchema.safeParse(docSnap.data());
-            if (parsed.success) {
-                return parsed.data;
-            } else {
-                console.warn("Invalid branding settings in Firestore, returning defaults.", parsed.error);
-                return defaultBrandingSettings;
-            }
-        } else {
-            await setDoc(docRef, { ...defaultBrandingSettings, lastUpdated: serverTimestamp() });
-            return defaultBrandingSettings;
-        }
-    } catch (error) {
-        console.error("Error fetching branding settings: ", error);
-        return defaultBrandingSettings;
-    }
-}
-
-export const saveBrandingSettings = async (
-    settings: Partial<BrandingSettings>,
-    files: { logo?: File | null, default_product_image?: File | null }
-): Promise<BrandingSettings> => {
-    try {
-        const settingsRef = doc(db, SETTINGS_COLLECTION, BRANDING_SETTINGS_DOC_ID);
-        const dataToUpdate: Partial<BrandingSettings> & { lastUpdated: any } = { lastUpdated: serverTimestamp() };
-
-        if (files.logo) {
-            const logoStorageRef = ref(storage, `app_logos/${uuidv4()}-${files.logo.name}`);
-            await uploadBytes(logoStorageRef, files.logo);
-            dataToUpdate.logo_url = await getDownloadURL(logoStorageRef);
-        } else if (settings.logo_url !== undefined) {
-            dataToUpdate.logo_url = settings.logo_url;
-        }
-
-        if (files.default_product_image) {
-            const defaultImageRef = ref(storage, `default_images/${uuidv4()}-${files.default_product_image.name}`);
-            await uploadBytes(defaultImageRef, files.default_product_image);
-            dataToUpdate.default_product_image_url = await getDownloadURL(defaultImageRef);
-        } else if (settings.default_product_image_url !== undefined) {
-            dataToUpdate.default_product_image_url = settings.default_product_image_url;
-        }
-        
-        await setDoc(settingsRef, dataToUpdate, { merge: true });
-        
-        const updatedDoc = await getDoc(settingsRef);
-        return updatedDoc.data() as BrandingSettings;
-
-    } catch (error) {
-        console.error("Error saving branding settings: ", error);
-        throw new Error("Failed to save branding settings.");
-    }
-};
 
 
 // --- TICKET SETTINGS ---

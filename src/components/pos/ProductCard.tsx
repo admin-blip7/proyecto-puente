@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useBranding } from "../brand/BrandingProvider";
 
 interface ProductCardProps {
   product: Product;
@@ -13,7 +12,6 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
-  const { settings } = useBranding();
   
   const getStockColor = () => {
     if (isOutOfStock) return "text-red-600";
@@ -21,7 +19,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
     return "text-black";
   }
 
-  const imageUrl = product.imageUrl || settings.default_product_image_url;
+  const imageUrl = product.imageUrl || "https://placehold.co/400x400/E2E8F0/AAAAAA&text=Sin+Imagen";
 
   return (
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
