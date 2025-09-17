@@ -329,7 +329,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                 </TableCell>
                                                  <TableCell>
                                                     <CategoryComboBox 
-                                                        value={item.category}
+                                                        value={item.category || ""}
                                                         onChange={(value) => handleUpdateItem(item.id, 'category', value)}
                                                         categories={productCategories.map(c => c.name)}
                                                     />
@@ -392,7 +392,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
                                              <CategoryComboBox 
-                                                value={item.category}
+                                                value={item.category || ""}
                                                 onChange={(value) => handleUpdateItem(item.id, 'category', value)}
                                                 categories={productCategories.map(c => c.name)}
                                             />
@@ -465,7 +465,6 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
   const handleSelect = (selectedValue: string) => {
     onChange(selectedValue);
     setOpen(false);
-    setSearch(""); // Reset search after selection
   };
   
   const filteredCategories = search
