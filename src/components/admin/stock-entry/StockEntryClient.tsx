@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,6 @@ import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff } from "lucide-react"
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
-import PrintLabelsView from "./PrintLabelsView";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
@@ -34,7 +34,6 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
     const [searchQuery, setSearchQuery] = useState("");
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
     const [consignors, setConsignors] = useState<Consignor[]>([]);
     const [isListening, setIsListening] = useState(false);
 
@@ -43,6 +42,7 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
 
     const { userProfile } = useAuth();
     const { toast } = useToast();
+    const router = useRouter();
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
     
@@ -97,15 +97,14 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
     };
     
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) {
-            return allProducts;
-        }
+        if (!searchQuery) return [];
         const lowerCaseQuery = searchQuery.toLowerCase();
         
         return allProducts.filter(p => {
             const name = p.name.toLowerCase();
             const sku = p.sku.toLowerCase();
-            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery);
+            const keywords = p.searchKeywords || [];
+            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery) || keywords.some(k => k.includes(lowerCaseQuery));
         });
     }, [searchQuery, allProducts]);
 
@@ -219,10 +218,26 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
         
         setIsLoading(true);
         try {
-            const result = await processStockEntry(entryList, userProfile.uid);
+            const processedItems = await processStockEntry(entryList, userProfile.uid);
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
             
-            setProcessedItems(result);
+            // Redirect to print view
+            try {
+                const payload = processedItems.map(p => ({
+                    id: p.id || p.productId || p.sku || crypto.randomUUID(),
+                    nombre: String(p.name || ""),
+                    sku: String(p.sku || ""),
+                    precio: p.price ?? "",
+                    cantidad: Math.max(0, parseInt(String(p.quantity) ?? "0", 10) || 0),
+                })).filter(x => x.cantidad > 0);
+
+                sessionStorage.setItem("labelsToPrint", JSON.stringify(payload));
+                router.push("/print/labels");
+            } catch (e) {
+                 console.error("No se pudo preparar impresión", e);
+                 alert("No se pudo preparar los datos de impresión.");
+            }
+
             setEntryList([]);
         } catch (error) {
             console.error(error);
@@ -231,10 +246,6 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
             setIsLoading(false);
         }
     };
-    
-    if (processedItems) {
-        return <PrintLabelsView items={processedItems} onDone={() => setProcessedItems(null)} />;
-    }
 
     return (
         <>
@@ -268,7 +279,7 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
                                           />
                                           <CommandList>
                                             {filteredProducts.length === 0 && searchQuery.length > 0 ? (
-                                                <div className="py-6 text-center text-sm">No se encontraron productos.</div>
+                                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
                                             ) : (
                                                 <CommandGroup>
                                                     {filteredProducts.slice(0, 50).map(product => (

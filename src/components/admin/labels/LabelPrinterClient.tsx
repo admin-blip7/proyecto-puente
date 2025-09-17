@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Product, StockEntryItem } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import PrintLabelsView from "../stock-entry/PrintLabelsView";
 import { Label } from "@/components/ui/label";
 import { Printer, Search } from "lucide-react";
 
@@ -23,8 +23,7 @@ export default function LabelPrinterClient({ allProducts }: LabelPrinterClientPr
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [labelQuantity, setLabelQuantity] = useState(1);
-    const [showPrintView, setShowPrintView] = useState(false);
-    const [itemsToPrint, setItemsToPrint] = useState<StockEntryItem[]>([]);
+    const router = useRouter();
 
     const searchContainerRef = useRef<HTMLDivElement>(null);
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
@@ -50,24 +49,23 @@ export default function LabelPrinterClient({ allProducts }: LabelPrinterClientPr
 
     const handleGenerate = () => {
         if (!selectedProduct) return;
-        const item: StockEntryItem = {
-            id: uuidv4(),
-            productId: selectedProduct.id,
-            name: selectedProduct.name,
-            sku: selectedProduct.sku,
-            quantity: labelQuantity,
-            price: selectedProduct.price,
-            cost: selectedProduct.cost,
-            isNew: false, // Not a new product, just printing labels
-            ownershipType: selectedProduct.ownershipType,
+        
+        try {
+            const payload = [{
+                id: selectedProduct.id || selectedProduct.sku,
+                nombre: String(selectedProduct.name || ""),
+                sku: String(selectedProduct.sku || ""),
+                precio: selectedProduct.price ?? "",
+                cantidad: Math.max(0, parseInt(String(labelQuantity) ?? "0", 10) || 0),
+            }];
+
+            sessionStorage.setItem("labelsToPrint", JSON.stringify(payload));
+            router.push("/print/labels");
+        } catch (e) {
+            console.error("No se pudo preparar impresión", e);
+            alert("No se pudo preparar los datos de impresión.");
         }
-        setItemsToPrint([item]);
-        setShowPrintView(true);
     };
-    
-    if (showPrintView) {
-        return <PrintLabelsView items={itemsToPrint} onDone={() => setShowPrintView(false)} />;
-    }
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
