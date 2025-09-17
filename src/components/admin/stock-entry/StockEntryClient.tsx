@@ -461,6 +461,11 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
     const [open, setOpen] = useState(false);
 
+    const handleSelect = (selectedValue: string) => {
+        onChange(selectedValue);
+        setOpen(false);
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -475,24 +480,25 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
+                <Command
+                    // This filter is important for creation to work
+                    filter={(itemValue, search) => {
+                        if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
+                        return 0;
+                    }}
+                >
                     <CommandInput
                         placeholder="Buscar o crear categoría..."
-                        onValueChange={(search) => {
-                            // Allows typing to filter or create new
-                        }}
+                        value={value}
+                        onValueChange={onChange}
                     />
                     <CommandList>
                         <CommandEmpty>
-                            <CommandItem
-                                onSelect={(currentValue) => {
-                                    const input = (document.querySelector(`[cmdk-input]`) as HTMLInputElement)?.value;
-                                    onChange(input);
-                                    setOpen(false);
-                                }}
-                            >
+                             <CommandItem
+                                onSelect={() => handleSelect(value)}
+                             >
                                 <PlusCircle className="mr-2 h-4 w-4" />
-                                Crear nueva categoría
+                                Crear "{value}"
                             </CommandItem>
                         </CommandEmpty>
                         <CommandGroup>
@@ -500,10 +506,7 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
                                 <CommandItem
                                     key={category}
                                     value={category}
-                                    onSelect={(currentValue) => {
-                                        onChange(currentValue === value ? "" : currentValue);
-                                        setOpen(false);
-                                    }}
+                                    onSelect={() => handleSelect(category)}
                                 >
                                     <Check
                                         className={cn(
