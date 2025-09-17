@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
+import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, LabelSettings } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
-import { cn } from "@/lib/utils";
+import { cn, generateAndPrintLabels } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,9 +26,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 interface StockEntryClientProps {
     allProducts: Product[];
+    labelSettings: LabelSettings;
 }
 
-export default function StockEntryClient({ allProducts: initialProducts }: StockEntryClientProps) {
+export default function StockEntryClient({ allProducts: initialProducts, labelSettings }: StockEntryClientProps) {
     const [entryList, setEntryList] = useState<StockEntryItem[]>([]);
     const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
     const [searchQuery, setSearchQuery] = useState("");
@@ -221,22 +222,14 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
             const processedItems = await processStockEntry(entryList, userProfile.uid);
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
             
-            // Redirect to print view
-            try {
-                const payload = processedItems.map(p => ({
-                    id: p.id || p.productId || p.sku || crypto.randomUUID(),
-                    nombre: String(p.name || ""),
-                    sku: String(p.sku || ""),
-                    precio: p.price ?? "",
-                    cantidad: Math.max(0, parseInt(String(p.quantity) ?? "0", 10) || 0),
-                })).filter(x => x.cantidad > 0);
+            const labelsToPrint = processedItems.map(p => ({
+                name: p.name,
+                sku: p.sku,
+                price: p.price,
+                quantity: p.quantity,
+            }));
 
-                sessionStorage.setItem("labelsToPrint", JSON.stringify(payload));
-                router.push("/print/labels");
-            } catch (e) {
-                 console.error("No se pudo preparar impresión", e);
-                 alert("No se pudo preparar los datos de impresión.");
-            }
+            generateAndPrintLabels(labelsToPrint, labelSettings);
 
             setEntryList([]);
         } catch (error) {

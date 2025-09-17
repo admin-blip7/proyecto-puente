@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { getProducts } from "@/lib/services/productService";
 import LabelPrinterClient from "@/components/admin/labels/LabelPrinterClient";
+import { getLabelSettings } from "@/lib/services/settingsService";
 
 
 export default async function LabelsPage() {
     const initialProducts = await getProducts();
+    const labelSettings = await getLabelSettings();
    
     return (
         <div className="flex h-screen w-full flex-row">
@@ -28,7 +30,7 @@ export default async function LabelsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-              <LabelPrinterClient allProducts={initialProducts} />
+              <LabelPrinterClient allProducts={initialProducts} settings={labelSettings} />
             </main>
         </div>
     )

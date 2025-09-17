@@ -238,7 +238,7 @@ export interface CashSession {
 export const TicketSettingsSchema = z.object({
   header: z.object({
     showLogo: z.boolean(),
-    logoUrl: z.string().url().or(z.literal("")),
+    logoUrl: z.string().url().or(z.literal("")).optional(),
     show: z.object({
         storeName: z.boolean(),
         address: z.boolean(),
@@ -246,11 +246,11 @@ export const TicketSettingsSchema = z.object({
         rfc: z.boolean(),
         website: z.boolean(),
     }),
-    storeName: z.string(),
-    address: z.string(),
-    phone: z.string(),
-    rfc: z.string(),
-    website: z.string(),
+    storeName: z.string().optional(),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+    rfc: z.string().optional(),
+    website: z.string().optional(),
   }),
   body: z.object({
     showQuantity: z.boolean(),
@@ -262,10 +262,10 @@ export const TicketSettingsSchema = z.object({
     showSubtotal: z.boolean(),
     showTaxes: z.boolean(),
     showDiscounts: z.boolean(),
-    thankYouMessage: z.string(),
-    additionalInfo: z.string(),
+    thankYouMessage: z.string().optional(),
+    additionalInfo: z.string().optional(),
     showQrCode: z.boolean(),
-    qrCodeUrl: z.string().url().or(z.literal("")),
+    qrCodeUrl: z.string().url().or(z.literal("")).optional(),
   }),
 });
 
@@ -274,8 +274,6 @@ export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
 export const LabelSettingsSchema = z.object({
     width: z.coerce.number().positive(),
     height: z.coerce.number().positive(),
-    margin: z.coerce.number().min(0),
-    gap: z.coerce.number().min(0),
     fontSize: z.coerce.number().positive(),
     barcodeHeight: z.coerce.number().positive(),
     includeLogo: z.boolean(),

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Product, StockEntryItem } from "@/types";
+import { Product, StockEntryItem, LabelSettings } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,15 @@ import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Label } from "@/components/ui/label";
 import { Printer, Search } from "lucide-react";
+import { generateAndPrintLabels } from "@/lib/utils";
 
 
 interface LabelPrinterClientProps {
     allProducts: Product[];
+    settings: LabelSettings;
 }
 
-export default function LabelPrinterClient({ allProducts }: LabelPrinterClientProps) {
+export default function LabelPrinterClient({ allProducts, settings }: LabelPrinterClientProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -50,21 +52,14 @@ export default function LabelPrinterClient({ allProducts }: LabelPrinterClientPr
     const handleGenerate = () => {
         if (!selectedProduct) return;
         
-        try {
-            const payload = [{
-                id: selectedProduct.id || selectedProduct.sku,
-                nombre: String(selectedProduct.name || ""),
-                sku: String(selectedProduct.sku || ""),
-                precio: selectedProduct.price ?? "",
-                cantidad: Math.max(0, parseInt(String(labelQuantity) ?? "0", 10) || 0),
-            }];
+        const payload = [{
+            name: selectedProduct.name,
+            sku: selectedProduct.sku,
+            price: selectedProduct.price,
+            quantity: labelQuantity,
+        }];
 
-            sessionStorage.setItem("labelsToPrint", JSON.stringify(payload));
-            router.push("/print/labels");
-        } catch (e) {
-            console.error("No se pudo preparar impresión", e);
-            alert("No se pudo preparar los datos de impresión.");
-        }
+        generateAndPrintLabels(payload, settings);
     };
 
     return (

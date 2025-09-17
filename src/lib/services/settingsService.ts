@@ -94,10 +94,8 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
 // --- LABEL SETTINGS ---
 
 const defaultLabelSettings: LabelSettings = {
-    width: 66.7, // 2.625 inches in mm
-    height: 25.4, // 1 inch in mm
-    margin: 10,
-    gap: 0,
+    width: 58, 
+    height: 40, 
     fontSize: 9,
     barcodeHeight: 30,
     includeLogo: false,

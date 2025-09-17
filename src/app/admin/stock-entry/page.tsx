@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import StockEntryClient from "@/components/admin/stock-entry/StockEntryClient";
 import { getProducts } from "@/lib/services/productService";
+import { getLabelSettings } from "@/lib/services/settingsService";
 
 export default async function StockEntryPage() {
     const initialProducts = await getProducts();
+    const labelSettings = await getLabelSettings();
 
     return (
         <div className="flex h-screen w-full flex-row">
@@ -27,7 +29,7 @@ export default async function StockEntryPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-               <StockEntryClient allProducts={initialProducts} />
+               <StockEntryClient allProducts={initialProducts} labelSettings={labelSettings} />
             </main>
         </div>
     )
