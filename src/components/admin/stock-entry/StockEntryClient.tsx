@@ -27,8 +27,9 @@ interface StockEntryClientProps {
     allProducts: Product[];
 }
 
-export default function StockEntryClient({ allProducts }: StockEntryClientProps) {
+export default function StockEntryClient({ allProducts: initialProducts }: StockEntryClientProps) {
     const [entryList, setEntryList] = useState<StockEntryItem[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
     const [searchQuery, setSearchQuery] = useState("");
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +97,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
-            return [];
+            return allProducts; // Show all products if search is empty
         }
         const lowerCaseQuery = searchQuery.toLowerCase();
         
@@ -247,12 +248,15 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                                     <PopoverTrigger asChild className="w-full">
-                                        <Input
-                                            placeholder="Buscar producto por SKU o nombre..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            onFocus={() => setPopoverOpen(true)}
-                                        />
+                                        <div className="relative">
+                                            <CommandInput
+                                                placeholder="Buscar producto por SKU o nombre..."
+                                                value={searchQuery}
+                                                onValueChange={setSearchQuery}
+                                                onFocus={() => setPopoverOpen(true)}
+                                                className="w-full"
+                                            />
+                                        </div>
                                     </PopoverTrigger>
                                     <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                                         <Command>
