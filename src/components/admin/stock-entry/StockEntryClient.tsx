@@ -459,72 +459,65 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+    const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    // When the popover is closed, reset the search term to the current value
-    if (!open) {
-      setSearch(value);
-    }
-  }, [open, value]);
-
-  const handleSelect = (selectedValue: string) => {
-    onChange(selectedValue);
-    setOpen(false);
-  };
-  
-  const filteredCategories = search
-    ? categories.filter((cat) => cat.toLowerCase().includes(search.toLowerCase()))
-    : categories;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-        >
-          {value || "Seleccionar..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput 
-            placeholder="Buscar o crear categoría..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>
-                <CommandItem onSelect={() => handleSelect(search)}>
-                    <PlusCircle className="mr-2 h-4 w-4"/>
-                    Crear "{search}"
-                </CommandItem>
-            </CommandEmpty>
-            <CommandGroup>
-              {filteredCategories.map((category) => (
-                <CommandItem
-                  key={category}
-                  value={category}
-                  onSelect={(currentValue) => handleSelect(currentValue)}
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between font-normal"
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === category ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {category}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  )
+                    {value || "Seleccionar..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                    <CommandInput
+                        placeholder="Buscar o crear categoría..."
+                        onValueChange={(search) => {
+                            // Allows typing to filter or create new
+                        }}
+                    />
+                    <CommandList>
+                        <CommandEmpty>
+                            <CommandItem
+                                onSelect={(currentValue) => {
+                                    const input = (document.querySelector(`[cmdk-input]`) as HTMLInputElement)?.value;
+                                    onChange(input);
+                                    setOpen(false);
+                                }}
+                            >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Crear nueva categoría
+                            </CommandItem>
+                        </CommandEmpty>
+                        <CommandGroup>
+                            {categories.map((category) => (
+                                <CommandItem
+                                    key={category}
+                                    value={category}
+                                    onSelect={(currentValue) => {
+                                        onChange(currentValue === value ? "" : currentValue);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            value === category ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {category}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    )
 }
