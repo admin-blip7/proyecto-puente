@@ -1,19 +1,19 @@
+'use client'
 
-'use client';
-
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { searchCategories, createCategory } from '@/lib/services/productCategoryService';
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, Loader2, PlusCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useOnClickOutside } from '@/hooks/useOnClickOutside';
-
+import { createPortal } from 'react-dom'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useControlledInput } from '@/hooks/useControlledInput'
+import { useStablePortal } from '@/hooks/useStablePortal'
+import { searchCategories, createCategory } from '@/lib/services/productCategoryService'
+import { Loader2, PlusCircle, Check, ChevronsUpDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 
 type CategoryOption = { id: string; name: string };
-
 interface CategoryComboBoxProps {
   value?: string | null;
   onChange?: (value: string) => void;
@@ -57,7 +57,6 @@ export default function CategoryComboBox({
       try {
         const firestoreCategories = await searchCategories(debouncedSearchTerm);
         if (active) {
-            // Combine and deduplicate results
             const combined = [...categories, ...firestoreCategories];
             const unique = Array.from(new Set(combined.map(c => c.name)))
                 .map(name => combined.find(c => c.name === name)!);

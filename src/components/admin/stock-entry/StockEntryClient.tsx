@@ -337,12 +337,14 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                                 </TableCell>
                                                  <TableCell>
-                                                    <CategoryComboBox 
-                                                        value={item.category || ""}
-                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                        categories={productCategories}
-                                                        onCategoriesChange={setProductCategories}
-                                                    />
+                                                    <ClientOnly>
+                                                        <CategoryComboBox 
+                                                            value={item.category || ""}
+                                                            onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                            categories={productCategories}
+                                                            onCategoriesChange={setProductCategories}
+                                                        />
+                                                    </ClientOnly>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -401,12 +403,14 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
-                                             <CategoryComboBox 
-                                                value={item.category || ""}
-                                                onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                categories={productCategories}
-                                                onCategoriesChange={setProductCategories}
-                                            />
+                                            <ClientOnly>
+                                                <CategoryComboBox 
+                                                    value={item.category || ""}
+                                                    onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                    categories={productCategories}
+                                                    onCategoriesChange={setProductCategories}
+                                                />
+                                            </ClientOnly>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
