@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
@@ -249,10 +250,10 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
                                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                                     <PopoverTrigger asChild className="w-full">
                                         <div className="relative">
-                                            <CommandInput
+                                             <Input
                                                 placeholder="Buscar producto por SKU o nombre..."
                                                 value={searchQuery}
-                                                onValueChange={setSearchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
                                                 onFocus={() => setPopoverOpen(true)}
                                                 className="w-full"
                                             />
@@ -260,6 +261,11 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
                                     </PopoverTrigger>
                                     <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                                         <Command>
+                                            <CommandInput
+                                                placeholder="Buscar producto por SKU o nombre..."
+                                                value={searchQuery}
+                                                onValueChange={setSearchQuery}
+                                            />
                                             <CommandList>
                                                 <CommandEmpty>No se encontraron productos.</CommandEmpty>
                                                 {filteredProducts.slice(0, 50).map(product => (
