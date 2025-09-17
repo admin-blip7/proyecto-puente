@@ -108,12 +108,6 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
           #print-area, #print-area * {
             visibility: visible;
           }
-          #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
           .label-grid {
              display: block; /* Change from grid to block for printing */
           }
@@ -123,6 +117,9 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
             position: absolute;
             top: 0;
             left: 0;
+          }
+           .label:last-child {
+            page-break-after: auto; /* Prevent final page break */
           }
           @page {
             size: auto;
