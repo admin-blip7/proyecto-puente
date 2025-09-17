@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
+import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, ProductCategory } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import PrintLabelsView from "./PrintLabelsView";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
+import { getProductCategories } from "@/lib/services/productCategoryService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
@@ -32,6 +33,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [isLoading, setIsLoading] = useState(false);
     const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
     const [consignors, setConsignors] = useState<Consignor[]>([]);
+    const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
     const [isListening, setIsListening] = useState(false);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -42,14 +44,9 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
     
-    const existingCategories = useMemo(() => {
-        const categories = new Set(allProducts.map(p => p.category));
-        return Array.from(categories).sort();
-    }, [allProducts]);
-
-
     useEffect(() => {
         getConsignors().then(setConsignors);
+        getProductCategories().then(setProductCategories);
         
         if (typeof window !== 'undefined') {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -225,6 +222,10 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         try {
             const result = await processStockEntry(entryList, userProfile.uid);
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
+            
+            // Refresh categories list after processing
+            getProductCategories().then(setProductCategories);
+
             setProcessedItems(result);
             setEntryList([]);
         } catch (error) {
@@ -330,7 +331,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                     <CategoryComboBox 
                                                         value={item.category}
                                                         onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                        categories={existingCategories}
+                                                        categories={productCategories.map(c => c.name)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -393,7 +394,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                              <CategoryComboBox 
                                                 value={item.category}
                                                 onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                categories={existingCategories}
+                                                categories={productCategories.map(c => c.name)}
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">

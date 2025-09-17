@@ -166,6 +166,12 @@ export interface ExpenseCategory {
     isActive: boolean;
 }
 
+export interface ProductCategory {
+    id: string;
+    name: string;
+}
+
+
 export interface Expense {
     id: string;
     expenseId: string;
