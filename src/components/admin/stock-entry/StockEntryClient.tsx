@@ -98,7 +98,7 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
     
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
-            return allProducts; // Show all products if search is empty
+            return allProducts;
         }
         const lowerCaseQuery = searchQuery.toLowerCase();
         
@@ -259,21 +259,27 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
                                             />
                                         </div>
                                     </PopoverTrigger>
-                                    <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                                        <Command>
-                                            <CommandInput
-                                                placeholder="Buscar producto por SKU o nombre..."
-                                                value={searchQuery}
-                                                onValueChange={setSearchQuery}
-                                            />
-                                            <CommandList>
-                                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                                {filteredProducts.slice(0, 50).map(product => (
-                                                    <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)}>
-                                                        {product.name} ({product.sku})
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandList>
+                                    <PopoverContent className="p-1 w-[--radix-popover-trigger-width]" align="start">
+                                       <Command>
+                                          <CommandInput
+                                            placeholder="Buscar producto por SKU o nombre..."
+                                            value={searchQuery}
+                                            onValueChange={setSearchQuery}
+                                          />
+                                          <CommandList>
+                                            {filteredProducts.length === 0 && searchQuery.length > 0 ? (
+                                                <div className="py-6 text-center text-sm">No se encontraron productos.</div>
+                                            ) : (
+                                                <CommandGroup>
+                                                    {filteredProducts.slice(0, 50).map(product => (
+                                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)} className="cursor-pointer">
+                                                            <span>{product.name}</span>
+                                                            <span className="text-xs text-muted-foreground ml-auto">{product.sku}</span>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            )}
+                                          </CommandList>
                                         </Command>
                                     </PopoverContent>
                                 </Popover>
@@ -444,3 +450,4 @@ export default function StockEntryClient({ allProducts: initialProducts }: Stock
         </>
     );
 }
+
