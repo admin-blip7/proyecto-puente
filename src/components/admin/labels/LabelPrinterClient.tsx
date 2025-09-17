@@ -36,7 +36,8 @@ export default function LabelPrinterClient({ allProducts }: LabelPrinterClientPr
         return allProducts.filter(p => {
             const name = p.name.toLowerCase();
             const sku = p.sku.toLowerCase();
-            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery);
+            const keywords = p.searchKeywords || [];
+            return name.includes(lowerCaseQuery) || sku.includes(lowerCaseQuery) || keywords.some(k => k.includes(lowerCaseQuery));
         });
     }, [searchQuery, allProducts]);
 
