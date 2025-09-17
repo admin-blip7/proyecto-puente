@@ -464,8 +464,8 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
 
   const handleSelect = (selectedValue: string) => {
     onChange(selectedValue);
-    setSearch(selectedValue);
     setOpen(false);
+    setSearch(""); // Reset search after selection
   };
   
   const filteredCategories = search
@@ -493,18 +493,22 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>
-                <CommandItem onSelect={() => handleSelect(search)}>
+            {filteredCategories.length === 0 && search.length > 0 && (
+              <CommandEmpty asChild>
+                <div onMouseDown={(e) => e.preventDefault()}>
+                  <CommandItem onSelect={() => handleSelect(search)}>
                     <PlusCircle className="mr-2 h-4 w-4"/>
                     Crear "{search}"
-                </CommandItem>
-            </CommandEmpty>
+                  </CommandItem>
+                </div>
+              </CommandEmpty>
+            )}
             <CommandGroup>
               {filteredCategories.map((category) => (
                 <CommandItem
                   key={category}
                   value={category}
-                  onSelect={() => handleSelect(category)}
+                  onSelect={handleSelect}
                 >
                   <Check
                     className={cn(
