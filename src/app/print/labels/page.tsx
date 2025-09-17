@@ -178,13 +178,13 @@ export default function PrintLabelsPage() {
             {expanded.map((lbl) => (
             <div key={lbl._k} className="label">
                 <div>
-                <div className="name">{lbl.nombre || "\u00A0"}</div>
-                <div className="sku">{lbl.sku || "\u00A0"}</div>
+                <div className="name">{lbl.nombre || " "}</div>
+                <div className="sku">{lbl.sku || " "}</div>
                 </div>
                 <canvas ref={el => (barcodeRefs.current[lbl._k] = el)} className="barcode"></canvas>
                 <div className="meta">
                 <span className="price">
-                    {lbl.precio !== "" ? \`$\${Number(lbl.precio).toFixed(2)}\` : "\u00A0"}
+                    {lbl.precio !== "" ? `$${Number(lbl.precio).toFixed(2)}` : " "}
                 </span>
                 <span>{new Date().toLocaleDateString()}</span>
                 </div>
