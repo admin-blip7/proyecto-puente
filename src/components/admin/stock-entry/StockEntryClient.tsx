@@ -462,10 +462,16 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  useEffect(() => {
+    // When the popover is closed, reset the search term to the current value
+    if (!open) {
+      setSearch(value);
+    }
+  }, [open, value]);
+
   const handleSelect = (selectedValue: string) => {
     onChange(selectedValue);
     setOpen(false);
-    setSearch(""); 
   };
   
   const filteredCategories = search
@@ -504,7 +510,7 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
                 <CommandItem
                   key={category}
                   value={category}
-                  onSelect={handleSelect}
+                  onSelect={(currentValue) => handleSelect(currentValue)}
                 >
                   <Check
                     className={cn(
