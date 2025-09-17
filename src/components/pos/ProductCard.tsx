@@ -22,7 +22,6 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
       <CardContent className="p-3 text-center flex flex-col flex-1 justify-center">
         <h3 className="text-sm font-semibold tracking-tight leading-tight flex-1 mb-2">{product.name}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{product.category}</p>
         <div className={cn("flex items-center justify-center gap-1 mt-1 font-medium", getStockColor())}>
             <Package className="w-3 h-3" />
             <span className="text-xs">{product.stock} en Stock</span>

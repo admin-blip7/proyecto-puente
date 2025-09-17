@@ -29,7 +29,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
   const [suggestedProducts, setSuggestedProducts] = useState<SuggestedProduct[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -132,16 +131,13 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     setSelectedCartItem(null);
   };
 
-  const categories = useMemo(() => ["All", ...Array.from(new Set(products.map(p => p.category)))], [products]);
-
   const filteredProducts = useMemo(() => {
     return products.filter(
       (product) =>
-        (activeCategory === "All" || product.category === activeCategory) &&
-        (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [products, searchQuery, activeCategory]);
+  }, [products, searchQuery]);
   
   const selectedProductDetails = useMemo(() => {
     if (!selectedCartItem) return null;
@@ -271,23 +267,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         <div className="mt-6">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
         </div>
-        <div className="mt-4 flex items-center gap-2">
-            <ScrollArea className="w-full whitespace-nowrap">
-                 <div className="flex gap-2 pb-2">
-                    {categories.map(category => (
-                        <Button 
-                            key={category} 
-                            variant={activeCategory === category ? 'default' : 'outline'}
-                            onClick={() => setActiveCategory(category)}
-                            className="rounded-full"
-                        >
-                            {category}
-                        </Button>
-                    ))}
-                 </div>
-            </ScrollArea>
-        </div>
-        <ScrollArea className="flex-1 -mx-4 sm:-mx-6">
+        <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
           <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))'}}>
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} onAddToCart={() => addToCart(product)} />

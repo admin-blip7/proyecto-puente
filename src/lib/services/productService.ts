@@ -8,7 +8,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../hooks";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
-import { findOrCreateCategory } from "./productCategoryService";
 
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
@@ -43,7 +42,6 @@ const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData)
         price: Number(data.price || 0),
         cost: Number(data.cost || 0),
         stock: Number(data.stock || 0),
-        category: data.category,
         createdAt: data.createdAt?.toDate(),
         type: data.type || 'Venta',
         ownershipType: data.ownershipType || 'Propio',
@@ -88,8 +86,6 @@ export const addProduct = async (
     const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
     
     try {
-        await findOrCreateCategory(productData.category);
-
         const searchKeywords = generateSearchKeywords(productData.name);
         const dataToSave = {
             ...productData,
@@ -144,9 +140,6 @@ export const updateProduct = async (
     if (productData.name) {
         dataToUpdate.searchKeywords = generateSearchKeywords(productData.name);
     }
-    if (productData.category) {
-        await findOrCreateCategory(productData.category);
-    }
     
     try {
         await updateDoc(productDocRef, dataToUpdate);
@@ -198,14 +191,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
     const processedItems: StockEntryItem[] = [];
     const newProductsForTagging: { id: string; name: string }[] = [];
 
-    // Ensure all categories exist before the main transaction
-    const uniqueCategories = [...new Set(entryItems.map(item => item.category))];
-    for (const categoryName of uniqueCategories) {
-        if (categoryName) {
-            await findOrCreateCategory(categoryName);
-        }
-    }
-
     for (const item of entryItems) {
         const isNewProduct = !item.productId;
         const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
@@ -220,7 +205,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     price: item.price,
                     ownershipType: item.ownershipType,
                     consignorId: item.consignorId || null,
-                    category: item.category // Also update category on existing items
                 });
             } else {
                 const searchKeywords = generateSearchKeywords(item.name);
@@ -230,7 +214,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                     price: item.price,
                     cost: item.cost,
                     stock: item.quantity,
-                    category: item.category,
                     createdAt: serverTimestamp(),
                     type: 'Venta',
                     ownershipType: item.ownershipType,

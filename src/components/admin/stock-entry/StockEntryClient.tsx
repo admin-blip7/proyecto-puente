@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, ProductCategory } from "@/types";
-import dynamic from 'next/dynamic';
+import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,18 +16,11 @@ import PrintLabelsView from "./PrintLabelsView";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
-import { getProductCategories } from "@/lib/services/productCategoryService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
-import { ClientOnly } from "@/components/shared/ClientOnly";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-const CategoryComboBox = dynamic(() => import('@/components/stock/CategoryComboBox'), { 
-    ssr: false,
-    loading: () => <div className="h-10 w-full bg-muted rounded-md animate-pulse" />
-});
 
 
 interface StockEntryClientProps {
@@ -42,7 +34,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     const [isLoading, setIsLoading] = useState(false);
     const [processedItems, setProcessedItems] = useState<StockEntryItem[] | null>(null);
     const [consignors, setConsignors] = useState<Consignor[]>([]);
-    const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
     const [isListening, setIsListening] = useState(false);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -55,7 +46,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     
     useEffect(() => {
         getConsignors().then(setConsignors);
-        getProductCategories().then(setProductCategories);
         
         if (typeof window !== 'undefined') {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -132,7 +122,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                 quantity: 1,
                 price: product.price,
                 cost: product.cost,
-                category: product.category,
                 ownershipType: product.ownershipType,
                 consignorId: product.consignorId,
                 isNew: false
@@ -166,7 +155,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             quantity: quantity,
             price: 0,
             cost: 0,
-            category: '',
             ownershipType: 'Propio',
             isNew: true
         }]);
@@ -202,8 +190,8 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     
     const validateEntryList = () => {
         for (const item of entryList) {
-            if (!item.sku || !item.name || !item.category || item.quantity <= 0) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre, categoría y cantidad.` });
+            if (!item.sku || !item.name || item.quantity <= 0) {
+                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre y cantidad.` });
                 return false;
             }
             if (item.ownershipType === 'Consigna' && !item.consignorId) {
@@ -232,9 +220,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             const result = await processStockEntry(entryList, userProfile.uid);
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
             
-            // Refresh categories list after processing
-            getProductCategories().then(setProductCategories);
-
             setProcessedItems(result);
             setEntryList([]);
         } catch (error) {
@@ -313,7 +298,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                     <TableRow>
                                         <TableHead className="w-[120px]">SKU</TableHead>
                                         <TableHead>Nombre Producto</TableHead>
-                                        <TableHead>Categoría</TableHead>
                                         <TableHead className="w-[140px]">Tipo Propiedad</TableHead>
                                         <TableHead className="w-[160px]">Consignador</TableHead>
                                         <TableHead className="w-[90px] text-right">Cantidad</TableHead>
@@ -325,7 +309,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                 <TableBody>
                                     {entryList.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
+                                            <TableCell colSpan={8} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
                                         </TableRow>
                                     ) : (
                                         entryList.map(item => (
@@ -335,13 +319,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                 </TableCell>
                                                 <TableCell>
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
-                                                </TableCell>
-                                                 <TableCell>
-                                                    <CategoryComboBox 
-                                                        value={item.category}
-                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value ?? '')}
-                                                        placeholder="Categoría..."
-                                                    />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -397,14 +374,6 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         <div className="space-y-1">
                                             <Label>Nombre Producto</Label>
                                             <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label>Categoría</Label>
-                                            <CategoryComboBox 
-                                                value={item.category}
-                                                onChange={(value) => handleUpdateItem(item.id, 'category', value ?? '')}
-                                                placeholder="Categoría..."
-                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">

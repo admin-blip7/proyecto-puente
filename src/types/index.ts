@@ -11,7 +11,6 @@ export interface Product {
   price: number;
   cost: number;
   stock: number;
-  category: string;
   createdAt: Date;
   type: 'Venta' | 'Refacción';
   ownershipType: OwnershipType;
@@ -107,7 +106,6 @@ export interface StockEntryItem {
   quantity: number;
   price: number;
   cost: number;
-  category: string;
   isNew: boolean;
   ownershipType: OwnershipType;
   consignorId?: string;
@@ -165,12 +163,6 @@ export interface ExpenseCategory {
     name: string;
     isActive: boolean;
 }
-
-export interface ProductCategory {
-    id: string;
-    name: string;
-}
-
 
 export interface Expense {
     id: string;

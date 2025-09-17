@@ -34,7 +34,6 @@ const formSchema = z.object({
   cost: z.coerce.number().min(0, "El costo debe ser positivo."),
   stock: z.coerce.number().int().min(0, "El stock debe ser un número entero positivo."),
   reorderPoint: z.coerce.number().int().min(0, "El punto de reorden debe ser un número entero positivo.").optional(),
-  category: z.string().min(1, "La categoría es requerida."),
   type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
@@ -73,7 +72,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
       cost: 0,
       stock: 0,
       reorderPoint: 0,
-      category: "",
       type: "Venta",
       ownershipType: "Propio",
       comboProductIds: [],
@@ -128,7 +126,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
         price: values.price,
         cost: values.cost,
         stock: values.stock,
-        category: values.category,
         type: values.type,
         ownershipType: values.ownershipType,
         reorderPoint: values.reorderPoint || 0,
@@ -255,19 +252,6 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                                 )}
                             />
                         </div>
-                        <FormField
-                            control={form.control}
-                            name="category"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Categoría</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Ej: Bebidas" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
                         <FormField
                             control={form.control}
                             name="type"

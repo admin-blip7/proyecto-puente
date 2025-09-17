@@ -25,7 +25,6 @@ const formSchema = z.object({
   cost: z.coerce.number().min(0, "El costo debe ser positivo."),
   stock: z.coerce.number().int().min(0, "El stock debe ser un número entero positivo."),
   reorderPoint: z.coerce.number().int().min(0, "El punto de reorden debe ser un número entero positivo.").optional(),
-  category: z.string().min(1, "La categoría es requerida."),
   type: z.enum(["Venta", "Refacción"], { required_error: "Debe seleccionar un tipo."}),
   ownershipType: z.enum(ownershipTypes, { required_error: "Debe seleccionar un tipo de propiedad."}),
   consignorId: z.string().optional(),
@@ -117,7 +116,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: 'general', label: 'Información General', icon: Info },
     { id: 'pricing', label: 'Precios y Stock', icon: DollarSign },
-    { id: 'details', label: 'Categorías y Tipos', icon: Package },
+    { id: 'details', label: 'Tipos y Combo', icon: Package },
   ];
 
   return (
@@ -225,16 +224,6 @@ export default function EditProductPageClient({ product, consignors, allProducts
 
                         {activeSection === 'details' && (
                              <div className="space-y-4">
-                                <FormField
-                                    control={form.control} name="category"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>Categoría</FormLabel>
-                                        <FormControl><Input {...field} /></FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
                                 <FormField
                                     control={form.control} name="type"
                                     render={({ field }) => (
