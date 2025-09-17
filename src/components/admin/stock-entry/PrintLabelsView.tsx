@@ -109,17 +109,19 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
             visibility: visible;
           }
           .label-grid {
-             display: block; /* Change from grid to block for printing */
+             display: block;
           }
           .label {
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            page-break-after: always; /* Force a page break after each label */
+            page-break-after: always;
             position: absolute;
             top: 0;
             left: 0;
           }
            .label:last-child {
-            page-break-after: auto; /* Prevent final page break */
+            page-break-after: auto;
           }
           @page {
             size: auto;
