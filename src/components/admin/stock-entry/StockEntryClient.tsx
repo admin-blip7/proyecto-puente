@@ -464,18 +464,15 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
     const [open, setOpen] = useState(false);
-    const [inputValue, setInputValue] = useState(value || "");
+    const [inputValue, setInputValue] = useState(value);
 
     useEffect(() => {
-        // This effect synchronizes the internal input value with the external prop value.
-        // It's crucial for when the combobox is part of a larger form.
-        if (value !== inputValue) {
+        if (!open) {
             setInputValue(value);
         }
-    }, [value]);
+    }, [open, value]);
 
     const handleSelect = (selectedValue: string) => {
-        setInputValue(selectedValue);
         onChange(selectedValue);
         setOpen(false);
     };
@@ -539,3 +536,5 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
         </Popover>
     )
 }
+
+    
