@@ -1,15 +1,17 @@
+
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, ProductCategory } from "@/types";
+import dynamic from 'next/dynamic';
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Check, ChevronsUpDown } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { processStockEntry } from "@/lib/services/productService";
@@ -22,6 +24,12 @@ import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { ClientOnly } from "@/components/shared/ClientOnly";
+
+const CategoryComboBox = dynamic(() => import('@/components/admin/stock-entry/CategoryComboBox'), { 
+    ssr: false,
+    loading: () => <div className="h-10 w-full bg-muted rounded-md animate-pulse" />
+});
+
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -329,13 +337,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                                 </TableCell>
                                                  <TableCell>
-                                                    <ClientOnly>
-                                                        <CategoryComboBox 
-                                                            value={item.category || ""}
-                                                            onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                            categories={productCategories.map(c => c.name)}
-                                                        />
-                                                    </ClientOnly>
+                                                    <CategoryComboBox 
+                                                        value={item.category || ""}
+                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                        categories={productCategories}
+                                                        onCategoriesChange={setProductCategories}
+                                                    />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -394,13 +401,12 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
-                                             <ClientOnly>
-                                                <CategoryComboBox 
-                                                    value={item.category || ""}
-                                                    onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                    categories={productCategories.map(c => c.name)}
-                                                />
-                                             </ClientOnly>
+                                             <CategoryComboBox 
+                                                value={item.category || ""}
+                                                onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                categories={productCategories}
+                                                onCategoriesChange={setProductCategories}
+                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
@@ -461,80 +467,3 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         </>
     );
 }
-
-function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
-    const [open, setOpen] = useState(false);
-    const [inputValue, setInputValue] = useState(value);
-
-    useEffect(() => {
-        if (!open) {
-            setInputValue(value);
-        }
-    }, [open, value]);
-
-    const handleSelect = (selectedValue: string) => {
-        onChange(selectedValue);
-        setOpen(false);
-    };
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between font-normal"
-                >
-                    {value || "Seleccionar..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command
-                    filter={(itemValue, search) => {
-                         // cmdk's default filter is great, we don't need to override it
-                        return itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
-                    }}
-                >
-                    <CommandInput
-                        placeholder="Buscar o crear categoría..."
-                        value={inputValue}
-                        onValueChange={setInputValue}
-                    />
-                    <CommandList>
-                        <CommandEmpty>
-                             {inputValue.trim().length > 0 && (
-                                <CommandItem
-                                    onSelect={() => handleSelect(inputValue.trim())}
-                                >
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Crear "{inputValue.trim()}"
-                                </CommandItem>
-                             )}
-                        </CommandEmpty>
-                        <CommandGroup>
-                            {categories.map((category) => (
-                                <CommandItem
-                                    key={category}
-                                    value={category}
-                                    onSelect={() => handleSelect(category)}
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            value === category ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    {category}
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    )
-}
-
-    
