@@ -36,8 +36,10 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
   
   const labels: LabelData[] = [];
   items.forEach(item => {
-    const copies = item.isNew ? item.quantity * numCopies : numCopies;
-    for (let i = 0; i < copies; i++) {
+    // For newly created items, we might want to print a label for each unit entered.
+    // For existing items (e.g., from the label printer module), 'quantity' might just be the number of labels to print.
+    const copiesToPrint = item.isNew ? item.quantity * numCopies : item.quantity;
+    for (let i = 0; i < copiesToPrint; i++) {
       labels.push({
         name: item.name,
         sku: item.sku,
@@ -51,13 +53,18 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
         labels.forEach((_, index) => {
             const canvas = document.getElementById(`barcode-${index}`) as HTMLCanvasElement;
             if (canvas && _.sku) {
-                JsBarcode(canvas, _.sku, {
-                    format: "CODE128",
-                    displayValue: false,
-                    height: settings.barcodeHeight,
-                    width: 1.5,
-                    margin: 0,
-                });
+                try {
+                  JsBarcode(canvas, _.sku, {
+                      format: "CODE128",
+                      displayValue: false,
+                      height: settings.barcodeHeight,
+                      width: 1.5,
+                      margin: 0,
+                  });
+                } catch (e) {
+                  // Ignore JsBarcode errors for invalid SKUs during entry
+                  console.warn("Invalid SKU for barcode generation:", _.sku);
+                }
             }
         });
     }
@@ -88,6 +95,13 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
     <>
       <style jsx global>{`
         @media print {
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            box-shadow: none !important;
+            border: none !important;
+          }
           body * {
             visibility: hidden;
           }
@@ -104,12 +118,14 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
              display: block; /* Change from grid to block for printing */
           }
           .label {
-            border: none;
             overflow: hidden;
             page-break-after: always; /* Force a page break after each label */
+            position: absolute;
+            top: 0;
+            left: 0;
           }
           @page {
-            size: auto; /* Let the printer decide the page size */
+            size: auto;
             margin: 0;
           }
         }
@@ -125,17 +141,19 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Volver
             </Button>
-            <div className="space-y-1.5">
-                <Label htmlFor="copies">Copias por producto</Label>
-                <Input 
-                    id="copies" 
-                    type="number" 
-                    value={numCopies}
-                    onChange={(e) => setNumCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-24"
-                    min="1"
-                />
-            </div>
+            {items.every(item => item.isNew) && (
+              <div className="space-y-1.5">
+                  <Label htmlFor="copies">Copias por c/producto nuevo</Label>
+                  <Input 
+                      id="copies" 
+                      type="number" 
+                      value={numCopies}
+                      onChange={(e) => setNumCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-32"
+                      min="1"
+                  />
+              </div>
+            )}
             <Button onClick={handlePrint} className="sm:ml-auto">
               <Printer className="mr-2 h-4 w-4" />
               Imprimir Etiquetas
