@@ -457,14 +457,27 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
     );
 }
 
-
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
     const [open, setOpen] = useState(false);
+    const [inputValue, setInputValue] = useState(value || "");
+
+    useEffect(() => {
+        // Sync internal state with external prop value, but only if not focused.
+        // This prevents the user's typing from being overwritten.
+        if (!open) {
+            setInputValue(value || "");
+        }
+    }, [value, open]);
 
     const handleSelect = (selectedValue: string) => {
         onChange(selectedValue);
+        setInputValue(selectedValue);
         setOpen(false);
     };
+
+    const filteredCategories = categories.filter(category =>
+        category.toLowerCase().includes(inputValue.toLowerCase())
+    );
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -481,28 +494,29 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
             </PopoverTrigger>
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                 <Command
-                    // This filter is important for creation to work
                     filter={(itemValue, search) => {
-                        if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1;
-                        return 0;
+                         // cmdk's default filter is great, we don't need to override it
+                        return itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
                     }}
                 >
                     <CommandInput
                         placeholder="Buscar o crear categoría..."
-                        value={value}
-                        onValueChange={onChange}
+                        value={inputValue}
+                        onValueChange={setInputValue}
                     />
                     <CommandList>
                         <CommandEmpty>
-                             <CommandItem
-                                onSelect={() => handleSelect(value)}
-                             >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Crear "{value}"
-                            </CommandItem>
+                             {inputValue.trim().length > 0 && (
+                                <CommandItem
+                                    onSelect={() => handleSelect(inputValue.trim())}
+                                >
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Crear "{inputValue.trim()}"
+                                </CommandItem>
+                             )}
                         </CommandEmpty>
                         <CommandGroup>
-                            {categories.map((category) => (
+                            {filteredCategories.map((category) => (
                                 <CommandItem
                                     key={category}
                                     value={category}
