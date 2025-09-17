@@ -21,6 +21,7 @@ import { getProductCategories } from "@/lib/services/productCategoryService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import { ClientOnly } from "@/components/shared/ClientOnly";
 
 interface StockEntryClientProps {
     allProducts: Product[];
@@ -328,11 +329,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                                 </TableCell>
                                                  <TableCell>
-                                                    <CategoryComboBox 
-                                                        value={item.category || ""}
-                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                        categories={productCategories.map(c => c.name)}
-                                                    />
+                                                    <ClientOnly>
+                                                        <CategoryComboBox 
+                                                            value={item.category || ""}
+                                                            onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                            categories={productCategories.map(c => c.name)}
+                                                        />
+                                                    </ClientOnly>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -391,11 +394,13 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
-                                             <CategoryComboBox 
-                                                value={item.category || ""}
-                                                onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                categories={productCategories.map(c => c.name)}
-                                            />
+                                             <ClientOnly>
+                                                <CategoryComboBox 
+                                                    value={item.category || ""}
+                                                    onChange={(value) => handleUpdateItem(item.id, 'category', value)}
+                                                    categories={productCategories.map(c => c.name)}
+                                                />
+                                             </ClientOnly>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
@@ -462,22 +467,18 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
     const [inputValue, setInputValue] = useState(value || "");
 
     useEffect(() => {
-        // Sync internal state with external prop value, but only if not focused.
-        // This prevents the user's typing from being overwritten.
-        if (!open) {
-            setInputValue(value || "");
+        // This effect synchronizes the internal input value with the external prop value.
+        // It's crucial for when the combobox is part of a larger form.
+        if (value !== inputValue) {
+            setInputValue(value);
         }
-    }, [value, open]);
+    }, [value]);
 
     const handleSelect = (selectedValue: string) => {
-        onChange(selectedValue);
         setInputValue(selectedValue);
+        onChange(selectedValue);
         setOpen(false);
     };
-
-    const filteredCategories = categories.filter(category =>
-        category.toLowerCase().includes(inputValue.toLowerCase())
-    );
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -516,7 +517,7 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
                              )}
                         </CommandEmpty>
                         <CommandGroup>
-                            {filteredCategories.map((category) => (
+                            {categories.map((category) => (
                                 <CommandItem
                                     key={category}
                                     value={category}
