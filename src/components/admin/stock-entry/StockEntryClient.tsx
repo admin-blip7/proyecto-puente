@@ -459,19 +459,18 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
 
 
 function CategoryComboBox({ value, onChange, categories }: { value: string, onChange: (value: string) => void, categories: string[] }) {
-  const [open, setOpen] = useState(false)
-  const [inputValue, setInputValue] = useState(value)
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    setInputValue(value);
-  }, [value])
-
-  const handleSelect = (currentValue: string) => {
-    const newValue = currentValue === inputValue ? "" : currentValue
-    setInputValue(newValue)
-    onChange(newValue)
-    setOpen(false)
-  }
+  const handleSelect = (selectedValue: string) => {
+    onChange(selectedValue);
+    setSearch(selectedValue);
+    setOpen(false);
+  };
+  
+  const filteredCategories = search
+    ? categories.filter((cat) => cat.toLowerCase().includes(search.toLowerCase()))
+    : categories;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -482,7 +481,7 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
           aria-expanded={open}
           className="w-full justify-between font-normal"
         >
-          {inputValue || "Seleccionar..."}
+          {value || "Seleccionar..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -490,22 +489,22 @@ function CategoryComboBox({ value, onChange, categories }: { value: string, onCh
         <Command>
           <CommandInput 
             placeholder="Buscar o crear categoría..."
-            onValueChange={setInputValue}
-            value={inputValue}
-            />
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>
-                <Button variant="ghost" className="w-full justify-start" onClick={() => handleSelect(inputValue)}>
+                <CommandItem onSelect={() => handleSelect(search)}>
                     <PlusCircle className="mr-2 h-4 w-4"/>
-                    Crear "{inputValue}"
-                </Button>
+                    Crear "{search}"
+                </CommandItem>
             </CommandEmpty>
             <CommandGroup>
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <CommandItem
                   key={category}
                   value={category}
-                  onSelect={handleSelect}
+                  onSelect={() => handleSelect(category)}
                 >
                   <Check
                     className={cn(
