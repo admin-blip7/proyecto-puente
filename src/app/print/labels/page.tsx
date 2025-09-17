@@ -40,7 +40,7 @@ export default function PrintLabelsPage() {
 
   // Esperar fuentes + imágenes antes de print
   useEffect(() => {
-    if (labels.length === 0) return;
+    if (expanded.length === 0) return;
     let cancelled = false;
     async function waitAssets() {
       try {
@@ -58,7 +58,7 @@ export default function PrintLabelsPage() {
     }
     waitAssets();
     return () => { cancelled = true; };
-  }, [labels]);
+  }, [expanded]);
 
   // afterprint: regresar a la pantalla anterior
   useEffect(() => {
@@ -112,9 +112,6 @@ export default function PrintLabelsPage() {
     });
   }, [ready, attempted, router]);
 
-  if (expanded.length === 0) {
-    return <div>Cargando etiquetas...</div>;
-  }
 
   return (
     <div ref={containerRef}>
@@ -147,24 +144,28 @@ export default function PrintLabelsPage() {
         .meta { font-size: 7pt; opacity: 0.8; display:flex; justify-content:space-between; }
         .barcode { width: 100%; height: 14mm; object-fit: contain; }
       `}</style>
-
-      <div className="sheet">
-        {expanded.map((lbl) => (
-          <div key={lbl._k} className="label">
-            <div>
-              <div className="name">{lbl.nombre || "\u00A0"}</div>
-              <div className="sku">{lbl.sku || "\u00A0"}</div>
+      
+      {expanded.length === 0 ? (
+        <div>Cargando etiquetas...</div>
+      ) : (
+        <div className="sheet">
+            {expanded.map((lbl) => (
+            <div key={lbl._k} className="label">
+                <div>
+                <div className="name">{lbl.nombre || "\u00A0"}</div>
+                <div className="sku">{lbl.sku || "\u00A0"}</div>
+                </div>
+                <img className="barcode" src={lbl.barcodeUrl || ""} alt="" />
+                <div className="meta">
+                <span className="price">
+                    {lbl.precio !== "" ? \`$\${Number(lbl.precio).toFixed(2)}\` : "\u00A0"}
+                </span>
+                <span>{new Date().toLocaleDateString()}</span>
+                </div>
             </div>
-            <img className="barcode" src={lbl.barcodeUrl || ""} alt="" />
-            <div className="meta">
-              <span className="price">
-                {lbl.precio !== "" ? \`$\${Number(lbl.precio).toFixed(2)}\` : "\u00A0"}
-              </span>
-              <span>{new Date().toLocaleDateString()}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
