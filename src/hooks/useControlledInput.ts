@@ -12,27 +12,25 @@ import { useCallback, useRef, useState } from 'react';
  */
 export function useControlledInput(initial = '') {
   const [value, setValue] = useState(initial);
-  const isComposing = useRef(false);
+  const composing = useRef(false);
 
   // This `onChange` handler is bound to the input element.
   // It updates the visual state of the input immediately for a responsive user experience.
-  // The actual logic that depends on the final value (like a search) should use a debounced
-  // value derived from this state, and check `isComposing`.
   const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
   }, []);
 
-  // When the user starts composing a character (e.g., typing '`' to get '`' for pinyin),
-  // we set a flag to true.
+  // When the user starts composing a character (e.g., using a Pinyin IME),
+  // we set a flag to true to indicate that the input is in an intermediate state.
   const onCompositionStart = useCallback(() => {
-    isComposing.current = true;
+    composing.current = true;
   }, []);
 
-  // When the user finalizes their composition (e.g., selects '字' from a list),
+  // When the user finalizes their composition (e.g., selects a character),
   // this event fires. We then set the flag to false and update the state with the final,
   // composed value from the input field.
   const onCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
-    isComposing.current = false;
+    composing.current = false;
     // We update the value one last time to ensure we have the final composed character.
     setValue(e.currentTarget.value);
   }, []);
@@ -44,6 +42,6 @@ export function useControlledInput(initial = '') {
     value,
     bind,
     // A function to check the composition status imperatively if needed.
-    isComposing: () => isComposing.current,
+    isComposing: () => composing.current,
   };
 }

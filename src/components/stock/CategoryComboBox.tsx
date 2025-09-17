@@ -1,6 +1,5 @@
 
 'use client'
-
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useStablePortal } from '@/components/infra/useStablePortal'
@@ -9,7 +8,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { searchCategories, createCategory } from '@/lib/firebase/firestore.categories'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 import { Loader2, PlusCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+
 
 type Option = { id: string; label: string }
 interface Props {
@@ -21,37 +21,37 @@ interface Props {
 
 function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categoría…', allowCreate = true }: Props) {
   const { container, mounted, isInline } = useStablePortal('category-combobox')
-  const { value: term, bind, isComposing } = useControlledInput('')
+  const { value: term, bind, isComposing } = useControlledInput(value ?? '')
   const debounced = useDebouncedValue(term, 320)
   
   const [open, setOpen] = useState(false)
   const [options, setOptions] = useState<Option[]>([])
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedValue, setSelectedValue] = useState<Option | null>(null);
   
   const componentRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useOnClickOutside(componentRef, () => setOpen(false));
-
+  
+  // This effect syncs the external value prop to the internal input value
+  // when the combobox is not focused. This is important for form resets or external updates.
   useEffect(() => {
-    if (value && options.length > 0) {
-        setSelectedValue(options.find(opt => opt.label === value) ?? null);
-    } else if (!value) {
-        setSelectedValue(null);
+    if (document.activeElement !== componentRef.current?.querySelector('input')) {
+      bind.onChange({ target: { value: value ?? '' } } as React.ChangeEvent<HTMLInputElement>);
     }
-  }, [value, options]);
+  }, [value, bind]);
 
 
+  // This effect fetches categories based on the debounced search term.
   useEffect(() => {
     let active = true
+    // Do not search while user is composing with an IME (e.g., Pinyin, Japanese)
     if (isComposing()) return;
 
     const q = debounced.trim()
     setIsLoading(true);
     
     searchCategories(q).then(rows => {
-        if (!active) return
+        if (!active) return // Prevent state update if component has unmounted
         setOptions((rows ?? []).filter(Boolean))
         setIsLoading(false);
     }).catch(() => {
@@ -63,9 +63,8 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
 
   const handleSelect = useCallback((option: Option) => {
     onChange?.(option.label)
-    setSelectedValue(option);
     setOpen(false)
-    inputRef.current?.blur()
+    componentRef.current?.querySelector('input')?.blur();
   }, [onChange])
 
   const handleCreate = useCallback(async (newCategoryName: string) => {
@@ -93,7 +92,7 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
             {options.filter(Boolean).map(opt => (
                 <li key={opt.id} role="option" tabIndex={0}
                     className="px-3 py-2 hover:bg-accent cursor-pointer"
-                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent blur on click
                     onClick={() => handleSelect(opt)}>
                 {opt.label}
                 </li>
@@ -114,33 +113,31 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
     </ul>
   ), [options, isLoading, handleSelect, handleCreate, debounced, allowCreate])
 
-  const inlineBox = (
+  const dropdownContent = (
     <div className="absolute left-0 right-0 z-50 mt-1">{popup}</div>
   )
-  
-  const displayValue = open ? bind.value : (selectedValue?.label || placeholder);
 
   return (
     <div className="relative" ref={componentRef}>
       <Input
-        ref={inputRef}
         {...bind}
-        value={displayValue}
         placeholder={placeholder}
-        onFocus={() => {
-            setOpen(true);
-            bind.onChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>);
-        }}
+        onFocus={() => setOpen(true)}
         aria-expanded={open}
       />
       {open && (isInline
-        ? inlineBox
-        : (mounted && container ? createPortal(inlineBox, container) : null))}
+        ? dropdownContent // Render inline for iOS Safari
+        : (mounted && container ? createPortal(dropdownContent, container) : null))}
     </div>
   )
 }
 
+// Memoize the component to prevent re-renders when parent state changes,
+// if the props passed to this component remain the same.
 const CategoryComboBox = memo(CategoryComboBoxBase, (prevProps, nextProps) =>
-  prevProps.value === nextProps.value && prevProps.placeholder === nextProps.placeholder && prevProps.onChange === nextProps.onChange
+  prevProps.value === nextProps.value && 
+  prevProps.placeholder === nextProps.placeholder && 
+  prevProps.onChange === nextProps.onChange
 )
+
 export default CategoryComboBox;

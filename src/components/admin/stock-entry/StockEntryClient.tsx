@@ -1,14 +1,12 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, ProductCategory } from "@/types";
 import dynamic from 'next/dynamic';
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff } from "lucide-react";
@@ -24,8 +22,10 @@ import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
 import { cn } from "@/lib/utils";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { ClientOnly } from "@/components/shared/ClientOnly";
+import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-const CategoryComboBox = dynamic(() => import('@/components/admin/stock-entry/CategoryComboBox'), { 
+const CategoryComboBox = dynamic(() => import('@/components/stock/CategoryComboBox'), { 
     ssr: false,
     loading: () => <div className="h-10 w-full bg-muted rounded-md animate-pulse" />
 });
@@ -172,7 +172,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
         }]);
     };
 
-    const handleUpdateItem = (id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
+    const handleUpdateItem = useCallback((id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {
                 let updatedValue = value;
@@ -194,7 +194,7 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
             }
             return item;
         }));
-    };
+    }, []);
     
     const handleRemoveItem = (id: string) => {
         setEntryList(prev => prev.filter(item => item.id !== id));
@@ -337,14 +337,11 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                                      <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
                                                 </TableCell>
                                                  <TableCell>
-                                                    <ClientOnly>
-                                                        <CategoryComboBox 
-                                                            value={item.category || ""}
-                                                            onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                            categories={productCategories}
-                                                            onCategoriesChange={setProductCategories}
-                                                        />
-                                                    </ClientOnly>
+                                                    <CategoryComboBox 
+                                                        value={item.category}
+                                                        onChange={(value) => handleUpdateItem(item.id, 'category', value ?? '')}
+                                                        placeholder="Categoría..."
+                                                    />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
@@ -403,14 +400,11 @@ export default function StockEntryClient({ allProducts }: StockEntryClientProps)
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Categoría</Label>
-                                            <ClientOnly>
-                                                <CategoryComboBox 
-                                                    value={item.category || ""}
-                                                    onChange={(value) => handleUpdateItem(item.id, 'category', value)}
-                                                    categories={productCategories}
-                                                    onCategoriesChange={setProductCategories}
-                                                />
-                                            </ClientOnly>
+                                            <CategoryComboBox 
+                                                value={item.category}
+                                                onChange={(value) => handleUpdateItem(item.id, 'category', value ?? '')}
+                                                placeholder="Categoría..."
+                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
