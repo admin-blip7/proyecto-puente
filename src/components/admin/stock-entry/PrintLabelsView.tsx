@@ -101,19 +101,15 @@ export default function PrintLabelsView({ items, onDone }: PrintLabelsViewProps)
             width: 100%;
           }
           .label-grid {
-             display: grid;
-             grid-template-columns: repeat(3, 1fr);
-             gap: ${settings.gap}mm;
-             page-break-inside: avoid;
-             padding: ${settings.margin}mm;
+             display: block; /* Change from grid to block for printing */
           }
           .label {
             border: none;
-            page-break-inside: avoid;
             overflow: hidden;
+            page-break-after: always; /* Force a page break after each label */
           }
           @page {
-            size: letter;
+            size: auto; /* Let the printer decide the page size */
             margin: 0;
           }
         }
