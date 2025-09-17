@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -39,7 +39,10 @@ const financeNavItems = [
     { href: '/admin/finance/cash-history', icon: Landmark, label: 'Cortes de Caja' },
 ]
 
-const settingsNavItem = { href: '/admin/settings', icon: Settings, label: 'Ajustes' };
+const settingsNavItems = [
+    { href: '/admin/settings', icon: Settings, label: 'Diseño de Tickets y Etiquetas' },
+    { href: '/admin/labels', icon: Printer, label: 'Imprimir Etiquetas' },
+];
 
 
 const getInitials = (name: string) => {
@@ -55,6 +58,7 @@ export default function LeftSidebar() {
     const pathname = usePathname();
     const { userProfile, signOut } = useAuth();
     const isFinanceRoute = pathname.startsWith('/admin/finance');
+    const isSettingsRoute = pathname.startsWith('/admin/settings') || pathname.startsWith('/admin/labels');
     const isAdmin = userProfile?.role === 'Admin';
 
     return (
@@ -114,21 +118,36 @@ export default function LeftSidebar() {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                          <Tooltip>
+                        <DropdownMenu>
+                            <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Link href={settingsNavItem.href} className="w-full">
+                                    <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="lg" className={cn(
-                                            "rounded-lg w-full h-14",
-                                            pathname === settingsNavItem.href && 'bg-primary/10 text-primary',
+                                            "rounded-lg w-full h-14 relative",
+                                            isSettingsRoute && 'bg-primary/10 text-primary',
                                         )}>
-                                            <settingsNavItem.icon className="h-6 w-6" />
+                                            <Settings className="h-6 w-6" />
+                                            <ChevronRight className="h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2" />
                                         </Button>
-                                    </Link>
+                                    </DropdownMenuTrigger>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" sideOffset={5}>
-                                    <p>{settingsNavItem.label}</p>
+                                    <p>Ajustes</p>
                                 </TooltipContent>
                             </Tooltip>
+                            <DropdownMenuContent side="right" align="start" sideOffset={5} className="w-60">
+                                <DropdownMenuLabel>Ajustes y Herramientas</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {settingsNavItems.map(item => (
+                                    <Link href={item.href} key={item.href} passHref>
+                                        <DropdownMenuItem className={cn(pathname === item.href && "bg-accent")}>
+                                            <item.icon className="mr-2 h-4 w-4" />
+                                            <span>{item.label}</span>
+                                        </DropdownMenuItem>
+                                    </Link>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </nav>
                 </div>
                 <div className="flex flex-col items-center gap-4 mt-auto">
