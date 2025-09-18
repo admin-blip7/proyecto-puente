@@ -74,41 +74,49 @@ export default function EditProductPageClient({ product, consignors, allProducts
   const { watch, formState: { isDirty } } = form;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    console.log("Intentando guardar cambios para el producto:", product.id);
+
     if (!isDirty) {
         toast({ title: "Sin cambios", description: "No has realizado ninguna modificación." });
         return;
     }
 
     setLoading(true);
-    try {
-      let dataToUpdate: Partial<Product> = {};
-      const formKeys = Object.keys(values) as (keyof typeof values)[];
-      
-      formKeys.forEach(key => {
-        // A simple dirty check for each field
+    
+    let dataToUpdate: Partial<Product> = {};
+    const formKeys = Object.keys(values) as (keyof typeof values)[];
+    
+    formKeys.forEach(key => {
         if (JSON.stringify(values[key]) !== JSON.stringify(product[key as keyof Product])) {
             (dataToUpdate as any)[key] = values[key];
         }
-      });
-      
-      if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
-          (dataToUpdate as any).consignorId = null;
-      }
+    });
+    
+    if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
+        (dataToUpdate as any).consignorId = null;
+    }
+    
+    console.log("Datos a enviar:", dataToUpdate);
 
+    try {
       await updateProduct(product.id, dataToUpdate);
 
+      console.log("¡Éxito! Producto actualizado en Firestore.");
+      
       toast({
         title: "Producto Actualizado",
         description: `El producto "${values.name}" ha sido guardado exitosamente.`,
       });
+      
       router.push('/admin');
+      router.refresh();
 
     } catch (error) {
-      console.error("ERROR CAPTURADO (actualizando producto):", error);
+      console.error("ERROR AL GUARDAR EN FIRESTORE:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "No se pudo actualizar el producto.",
+        title: "Error al Guardar",
+        description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
       });
     } finally {
       setLoading(false);
@@ -241,5 +249,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
     </Form>
   );
 }
+
+    
 
     
