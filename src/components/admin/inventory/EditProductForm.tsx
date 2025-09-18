@@ -95,7 +95,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
     }
   };
   
-  const formMethods = {
+  const formMethodsForSelector = {
     watch: (fieldName: keyof Product) => formData[fieldName],
     setValue: (fieldName: keyof Product, value: any) => {
       setFormData(prev => ({...prev, [fieldName]: value}));
@@ -214,8 +214,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 {/* The selector is now self-contained */}
-                 <p className="text-sm text-muted-foreground">La edición de combos y etiquetas se gestionará aquí.</p>
+                 <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
               </CardContent>
             </Card>
           </TabsContent>

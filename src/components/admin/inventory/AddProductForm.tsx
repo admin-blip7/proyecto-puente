@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
 
@@ -22,7 +22,7 @@ interface AddProductFormProps {
   allProducts: Product[];
 }
 
-const initialFormData: Omit<Product, 'id' | 'createdAt'> = {
+const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'compatibilityTags'> & { compatibilityTags: string[] } = {
   name: '',
   sku: '',
   price: 0,
@@ -34,7 +34,6 @@ const initialFormData: Omit<Product, 'id' | 'createdAt'> = {
   consignorId: undefined,
   comboProductIds: [],
   compatibilityTags: [],
-  searchKeywords: [],
 };
 
 export default function AddProductForm({ consignors, allProducts }: AddProductFormProps) {
@@ -105,7 +104,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
     }
   };
   
-  const formMethods = {
+  const formMethodsForSelector = {
     watch: (fieldName: keyof typeof initialFormData) => formData[fieldName],
     setValue: (fieldName: keyof typeof initialFormData, value: any) => {
       setFormData(prev => ({...prev, [fieldName]: value}));
@@ -223,7 +222,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                 <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 <ComboProductSelector form={formMethods as any} allProducts={allProducts} />
+                 <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
               </CardContent>
             </Card>
           </TabsContent>

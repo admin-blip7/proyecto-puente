@@ -2,7 +2,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { UseFormReturn } from "react-hook-form";
 import { Product } from "@/types";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,7 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { PlusCircle, X } from "lucide-react";
 
 interface ComboProductSelectorProps {
-  form: Pick<UseFormReturn<any>, 'watch' | 'setValue' | 'getValues'>; // Use a subset of form methods
+  form: {
+    watch: (name: keyof Product) => any;
+    setValue: (name: keyof Product, value: any) => void;
+    getValues: (name: keyof Product) => any;
+  };
   allProducts: Product[];
 }
 
