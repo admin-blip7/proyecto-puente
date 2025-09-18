@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { RepairOrder, Product, TicketSettings, LabelSettings } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit } from "lucide-react";
+import { PlusCircle, Edit, MoreHorizontal, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AddRepairDialog from "./AddRepairDialog";
 import EditRepairDialog from "./EditRepairDialog";
@@ -21,6 +21,18 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getStatusVariant } from "@/lib/utils";
 import PrintRepairDocumentsDialog from "./PrintRepairDocumentsDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import JsBarcode from 'jsbarcode';
+
 
 interface RepairClientProps {
   initialOrders: RepairOrder[];
@@ -54,6 +66,84 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
     setSelectedOrder(order);
     setEditDialogOpen(true);
   }
+  
+  const handlePrint = (order: RepairOrder, type: 'ticket' | 'label') => {
+    const isLabel = type === 'label';
+
+    const printWindow = window.open('', 'PRINT', 'height=800,width=800');
+    if (!printWindow) {
+      alert("El navegador bloqueó la ventana de impresión.");
+      return;
+    }
+    
+    printWindow.document.write('<html><head><title>Imprimir</title>');
+    
+    let content = '';
+    if (isLabel) {
+      printWindow.document.write(`
+          <style>
+              @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
+              body { margin: 0; padding: 0; }
+          </style>
+      `);
+      content = `
+        <div style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; overflow: hidden; font-size: ${labelSettings.fontSize}px;">
+            <div style="font-weight: bold; font-size: 1.2em;">${order.orderId}</div>
+            <svg id="barcode-${order.orderId}" style="width: 90%; height: ${labelSettings.barcodeHeight}px; margin: 4px 0;"></svg>
+            <div>${order.customerName}</div>
+            <div style="font-size: 0.9em;">${order.deviceModel}</div>
+        </div>
+      `;
+    } else {
+        const { header, body, footer } = ticketSettings;
+        content = `
+            <div style="width: 80mm; font-family: 'Courier New', Courier, monospace; color: black; padding: 3mm; font-size: ${body.fontSize === 'xs' ? '10px' : body.fontSize === 'sm' ? '12px' : '14px'};">
+                <div style="text-align: center; margin-bottom: 1rem;">
+                ${header.showLogo && header.logoUrl ? `<img src="${header.logoUrl}" alt="Logo" style="max-width: 60px; max-height: 60px; margin: 0 auto;"/>` : ''}
+                ${header.show.storeName ? `<h1 style="font-size: 1.2em; font-weight: bold;">${header.storeName}</h1>` : ''}
+                ${header.show.address ? `<p>${header.address}</p>` : ''}
+                ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
+                </div>
+                <p>Folio: ${order.orderId}</p>
+                <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
+                <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
+                <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>
+                <p><strong>Falla Reportada:</strong></p>
+                <p>${order.reportedIssue}</p>
+                <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
+                <div style="font-size: 0.8em; margin-top: 1rem;">
+                    <p><strong>Términos y Condiciones:</strong></p>
+                    <p>No nos hacemos responsables por equipos abandonados después de 30 días. La revisión causa un costo de $150 MXN si el equipo no es reparado.</p>
+                </div>
+                <div style="margin-top: 2rem; border-top: 1px solid black; padding-top: 0.5rem;">
+                    <p>Firma de Conformidad del Cliente</p>
+                </div>
+            </div>
+        `;
+    }
+
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(content);
+    printWindow.document.write('</body></html>');
+
+    if (isLabel) {
+        try {
+             JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
+                format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
+  };
+
 
   return (
     <>
@@ -103,10 +193,34 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
                         </TableCell>
                         <TableCell className="text-right font-semibold">${order.totalPrice.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
-                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(order)}>
-                                <Edit className="h-4 w-4" />
-                                <span className="sr-only">Editar Orden</span>
-                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => handleOpenEditDialog(order)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar Orden
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Imprimir
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  <DropdownMenuItem onClick={() => handlePrint(order, 'ticket')}>
+                                    Reimprimir Ticket de Cliente
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handlePrint(order, 'label')}>
+                                    Reimprimir Etiqueta
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                     </TableRow>
                     ))}
@@ -128,6 +242,8 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
           order={selectedOrder}
           onOrderUpdated={handleOrderUpdated}
           allSpareParts={allSpareParts}
+          ticketSettings={ticketSettings}
+          labelSettings={labelSettings}
         />
       )}
       {newlyCreatedOrder && (

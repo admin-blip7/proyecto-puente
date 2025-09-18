@@ -14,6 +14,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Form,
   FormControl,
   FormField,
@@ -33,14 +39,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { RepairOrder, Product, repairStatuses, RepairStatus } from "@/types";
+import { RepairOrder, Product, repairStatuses, RepairStatus, TicketSettings, LabelSettings } from "@/types";
 import { updateRepairOrder, addPartToRepairOrder } from "@/lib/services/repairService";
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { Loader2, PlusCircle, Trash2, Printer } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
+import { generateAndPrintLabels } from "@/lib/utils";
+import JsBarcode from 'jsbarcode';
+
 
 interface EditRepairDialogProps {
   isOpen: boolean;
@@ -48,6 +57,8 @@ interface EditRepairDialogProps {
   order: RepairOrder;
   onOrderUpdated: (order: RepairOrder) => void;
   allSpareParts: Product[];
+  ticketSettings: TicketSettings;
+  labelSettings: LabelSettings;
 }
 
 const formSchema = z.object({
@@ -61,7 +72,9 @@ export default function EditRepairDialog({
   onOpenChange,
   order,
   onOrderUpdated,
-  allSpareParts
+  allSpareParts,
+  ticketSettings,
+  labelSettings
 }: EditRepairDialogProps) {
   const [loading, setLoading] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -161,14 +174,87 @@ export default function EditRepairDialog({
     }
   }
 
+  const generateTicketHTML = () => {
+    const { header, body, footer } = ticketSettings;
+    return `...`; // Same as in PrintRepairDocumentsDialog
+  };
+
+  const generateLabelHTML = () => {
+    const barcodeId = `barcode-${order.orderId}`;
+    return `...`; // Same as in PrintRepairDocumentsDialog
+  };
+
+  const handlePrint = (type: 'ticket' | 'label') => {
+    const contentGenerator = type === 'ticket' ? generateTicketHTML : generateLabelHTML;
+    const isLabel = type === 'label';
+    const printContent = contentGenerator();
+    
+    const printWindow = window.open('', 'PRINT', 'height=800,width=800');
+    if (!printWindow) {
+      alert("El navegador bloqueó la ventana de impresión.");
+      return;
+    }
+    
+    printWindow.document.write('<html><head><title>Imprimir</title>');
+     if (isLabel) {
+        printWindow.document.write(`
+            <style>
+                @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
+                body { margin: 0; padding: 0; }
+            </style>
+        `);
+    }
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContent);
+    printWindow.document.write('</body></html>');
+    
+    if (isLabel) {
+        try {
+            JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
+                format: 'CODE128',
+                displayValue: false,
+                height: labelSettings.barcodeHeight,
+                width: 1.5,
+                margin: 0,
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Orden de Reparación #{order.orderId}</DialogTitle>
-          <DialogDescription>
-            Revisa, actualiza el estado, añade notas y gestiona las refacciones utilizadas.
-          </DialogDescription>
+        <DialogHeader className="flex-row items-center justify-between">
+          <div>
+            <DialogTitle>Orden de Reparación #{order.orderId}</DialogTitle>
+            <DialogDescription>
+              Revisa, actualiza el estado, añade notas y gestiona las refacciones utilizadas.
+            </DialogDescription>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handlePrint('ticket')}>
+                    Reimprimir Ticket de Cliente
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePrint('label')}>
+                    Reimprimir Etiqueta de Dispositivo
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">
           <div className="pr-6 py-4 space-y-4">
