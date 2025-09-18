@@ -87,13 +87,15 @@ export default function EditProductPageClient({ product, consignors, allProducts
     const formKeys = Object.keys(values) as (keyof typeof values)[];
     
     formKeys.forEach(key => {
+        // A simple check to see if the value has changed from the initial product value
         if (JSON.stringify(values[key]) !== JSON.stringify(product[key as keyof Product])) {
             (dataToUpdate as any)[key] = values[key];
         }
     });
     
+    // Handle case where ownershipType changes from 'Consigna'
     if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
-        (dataToUpdate as any).consignorId = null;
+        (dataToUpdate as any).consignorId = null; // or use delete operator if you want to remove the field
     }
     
     console.log("Datos a enviar:", dataToUpdate);
@@ -175,7 +177,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
                                     <FormItem><FormLabel>Costo de Compra</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                                 )}/>
                                 <FormField control={form.control} name="price" render={({ field }) => (
-                                    <FormItem><FormLabel>Precio de Venta</FormLabel><FormControl><Input type="number" step="0.01" {...field} disabled={watch('ownershipType') === 'Familiar'}/></FormControl><FormMessage /></FormItem>
+                                    <FormItem><FormLabel>Precio de Venta</FormLabel><FormControl><Input type="number" step="0.01" disabled={watch('ownershipType') === 'Familiar'}/></FormControl><FormMessage /></FormItem>
                                 )}/>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
