@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Product, Consignor, ownershipTypes, OwnershipType } from "@/types";
+import { Product, Consignor, ownershipTypes } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -13,8 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { updateProduct } from "@/lib/services/productService";
-import { Loader2, Save, Package, DollarSign, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2, Save, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ComboProductSelector from "./ComboProductSelector";
 
 
@@ -47,7 +50,6 @@ const formSchema = z.object({
     path: ['consignorId'],
 });
 
-type Section = "general" | "pricing" | "details";
 
 interface EditProductPageClientProps {
   product: Product;
@@ -57,7 +59,6 @@ interface EditProductPageClientProps {
 
 export default function EditProductPageClient({ product, consignors, allProducts }: EditProductPageClientProps) {
   const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<Section>("general");
   const { toast } = useToast();
   const router = useRouter();
   
@@ -70,7 +71,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
     },
   });
 
-  const { watch, setValue, getValues, formState: { isDirty } } = form;
+  const { watch, formState: { isDirty } } = form;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!isDirty) {
@@ -84,6 +85,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
       const formKeys = Object.keys(values) as (keyof typeof values)[];
       
       formKeys.forEach(key => {
+        // A simple dirty check for each field
         if (JSON.stringify(values[key]) !== JSON.stringify(product[key as keyof Product])) {
             (dataToUpdate as any)[key] = values[key];
         }
@@ -92,7 +94,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
       if(product.ownershipType === 'Consigna' && values.ownershipType !== 'Consigna') {
           (dataToUpdate as any).consignorId = null;
       }
-      
+
       await updateProduct(product.id, dataToUpdate);
 
       toast({
@@ -112,170 +114,132 @@ export default function EditProductPageClient({ product, consignors, allProducts
       setLoading(false);
     }
   };
-
-  const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
-    { id: 'general', label: 'Información General', icon: Info },
-    { id: 'pricing', label: 'Precios y Stock', icon: DollarSign },
-    { id: 'details', label: 'Tipos y Combo', icon: Package },
-  ];
-
+  
   return (
-    <div className="flex flex-col h-full">
-        <header className="flex-shrink-0">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold tracking-tight">Editar Producto</h1>
-                <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !isDirty}>
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Guardar Cambios
-                </Button>
-            </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <header className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+          <div className="flex justify-between items-center mb-4 pt-4">
+              <Button asChild variant="outline" size="sm">
+                  <Link href="/admin">
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Volver
+                  </Link>
+              </Button>
+              <h1 className="text-xl font-bold tracking-tight text-center">Editar Producto</h1>
+              <Button type="submit" disabled={loading || !isDirty}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Guardar Cambios
+              </Button>
+          </div>
+           <p className="text-muted-foreground text-center mb-4">{product.name}</p>
         </header>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 flex-1 min-h-0">
-            <aside className="md:col-span-1">
-                <nav className="flex flex-col space-y-2">
-                    {navItems.map(item => (
-                        <Button 
-                            key={item.id}
-                            variant={activeSection === item.id ? 'default' : 'ghost'}
-                            className="justify-start"
-                            onClick={() => setActiveSection(item.id)}
-                        >
-                            <item.icon className="mr-3 h-5 w-5" />
-                            {item.label}
-                        </Button>
-                    ))}
-                </nav>
-            </aside>
-            <main className="md:col-span-3 flex-1 overflow-y-auto pr-4">
-                 <Form {...form}>
-                    <form className="space-y-6">
-                        {activeSection === 'general' && (
-                             <div className="space-y-4">
-                                <FormField
-                                    control={form.control} name="name"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>Nombre del Producto</FormLabel>
-                                        <FormControl><Input {...field} /></FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control} name="sku"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>SKU (Código de Barras)</FormLabel>
-                                        <FormControl><Input {...field} /></FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                        )}
 
-                        {activeSection === 'pricing' && (
-                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control} name="price"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>Precio de Venta</FormLabel>
-                                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control} name="cost"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>Costo de Compra</FormLabel>
-                                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control} name="stock"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>Stock Actual</FormLabel>
-                                            <FormControl><Input type="number" {...field} /></FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                     <FormField
-                                        control={form.control} name="reorderPoint"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>Punto de Reorden</FormLabel>
-                                            <FormControl><Input type="number" {...field} /></FormControl>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
-                        )}
+        <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="general">Información General</TabsTrigger>
+                <TabsTrigger value="pricing">Precios y Stock</TabsTrigger>
+                <TabsTrigger value="classification">Clasificación</TabsTrigger>
+                <TabsTrigger value="relations">Combos y Etiquetas</TabsTrigger>
+            </TabsList>
 
-                        {activeSection === 'details' && (
-                             <div className="space-y-4">
-                                <FormField
-                                    control={form.control} name="type"
-                                    render={({ field }) => (
-                                        <FormItem className="space-y-3">
-                                        <FormLabel>Tipo de Producto</FormLabel>
-                                        <FormControl>
-                                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
-                                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Venta" /></FormControl><FormLabel className="font-normal">Para Venta</FormLabel></FormItem>
-                                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Refacción" /></FormControl><FormLabel className="font-normal">Refacción</FormLabel></FormItem>
-                                            </RadioGroup>
-                                        </FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control} name="ownershipType"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>Tipo de Propiedad</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                            <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                {watch('ownershipType') === 'Consigna' && (
-                                    <FormField
-                                        control={form.control} name="consignorId"
-                                        render={({ field }) => (
-                                            <FormItem className="mt-4">
-                                            <FormLabel>Consignador</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
-                                                <SelectContent>{consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                )}
-                                <ComboProductSelector form={form} allProducts={allProducts} />
+            <div className="py-6">
+                <TabsContent value="general">
+                    <Card>
+                        <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField control={form.control} name="name" render={({ field }) => (
+                                <FormItem><FormLabel>Nombre del Producto</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={form.control} name="sku" render={({ field }) => (
+                                <FormItem><FormLabel>SKU (Código de Barras)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="pricing">
+                    <Card>
+                        <CardHeader><CardTitle>Precios y Stock</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="cost" render={({ field }) => (
+                                    <FormItem><FormLabel>Costo de Compra</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                                )}/>
+                                <FormField control={form.control} name="price" render={({ field }) => (
+                                    <FormItem><FormLabel>Precio de Venta</FormLabel><FormControl><Input type="number" step="0.01" {...field} disabled={watch('ownershipType') === 'Familiar'}/></FormControl><FormMessage /></FormItem>
+                                )}/>
                             </div>
-                        )}
-                    </form>
-                 </Form>
-            </main>
-        </div>
-    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="stock" render={({ field }) => (
+                                    <FormItem><FormLabel>Stock Actual</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                                )}/>
+                                <FormField control={form.control} name="reorderPoint" render={({ field }) => (
+                                    <FormItem><FormLabel>Punto de Reorden</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                                )}/>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="classification">
+                    <Card>
+                        <CardHeader><CardTitle>Clasificación del Producto</CardTitle></CardHeader>
+                        <CardContent className="space-y-6">
+                            <FormField control={form.control} name="type" render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                    <FormLabel>Tipo de Producto</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Venta" /></FormControl><FormLabel className="font-normal">Para Venta</FormLabel></FormItem>
+                                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Refacción" /></FormControl><FormLabel className="font-normal">Refacción</FormLabel></FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}/>
+                             <FormField control={form.control} name="ownershipType" render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Tipo de Propiedad</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}/>
+                            {watch('ownershipType') === 'Consigna' && (
+                                <FormField control={form.control} name="consignorId" render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Consignador</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un consignador..." /></SelectTrigger></FormControl>
+                                        <SelectContent>{consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}/>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="relations">
+                    <Card>
+                         <CardHeader>
+                            <CardTitle>Combos y Etiquetas</CardTitle>
+                            <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
+                         </CardHeader>
+                        <CardContent className="space-y-8">
+                             <ComboProductSelector form={form} allProducts={allProducts} />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </div>
+        </Tabs>
+      </form>
+    </Form>
   );
 }
+
+    

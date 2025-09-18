@@ -1,7 +1,8 @@
+
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { getProductById } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
 import { getProducts } from "@/lib/services/productService";
@@ -49,15 +50,7 @@ export default async function EditProductPage({ params }: { params: { productId:
                     </SheetContent>
                 </Sheet>
             </div>
-            <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-                <div className="mb-4">
-                     <Button asChild variant="outline" size="sm">
-                        <Link href="/admin">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Volver al Inventario
-                        </Link>
-                    </Button>
-                </div>
+            <main className="flex-1 overflow-auto p-4 md:p-6">
                 <EditProductPageClient 
                     product={product}
                     consignors={consignors}
@@ -67,3 +60,5 @@ export default async function EditProductPage({ params }: { params: { productId:
         </div>
     )
 }
+
+    
