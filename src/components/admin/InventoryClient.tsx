@@ -6,7 +6,6 @@ import { Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Trash2, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import AddProductDialog from "./AddProductDialog";
 import {
   Table,
   TableBody,
@@ -29,7 +28,6 @@ interface InventoryClientProps {
 
 export default function InventoryClient({ initialProducts }: InventoryClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isBulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
@@ -37,10 +35,6 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const router = useRouter();
 
 
-  const handleProductAdded = (newProduct: Product) => {
-    setProducts(prev => [newProduct, ...prev]);
-  };
-  
   const handleProductsDeleted = (deletedIds: string[]) => {
     setProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
     setSelectedProductIds([]);
@@ -50,6 +44,10 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     router.push(`/admin/inventory/edit/${productId}`);
   }
   
+  const handleOpenAddPage = () => {
+    router.push('/admin/inventory/add');
+  };
+
   const handleRefreshData = async () => {
     try {
         const updatedProducts = await getProducts();
@@ -112,7 +110,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
              </Button>
            </div>
         ) : (
-          <Button onClick={() => setAddDialogOpen(true)}>
+          <Button onClick={handleOpenAddPage}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Agregar Producto
           </Button>
@@ -180,11 +178,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
           </ScrollArea>
         </CardContent>
       </Card>
-      <AddProductDialog
-        isOpen={isAddDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onProductAdded={handleProductAdded}
-      />
+      
       <DeleteProductsDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
