@@ -228,6 +228,8 @@ export default function EditRepairDialog({
         printWindow.close();
     }, 250);
   };
+  
+  const watchedLaborCost = form.watch('laborCost');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -390,16 +392,16 @@ export default function EditRepairDialog({
                                      </div>
                                      <div className="flex justify-between">
                                         <span>Mano de Obra:</span>
-                                        <span>${form.watch('laborCost').toFixed(2)}</span>
+                                        <span>${Number(watchedLaborCost || 0).toFixed(2)}</span>
                                      </div>
                                       <hr />
                                      <div className="flex justify-between text-lg font-bold">
                                         <span>Total a Cobrar:</span>
-                                        <span>${(order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + form.watch('laborCost')).toFixed(2)}</span>
+                                        <span>${(order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)).toFixed(2)}</span>
                                      </div>
                                      <div className="flex justify-between text-xs text-green-600">
                                         <span>Ganancia Estimada:</span>
-                                        <span>${((order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + form.watch('laborCost')) - order.totalCost).toFixed(2)}</span>
+                                        <span>${((order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)) - order.totalCost).toFixed(2)}</span>
                                      </div>
                                 </div>
 
