@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Product } from "@/types";
-import { FormLabel } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { PlusCircle, X } from "lucide-react";
 
 interface ComboProductSelectorProps {
-  form: UseFormReturn<any>;
+  form: Pick<UseFormReturn<any>, 'watch' | 'setValue' | 'getValues'>; // Use a subset of form methods
   allProducts: Product[];
 }
 
@@ -38,7 +38,7 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
     const newIds = currentIds.includes(productId) 
         ? currentIds.filter(id => id !== productId)
         : [...currentIds, productId];
-    setValue("comboProductIds", newIds, { shouldDirty: true });
+    setValue("comboProductIds", newIds);
   };
 
   return (
@@ -68,7 +68,7 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
       </Popover>
       
       <div className="space-y-2">
-        <FormLabel>Productos en el combo ({comboProducts.length})</FormLabel>
+        <Label>Productos en el combo ({comboProducts.length})</Label>
         {comboProducts.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {comboProducts.map(p => (

@@ -14,7 +14,7 @@ import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FormLabel } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
 
 interface EditProductFormProps {
@@ -43,7 +43,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
 
     setFormData(prevData => ({ ...prevData, [name]: processedValue }));
   };
-
+  
   const handleSelectChange = (name: keyof Product, value: string) => {
     const updatedFormData = { ...formData, [name]: value };
      if (name === 'ownershipType' && value === 'Familiar') {
@@ -65,7 +65,6 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
         return newData;
     });
    };
-
 
   const handleSaveChanges = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -95,6 +94,15 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
       setIsLoading(false);
     }
   };
+  
+  const formMethods = {
+    watch: (fieldName: keyof Product) => formData[fieldName],
+    setValue: (fieldName: keyof Product, value: any) => {
+      setFormData(prev => ({...prev, [fieldName]: value}));
+    },
+    getValues: (fieldName: keyof Product) => formData[fieldName],
+  };
+
 
   return (
     <form onSubmit={handleSaveChanges} className="h-full flex flex-col">
@@ -129,11 +137,11 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
               <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <FormLabel htmlFor="name">Nombre del Producto</FormLabel>
+                  <Label htmlFor="name">Nombre del Producto</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleChange} />
                 </div>
                 <div>
-                  <FormLabel htmlFor="sku">SKU (Código de Barras)</FormLabel>
+                  <Label htmlFor="sku">SKU (Código de Barras)</Label>
                   <Input id="sku" name="sku" value={formData.sku} onChange={handleChange} />
                 </div>
               </CardContent>
@@ -146,21 +154,21 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <FormLabel htmlFor="cost">Costo de Compra</FormLabel>
+                    <Label htmlFor="cost">Costo de Compra</Label>
                     <Input id="cost" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleCostChange} />
                   </div>
                   <div>
-                    <FormLabel htmlFor="price">Precio de Venta</FormLabel>
+                    <Label htmlFor="price">Precio de Venta</Label>
                     <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} disabled={formData.ownershipType === 'Familiar'} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <FormLabel htmlFor="stock">Stock Actual</FormLabel>
+                    <Label htmlFor="stock">Stock Actual</Label>
                     <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleChange} />
                   </div>
                   <div>
-                    <FormLabel htmlFor="reorderPoint">Punto de Reorden</FormLabel>
+                    <Label htmlFor="reorderPoint">Punto de Reorden</Label>
                     <Input id="reorderPoint" name="reorderPoint" type="number" value={formData.reorderPoint || 0} onChange={handleChange} />
                   </div>
                 </div>
@@ -173,14 +181,14 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
               <CardHeader><CardTitle>Clasificación del Producto</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <FormLabel>Tipo de Producto</FormLabel>
+                  <Label>Tipo de Producto</Label>
                   <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex space-x-4 mt-2">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Venta" id="type-venta" /><FormLabel htmlFor="type-venta" className="font-normal">Para Venta</FormLabel></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Refacción" id="type-refaccion" /><FormLabel htmlFor="type-refaccion" className="font-normal">Refacción</FormLabel></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="Venta" id="type-venta" /><Label htmlFor="type-venta" className="font-normal">Para Venta</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="Refacción" id="type-refaccion" /><Label htmlFor="type-refaccion" className="font-normal">Refacción</Label></div>
                   </RadioGroup>
                 </div>
                 <div>
-                  <FormLabel>Tipo de Propiedad</FormLabel>
+                  <Label>Tipo de Propiedad</Label>
                   <Select name="ownershipType" value={formData.ownershipType} onValueChange={(value: any) => handleSelectChange('ownershipType', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
@@ -188,7 +196,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 </div>
                 {formData.ownershipType === 'Consigna' && (
                   <div>
-                    <FormLabel>Consignador</FormLabel>
+                    <Label>Consignador</Label>
                     <Select name="consignorId" value={formData.consignorId || ''} onValueChange={(value) => handleSelectChange('consignorId', value)}>
                       <SelectTrigger><SelectValue placeholder="Seleccione un consignador..." /></SelectTrigger>
                       <SelectContent>{consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
@@ -206,7 +214,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 {/* This would require its own state management or integration with the main form state */}
+                 {/* The selector is now self-contained */}
                  <p className="text-sm text-muted-foreground">La edición de combos y etiquetas se gestionará aquí.</p>
               </CardContent>
             </Card>
