@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { RepairOrder, Product } from "@/types";
+import { RepairOrder, Product, TicketSettings, LabelSettings } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,20 +20,28 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getStatusVariant } from "@/lib/utils";
+import PrintRepairDocumentsDialog from "./PrintRepairDocumentsDialog";
 
 interface RepairClientProps {
   initialOrders: RepairOrder[];
   allSpareParts: Product[];
+  ticketSettings: TicketSettings;
+  labelSettings: LabelSettings;
 }
 
-export default function RepairClient({ initialOrders, allSpareParts }: RepairClientProps) {
+export default function RepairClient({ initialOrders, allSpareParts, ticketSettings, labelSettings }: RepairClientProps) {
   const [orders, setOrders] = useState<RepairOrder[]>(initialOrders);
   const [selectedOrder, setSelectedOrder] = useState<RepairOrder | null>(null);
+  const [newlyCreatedOrder, setNewlyCreatedOrder] = useState<RepairOrder | null>(null);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [isPrintDialogOpen, setPrintDialogOpen] = useState(false);
+
 
   const handleOrderAdded = (newOrder: RepairOrder) => {
     setOrders(prev => [newOrder, ...prev]);
+    setNewlyCreatedOrder(newOrder);
+    setPrintDialogOpen(true);
   };
 
   const handleOrderUpdated = (updatedOrder: RepairOrder) => {
@@ -120,6 +128,15 @@ export default function RepairClient({ initialOrders, allSpareParts }: RepairCli
           order={selectedOrder}
           onOrderUpdated={handleOrderUpdated}
           allSpareParts={allSpareParts}
+        />
+      )}
+      {newlyCreatedOrder && (
+        <PrintRepairDocumentsDialog
+          isOpen={isPrintDialogOpen}
+          onOpenChange={setPrintDialogOpen}
+          order={newlyCreatedOrder}
+          ticketSettings={ticketSettings}
+          labelSettings={labelSettings}
         />
       )}
     </>
