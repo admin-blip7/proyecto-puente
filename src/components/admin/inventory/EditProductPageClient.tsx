@@ -125,7 +125,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
   
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="h-full flex flex-col">
         <header className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
           <div className="flex justify-between items-center mb-4 pt-4">
               <Button asChild variant="outline" size="sm">
@@ -143,7 +143,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
            <p className="text-muted-foreground text-center mb-4">{product.name}</p>
         </header>
 
-        <Tabs defaultValue="general" className="w-full">
+        <Tabs defaultValue="general" className="w-full flex-1 flex flex-col">
             <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general">Información General</TabsTrigger>
                 <TabsTrigger value="pricing">Precios y Stock</TabsTrigger>
@@ -151,7 +151,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
                 <TabsTrigger value="relations">Combos y Etiquetas</TabsTrigger>
             </TabsList>
 
-            <div className="py-6">
+            <div className="py-6 flex-1 overflow-y-auto">
                 <TabsContent value="general">
                     <Card>
                         <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
@@ -249,7 +249,3 @@ export default function EditProductPageClient({ product, consignors, allProducts
     </Form>
   );
 }
-
-    
-
-    
