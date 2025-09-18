@@ -121,15 +121,17 @@ export default function EditProductPageClient({ product, consignors, allProducts
 
   return (
     <div className="flex flex-col h-full">
-        <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Editar Producto</h1>
-            <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !isDirty}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Guardar Cambios
-            </Button>
-        </div>
+        <header className="flex-shrink-0">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold tracking-tight">Editar Producto</h1>
+                <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !isDirty}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Guardar Cambios
+                </Button>
+            </div>
+        </header>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 flex-1 min-h-0">
             <aside className="md:col-span-1">
                 <nav className="flex flex-col space-y-2">
                     {navItems.map(item => (
@@ -145,7 +147,7 @@ export default function EditProductPageClient({ product, consignors, allProducts
                     ))}
                 </nav>
             </aside>
-            <main className="md:col-span-3">
+            <main className="md:col-span-3 flex-1 overflow-y-auto pr-4">
                  <Form {...form}>
                     <form className="space-y-6">
                         {activeSection === 'general' && (

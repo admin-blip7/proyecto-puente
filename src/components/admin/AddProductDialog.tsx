@@ -157,7 +157,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Producto</DialogTitle>
             <DialogDescription>
@@ -165,8 +165,8 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <ScrollArea className="max-h-[70vh]">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
+              <ScrollArea className="flex-1">
                 <div className="space-y-4 py-4 pr-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                     <div className="space-y-4">
@@ -383,7 +383,7 @@ export default function AddProductDialog({ isOpen, onOpenChange, onProductAdded 
                   </div>
                 </div>
               </ScrollArea>
-              <DialogFooter className="pt-6 border-t mt-4">
+              <DialogFooter className="pt-6 border-t mt-4 flex-shrink-0">
                   <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
                   Cancelar
                   </Button>
