@@ -6,7 +6,7 @@ import { Menu } from "lucide-react";
 import { getProductById } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
 import { getProducts } from "@/lib/services/productService";
-import EditProductPageClient from "@/components/admin/inventory/EditProductPageClient";
+import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 
 
@@ -51,7 +51,7 @@ export default async function EditProductPage({ params }: { params: { productId:
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6">
-                <EditProductPageClient 
+                <EditProductForm 
                     product={product}
                     consignors={consignors}
                     allProducts={allProducts}
@@ -60,5 +60,3 @@ export default async function EditProductPage({ params }: { params: { productId:
         </div>
     )
 }
-
-    

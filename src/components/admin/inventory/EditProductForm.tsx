@@ -1,0 +1,218 @@
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Product, Consignor, ownershipTypes } from "@/types";
+import { updateProduct } from "@/lib/services/productService";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Loader2, Save, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FormLabel } from "@/components/ui/form";
+import ComboProductSelector from "./ComboProductSelector";
+
+interface EditProductFormProps {
+  product: Product;
+  consignors: Consignor[];
+  allProducts: Product[];
+}
+
+export default function EditProductForm({ product, consignors, allProducts }: EditProductFormProps) {
+  const [formData, setFormData] = useState<Product>(product);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  useEffect(() => {
+    setFormData(product);
+  }, [product]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    
+    let processedValue: string | number = value;
+    if (type === 'number') {
+        processedValue = value === '' ? '' : Number(value);
+    }
+
+    setFormData(prevData => ({ ...prevData, [name]: processedValue }));
+  };
+
+  const handleSelectChange = (name: keyof Product, value: string) => {
+    const updatedFormData = { ...formData, [name]: value };
+     if (name === 'ownershipType' && value === 'Familiar') {
+      updatedFormData.price = updatedFormData.cost;
+    }
+     if (name === 'ownershipType' && value !== 'Consigna') {
+      updatedFormData.consignorId = undefined;
+    }
+    setFormData(updatedFormData);
+  };
+  
+   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCost = Number(e.target.value);
+    setFormData(prevData => {
+        const newData = { ...prevData, cost: newCost };
+        if (newData.ownershipType === 'Familiar') {
+            newData.price = newCost;
+        }
+        return newData;
+    });
+   };
+
+
+  const handleSaveChanges = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsLoading(true);
+    console.log("Guardando datos:", formData);
+
+    try {
+      await updateProduct(product.id, formData);
+      
+      console.log("¡Éxito! Producto actualizado en Firestore.");
+      toast({
+        title: "Producto Actualizado",
+        description: `El producto "${formData.name}" ha sido guardado exitosamente.`,
+      });
+      
+      router.push('/admin');
+      router.refresh();
+
+    } catch (error) {
+      console.error("ERROR AL GUARDAR EN FIRESTORE:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al Guardar",
+        description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSaveChanges} className="h-full flex flex-col">
+      <header className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+        <div className="flex justify-between items-center mb-4 pt-4">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Link>
+          </Button>
+          <h1 className="text-xl font-bold tracking-tight text-center">Editar Producto</h1>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </div>
+        <p className="text-muted-foreground text-center mb-4">{product.name}</p>
+      </header>
+
+      <Tabs defaultValue="general" className="w-full flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="general">Información General</TabsTrigger>
+          <TabsTrigger value="pricing">Precios y Stock</TabsTrigger>
+          <TabsTrigger value="classification">Clasificación</TabsTrigger>
+          <TabsTrigger value="relations">Combos y Etiquetas</TabsTrigger>
+        </TabsList>
+
+        <div className="py-6 flex-1 overflow-y-auto">
+          <TabsContent value="general">
+            <Card>
+              <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <FormLabel htmlFor="name">Nombre del Producto</FormLabel>
+                  <Input id="name" name="name" value={formData.name} onChange={handleChange} />
+                </div>
+                <div>
+                  <FormLabel htmlFor="sku">SKU (Código de Barras)</FormLabel>
+                  <Input id="sku" name="sku" value={formData.sku} onChange={handleChange} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pricing">
+            <Card>
+              <CardHeader><CardTitle>Precios y Stock</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <FormLabel htmlFor="cost">Costo de Compra</FormLabel>
+                    <Input id="cost" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleCostChange} />
+                  </div>
+                  <div>
+                    <FormLabel htmlFor="price">Precio de Venta</FormLabel>
+                    <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} disabled={formData.ownershipType === 'Familiar'} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <FormLabel htmlFor="stock">Stock Actual</FormLabel>
+                    <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleChange} />
+                  </div>
+                  <div>
+                    <FormLabel htmlFor="reorderPoint">Punto de Reorden</FormLabel>
+                    <Input id="reorderPoint" name="reorderPoint" type="number" value={formData.reorderPoint || 0} onChange={handleChange} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="classification">
+            <Card>
+              <CardHeader><CardTitle>Clasificación del Producto</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <FormLabel>Tipo de Producto</FormLabel>
+                  <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex space-x-4 mt-2">
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="Venta" id="type-venta" /><FormLabel htmlFor="type-venta" className="font-normal">Para Venta</FormLabel></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="Refacción" id="type-refaccion" /><FormLabel htmlFor="type-refaccion" className="font-normal">Refacción</FormLabel></div>
+                  </RadioGroup>
+                </div>
+                <div>
+                  <FormLabel>Tipo de Propiedad</FormLabel>
+                  <Select name="ownershipType" value={formData.ownershipType} onValueChange={(value: any) => handleSelectChange('ownershipType', value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {formData.ownershipType === 'Consigna' && (
+                  <div>
+                    <FormLabel>Consignador</FormLabel>
+                    <Select name="consignorId" value={formData.consignorId || ''} onValueChange={(value) => handleSelectChange('consignorId', value)}>
+                      <SelectTrigger><SelectValue placeholder="Seleccione un consignador..." /></SelectTrigger>
+                      <SelectContent>{consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="relations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Combos y Etiquetas</CardTitle>
+                <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                 {/* This would require its own state management or integration with the main form state */}
+                 <p className="text-sm text-muted-foreground">La edición de combos y etiquetas se gestionará aquí.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
+      </Tabs>
+    </form>
+  );
+}
