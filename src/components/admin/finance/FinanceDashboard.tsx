@@ -4,9 +4,8 @@
 import * as React from "react";
 import { useState, useMemo, FC } from "react";
 import { Expense, Sale, RepairOrder, Product, Consignor, ConsignorPayment, CashSession, Account } from "@/types";
-import { Button } from "@/components/ui/button";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, subMonths, startOfYear, isWithinInterval, format, parseISO } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, isWithinInterval, format, parseISO, getDay, getHours } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -15,14 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart as BarChartIcon, LineChart as LineChartIcon } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Landmark, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart as BarChartIcon } from "lucide-react";
 import StatCard from "./StatCard";
-import { Separator } from "@/components/ui/separator";
-import Link from "next/link";
-import { useToast } from "@/hooks/use-toast";
 import { DatePickerWithRange } from "./DatePickerWithRange";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from 'recharts';
+import PeakHoursHeatmap from "./PeakHoursHeatmap";
 
 interface FinanceDashboardProps {
   initialExpenses: Expense[];
@@ -37,6 +33,144 @@ interface FinanceDashboardProps {
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+};
+
+const calculateMetrics = (
+    sales: Sale[],
+    expenses: Expense[],
+    repairs: RepairOrder[],
+    products: Product[],
+    dateRange?: DateRange
+) => {
+    const range = {
+        start: dateRange?.from || new Date(0),
+        end: dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : new Date(),
+    };
+
+    const salesInRange = sales.filter(sale => isWithinInterval(sale.createdAt, range));
+    const expensesInRange = expenses.filter(expense => isWithinInterval(expense.paymentDate, range));
+    const repairsInRange = repairs.filter(repair => repair.completedAt && isWithinInterval(repair.completedAt, range));
+
+    let salesRevenue = 0, salesCost = 0, ownProductsRevenue = 0, consignaProductsRevenue = 0, ownProductsProfit = 0, consignaProductsProfit = 0;
+
+    salesInRange.forEach(sale => {
+        salesRevenue += sale.totalAmount;
+        sale.items.forEach(item => {
+            const product = products.find(p => p.id === item.productId);
+            const cost = product?.cost || 0;
+            const itemRevenue = item.priceAtSale * item.quantity;
+            const itemProfit = itemRevenue - (cost * item.quantity);
+            salesCost += cost * item.quantity;
+
+            if (product?.ownershipType === 'Consigna') {
+                consignaProductsRevenue += itemRevenue;
+                consignaProductsProfit += itemProfit;
+            } else {
+                ownProductsRevenue += itemRevenue;
+                ownProductsProfit += itemProfit;
+            }
+        });
+    });
+
+    const repairsRevenue = repairsInRange.reduce((sum, repair) => sum + repair.totalPrice, 0);
+    const repairsProfit = repairsInRange.reduce((sum, repair) => sum + repair.profit, 0);
+
+    const totalRevenue = salesRevenue + repairsRevenue;
+    const operationalExpenses = expensesInRange.reduce((sum, expense) => sum + expense.amount, 0);
+    const totalCost = salesCost + repairsInRange.reduce((sum, r) => sum + r.totalCost, 0) + operationalExpenses;
+    const netProfit = totalRevenue - totalCost;
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const averageTicket = salesInRange.length > 0 ? salesRevenue / salesInRange.length : 0;
+
+    const soldQuantities = new Map<string, number>();
+    salesInRange.forEach(sale => {
+        sale.items.forEach(item => {
+            soldQuantities.set(item.productId, (soldQuantities.get(item.productId) || 0) + item.quantity);
+        });
+    });
+
+    const lowRotationProducts = products
+        .filter(p => p.type === 'Venta')
+        .map(p => ({ ...p, sold: soldQuantities.get(p.id) || 0 }))
+        .sort((a,b) => a.sold - b.sold)
+        .slice(0, 3);
+
+    const dailyData: Record<string, { revenue: number, profit: number }> = {};
+    salesInRange.forEach(sale => {
+        const date = format(sale.createdAt, 'yyyy-MM-dd');
+        if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+        const saleCost = sale.items.reduce((sum, item) => {
+            const product = products.find(p => p.id === item.productId);
+            return sum + ((product?.cost || 0) * item.quantity);
+        }, 0);
+        dailyData[date].revenue += sale.totalAmount;
+        dailyData[date].profit += (sale.totalAmount - saleCost);
+    });
+
+    repairsInRange.forEach(repair => {
+         if (!repair.completedAt) return;
+         const date = format(repair.completedAt, 'yyyy-MM-dd');
+         if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+         dailyData[date].revenue += repair.totalPrice;
+         dailyData[date].profit += repair.profit;
+    });
+
+    expensesInRange.forEach(expense => {
+        const date = format(expense.paymentDate, 'yyyy-MM-dd');
+        if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+        dailyData[date].profit -= expense.amount;
+    });
+
+    const chartData = Object.entries(dailyData)
+        .map(([date, values]) => ({
+            date: format(parseISO(date), 'dd MMM'),
+            Ingresos: values.revenue,
+            Ganancias: values.profit
+        }))
+        .sort((a,b) => a.date.localeCompare(b.date));
+
+    const revenueBreakdown = [
+        { name: "Ventas Propias", Ingresos: ownProductsRevenue, Ganancia: ownProductsProfit, Costo: ownProductsRevenue - ownProductsProfit },
+        { name: "Consigna", Ingresos: consignaProductsRevenue, Ganancia: consignaProductsProfit, Costo: consignaProductsRevenue - consignaProductsProfit },
+        { name: "Reparaciones", Ingresos: repairsRevenue, Ganancia: repairsProfit, Costo: repairsRevenue - repairsProfit },
+    ];
+
+    const customerVisits = new Map<string, number>();
+    salesInRange.forEach(sale => {
+        if (sale.customerPhone) {
+            customerVisits.set(sale.customerPhone, (customerVisits.get(sale.customerPhone) || 0) + 1);
+        }
+    });
+
+    let newCustomers = 0, recurrentCustomers = 0;
+    customerVisits.forEach(count => (count === 1 ? newCustomers++ : recurrentCustomers++));
+
+    const customerAnalysis = {
+        new: newCustomers,
+        recurrent: recurrentCustomers,
+        chartData: [ { name: 'Nuevos', value: newCustomers }, { name: 'Recurrentes', value: recurrentCustomers } ]
+    };
+    
+    const activityByHour: Record<string, number>[] = Array(7).fill(0).map(() => ({}));
+    [...salesInRange, ...repairsInRange].forEach(transaction => {
+        const date = 'createdAt' in transaction ? transaction.createdAt : transaction.completedAt!;
+        const day = (getDay(date) + 6) % 7; // Monday = 0
+        const hour = getHours(date);
+        const amount = 'totalAmount' in transaction ? transaction.totalAmount : transaction.totalPrice;
+        activityByHour[day][hour] = (activityByHour[day][hour] || 0) + amount;
+    });
+
+    const heatmapData = Array.from({ length: 24 }, (_, hour) => {
+        const dataPoint: any = { hour: `${hour}:00` };
+        const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        days.forEach((day, index) => {
+            dataPoint[day] = activityByHour[index][hour] || 0;
+        });
+        return dataPoint;
+    });
+
+
+    return { totalRevenue, totalCost, netProfit, netMargin, averageTicket, lowRotationProducts, chartData, revenueBreakdown, customerAnalysis, heatmapData };
 };
 
 
@@ -61,10 +195,6 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
     initialSales,
     initialRepairs,
     initialProducts,
-    initialConsignors,
-    initialConsignorPayments,
-    initialCashSessions,
-    initialAccounts,
 }) => {
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: startOfMonth(new Date()),
@@ -102,139 +232,9 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         lowRotationProducts,
         chartData,
         revenueBreakdown,
-        customerAnalysis
-     } = useMemo(() => {
-        const range = {
-            start: dateRange?.from || new Date(0),
-            end: dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : new Date(),
-        };
-
-        const salesInRange = initialSales.filter(sale => isWithinInterval(sale.createdAt, range));
-        const expensesInRange = initialExpenses.filter(expense => isWithinInterval(expense.paymentDate, range));
-        const repairsInRange = initialRepairs.filter(repair => repair.completedAt && isWithinInterval(repair.completedAt, range));
-
-        let salesRevenue = 0;
-        let salesCost = 0;
-        let ownProductsRevenue = 0;
-        let consignaProductsRevenue = 0;
-        let ownProductsProfit = 0;
-        let consignaProductsProfit = 0;
-
-        salesInRange.forEach(sale => {
-            salesRevenue += sale.totalAmount;
-            sale.items.forEach(item => {
-                const product = initialProducts.find(p => p.id === item.productId);
-                const cost = product?.cost || 0;
-                const itemRevenue = item.priceAtSale * item.quantity;
-                const itemProfit = itemRevenue - (cost * item.quantity);
-                salesCost += cost * item.quantity;
-
-                if (product?.ownershipType === 'Consigna') {
-                    consignaProductsRevenue += itemRevenue;
-                    consignaProductsProfit += itemProfit;
-                } else {
-                    ownProductsRevenue += itemRevenue;
-                    ownProductsProfit += itemProfit;
-                }
-            });
-        });
-
-        const repairsRevenue = repairsInRange.reduce((sum, repair) => sum + repair.totalPrice, 0);
-        const repairsProfit = repairsInRange.reduce((sum, repair) => sum + repair.profit, 0);
-
-        const totalRevenue = salesRevenue + repairsRevenue;
-        
-        const operationalExpenses = expensesInRange.reduce((sum, expense) => sum + expense.amount, 0);
-        const totalCost = salesCost + repairsInRange.reduce((sum, r) => sum + r.totalCost, 0) + operationalExpenses;
-
-        const netProfit = totalRevenue - totalCost;
-        const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-        
-        const averageTicket = salesInRange.length > 0 ? salesRevenue / salesInRange.length : 0;
-
-        const soldQuantities = new Map<string, number>();
-        salesInRange.forEach(sale => {
-            sale.items.forEach(item => {
-                soldQuantities.set(item.productId, (soldQuantities.get(item.productId) || 0) + item.quantity);
-            });
-        });
-
-        const lowRotationProducts = initialProducts
-            .filter(p => p.type === 'Venta')
-            .map(p => ({ ...p, sold: soldQuantities.get(p.id) || 0 }))
-            .sort((a,b) => a.sold - b.sold)
-            .slice(0, 3);
-        
-        const dailyData: Record<string, { revenue: number, profit: number }> = {};
-        
-        salesInRange.forEach(sale => {
-            const date = format(sale.createdAt, 'yyyy-MM-dd');
-            if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
-            
-            const saleCost = sale.items.reduce((sum, item) => {
-                const product = initialProducts.find(p => p.id === item.productId);
-                return sum + ((product?.cost || 0) * item.quantity);
-            }, 0);
-
-            dailyData[date].revenue += sale.totalAmount;
-            dailyData[date].profit += (sale.totalAmount - saleCost);
-        });
-
-        repairsInRange.forEach(repair => {
-             if (!repair.completedAt) return;
-             const date = format(repair.completedAt, 'yyyy-MM-dd');
-             if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
-             dailyData[date].revenue += repair.totalPrice;
-             dailyData[date].profit += repair.profit;
-        });
-
-        expensesInRange.forEach(expense => {
-            const date = format(expense.paymentDate, 'yyyy-MM-dd');
-            if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
-            dailyData[date].profit -= expense.amount;
-        });
-        
-        const chartData = Object.entries(dailyData)
-            .map(([date, values]) => ({
-                date: format(parseISO(date), 'dd MMM'),
-                Ingresos: values.revenue,
-                Ganancias: values.profit
-            }))
-            .sort((a,b) => a.date.localeCompare(b.date));
-
-        const revenueBreakdown = [
-            { name: "Ventas Propias", Ingresos: ownProductsRevenue, Ganancia: ownProductsProfit, Costo: ownProductsRevenue - ownProductsProfit },
-            { name: "Consigna", Ingresos: consignaProductsRevenue, Ganancia: consignaProductsProfit, Costo: consignaProductsRevenue - consignaProductsProfit },
-            { name: "Reparaciones", Ingresos: repairsRevenue, Ganancia: repairsProfit, Costo: repairsRevenue - repairsProfit },
-        ];
-        
-        const customerVisits = new Map<string, number>();
-        salesInRange.forEach(sale => {
-            if (sale.customerPhone) {
-                customerVisits.set(sale.customerPhone, (customerVisits.get(sale.customerPhone) || 0) + 1);
-            }
-        });
-
-        let newCustomers = 0;
-        let recurrentCustomers = 0;
-        customerVisits.forEach(count => {
-            if (count === 1) newCustomers++;
-            else recurrentCustomers++;
-        });
-
-        const customerAnalysis = {
-            new: newCustomers,
-            recurrent: recurrentCustomers,
-            chartData: [
-                { name: 'Nuevos', value: newCustomers },
-                { name: 'Recurrentes', value: recurrentCustomers },
-            ]
-        };
-
-
-        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts, chartData, revenueBreakdown, customerAnalysis };
-
-    }, [dateRange, initialSales, initialExpenses, initialRepairs, initialProducts]);
+        customerAnalysis,
+        heatmapData
+     } = useMemo(() => calculateMetrics(initialSales, initialExpenses, initialRepairs, initialProducts, dateRange), [dateRange, initialSales, initialExpenses, initialRepairs, initialProducts]);
 
     const inventoryValue = useMemo(() => initialProducts.reduce((sum, p) => sum + (p.stock * p.cost), 0), [initialProducts]);
 
@@ -303,26 +303,38 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                            </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Desglose de Ingresos por Categoría</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-80 w-full rounded-md">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={revenueBreakdown} layout="vertical" margin={{ left: 20, right: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={(value) => `$${value/1000}k`} />
-                                        <YAxis type="category" dataKey="name" width={100} />
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                        <Legend />
-                                        <Bar dataKey="Ganancia" stackId="a" fill="#16a34a" name="Ganancia" />
-                                        <Bar dataKey="Costo" stackId="a" fill="#e2e8f0" name="Costo" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>Desglose de Ingresos por Categoría</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-80 w-full rounded-md">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={revenueBreakdown} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis type="number" tickFormatter={(value) => `$${value/1000}k`} />
+                                            <YAxis type="category" dataKey="name" width={100} />
+                                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                            <Legend />
+                                            <Bar dataKey="Ganancia" stackId="a" fill="#16a34a" name="Ganancia" />
+                                            <Bar dataKey="Costo" stackId="a" fill="#e2e8f0" name="Costo" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Mapa de Calor de Horas Pico</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <PeakHoursHeatmap data={heatmapData} />
+                            </CardContent>
+                        </Card>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card>
                             <CardHeader>
@@ -391,3 +403,5 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 };
 
 export default FinanceDashboard;
+
+    
