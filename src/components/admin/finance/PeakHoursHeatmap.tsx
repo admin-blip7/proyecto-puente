@@ -13,7 +13,7 @@ interface HeatmapProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0];
-    const day = data.payload.name;
+    const day = data.dataKey;
     const hour = label;
     const value = data.value;
     
@@ -30,8 +30,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const getColor = (value: number, max: number) => {
     if (value === 0) return 'hsl(var(--muted))';
     const intensity = Math.min(value / (max * 0.8), 1); // Cap intensity to make high values more visible
-    // Interpolate between a muted blue and the primary color
-    const h = 240 + (308 - 240) * intensity;
+    // Interpolate from muted to primary
+    const h = 232 + (308 - 232) * intensity;
     const s = 30 + (100 - 30) * intensity;
     const l = 15 + (47 - 15) * intensity;
     return `hsl(${h}, ${s}%, ${l}%)`;
@@ -45,15 +45,22 @@ export default function PeakHoursHeatmap({ data }: HeatmapProps) {
   const maxValue = Math.max(...data.flatMap(d => days.map(day => d[day] || 0)));
 
   return (
-    <div style={{ width: '100%', height: 400 }}>
+    <div style={{ width: '100%', height: 320 }}>
         <ResponsiveContainer>
             <BarChart
                 data={data}
+                margin={{ top: 5, right: 0, left: -20, bottom: 5 }}
                 layout="vertical"
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
-                <XAxis type="category" dataKey="hour" axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" hide />
+                <XAxis type="number" hide />
+                <YAxis 
+                    type="category" 
+                    dataKey="hour" 
+                    tickLine={false} 
+                    axisLine={false} 
+                    interval={2}
+                    tick={{ fontSize: 12 }}
+                />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.1)' }} />
                 
                 {days.map((day, index) => (

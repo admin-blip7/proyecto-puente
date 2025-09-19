@@ -151,7 +151,9 @@ const calculateMetrics = (
         chartData: [ { name: 'Nuevos', value: newCustomers }, { name: 'Recurrentes', value: recurrentCustomers } ]
     };
     
-    const activityByHour: Record<string, number>[] = Array(7).fill(0).map(() => ({}));
+    const activityByHour: Record<number, Record<number, number>> = {};
+    for (let i = 0; i < 7; i++) activityByHour[i] = {};
+
     [...salesInRange, ...repairsInRange].forEach(transaction => {
         const date = 'createdAt' in transaction ? transaction.createdAt : transaction.completedAt!;
         const day = (getDay(date) + 6) % 7; // Monday = 0
