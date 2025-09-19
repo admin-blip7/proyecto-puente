@@ -101,7 +101,8 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         averageTicket,
         lowRotationProducts,
         chartData,
-        revenueBreakdown
+        revenueBreakdown,
+        customerAnalysis
      } = useMemo(() => {
         const range = {
             start: dateRange?.from || new Date(0),
@@ -206,9 +207,32 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
             { name: "Consigna", Ingresos: consignaProductsRevenue, Ganancia: consignaProductsProfit, Costo: consignaProductsRevenue - consignaProductsProfit },
             { name: "Reparaciones", Ingresos: repairsRevenue, Ganancia: repairsProfit, Costo: repairsRevenue - repairsProfit },
         ];
+        
+        const customerVisits = new Map<string, number>();
+        salesInRange.forEach(sale => {
+            if (sale.customerPhone) {
+                customerVisits.set(sale.customerPhone, (customerVisits.get(sale.customerPhone) || 0) + 1);
+            }
+        });
+
+        let newCustomers = 0;
+        let recurrentCustomers = 0;
+        customerVisits.forEach(count => {
+            if (count === 1) newCustomers++;
+            else recurrentCustomers++;
+        });
+
+        const customerAnalysis = {
+            new: newCustomers,
+            recurrent: recurrentCustomers,
+            chartData: [
+                { name: 'Nuevos', value: newCustomers },
+                { name: 'Recurrentes', value: recurrentCustomers },
+            ]
+        };
 
 
-        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts, chartData, revenueBreakdown };
+        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts, chartData, revenueBreakdown, customerAnalysis };
 
     }, [dateRange, initialSales, initialExpenses, initialRepairs, initialProducts]);
 
@@ -322,12 +346,22 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                                 <CardTitle>Análisis de Clientes (CRM)</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Nuevos vs Recurrentes</span> <span className="font-bold">N/A</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Ticket Promedio</span> <span className="font-bold">{formatCurrency(averageTicket)}</span></div>
-                                   {/* Placeholder for chart */}
-                                   <div className="h-24 w-full bg-muted rounded-md flex items-center justify-center">
-                                     <p className="text-muted-foreground text-xs">Gráfico de Clientes</p>
-                                   </div>
+                                 <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Nuevos vs Recurrentes</span> 
+                                    <span className="font-bold">{customerAnalysis.new} Nuevos / {customerAnalysis.recurrent} Rec.</span>
+                                </div>
+                                <div className="flex justify-between items-center"><span className="text-muted-foreground">Ticket Promedio</span> <span className="font-bold">{formatCurrency(averageTicket)}</span></div>
+                                <div className="h-24 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={customerAnalysis.chartData} layout="vertical" margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
+                                            <XAxis type="number" hide />
+                                            <YAxis type="category" dataKey="name" hide />
+                                            <Tooltip formatter={(value, name) => [value, name === 'new' ? 'Nuevos' : 'Recurrentes']} />
+                                            <Bar dataKey="value" name="Nuevos" fill="#8884d8" stackId="a" />
+                                            <Bar dataKey="value" name="Recurrentes" fill="#82ca9d" stackId="a" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
