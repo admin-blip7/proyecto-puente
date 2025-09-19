@@ -16,13 +16,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart as LineChartIcon } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart as BarChartIcon, LineChart as LineChartIcon } from "lucide-react";
 import StatCard from "./StatCard";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { DatePickerWithRange } from "./DatePickerWithRange";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from 'recharts';
 
 interface FinanceDashboardProps {
   initialExpenses: Expense[];
@@ -244,7 +244,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                 <StatCard title="Ganancia Neta" value={formatCurrency(netProfit)} icon={TrendingUp} description="Ganancia después de todos los costos." isPrimary />
                 <StatCard title="Ingresos Totales" value={formatCurrency(totalRevenue)} icon={DollarSign} />
                 <StatCard title="Costos Totales" value={formatCurrency(totalCost)} icon={TrendingDown} />
-                <StatCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart} />
+                <StatCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChartIcon} />
             </div>
 
             {/* Main Content */}
@@ -286,7 +286,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                         <CardContent>
                             <div className="h-80 w-full rounded-md">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <RechartsPrimitive.BarChart data={revenueBreakdown} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                    <BarChart data={revenueBreakdown} layout="vertical" margin={{ left: 20, right: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis type="number" tickFormatter={(value) => `$${value/1000}k`} />
                                         <YAxis type="category" dataKey="name" width={100} />
@@ -294,7 +294,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                                         <Legend />
                                         <Bar dataKey="Ganancia" stackId="a" fill="#16a34a" name="Ganancia" />
                                         <Bar dataKey="Costo" stackId="a" fill="#e2e8f0" name="Costo" />
-                                    </RechartsPrimitive.BarChart>
+                                    </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </CardContent>
