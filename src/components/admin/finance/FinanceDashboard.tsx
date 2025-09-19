@@ -6,7 +6,7 @@ import { useState, useMemo, FC } from "react";
 import { Expense, Sale, RepairOrder, Product, Consignor, ConsignorPayment, CashSession, Account } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, subMonths, startOfYear, isWithinInterval } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, isWithinInterval, format, parseISO } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -16,12 +16,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart as LineChartIcon } from "lucide-react";
 import StatCard from "./StatCard";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { DatePickerWithRange } from "./DatePickerWithRange";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface FinanceDashboardProps {
   initialExpenses: Expense[];
@@ -100,10 +101,11 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         salesInRange,
         averageTicket,
         lowRotationProducts,
+        chartData
      } = useMemo(() => {
         const range = {
             start: dateRange?.from || new Date(0),
-            end: dateRange?.to || new Date(),
+            end: dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : new Date(),
         };
 
         const salesInRange = initialSales.filter(sale => isWithinInterval(sale.createdAt, range));
@@ -141,9 +143,46 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
             .map(p => ({ ...p, sold: soldQuantities.get(p.id) || 0 }))
             .sort((a,b) => a.sold - b.sold)
             .slice(0, 3);
+        
+        const dailyData: Record<string, { revenue: number, profit: number }> = {};
+        
+        salesInRange.forEach(sale => {
+            const date = format(sale.createdAt, 'yyyy-MM-dd');
+            if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+            
+            const saleCost = sale.items.reduce((sum, item) => {
+                const product = initialProducts.find(p => p.id === item.productId);
+                return sum + ((product?.cost || 0) * item.quantity);
+            }, 0);
+
+            dailyData[date].revenue += sale.totalAmount;
+            dailyData[date].profit += (sale.totalAmount - saleCost);
+        });
+
+        repairsInRange.forEach(repair => {
+             if (!repair.completedAt) return;
+             const date = format(repair.completedAt, 'yyyy-MM-dd');
+             if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+             dailyData[date].revenue += repair.totalPrice;
+             dailyData[date].profit += repair.profit;
+        });
+
+        expensesInRange.forEach(expense => {
+            const date = format(expense.paymentDate, 'yyyy-MM-dd');
+            if (!dailyData[date]) dailyData[date] = { revenue: 0, profit: 0 };
+            dailyData[date].profit -= expense.amount;
+        });
+        
+        const chartData = Object.entries(dailyData)
+            .map(([date, values]) => ({
+                date: format(parseISO(date), 'dd MMM'),
+                Ingresos: values.revenue,
+                Ganancias: values.profit
+            }))
+            .sort((a,b) => a.date.localeCompare(b.date));
 
 
-        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts };
+        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts, chartData };
 
     }, [dateRange, initialSales, initialExpenses, initialRepairs, initialProducts]);
 
@@ -191,9 +230,26 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                             <CardTitle>Desglose de Ingresos y Ganancias</CardTitle>
                         </CardHeader>
                         <CardContent>
-                           {/* Placeholder for chart */}
-                           <div className="h-60 w-full bg-muted rounded-md flex items-center justify-center">
-                             <p className="text-muted-foreground">Gráfico de Ingresos aquí</p>
+                           <div className="h-80 w-full rounded-md">
+                             <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                data={chartData}
+                                margin={{
+                                    top: 5,
+                                    right: 20,
+                                    left: -10,
+                                    bottom: 5,
+                                }}
+                                >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis tickFormatter={(value) => `$${value/1000}k`} />
+                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                <Legend />
+                                <Line type="monotone" dataKey="Ingresos" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="Ganancias" stroke="#16a34a" strokeWidth={2} dot={false}/>
+                                </LineChart>
+                            </ResponsiveContainer>
                            </div>
                         </CardContent>
                     </Card>
