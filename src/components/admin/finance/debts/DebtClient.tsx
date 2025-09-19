@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -108,7 +109,7 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                     <h2 className="text-xl font-semibold mb-2">Tarjetas de Crédito</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {creditCardDebts.map(debt => {
-                            const usage = debt.totalLimit ? (debt.currentBalance / debt.totalLimit) * 100 : 0;
+                            const usage = debt.totalLimit && debt.totalLimit > 0 ? (debt.currentBalance / debt.totalLimit) * 100 : 0;
                             return (
                                 <Card key={debt.id}>
                                     <CardHeader className='flex-row items-center justify-between pb-2'>
@@ -232,3 +233,5 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
         </>
     )
 }
+
+  
