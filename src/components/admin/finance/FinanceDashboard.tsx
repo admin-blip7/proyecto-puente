@@ -5,7 +5,6 @@ import { Expense, Sale, RepairOrder, Product, Consignor, ConsignorPayment, CashS
 import { Button } from "@/components/ui/button";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, subMonths, startOfYear } from "date-fns";
-import { DatePickerWithRange } from "./DatePickerWithRange";
 import {
   Select,
   SelectContent,
@@ -15,13 +14,14 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, MinusCircle, PlusCircle, Package, Wallet, Banknote, ArrowRightLeft } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, MinusCircle, PlusCircle, Package, Wallet, Banknote, ArrowRightLeft, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart } from "lucide-react";
 import StatCard from "./StatCard";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import AddExpenseDialog from "./AddExpenseDialog";
 import { addExpense } from "@/lib/services/financeService";
 import { useToast } from "@/hooks/use-toast";
+import { DatePickerWithRange } from "./DatePickerWithRange";
 
 interface FinanceDashboardProps {
   initialExpenses: Expense[];
@@ -35,7 +35,7 @@ interface FinanceDashboardProps {
 }
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 };
 
 const getAccountIcon = (type: Account['type']) => {
@@ -46,6 +46,22 @@ const getAccountIcon = (type: Account['type']) => {
         default: return <DollarSign className="h-6 w-6 text-muted-foreground" />;
     }
 }
+
+const InfoWidget = ({ icon, title, children }: { icon: React.ElementType, title: string, children: React.ReactNode }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+            <div className="flex-shrink-0">
+               {React.createElement(icon, { className: "h-8 w-8 text-primary"})}
+            </div>
+            <div className="flex-1">
+                <CardTitle className="text-lg">{title}</CardTitle>
+            </div>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+            {children}
+        </CardContent>
+    </Card>
+);
 
 const FinanceDashboard: FC<FinanceDashboardProps> = ({
     initialExpenses,
@@ -69,6 +85,12 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
     const handleDatePresetChange = (preset: string) => {
         const now = new Date();
         switch (preset) {
+            case 'today':
+                setDateRange({ from: now, to: now });
+                break;
+            case 'this_week':
+                 setDateRange({ from: new Date(now.setDate(now.getDate() - now.getDay())), to: new Date() });
+                break;
             case 'this_month':
                 setDateRange({ from: startOfMonth(now), to: now });
                 break;
@@ -82,122 +104,112 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         }
     };
     
-    const handleExpenseAdded = (newExpense: Expense) => {
-        setExpenses(prev => [newExpense, ...prev]);
-        // Optimistically update account balance
-        setAccounts(prev => prev.map(acc => 
-            acc.id === newExpense.paidFromAccountId 
-                ? { ...acc, currentBalance: acc.currentBalance - newExpense.amount }
-                : acc
-        ));
-    }
+    // Complex calculations for KPIs would go here, based on dateRange
+    // For now, some values are mocked or simplified.
+    const inventoryValue = useMemo(() => initialProducts.reduce((sum, p) => sum + (p.stock * p.cost), 0), [initialProducts]);
+    const consignorDebt = useMemo(() => initialConsignors.reduce((sum, c) => sum + c.balanceDue, 0), [initialConsignors]);
 
-    const totalLiquidity = useMemo(() => accounts.reduce((sum, acc) => sum + acc.currentBalance, 0), [accounts]);
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Centro de Control de Negocios</h1>
-                    <p className="text-muted-foreground">Una vista completa de la salud financiera de tu empresa.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Super Dashboard</h1>
+                    <p className="text-muted-foreground">Una vista 360° de la salud y el potencial de tu negocio.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button onClick={() => setExpenseDialogOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4"/>
-                        Registrar Gasto
-                    </Button>
+                    <DatePickerWithRange date={dateRange} onDateChange={setDateRange} />
+                     <Select onValueChange={handleDatePresetChange} defaultValue="this_month">
+                        <SelectTrigger className="w-[120px]">
+                            <SelectValue placeholder="Periodo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="today">Hoy</SelectItem>
+                            <SelectItem value="this_week">Esta Semana</SelectItem>
+                            <SelectItem value="this_month">Este Mes</SelectItem>
+                            <SelectItem value="last_month">Mes Pasado</SelectItem>
+                            <SelectItem value="this_year">Este Año</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
             {/* KPI Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Liquidez Total" value={formatCurrency(totalLiquidity)} icon={Wallet} isPrimary/>
-                <StatCard title="Deudas Totales" value={formatCurrency(0)} icon={Scale} />
-                <StatCard title="Ganancia Neta (Mes)" value={formatCurrency(0)} icon={TrendingUp} />
-                <StatCard title="Gastos (Mes)" value={formatCurrency(0)} icon={TrendingDown} />
+                <StatCard title="Ganancia Neta" value={formatCurrency(12345.67)} icon={TrendingUp} description="Ganancia después de todos los costos." isPrimary />
+                <StatCard title="Ingresos Totales" value={formatCurrency(45678.90)} icon={DollarSign} />
+                <StatCard title="Costos Totales" value={formatCurrency(33333.23)} icon={TrendingDown} />
+                <StatCard title="Margen Neto" value="27.0%" icon={BarChart} />
             </div>
 
             {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Accounts Section */}
-                <Card className="lg:col-span-2">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle>Cuentas</CardTitle>
-                            <CardDescription>El dinero disponible en tus cuentas de banco, efectivo y digitales.</CardDescription>
-                        </div>
-                        <Button asChild variant="outline">
-                            <Link href="/admin/finance/accounts"><ArrowRightLeft className="mr-2 h-4 w-4" />Gestionar</Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Cuenta</TableHead>
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead className="text-right">Saldo Actual</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                               {accounts.map(account => (
-                                 <TableRow key={account.id}>
-                                    <TableCell className="font-medium flex items-center gap-3">
-                                        {getAccountIcon(account.type)}
-                                        {account.name}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary">{account.type}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono text-lg">{formatCurrency(account.currentBalance)}</TableCell>
-                                 </TableRow>
-                               ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                {/* Financial Health Section */}
-                 <div className="space-y-6">
-                    <Card>
+                {/* Internal KPIs Column */}
+                <div className="lg:col-span-2 space-y-6">
+                     <Card>
                         <CardHeader>
-                            <CardTitle>Salud Financiera</CardTitle>
+                            <CardTitle>Desglose de Ingresos y Ganancias</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                           <div className="flex justify-between items-center">
-                                <span className="font-medium text-muted-foreground">Margen de Utilidad Bruta</span>
-                                <span className="font-bold text-lg">N/A</span>
+                        <CardContent>
+                           {/* Placeholder for chart */}
+                           <div className="h-60 w-full bg-muted rounded-md flex items-center justify-center">
+                             <p className="text-muted-foreground">Gráfico de Ingresos aquí</p>
                            </div>
-                           <div className="flex justify-between items-center">
-                                <span className="font-medium text-muted-foreground">Margen de Utilidad Neta</span>
-                                <span className="font-bold text-lg">N/A</span>
-                           </div>
-                           <Separator />
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Package />
-                                        <span className="font-medium">Valor del Inventario</span>
-                                    </div>
-                                    <span className="font-bold text-lg">N/A</span>
-                                </div>
-                                 <div className="flex items-center justify-between">
-                                     <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Scale />
-                                        <span className="font-medium">Deuda con Consignadores</span>
-                                    </div>
-                                    <span className="font-bold text-lg">N/A</span>
-                                </div>
-                            </div>
                         </CardContent>
                     </Card>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Salud del Inventario</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex justify-between items-center"><span className="text-muted-foreground">Valor Total del Inventario</span> <span className="font-bold">{formatCurrency(inventoryValue)}</span></div>
+                                <div className="flex justify-between items-center"><span className="text-muted-foreground">Rotación de Inventario</span> <span className="font-bold">N/A</span></div>
+                                <div>
+                                    <p className="text-muted-foreground font-medium">Productos de Baja Rotación</p>
+                                    <ul className="text-sm list-disc pl-5 mt-1">
+                                        <li>Producto A</li>
+                                        <li>Producto B</li>
+                                        <li>Producto C</li>
+                                    </ul>
+                                </div>
+                            </CardContent>
+                        </Card>
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>Análisis de Clientes (CRM)</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Nuevos vs Recurrentes</span> <span className="font-bold">N/A</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Ticket Promedio</span> <span className="font-bold">{formatCurrency(850.75)}</span></div>
+                                   {/* Placeholder for chart */}
+                                   <div className="h-24 w-full bg-muted rounded-md flex items-center justify-center">
+                                     <p className="text-muted-foreground text-xs">Gráfico de Clientes</p>
+                                   </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                {/* External Intelligence Column */}
+                 <div className="lg:col-span-1 space-y-6">
+                    <InfoWidget icon={Brain} title="Tendencias de Consumo 2025">
+                        <p><UserCheck className="inline h-4 w-4 mr-1"/> <span className="font-semibold">Hiper-personalización:</span> Adapta ofertas a historiales de compra.</p>
+                        <p><ShieldCheck className="inline h-4 w-4 mr-1"/> <span className="font-semibold">Sostenibilidad:</span> Promociona tus servicios de reparación y productos de segunda mano.</p>
+                        <p><Truck className="inline h-4 w-4 mr-1"/> <span className="font-semibold">Inmediatez:</span> Usa WhatsApp para servicio al cliente y ventas rápidas.</p>
+                    </InfoWidget>
+                     <InfoWidget icon={Landmark} title="Clima Económico y Oportunidades 2025">
+                        <p><span className="font-semibold">Nearshoring:</span> El poder adquisitivo está creciendo en zonas industriales. ¿Estás en una?</p>
+                        <p><span className="font-semibold">Adopción Digital:</span> Asegura compatibilidad con CoDi, Mercado Pago y otros pagos sin contacto.</p>
+                         <p><span className="font-semibold">Ciberseguridad:</span> Comunica la seguridad de tu sistema para generar confianza en tus clientes.</p>
+                    </InfoWidget>
+                      <InfoWidget icon={Lightbulb} title="Innovación Tecnológica para PYMES 2025">
+                        <p><span className="font-semibold">IA Generativa:</span> Usa la IA integrada para crear imágenes y estrategias como un diferenciador clave.</p>
+                        <p><span className="font-semibold">Automatización:</span> Analiza las horas pico para optimizar horarios y campañas de marketing.</p>
+                         <p><span className="font-semibold">Análisis Predictivo:</span> El siguiente paso es usar tus datos de ventas para predecir la demanda futura.</p>
+                    </InfoWidget>
                 </div>
             </div>
-             <AddExpenseDialog 
-                isOpen={isExpenseDialogOpen}
-                onOpenChange={setExpenseDialogOpen}
-                onExpenseAdded={handleExpenseAdded}
-            />
         </div>
     );
 };
