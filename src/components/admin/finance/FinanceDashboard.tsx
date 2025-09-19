@@ -357,5 +357,3 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 };
 
 export default FinanceDashboard;
-
-  
