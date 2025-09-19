@@ -13,9 +13,9 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
   const isOutOfStock = product.stock <= 0;
   
   const getStockColor = () => {
-    if (isOutOfStock) return "text-red-600";
+    if (isOutOfStock) return "text-destructive";
     if (product.reorderPoint && product.stock <= product.reorderPoint) return "text-yellow-600";
-    return "text-black";
+    return "text-foreground";
   }
 
   return (
