@@ -16,12 +16,10 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
-import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, MinusCircle, PlusCircle, Package, Wallet, Banknote, ArrowRightLeft, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Landmark, Scale, Brain, Lightbulb, UserCheck, ShieldCheck, Truck, BarChart, LineChart } from "lucide-react";
 import StatCard from "./StatCard";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import AddExpenseDialog from "./AddExpenseDialog";
-import { addExpense } from "@/lib/services/financeService";
 import { useToast } from "@/hooks/use-toast";
 import { DatePickerWithRange } from "./DatePickerWithRange";
 
@@ -40,14 +38,6 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 };
 
-const getAccountIcon = (type: Account['type']) => {
-    switch (type) {
-        case 'Banco': return <Landmark className="h-6 w-6 text-muted-foreground" />;
-        case 'Efectivo': return <Banknote className="h-6 w-6 text-muted-foreground" />;
-        case 'Billetera Digital': return <Wallet className="h-6 w-6 text-muted-foreground" />;
-        default: return <DollarSign className="h-6 w-6 text-muted-foreground" />;
-    }
-}
 
 const InfoWidget = ({ icon, title, children }: { icon: React.ElementType, title: string, children: React.ReactNode }) => (
     <Card>
@@ -79,10 +69,6 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         from: startOfMonth(new Date()),
         to: new Date(),
     });
-    const [accounts, setAccounts] = useState(initialAccounts);
-    const [expenses, setExpenses] = useState(initialExpenses);
-    const [isExpenseDialogOpen, setExpenseDialogOpen] = useState(false);
-    const { toast } = useToast();
 
     const handleDatePresetChange = (preset: string) => {
         const now = new Date();
@@ -106,14 +92,22 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         }
     };
     
-    const { totalRevenue, totalCost, netProfit, netMargin } = useMemo(() => {
+    const { 
+        totalRevenue, 
+        totalCost, 
+        netProfit, 
+        netMargin,
+        salesInRange,
+        averageTicket,
+        lowRotationProducts,
+     } = useMemo(() => {
         const range = {
             start: dateRange?.from || new Date(0),
             end: dateRange?.to || new Date(),
         };
 
         const salesInRange = initialSales.filter(sale => isWithinInterval(sale.createdAt, range));
-        const expensesInRange = expenses.filter(expense => isWithinInterval(expense.paymentDate, range));
+        const expensesInRange = initialExpenses.filter(expense => isWithinInterval(expense.paymentDate, range));
         const repairsInRange = initialRepairs.filter(repair => repair.completedAt && isWithinInterval(repair.completedAt, range));
 
         const salesRevenue = salesInRange.reduce((sum, sale) => sum + sale.totalAmount, 0);
@@ -133,13 +127,27 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 
         const netProfit = totalRevenue - totalCost;
         const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+        
+        const averageTicket = salesInRange.length > 0 ? totalRevenue / salesInRange.length : 0;
 
-        return { totalRevenue, totalCost, netProfit, netMargin };
+        const soldQuantities = new Map<string, number>();
+        salesInRange.forEach(sale => {
+            sale.items.forEach(item => {
+                soldQuantities.set(item.productId, (soldQuantities.get(item.productId) || 0) + item.quantity);
+            });
+        });
 
-    }, [dateRange, initialSales, expenses, initialRepairs, initialProducts]);
+        const lowRotationProducts = initialProducts
+            .map(p => ({ ...p, sold: soldQuantities.get(p.id) || 0 }))
+            .sort((a,b) => a.sold - b.sold)
+            .slice(0, 3);
+
+
+        return { totalRevenue, totalCost, netProfit, netMargin, salesInRange, averageTicket, lowRotationProducts };
+
+    }, [dateRange, initialSales, initialExpenses, initialRepairs, initialProducts]);
 
     const inventoryValue = useMemo(() => initialProducts.reduce((sum, p) => sum + (p.stock * p.cost), 0), [initialProducts]);
-    const consignorDebt = useMemo(() => initialConsignors.reduce((sum, c) => sum + c.balanceDue, 0), [initialConsignors]);
 
 
     return (
@@ -199,10 +207,10 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Rotación de Inventario</span> <span className="font-bold">N/A</span></div>
                                 <div>
                                     <p className="text-muted-foreground font-medium">Productos de Baja Rotación</p>
-                                    <ul className="text-sm list-disc pl-5 mt-1">
-                                        <li>Producto A</li>
-                                        <li>Producto B</li>
-                                        <li>Producto C</li>
+                                     <ul className="text-sm list-disc pl-5 mt-1">
+                                        {lowRotationProducts.map(p => (
+                                            <li key={p.id}>{p.name} <span className="text-muted-foreground">({p.sold} vendidos)</span></li>
+                                        ))}
                                     </ul>
                                 </div>
                             </CardContent>
@@ -213,7 +221,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                             </CardHeader>
                             <CardContent className="space-y-4">
                                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Nuevos vs Recurrentes</span> <span className="font-bold">N/A</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Ticket Promedio</span> <span className="font-bold">{formatCurrency(850.75)}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Ticket Promedio</span> <span className="font-bold">{formatCurrency(averageTicket)}</span></div>
                                    {/* Placeholder for chart */}
                                    <div className="h-24 w-full bg-muted rounded-md flex items-center justify-center">
                                      <p className="text-muted-foreground text-xs">Gráfico de Clientes</p>
