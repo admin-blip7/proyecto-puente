@@ -6,7 +6,7 @@ import { useState, useMemo, FC } from "react";
 import { Expense, Sale, RepairOrder, Product, Consignor, ConsignorPayment, CashSession, Account } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, subMonths, startOfYear } from "date-fns";
+import { startOfMonth, subMonths, startOfYear, isWithinInterval } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -106,8 +106,38 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
         }
     };
     
-    // Complex calculations for KPIs would go here, based on dateRange
-    // For now, some values are mocked or simplified.
+    const { totalRevenue, totalCost, netProfit, netMargin } = useMemo(() => {
+        const range = {
+            start: dateRange?.from || new Date(0),
+            end: dateRange?.to || new Date(),
+        };
+
+        const salesInRange = initialSales.filter(sale => isWithinInterval(sale.createdAt, range));
+        const expensesInRange = expenses.filter(expense => isWithinInterval(expense.paymentDate, range));
+        const repairsInRange = initialRepairs.filter(repair => repair.completedAt && isWithinInterval(repair.completedAt, range));
+
+        const salesRevenue = salesInRange.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        const repairsRevenue = repairsInRange.reduce((sum, repair) => sum + repair.totalPrice, 0);
+        const totalRevenue = salesRevenue + repairsRevenue;
+
+        const salesCost = salesInRange.reduce((sum, sale) => {
+            const saleCost = sale.items.reduce((itemSum, item) => {
+                const product = initialProducts.find(p => p.id === item.productId);
+                return itemSum + ((product?.cost || 0) * item.quantity);
+            }, 0);
+            return sum + saleCost;
+        }, 0);
+        const repairsCost = repairsInRange.reduce((sum, repair) => sum + repair.totalCost, 0);
+        const operationalExpenses = expensesInRange.reduce((sum, expense) => sum + expense.amount, 0);
+        const totalCost = salesCost + repairsCost + operationalExpenses;
+
+        const netProfit = totalRevenue - totalCost;
+        const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+        return { totalRevenue, totalCost, netProfit, netMargin };
+
+    }, [dateRange, initialSales, expenses, initialRepairs, initialProducts]);
+
     const inventoryValue = useMemo(() => initialProducts.reduce((sum, p) => sum + (p.stock * p.cost), 0), [initialProducts]);
     const consignorDebt = useMemo(() => initialConsignors.reduce((sum, c) => sum + c.balanceDue, 0), [initialConsignors]);
 
@@ -138,10 +168,10 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 
             {/* KPI Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Ganancia Neta" value={formatCurrency(12345.67)} icon={TrendingUp} description="Ganancia después de todos los costos." isPrimary />
-                <StatCard title="Ingresos Totales" value={formatCurrency(45678.90)} icon={DollarSign} />
-                <StatCard title="Costos Totales" value={formatCurrency(33333.23)} icon={TrendingDown} />
-                <StatCard title="Margen Neto" value="27.0%" icon={BarChart} />
+                <StatCard title="Ganancia Neta" value={formatCurrency(netProfit)} icon={TrendingUp} description="Ganancia después de todos los costos." isPrimary />
+                <StatCard title="Ingresos Totales" value={formatCurrency(totalRevenue)} icon={DollarSign} />
+                <StatCard title="Costos Totales" value={formatCurrency(totalCost)} icon={TrendingDown} />
+                <StatCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart} />
             </div>
 
             {/* Main Content */}
@@ -217,3 +247,5 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 };
 
 export default FinanceDashboard;
+
+    
