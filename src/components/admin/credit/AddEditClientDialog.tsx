@@ -132,16 +132,16 @@ export default function AddEditClientDialog({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh]">
+                <DialogHeader>
+                    <DialogTitle>{isEditMode ? "Editar Cliente a Crédito" : "Agregar Nuevo Cliente a Crédito"}</DialogTitle>
+                    <DialogDescription>
+                        {isEditMode ? "Modifica los detalles del cliente y su cuenta." : "Completa la información para crear un nuevo cliente y su línea de crédito."}
+                    </DialogDescription>
+                </DialogHeader>
+
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-grow min-h-0">
-                        <DialogHeader>
-                            <DialogTitle>{isEditMode ? "Editar Cliente a Crédito" : "Agregar Nuevo Cliente a Crédito"}</DialogTitle>
-                            <DialogDescription>
-                                {isEditMode ? "Modifica los detalles del cliente y su cuenta." : "Completa la información para crear un nuevo cliente y su línea de crédito."}
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <ScrollArea className="flex-grow min-h-0">
+                        <ScrollArea className="flex-grow">
                             <div className="space-y-4 py-4 pr-6">
                                 <h4 className="font-semibold text-lg">Información Personal</h4>
                                 <FormField name="name" control={form.control} render={({ field }) => (
