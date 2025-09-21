@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ClientProfile, Account } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, MoreHorizontal, Edit, DollarSign } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit, DollarSign, FileText, BarChart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { getCreditStatusVariant } from "@/lib/utils";
 import AddEditClientDialog from "./AddEditClientDialog";
 import AddCreditPaymentDialog from "./AddCreditPaymentDialog";
+import PaymentPlanDialog from "./PaymentPlanDialog";
+import GenerateContractDialog from "./GenerateContractDialog";
 
 interface CreditClientProps {
     initialClients: ClientProfile[];
@@ -22,6 +24,8 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
     const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
     const [isAddEditOpen, setAddEditOpen] = useState(false);
     const [isPaymentOpen, setPaymentOpen] = useState(false);
+    const [isPlanOpen, setPlanOpen] = useState(false);
+    const [isContractOpen, setContractOpen] = useState(false);
 
     const handleOpenAddDialog = () => {
         setSelectedClient(null);
@@ -36,6 +40,16 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
     const handleOpenPaymentDialog = (client: ClientProfile) => {
         setSelectedClient(client);
         setPaymentOpen(true);
+    }
+
+    const handleOpenPlanDialog = (client: ClientProfile) => {
+        setSelectedClient(client);
+        setPlanOpen(true);
+    }
+    
+    const handleOpenContractDialog = (client: ClientProfile) => {
+        setSelectedClient(client);
+        setContractOpen(true);
     }
 
     const handleClientAdded = (newClient: ClientProfile) => {
@@ -119,6 +133,14 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
                                                         <DollarSign className="mr-2 h-4 w-4" />
                                                         <span>Registrar Abono</span>
                                                     </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenPlanDialog(client)} disabled={!client.creditAccount || !client.creditAccount.interestRate}>
+                                                        <BarChart className="mr-2 h-4 w-4" />
+                                                        <span>Generar Plan de Pagos</span>
+                                                    </DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleOpenContractDialog(client)} disabled={!client.creditAccount}>
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        <span>Generar Contrato</span>
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleOpenEditDialog(client)}>
                                                         <Edit className="mr-2 h-4 w-4" />
                                                         <span>Editar Cliente</span>
@@ -143,6 +165,7 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
             />
 
             {selectedClient && selectedClient.creditAccount && (
+              <>
                 <AddCreditPaymentDialog
                     isOpen={isPaymentOpen}
                     onOpenChange={setPaymentOpen}
@@ -150,6 +173,17 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
                     accounts={initialAccounts}
                     onPaymentAdded={handlePaymentAdded}
                 />
+                <PaymentPlanDialog
+                    isOpen={isPlanOpen}
+                    onOpenChange={setPlanOpen}
+                    client={selectedClient}
+                />
+                 <GenerateContractDialog
+                    isOpen={isContractOpen}
+                    onOpenChange={setContractOpen}
+                    client={selectedClient}
+                />
+              </>
             )}
         </>
     );
