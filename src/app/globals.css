@@ -71,64 +71,54 @@ body {
   }
 }
 
-/*
- * ANULACIÓN DEL BLOQUEO DE SCROLL PARA MODALES
- *
- * Esta regla fuerza a que el área de scroll DENTRO de un diálogo
- * siempre pueda tener scroll, ganándole a la regla `!important` del body.
-*/
-body[data-scroll-locked="1"] [data-radix-dialog-content] [data-radix-scroll-area-viewport] {
+/* --- Hotfix global para TODOS los modales Radix/shadcn --- */
+
+/* 1) Estructura base: DialogContent en columna y con altura limitada al viewport dinámico */
+[data-radix-dialog-content] {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: calc(100dvh - 2rem) !important; /* deja margen con borde/padding */
+  contain: layout size style;
+}
+
+/* 2) Evita que header/footer se “estiren” y colapsen el body */
+[data-radix-dialog-content] > * {
+  flex-shrink: 0;
+}
+
+/* 3) Haz que el área principal scrollee.
+   Casos comunes legacy: el form directo, o un contenedor con clase "modal-body" o "content" */
+[data-radix-dialog-content] form,
+[data-radix-dialog-content] .modal-body,
+[data-radix-dialog-content] .content,
+[data-radix-dialog-content] main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;                 /* clave para permitir overflow en flex */
   overflow-y: auto !important;
-}
-
-/* --- Normalización base de layout/scroll --- */
-html, body {
-  height: 100%;
-}
-
-:root {
-  /* Evita saltos al aparecer scrollbars (Chrome/Edge/Firefox) */
-  scrollbar-gutter: stable both-edges;
-}
-
-/* iOS/Safari: asegura que el viewport dinámico se respete */
-@supports (height: 100dvh) {
-  .h-dvh {
-    height: 100dvh;
-  }
-}
-
-/* Clase util para contenedores scrolleables suaves en iOS */
-.ios-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
 }
 
-/* ---- Radix / shadcn: lock del body cuando el Dialog está abierto ----
-   El body queda sin scroll, pero habilitamos scroll DENTRO del contenido del Dialog.
-*/
+/* 4) Si algunos modales viejos metieron otro contenedor intermedio, dales min-height:0
+   para que no bloqueen el scroll del nieto */
+[data-radix-dialog-content] > .wrapper,
+[data-radix-dialog-content] > .container,
+[data-radix-dialog-content] > .body {
+  min-height: 0 !important;
+}
+
+/* 5) Body lock de Radix (no tocar), pero asegura scroll DENTRO del dialog */
 body[data-scroll-locked="1"] {
   overflow: hidden !important;
 }
 
-/* El viewport del contenido del Dialog debe poder scrollear */
-body[data-scroll-locked="1"] [data-radix-dialog-content] .dialog-scroll {
-  overflow-y: auto !important;
+/* 6) (Opcional) Si algún modal viejo usó ScrollArea y te chocaba:
+   deja que su viewport también pueda scrollear bajo el lock */
+body[data-scroll-locked="1"] [data-radix-scroll-area-viewport] {
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
-/* Asegura que el contenedor interno del Dialog no colapse tamaños */
-[data-radix-dialog-content] {
-  contain: layout size style;
-}
-
-/* Opcional: estilo de scrollbar (no obligatorio) */
-@supports selector(::-webkit-scrollbar) {
-  .dialog-scroll::-webkit-scrollbar {
-    width: 8px;
-  }
-  .dialog-scroll::-webkit-scrollbar-thumb {
-    background: rgba(120,120,120,.4);
-    border-radius: 4px;
-  }
-}
+/* 7) iOS: utilidades generales ya probadas */
+html, body { height: 100%; }
+:root { scrollbar-gutter: stable both-edges; }
