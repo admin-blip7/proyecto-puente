@@ -100,7 +100,7 @@ export default function AddEditClientDialog({
                     employmentInfo: client.employmentInfo,
                     creditLimit: client.creditAccount?.creditLimit,
                     paymentDueDate: client.creditAccount?.paymentDueDate,
-                    interestRate: client.creditAccount?.interestRate || 0,
+                    interestRate: client.creditAccount?.interestRate,
                 });
                 setIdPreview(client.documents?.idUrl);
             } else {
