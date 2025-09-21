@@ -127,16 +127,16 @@ export default function AddEditClientDialog({
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh]">
+                <DialogHeader className="flex-shrink-0">
                     <DialogTitle>{isEditMode ? "Editar Cliente a Crédito" : "Agregar Nuevo Cliente a Crédito"}</DialogTitle>
                     <DialogDescription>
                         {isEditMode ? "Modifica los detalles del cliente y su cuenta." : "Completa la información para crear un nuevo cliente y su línea de crédito."}
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)}>
-                        <ScrollArea className="max-h-[70vh] pr-6">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow overflow-hidden flex flex-col">
+                        <ScrollArea className="flex-grow pr-6 -mr-6">
                             <div className="space-y-4 py-4">
                                 <h4 className="font-semibold text-lg">Información Personal</h4>
                                 <FormField name="name" control={form.control} render={({ field }) => (
@@ -181,7 +181,7 @@ export default function AddEditClientDialog({
                                 )}/>
                             </div>
                         </ScrollArea>
-                        <DialogFooter className="pt-6 border-t">
+                        <DialogFooter className="pt-6 border-t flex-shrink-0">
                             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
                             <Button type="submit" disabled={loading}>
                                 {loading ? <><Loader2 className="animate-spin mr-2"/> Guardando...</> : (isEditMode ? "Guardar Cambios" : "Crear Cliente")}
