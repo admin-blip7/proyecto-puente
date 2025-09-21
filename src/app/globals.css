@@ -57,3 +57,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * ANULACIÓN DEL BLOQUEO DE SCROLL PARA MODALES
+ *
+ * Esta regla fuerza a que el área de scroll DENTRO de un diálogo
+ * siempre pueda tener scroll, ganándole a la regla `!important` del body.
+*/
+body[data-scroll-locked="1"] [data-radix-dialog-content] [data-radix-scroll-area-viewport] {
+  overflow-y: auto !important;
+}
