@@ -233,8 +233,8 @@ export default function EditRepairDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader className="flex-row items-center justify-between">
+      <DialogContent className="sm:max-w-4xl flex flex-col max-h-[90vh]">
+        <DialogHeader className="flex-row items-center justify-between flex-shrink-0 pr-6">
           <div>
             <DialogTitle>Orden de Reparación #{order.orderId}</DialogTitle>
             <DialogDescription>
@@ -258,172 +258,168 @@ export default function EditRepairDialog({
             </DropdownMenuContent>
           </DropdownMenu>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh]">
-          <div className="pr-6 py-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Columna de Info */}
-                <div className="space-y-4 md:col-span-1">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Cliente</p>
-                        <p className="font-semibold">{order.customerName} ({order.customerPhone})</p>
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Dispositivo</p>
-                        <p className="font-semibold">{order.deviceBrand} {order.deviceModel}</p>
-                        <p className="text-sm font-mono">{order.deviceSerialIMEI}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Fecha de Recepción</p>
-                        <p className="font-semibold">{format(order.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}</p>
-                    </div>
-                     <div>
-                        <p className="text-sm font-medium text-muted-foreground">Problema Reportado</p>
-                        <p className="text-sm bg-muted p-2 rounded-md">{order.reportedIssue}</p>
-                    </div>
-                </div>
 
-                 {/* Columna de Formulario y Refacciones */}
-                <div className="space-y-6 md:col-span-2">
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <FormField
-                            control={form.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Estado de la Reparación</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccione un estado..." />
-                                    </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                    {repairStatuses.map((status) => (
-                                        <SelectItem key={status} value={status}>
-                                        {status}
-                                        </SelectItem>
-                                    ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
+        <ScrollArea className="flex-grow pr-6 -mr-6">
+          <Form {...form}>
+            <form id="edit-repair-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Columna de Info */}
+                  <div className="space-y-4 md:col-span-1">
+                      <div>
+                          <p className="text-sm font-medium text-muted-foreground">Cliente</p>
+                          <p className="font-semibold">{order.customerName} ({order.customerPhone})</p>
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-muted-foreground">Dispositivo</p>
+                          <p className="font-semibold">{order.deviceBrand} {order.deviceModel}</p>
+                          <p className="text-sm font-mono">{order.deviceSerialIMEI}</p>
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-muted-foreground">Fecha de Recepción</p>
+                          <p className="font-semibold">{format(order.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}</p>
+                      </div>
+                       <div>
+                          <p className="text-sm font-medium text-muted-foreground">Problema Reportado</p>
+                          <p className="text-sm bg-muted p-2 rounded-md">{order.reportedIssue}</p>
+                      </div>
+                  </div>
 
-                             <FormField
-                                control={form.control}
-                                name="technicianNotes"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Notas del Técnico (Diagnóstico)</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                        placeholder="Diagnóstico, procedimiento realizado, etc."
-                                        className="resize-y"
-                                        rows={4}
-                                        {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                   {/* Columna de Formulario y Refacciones */}
+                  <div className="space-y-6 md:col-span-2">
+                      
+                              <FormField
+                              control={form.control}
+                              name="status"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Estado de la Reparación</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                      <SelectTrigger>
+                                          <SelectValue placeholder="Seleccione un estado..." />
+                                      </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                      {repairStatuses.map((status) => (
+                                          <SelectItem key={status} value={status}>
+                                          {status}
+                                          </SelectItem>
+                                      ))}
+                                      </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                              />
 
-                            <div className="border rounded-lg p-4 space-y-4">
-                                <h4 className="font-semibold text-lg">Refacciones y Costos</h4>
+                               <FormField
+                                  control={form.control}
+                                  name="technicianNotes"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                      <FormLabel>Notas del Técnico (Diagnóstico)</FormLabel>
+                                      <FormControl>
+                                          <Textarea
+                                          placeholder="Diagnóstico, procedimiento realizado, etc."
+                                          className="resize-y"
+                                          rows={4}
+                                          {...field}
+                                          />
+                                      </FormControl>
+                                      <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
 
-                                {order.partsUsed.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {order.partsUsed.map(part => (
-                                            <div key={part.productId} className="flex justify-between items-center text-sm">
-                                                <p>{part.name} (x{part.quantity})</p>
-                                                <p>${part.price.toFixed(2)}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground italic">No se han agregado refacciones.</p>
-                                )}
-                                <Command>
-                                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-full justify-start">
-                                                <PlusCircle className="mr-2 h-4 w-4" />
-                                                Agregar Refacción
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-                                            <CommandInput 
-                                                placeholder="Buscar refacción..."
-                                                value={searchQuery}
-                                                onValueChange={setSearchQuery}
-                                            />
-                                            <CommandList>
-                                                <CommandEmpty>No se encontraron refacciones.</CommandEmpty>
-                                                {filteredParts.map(part => (
-                                                    <CommandItem key={part.id} onSelect={() => handleSelectPart(part)} disabled={part.stock <= 0}>
-                                                        {part.name} (Stock: {part.stock})
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandList>
-                                        </PopoverContent>
-                                    </Popover>
-                                </Command>
-                                
-                                <FormField
-                                    control={form.control}
-                                    name="laborCost"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>Costo de Mano de Obra</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" step="0.01" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                
-                                <div className="space-y-2 text-sm font-medium">
-                                     <div className="flex justify-between">
-                                        <span>Subtotal Refacciones:</span>
-                                        <span>${(order.totalPrice - order.laborCost).toFixed(2)}</span>
-                                     </div>
-                                     <div className="flex justify-between">
-                                        <span>Mano de Obra:</span>
-                                        <span>${Number(watchedLaborCost || 0).toFixed(2)}</span>
-                                     </div>
-                                      <hr />
-                                     <div className="flex justify-between text-lg font-bold">
-                                        <span>Total a Cobrar:</span>
-                                        <span>${(order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)).toFixed(2)}</span>
-                                     </div>
-                                     <div className="flex justify-between text-xs text-green-600">
-                                        <span>Ganancia Estimada:</span>
-                                        <span>${((order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)) - order.totalCost).toFixed(2)}</span>
-                                     </div>
-                                </div>
+                              <div className="border rounded-lg p-4 space-y-4">
+                                  <h4 className="font-semibold text-lg">Refacciones y Costos</h4>
 
-
-                            </div>
-                            
-                            <DialogFooter>
-                            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading ? <><Loader2 className="animate-spin mr-2"/> Actualizando...</> : "Guardar Cambios"}
-                            </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </div>
-            </div>
-
-            
-          </div>
+                                  {order.partsUsed.length > 0 ? (
+                                      <div className="space-y-2">
+                                          {order.partsUsed.map(part => (
+                                              <div key={part.productId} className="flex justify-between items-center text-sm">
+                                                  <p>{part.name} (x{part.quantity})</p>
+                                                  <p>${part.price.toFixed(2)}</p>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  ) : (
+                                      <p className="text-sm text-muted-foreground italic">No se han agregado refacciones.</p>
+                                  )}
+                                  <Command>
+                                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                                          <PopoverTrigger asChild>
+                                              <Button variant="outline" className="w-full justify-start">
+                                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                                  Agregar Refacción
+                                              </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                                              <CommandInput 
+                                                  placeholder="Buscar refacción..."
+                                                  value={searchQuery}
+                                                  onValueChange={setSearchQuery}
+                                              />
+                                              <CommandList>
+                                                  <CommandEmpty>No se encontraron refacciones.</CommandEmpty>
+                                                  {filteredParts.map(part => (
+                                                      <CommandItem key={part.id} onSelect={() => handleSelectPart(part)} disabled={part.stock <= 0}>
+                                                          {part.name} (Stock: {part.stock})
+                                                      </CommandItem>
+                                                  ))}
+                                              </CommandList>
+                                          </PopoverContent>
+                                      </Popover>
+                                  </Command>
+                                  
+                                  <FormField
+                                      control={form.control}
+                                      name="laborCost"
+                                      render={({ field }) => (
+                                          <FormItem>
+                                          <FormLabel>Costo de Mano de Obra</FormLabel>
+                                          <FormControl>
+                                              <Input type="number" step="0.01" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                          </FormItem>
+                                      )}
+                                  />
+                                  
+                                  <div className="space-y-2 text-sm font-medium">
+                                       <div className="flex justify-between">
+                                          <span>Subtotal Refacciones:</span>
+                                          <span>${(order.totalPrice - order.laborCost).toFixed(2)}</span>
+                                       </div>
+                                       <div className="flex justify-between">
+                                          <span>Mano de Obra:</span>
+                                          <span>${Number(watchedLaborCost || 0).toFixed(2)}</span>
+                                       </div>
+                                        <hr />
+                                       <div className="flex justify-between text-lg font-bold">
+                                          <span>Total a Cobrar:</span>
+                                          <span>${(order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)).toFixed(2)}</span>
+                                       </div>
+                                       <div className="flex justify-between text-xs text-green-600">
+                                          <span>Ganancia Estimada:</span>
+                                          <span>${((order.partsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + Number(watchedLaborCost || 0)) - order.totalCost).toFixed(2)}</span>
+                                       </div>
+                                  </div>
+                              </div>
+                  </div>
+              </div>
+            </form>
+          </Form>
         </ScrollArea>
+        
+        <DialogFooter className="flex-shrink-0 pt-4 border-t">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+          </Button>
+          <Button type="submit" form="edit-repair-form" disabled={loading}>
+              {loading ? <><Loader2 className="animate-spin mr-2"/> Actualizando...</> : "Guardar Cambios"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
