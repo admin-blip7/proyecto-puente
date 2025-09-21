@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,7 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ClientProfile } from "@/types";
-import { addClient } from "@/lib/services/creditService";
+import { addClient, uploadClientDocument } from "@/lib/services/creditService";
 import { Loader2, Calendar as CalendarIcon, Upload } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -34,6 +34,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 interface AddEditClientDialogProps {
   isOpen: boolean;
@@ -70,6 +73,9 @@ export default function AddEditClientDialog({
   onClientUpdated,
 }: AddEditClientDialogProps) {
     const [loading, setLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [idPreview, setIdPreview] = useState<string | undefined>(client?.documents?.idUrl);
+    const idFileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -80,7 +86,7 @@ export default function AddEditClientDialog({
 
     useEffect(() => {
         if (isOpen) {
-            if (isEditMode) {
+            if (isEditMode && client) {
                 form.reset({
                     name: client.name,
                     phone: client.phone,
@@ -94,8 +100,9 @@ export default function AddEditClientDialog({
                     employmentInfo: client.employmentInfo,
                     creditLimit: client.creditAccount?.creditLimit,
                     paymentDueDate: client.creditAccount?.paymentDueDate,
-                    interestRate: client.creditAccount?.interestRate,
+                    interestRate: client.creditAccount?.interestRate || 0,
                 });
+                setIdPreview(client.documents?.idUrl);
             } else {
                 form.reset({
                     name: "",
@@ -108,9 +115,36 @@ export default function AddEditClientDialog({
                     paymentDueDate: new Date(),
                     interestRate: 25,
                 });
+                setIdPreview(undefined);
             }
         }
     }, [isOpen, client, isEditMode, form]);
+
+    const handleIdUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !client) return;
+
+        setIsUploading(true);
+        try {
+            const downloadURL = await uploadClientDocument(client.id, 'idUrl', file);
+            setIdPreview(downloadURL);
+            onClientUpdated({ ...client, documents: { ...client.documents, idUrl: downloadURL }});
+            toast({
+                title: "Documento Subido",
+                description: "La credencial del cliente ha sido guardada."
+            });
+        } catch (error) {
+            console.error("Error uploading ID:", error);
+            toast({
+                variant: "destructive",
+                title: "Error de Subida",
+                description: "No se pudo guardar la imagen de la credencial."
+            })
+        } finally {
+            setIsUploading(false);
+        }
+    }
+
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setLoading(true);
@@ -214,10 +248,31 @@ return (
                     
                     <div>
                         <h4 className="font-semibold text-lg mb-3">Documentos</h4>
-                        <Button type="button" variant="outline" className="w-full">
-                            <Upload className="mr-2 h-4 w-4" />
-                            Subir Foto de Credencial (INE)
-                        </Button>
+                        {idPreview && isEditMode && (
+                           <div className="mb-4">
+                             <a href={idPreview} target="_blank" rel="noopener noreferrer">
+                                <Image src={idPreview} alt="Vista previa de ID" width={200} height={120} className="rounded-md object-cover border" />
+                             </a>
+                           </div>
+                        )}
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="w-full">
+                                        <Button type="button" variant="outline" className="w-full" onClick={() => idFileInputRef.current?.click()} disabled={!isEditMode || isUploading}>
+                                            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                            {isUploading ? "Subiendo..." : (idPreview ? "Reemplazar Credencial (INE)" : "Subir Credencial (INE)")}
+                                            <input ref={idFileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleIdUpload} disabled={!isEditMode || isUploading} />
+                                        </Button>
+                                    </div>
+                                </TooltipTrigger>
+                                {!isEditMode && (
+                                    <TooltipContent>
+                                        <p>Guarda el cliente primero para poder subir documentos.</p>
+                                    </TooltipContent>
+                                )}
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
 
                     <Separator />
@@ -255,7 +310,7 @@ return (
             </ScrollArea>
             <DialogFooter className="px-6 pt-3 pb-6 border-t flex-shrink-0">
                 <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || isUploading}>
                     {loading ? <><Loader2 className="animate-spin mr-2"/> Guardando...</> : (isEditMode ? "Guardar Cambios" : "Crear Cliente")}
                 </Button>
             </DialogFooter>
