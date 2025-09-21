@@ -51,7 +51,7 @@ const formSchema = z.object({
     }),
     creditLimit: z.coerce.number().min(0, "El límite no puede ser negativo."),
     paymentDueDate: z.date({ required_error: "La fecha de pago es requerida."}),
-    interestRate: z.coerce.number().min(0, "La tasa de interés no puede ser negativa.").optional(),
+    interestRate: z.coerce.number().min(0, "La tasa de interés no puede ser negativa."),
 });
 
 export default function AddEditClientDialog({
