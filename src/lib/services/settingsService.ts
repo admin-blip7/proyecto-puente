@@ -1,5 +1,5 @@
 import { db, storage } from "@/lib/firebase";
-import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema } from "@/types";
+import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema, ContractTemplateSettings, ContractTemplateSchema } from "@/types";
 import {
   doc,
   getDoc,
@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 const SETTINGS_COLLECTION = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
 const LABEL_SETTINGS_DOC_ID = "label_design";
-
+const CONTRACT_TEMPLATE_DOC_ID = "contract_template";
 
 
 // --- TICKET SETTINGS ---
@@ -145,4 +145,41 @@ export const saveLabelSettings = async (settings: LabelSettings): Promise<void> 
         console.error("Error saving label settings: ", error);
         throw new Error("Failed to save label settings.");
     }
+};
+
+
+// --- CONTRACT TEMPLATE SETTINGS ---
+
+const defaultContractTemplateSettings: ContractTemplateSettings = {
+    content: `CONTRATO DE CRÉDITO
+
+En la ciudad de {{STORE_CITY}} a {{CURRENT_DATE}}, se celebra el presente contrato de crédito entre:
+- El ACREEDOR: {{STORE_NAME}}
+- El DEUDOR: {{CLIENT_NAME}}, con domicilio en {{CLIENT_ADDRESS}}.
+
+CLÁUSULAS:
+1. Se otorga un límite de crédito de {{CREDIT_LIMIT}}.
+2. La fecha límite de pago es el día {{PAYMENT_DUE_DAY}} de cada mes.
+3. Se aplicará una tasa de interés anual del {{INTEREST_RATE}}% sobre saldos insolutos.
+
+_________________________
+{{CLIENT_NAME}}
+`,
+};
+
+export const getContractTemplate = async (): Promise<ContractTemplateSettings> => {
+    const docRef = doc(db, SETTINGS_COLLECTION, CONTRACT_TEMPLATE_DOC_ID);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        const parsed = ContractTemplateSchema.safeParse(docSnap.data());
+        if (parsed.success) return parsed.data;
+    }
+    await setDoc(docRef, { ...defaultContractTemplateSettings, lastUpdated: serverTimestamp() });
+    return defaultContractTemplateSettings;
+};
+
+export const saveContractTemplate = async (settings: ContractTemplateSettings): Promise<void> => {
+    const validatedSettings = ContractTemplateSchema.parse(settings);
+    const settingsRef = doc(db, SETTINGS_COLLECTION, CONTRACT_TEMPLATE_DOC_ID);
+    await setDoc(settingsRef, { ...validatedSettings, lastUpdated: serverTimestamp() }, { merge: true });
 };

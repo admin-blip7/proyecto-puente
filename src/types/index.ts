@@ -289,6 +289,12 @@ export const LabelSettingsSchema = z.object({
 
 export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
 
+export const ContractTemplateSchema = z.object({
+    content: z.string(),
+});
+
+export type ContractTemplateSettings = z.infer<typeof ContractTemplateSchema>;
+
 
 // Types for Finance Module
 export const accountTypes = ["Banco", "Efectivo", "Billetera Digital", "Otro"] as const;
