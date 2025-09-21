@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { RepairStatus, Warranty, LabelSettings } from "./types"
+import { RepairStatus, Warranty, LabelSettings, CreditAccountStatus } from "./types"
 import JsBarcode from 'jsbarcode';
 
 export function cn(...inputs: ClassValue[]) {
@@ -45,6 +45,19 @@ export const getStatusVariant = (status: RepairStatus): "default" | "secondary" 
         return 'default';
     }
 };
+
+export const getCreditStatusVariant = (status: CreditAccountStatus): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case 'Al Corriente':
+            return 'default';
+        case 'Atrasado':
+            return 'destructive';
+        case 'Pagado':
+            return 'secondary';
+        default:
+            return 'outline';
+    }
+}
 
 
 export const generateAndPrintLabels = (
