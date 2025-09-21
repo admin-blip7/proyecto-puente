@@ -137,7 +137,7 @@ export default function AddEditClientDialog({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow overflow-hidden flex flex-col">
                         <ScrollArea className="flex-grow pr-6 -mr-6">
-                            <div className="space-y-4 py-4">
+                            <div className="space-y-4 py-4 bg-red-500">
                                 <h4 className="font-semibold text-lg">Información Personal</h4>
                                 <FormField name="name" control={form.control} render={({ field }) => (
                                     <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
