@@ -1,5 +1,7 @@
-import { db, storage } from "@/lib/firebase";
-import { Client, CreditAccount, ClientPayment, ClientProfile } from "@/types";
+'use server';
+
+import { db } from "@/lib/firebase";
+import { Client, CreditAccount, ClientProfile } from "@/types";
 import {
   collection,
   getDocs,
@@ -13,15 +15,13 @@ import {
   where,
   limit,
   runTransaction,
-  increment,
+  getDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
+import { uploadFile } from "./documentService";
 
 const CLIENTS_COLLECTION = "clients";
 const CREDIT_ACCOUNTS_COLLECTION = "credit_accounts";
-const PAYMENTS_COLLECTION = "client_payments";
-const STORAGE_CLIENT_DOCS_PATH = "client_documents";
 
 
 // --- Converters ---
@@ -107,8 +107,11 @@ export const addClient = async (
         transaction.set(accountRef, newAccount);
     });
 
+    const createdClientDoc = await getDoc(clientRef);
+    const createdClient = clientFromDoc(createdClientDoc as QueryDocumentSnapshot<DocumentData>);
+
     return {
-        ...(await clientFromDoc((await getDoc(clientRef)) as any)),
+        ...createdClient,
         creditAccount: { ...newAccount, id: accountRef.id }
     };
 };
@@ -119,10 +122,8 @@ export const uploadClientDocument = async (
     documentType: 'idUrl' | 'proofOfAddressUrl',
     file: File
 ): Promise<string> => {
-    const filePath = `${STORAGE_CLIENT_DOCS_PATH}/${clientId}/${documentType}-${file.name}`;
-    const storageRef = ref(storage, filePath);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
+    const filePath = `client_documents/${clientId}/${documentType}-${file.name}`;
+    const downloadURL = await uploadFile(file, filePath);
 
     const clientRef = doc(db, CLIENTS_COLLECTION, clientId);
     await updateDoc(clientRef, {
@@ -131,31 +132,3 @@ export const uploadClientDocument = async (
 
     return downloadURL;
 };
-
-export const addPaymentToCreditAccount = async (
-    accountId: string,
-    amount: number
-): Promise<void> => {
-     await runTransaction(db, async (transaction) => {
-        const accountRef = doc(db, CREDIT_ACCOUNTS_COLLECTION, accountId);
-        const paymentRef = doc(collection(db, PAYMENTS_COLLECTION));
-
-        const accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) {
-            throw new Error("La cuenta de crédito no existe.");
-        }
-
-        // 1. Create payment record
-        transaction.set(paymentRef, {
-            paymentId: `PAY-${uuidv4().substring(0, 8).toUpperCase()}`,
-            accountId: accountId,
-            amountPaid: amount,
-            paymentDate: serverTimestamp()
-        });
-
-        // 2. Decrement credit account balance
-        transaction.update(accountRef, {
-            currentBalance: increment(-amount)
-        });
-     });
-}
