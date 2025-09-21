@@ -27,7 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 import { ClientProfile } from "@/types";
 import { addClient } from "@/lib/services/creditService";
 import { Loader2, Calendar as CalendarIcon } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -135,53 +134,51 @@ export default function AddEditClientDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow overflow-hidden flex flex-col">
-                        <ScrollArea className="flex-grow pr-6 -mr-6">
-                            <div className="space-y-4 py-4 bg-red-500">
-                                <h4 className="font-semibold text-lg">Información Personal</h4>
-                                <FormField name="name" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField name="phone" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Teléfono Celular</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField name="address" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Dirección Particular</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                
-                                <h4 className="font-semibold text-lg pt-4 border-t">Información Laboral</h4>
-                                <FormField name="employmentInfo.workplace" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Lugar de Trabajo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                 <FormField name="employmentInfo.workPhone" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Teléfono del Trabajo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow min-h-0">
+                        <div className="space-y-4 py-4 h-full overflow-y-auto">
+                            <h4 className="font-semibold text-lg">Información Personal</h4>
+                            <FormField name="name" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField name="phone" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Teléfono Celular</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField name="address" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Dirección Particular</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            
+                            <h4 className="font-semibold text-lg pt-4 border-t">Información Laboral</h4>
+                            <FormField name="employmentInfo.workplace" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Lugar de Trabajo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                             <FormField name="employmentInfo.workPhone" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Teléfono del Trabajo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
 
-                                <h4 className="font-semibold text-lg pt-4 border-t">Información del Crédito</h4>
-                                 <FormField name="creditLimit" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Límite de Crédito</FormLabel><FormControl><Input type="number" step="100" {...field} /></FormControl><FormMessage /></FormItem>
-                                )}/>
-                                <FormField control={form.control} name="paymentDueDate" render={({ field }) => (
-                                    <FormItem className="flex flex-col"><FormLabel>Próxima Fecha de Pago</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                            {field.value ? format(field.value, "PPP", { locale: es }) : <span>Elige una fecha</span>}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                            </Button>
-                                        </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}/>
-                            </div>
-                        </ScrollArea>
-                        <DialogFooter className="pt-6 border-t flex-shrink-0">
+                            <h4 className="font-semibold text-lg pt-4 border-t">Información del Crédito</h4>
+                             <FormField name="creditLimit" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Límite de Crédito</FormLabel><FormControl><Input type="number" step="100" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={form.control} name="paymentDueDate" render={({ field }) => (
+                                <FormItem className="flex flex-col"><FormLabel>Próxima Fecha de Pago</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Elige una fecha</span>}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                                </FormItem>
+                            )}/>
+                        </div>
+                         <DialogFooter className="pt-6 border-t flex-shrink-0">
                             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
                             <Button type="submit" disabled={loading}>
                                 {loading ? <><Loader2 className="animate-spin mr-2"/> Guardando...</> : (isEditMode ? "Guardar Cambios" : "Crear Cliente")}
