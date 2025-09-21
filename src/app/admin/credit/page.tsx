@@ -5,6 +5,7 @@ import { Menu } from "lucide-react";
 import CreditClient from "@/components/admin/credit/CreditClient";
 import { getClientsWithCredit } from "@/lib/services/creditService";
 import { getAccounts } from "@/lib/services/accountService";
+import { ModalForm } from "@/components/shared/ModalForm";
 
 
 export default async function CreditPage() {
@@ -31,6 +32,9 @@ export default async function CreditPage() {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
                <CreditClient initialClients={initialClients} initialAccounts={initialAccounts} />
+               <div className="mt-8">
+                <ModalForm />
+               </div>
             </main>
         </div>
     )
