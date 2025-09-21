@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import CreditClient from "@/components/admin/credit/CreditClient";
 import { getClientsWithCredit } from "@/lib/services/creditService";
+import { getAccounts } from "@/lib/services/accountService";
 
 
 export default async function CreditPage() {
     const initialClients = await getClientsWithCredit();
+    const initialAccounts = await getAccounts();
 
     return (
         <div className="flex h-screen w-full flex-row">
@@ -28,7 +30,7 @@ export default async function CreditPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-               <CreditClient initialClients={initialClients} />
+               <CreditClient initialClients={initialClients} initialAccounts={initialAccounts} />
             </main>
         </div>
     )

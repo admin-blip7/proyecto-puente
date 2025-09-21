@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ClientProfile } from "@/types";
+import { ClientProfile, Account } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, MoreHorizontal, Edit, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,15 +10,18 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Badge } from "@/components/ui/badge";
 import { getCreditStatusVariant } from "@/lib/utils";
 import AddEditClientDialog from "./AddEditClientDialog";
+import AddCreditPaymentDialog from "./AddCreditPaymentDialog";
 
 interface CreditClientProps {
     initialClients: ClientProfile[];
+    initialAccounts: Account[];
 }
 
-export default function CreditClient({ initialClients }: CreditClientProps) {
+export default function CreditClient({ initialClients, initialAccounts }: CreditClientProps) {
     const [clients, setClients] = useState<ClientProfile[]>(initialClients);
     const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
     const [isAddEditOpen, setAddEditOpen] = useState(false);
+    const [isPaymentOpen, setPaymentOpen] = useState(false);
 
     const handleOpenAddDialog = () => {
         setSelectedClient(null);
@@ -30,6 +33,11 @@ export default function CreditClient({ initialClients }: CreditClientProps) {
         setAddEditOpen(true);
     };
     
+    const handleOpenPaymentDialog = (client: ClientProfile) => {
+        setSelectedClient(client);
+        setPaymentOpen(true);
+    }
+
     const handleClientAdded = (newClient: ClientProfile) => {
         setClients(prev => [...prev, newClient].sort((a,b) => a.name.localeCompare(b.name)));
     };
@@ -37,6 +45,21 @@ export default function CreditClient({ initialClients }: CreditClientProps) {
     const handleClientUpdated = (updatedClient: ClientProfile) => {
         setClients(prev => prev.map(c => (c.id === updatedClient.id ? updatedClient : c)));
     };
+
+    const handlePaymentAdded = (clientId: string, amount: number) => {
+        setClients(prev => prev.map(c => {
+            if (c.id === clientId && c.creditAccount) {
+                return {
+                    ...c,
+                    creditAccount: {
+                        ...c.creditAccount,
+                        currentBalance: c.creditAccount.currentBalance - amount
+                    }
+                }
+            }
+            return c;
+        }));
+    }
 
     return (
         <>
@@ -90,7 +113,7 @@ export default function CreditClient({ initialClients }: CreditClientProps) {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                     <DropdownMenuItem onClick={() => { /* Open Register Payment */ }}>
+                                                     <DropdownMenuItem onClick={() => handleOpenPaymentDialog(client)}>
                                                         <DollarSign className="mr-2 h-4 w-4" />
                                                         <span>Registrar Abono</span>
                                                     </DropdownMenuItem>
@@ -116,6 +139,16 @@ export default function CreditClient({ initialClients }: CreditClientProps) {
                 onClientAdded={handleClientAdded}
                 onClientUpdated={handleClientUpdated}
             />
+
+            {selectedClient && selectedClient.creditAccount && (
+                <AddCreditPaymentDialog
+                    isOpen={isPaymentOpen}
+                    onOpenChange={setPaymentOpen}
+                    client={selectedClient}
+                    accounts={initialAccounts}
+                    onPaymentAdded={handlePaymentAdded}
+                />
+            )}
         </>
     );
 }

@@ -373,6 +373,7 @@ export interface ClientPayment {
     accountId: string;
     amountPaid: number;
     paymentDate: Date;
+    notes?: string;
 }
 
 export interface ClientProfile extends Client {
