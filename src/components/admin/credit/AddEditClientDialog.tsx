@@ -86,7 +86,11 @@ export default function AddEditClientDialog({
                     phone: client.phone,
                     address: client.address,
                     curp: client.curp || "",
-                    socialMedia: client.socialMedia || {},
+                    socialMedia: {
+                        facebook: client.socialMedia?.facebook || "",
+                        instagram: client.socialMedia?.instagram || "",
+                        whatsapp: client.socialMedia?.whatsapp || "",
+                    },
                     employmentInfo: client.employmentInfo,
                     creditLimit: client.creditAccount?.creditLimit,
                     paymentDueDate: client.creditAccount?.paymentDueDate,
@@ -187,7 +191,7 @@ return (
                                 <FormItem><FormLabel>Instagram</FormLabel><FormControl><Input placeholder="ej: @juan.perez" {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                             <FormField name="socialMedia.whatsapp" control={form.control} render={({ field }) => (
-                                <FormItem><FormLabel>WhatsApp</FormLabel><FormControl><Input {...field} defaultValue={form.getValues('phone')} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>WhatsApp</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                         </div>
                     </div>
