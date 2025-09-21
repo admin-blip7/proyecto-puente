@@ -3,3 +3,4 @@
 // You can add more modules here if needed.
 declare module '@types/jsbarcode';
 declare module 'react-qrcode-logo';
+declare module 'jspdf-autotable';
