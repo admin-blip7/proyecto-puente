@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Product, CartItem, SuggestedProduct, CashSession } from "@/types";
+import { Product, CartItem, SuggestedProduct, CashSession, ClientProfile } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import OpenCashDrawerDialog from "./OpenCashDrawerDialog";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
 import { Skeleton } from "../ui/skeleton";
+import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
+import { getClientsWithCredit } from "@/lib/services/creditService";
 
 
 interface POSClientProps {
@@ -27,6 +29,7 @@ interface POSClientProps {
 
 export default function POSClient({ initialProducts }: POSClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [allClients, setAllClients] = useState<ClientProfile[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
@@ -35,6 +38,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [activeSession, setActiveSession] = useState<CashSession | null | undefined>(undefined); // undefined means loading
   const [isOpeningDrawer, setOpeningDrawer] = useState(false);
   const [isClosingDrawer, setClosingDrawer] = useState(false);
+  const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -43,6 +47,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   useEffect(() => {
     if (userProfile) {
       getCurrentOpenSession(userProfile.uid).then(setActiveSession);
+      getClientsWithCredit().then(setAllClients);
     }
   }, [userProfile]);
 
@@ -134,8 +139,9 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const filteredProducts = useMemo(() => {
     return products.filter(
       (product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchQuery.toLowerCase())) &&
+        product.type === 'Venta'
     );
   }, [products, searchQuery]);
   
@@ -286,6 +292,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               suggestedProducts={suggestedProducts}
               onAddToCart={addToCart}
               onCloseSession={() => setClosingDrawer(true)}
+              onFinanceSale={() => setFinancePlanOpen(true)}
             />
          </div>
          <div className="w-80 h-full border-l">
@@ -321,6 +328,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 suggestedProducts={suggestedProducts}
                 onAddToCart={addToCart}
                 onCloseSession={() => setClosingDrawer(true)}
+                onFinanceSale={() => setFinancePlanOpen(true)}
              />
           </SheetContent>
         </Sheet>
@@ -331,6 +339,15 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         onOpenChange={setClosingDrawer}
         session={activeSession}
         onConfirm={handleCloseDrawer}
+      />
+      <CreateFinancePlanDialog
+        isOpen={isFinancePlanOpen}
+        onOpenChange={setFinancePlanOpen}
+        allProducts={products}
+        allClients={allClients}
+        onSaleCreated={() => {
+            // Here you could refresh products or clients if needed
+        }}
       />
     </>
   );

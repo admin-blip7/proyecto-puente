@@ -4,7 +4,7 @@ import { CartItem, SuggestedProduct, Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut } from "lucide-react";
+import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut, CreditCard } from "lucide-react";
 import CheckoutDialog from "./CheckoutDialog";
 import { useState, useMemo } from "react";
 import { Separator } from "../ui/separator";
@@ -26,6 +26,7 @@ interface ShoppingCartProps {
   suggestedProducts: SuggestedProduct[];
   onAddToCart: (product: Product | SuggestedProduct, quantity?: number) => void;
   onCloseSession: () => void;
+  onFinanceSale: () => void;
 }
 
 export default function ShoppingCart({ 
@@ -37,7 +38,8 @@ export default function ShoppingCart({
   onSelectItem,
   suggestedProducts,
   onAddToCart,
-  onCloseSession
+  onCloseSession,
+  onFinanceSale,
 }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
@@ -57,7 +59,7 @@ export default function ShoppingCart({
   const handleExpenseAdded = async (description: string, amount: number, category: string) => {
     if (!userProfile) return;
     try {
-        await addExpense({ description, amount, category }, undefined, userProfile.uid);
+        await addExpense({ description, amount, category, paidFromAccountId: 'cash_drawer' }, undefined, userProfile.uid);
         toast({
             title: "Gasto Registrado",
             description: "El gasto ha sido registrado exitosamente desde la caja."
@@ -178,6 +180,10 @@ export default function ShoppingCart({
           <div className="w-full grid grid-cols-1 gap-2">
             <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)} disabled={cartItems.length === 0}>
               Checkout
+            </Button>
+             <Button className="w-full" variant="secondary" onClick={onFinanceSale} disabled={cartItems.length > 0}>
+                <CreditCard className="mr-2" />
+                Vender a Crédito
             </Button>
             <Button className="w-full" variant="outline" onClick={() => setExpenseOpen(true)}>
               <Receipt className="mr-2" />

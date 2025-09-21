@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Product, ClientProfile } from "@/types";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronsUpDown, Package, User, PlusCircle } from "lucide-react";
+import { ChevronsUpDown, Package, User, PlusCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +16,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { addWeeks, addMonths } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { createFinancedSale } from "@/lib/services/creditService";
+import { useAuth } from "@/lib/hooks";
 
 interface CreateFinancePlanDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   allProducts: Product[];
   allClients: ClientProfile[];
+  onSaleCreated: () => void;
 }
 
 interface AmortizationRow {
@@ -39,18 +42,23 @@ export default function CreateFinancePlanDialog({
   onOpenChange,
   allProducts,
   allClients,
+  onSaleCreated,
 }: CreateFinancePlanDialogProps) {
-  const [step, setStep] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Form state
   const [downPayment, setDownPayment] = useState(0);
   const [annualInterestRate, setAnnualInterestRate] = useState(25);
   const [paymentFrequency, setPaymentFrequency] = useState<"Semanal" | "Mensual">("Semanal");
   const [term, setTerm] = useState(12);
+
+  const { toast } = useToast();
+  const { userProfile } = useAuth();
+
 
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
@@ -62,6 +70,59 @@ export default function CreateFinancePlanDialog({
     setClientPopoverOpen(false);
   };
   
+  const handleClose = (open: boolean) => {
+    if (!open) {
+        setSelectedProduct(null);
+        setSelectedClient(null);
+        setDownPayment(0);
+        setAnnualInterestRate(25);
+        setPaymentFrequency("Semanal");
+        setTerm(12);
+        setIsLoading(false);
+    }
+    onOpenChange(open);
+  }
+
+  const handleConfirmSale = async () => {
+    if (!selectedProduct || !selectedClient || !userProfile) {
+        toast({ variant: "destructive", title: "Datos incompletos", description: "Debes seleccionar un producto y un cliente." });
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        await createFinancedSale({
+            product: selectedProduct,
+            client: selectedClient,
+            user: userProfile,
+            terms: {
+                downPayment,
+                annualInterestRate,
+                paymentFrequency,
+                term,
+            }
+        });
+
+        toast({
+            title: "Venta a Crédito Creada",
+            description: `Se ha generado el crédito para ${selectedClient.name}.`
+        });
+        onSaleCreated();
+        handleClose(false);
+
+    } catch (error: any) {
+        console.error("Error creating financed sale:", error);
+        toast({
+            variant: "destructive",
+            title: "Error al crear el crédito",
+            description: error.message || "Ocurrió un error inesperado.",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+  }
+
+
   const amortizationTable = useMemo((): AmortizationRow[] => {
     if (!selectedProduct || term <= 0 || annualInterestRate < 0) {
         return [];
@@ -116,7 +177,7 @@ export default function CreateFinancePlanDialog({
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Financiar Producto: Venta a Crédito</DialogTitle>
@@ -267,8 +328,9 @@ export default function CreateFinancePlanDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={!selectedProduct || !selectedClient || amortizationTable.length === 0}>
+          <Button variant="outline" onClick={() => handleClose(false)} disabled={isLoading}>Cancelar</Button>
+          <Button onClick={handleConfirmSale} disabled={!selectedProduct || !selectedClient || amortizationTable.length === 0 || isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirmar y Crear Crédito
           </Button>
         </DialogFooter>

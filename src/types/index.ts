@@ -48,7 +48,7 @@ export interface Sale {
   saleId: string;
   items: SaleItem[];
   totalAmount: number;
-  paymentMethod: 'Efectivo' | 'Tarjeta de Crédito';
+  paymentMethod: 'Efectivo' | 'Tarjeta de Crédito' | 'Crédito';
   cashierId: string;
   cashierName?: string;
   customerName: string | null;
@@ -77,7 +77,7 @@ export interface InventoryLog {
   productId: string;
   productName: string;
   change: number;
-  reason: 'Venta' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto' | 'Uso en Reparación';
+  reason: 'Venta' | 'Venta a Crédito' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto' | 'Uso en Reparación';
   updatedBy: string; // User ID
   createdAt: Date;
   metadata?: {
@@ -349,9 +349,15 @@ export interface Client {
     name: string;
     phone: string;
     address: string;
+    curp?: string;
     employmentInfo: {
         workplace: string;
         workPhone: string;
+    };
+    socialMedia?: {
+        facebook?: string;
+        instagram?: string;
+        whatsapp?: string;
     };
     documents: {
         idUrl?: string;

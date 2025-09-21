@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from "@/lib/firebase";
-import { Client, CreditAccount, ClientProfile } from "@/types";
+import { Client, CreditAccount, ClientProfile, Product, UserProfile } from "@/types";
 import {
   collection,
   getDocs,
@@ -16,12 +16,16 @@ import {
   limit,
   runTransaction,
   getDoc,
+  increment,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 import { uploadFile } from "./documentService";
 
 const CLIENTS_COLLECTION = "clients";
 const CREDIT_ACCOUNTS_COLLECTION = "credit_accounts";
+const SALES_COLLECTION = "sales";
+const PRODUCTS_COLLECTION = "products";
+const INVENTORY_LOGS_COLLECTION = "inventory_logs";
 
 
 // --- Converters ---
@@ -33,7 +37,9 @@ const clientFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Client => {
         name: data.name,
         phone: data.phone,
         address: data.address,
+        curp: data.curp,
         employmentInfo: data.employmentInfo,
+        socialMedia: data.socialMedia,
         documents: data.documents,
         createdAt: data.createdAt.toDate(),
     };
@@ -135,3 +141,79 @@ export const uploadClientDocument = async (
 
     return downloadURL;
 };
+
+interface CreateFinancedSaleParams {
+    product: Product;
+    client: ClientProfile;
+    user: UserProfile;
+    terms: {
+        downPayment: number;
+        annualInterestRate: number;
+        paymentFrequency: 'Semanal' | 'Mensual';
+        term: number;
+    }
+}
+
+export const createFinancedSale = async (params: CreateFinancedSaleParams): Promise<void> => {
+    const { product, client, user, terms } = params;
+
+    const saleId = `SALE-${uuidv4().split('-')[0].toUpperCase()}`;
+    const accountId = `ACC-${uuidv4().substring(0, 8).toUpperCase()}`;
+    const amountToFinance = product.price - terms.downPayment;
+
+    await runTransaction(db, async (transaction) => {
+        const productRef = doc(db, PRODUCTS_COLLECTION, product.id);
+        const productDoc = await transaction.get(productRef);
+
+        if (!productDoc.exists() || productDoc.data().stock < 1) {
+            throw new Error(`Stock insuficiente para ${product.name}.`);
+        }
+        
+        // 1. Create the Sale record
+        const saleRef = doc(collection(db, SALES_COLLECTION));
+        transaction.set(saleRef, {
+            saleId,
+            items: [{ productId: product.id, name: product.name, quantity: 1, priceAtSale: product.price }],
+            totalAmount: product.price,
+            paymentMethod: "Crédito",
+            cashierId: user.uid,
+            cashierName: user.name,
+            customerName: client.name,
+            customerPhone: client.phone,
+            createdAt: serverTimestamp(),
+        });
+        
+        // 2. Create the Credit Account
+        const creditAccountRef = doc(collection(db, CREDIT_ACCOUNTS_COLLECTION));
+        transaction.set(creditAccountRef, {
+            accountId,
+            clientId: client.id,
+            creditLimit: product.price,
+            currentBalance: amountToFinance,
+            status: 'Al Corriente',
+            paymentDueDate: new Date(), // This should be calculated based on frequency
+            interestRate: terms.annualInterestRate,
+            financeTerms: { // Store terms for future reference
+                productId: product.id,
+                productName: product.name,
+                productPrice: product.price,
+                ...terms
+            }
+        });
+
+        // 3. Update product stock
+        transaction.update(productRef, { stock: increment(-1) });
+
+        // 4. Create inventory log
+        const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+        transaction.set(logRef, {
+            productId: product.id,
+            productName: product.name,
+            change: -1,
+            reason: 'Venta a Crédito',
+            updatedBy: user.uid,
+            createdAt: serverTimestamp(),
+            metadata: { saleId, cost: product.cost }
+        });
+    });
+}
