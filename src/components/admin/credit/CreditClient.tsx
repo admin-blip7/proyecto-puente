@@ -87,6 +87,7 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
                                     <TableHead>Teléfono</TableHead>
                                     <TableHead className="text-right">Límite Crédito</TableHead>
                                     <TableHead className="text-right">Saldo Actual</TableHead>
+                                    <TableHead className="text-center">Tasa Interés</TableHead>
                                     <TableHead className="text-center">Estado</TableHead>
                                     <TableHead className="text-right">Acciones</TableHead>
                                 </TableRow>
@@ -98,6 +99,7 @@ export default function CreditClient({ initialClients, initialAccounts }: Credit
                                         <TableCell>{client.phone}</TableCell>
                                         <TableCell className="text-right">${client.creditAccount?.creditLimit.toFixed(2) ?? 'N/A'}</TableCell>
                                         <TableCell className="text-right font-semibold">${client.creditAccount?.currentBalance.toFixed(2) ?? 'N/A'}</TableCell>
+                                        <TableCell className="text-center">{client.creditAccount?.interestRate ? `${client.creditAccount.interestRate}%` : 'N/A'}</TableCell>
                                         <TableCell className="text-center">
                                             {client.creditAccount && (
                                                 <Badge variant={getCreditStatusVariant(client.creditAccount.status)}>

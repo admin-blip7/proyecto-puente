@@ -365,6 +365,7 @@ export interface CreditAccount {
     currentBalance: number;
     status: CreditAccountStatus;
     paymentDueDate: Date;
+    interestRate?: number; // Tasa de Interés Anual
 }
 
 export interface ClientPayment {

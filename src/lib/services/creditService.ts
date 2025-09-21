@@ -49,6 +49,7 @@ const creditAccountFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): CreditA
         currentBalance: data.currentBalance,
         status: data.status,
         paymentDueDate: data.paymentDueDate.toDate(),
+        interestRate: data.interestRate,
     };
 }
 
@@ -78,7 +79,8 @@ export const getClientsWithCredit = async (): Promise<ClientProfile[]> => {
 export const addClient = async (
     clientData: Omit<Client, 'id' | 'clientId' | 'createdAt' | 'documents'>,
     creditLimit: number,
-    paymentDueDate: Date
+    paymentDueDate: Date,
+    interestRate?: number,
 ): Promise<ClientProfile> => {
     const clientId = `CLIENT-${uuidv4().substring(0, 8).toUpperCase()}`;
     const accountId = `ACC-${uuidv4().substring(0, 8).toUpperCase()}`;
@@ -100,6 +102,7 @@ export const addClient = async (
         currentBalance: 0,
         status: 'Al Corriente',
         paymentDueDate,
+        interestRate: interestRate || 0,
     };
     
     await runTransaction(db, async (transaction) => {
