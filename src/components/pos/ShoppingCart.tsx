@@ -70,6 +70,12 @@ export default function ShoppingCart({
         toast({ variant: 'destructive', title: "Error", description: "No se pudo registrar el gasto."})
     }
   }
+  
+  const canFinanceSale = useMemo(() => {
+    if (cartItems.length !== 1) return false;
+    return cartItems[0].quantity === 1;
+  }, [cartItems]);
+
 
   const renderCartContent = () => (
     <ScrollArea className="h-full">
@@ -181,7 +187,7 @@ export default function ShoppingCart({
             <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)} disabled={cartItems.length === 0}>
               Checkout
             </Button>
-             <Button className="w-full" variant="secondary" onClick={onFinanceSale} disabled={cartItems.length > 0}>
+             <Button className="w-full" variant="secondary" onClick={onFinanceSale} disabled={!canFinanceSale}>
                 <CreditCard className="mr-2" />
                 Vender a Crédito
             </Button>
