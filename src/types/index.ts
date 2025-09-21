@@ -335,3 +335,46 @@ export interface SavingsGoal {
     targetAmount: number;
     currentAmount: number;
 }
+
+// Types for Credit & Collection Module
+export interface Client {
+    id: string;
+    clientId: string;
+    name: string;
+    phone: string;
+    address: string;
+    employmentInfo: {
+        workplace: string;
+        workPhone: string;
+    };
+    documents: {
+        idUrl?: string;
+        proofOfAddressUrl?: string;
+    };
+    createdAt: Date;
+}
+
+export const creditAccountStatuses = ['Al Corriente', 'Atrasado', 'Pagado'] as const;
+export type CreditAccountStatus = typeof creditAccountStatuses[number];
+
+export interface CreditAccount {
+    id: string;
+    accountId: string;
+    clientId: string;
+    creditLimit: number;
+    currentBalance: number;
+    status: CreditAccountStatus;
+    paymentDueDate: Date;
+}
+
+export interface ClientPayment {
+    id: string;
+    paymentId: string;
+    accountId: string;
+    amountPaid: number;
+    paymentDate: Date;
+}
+
+export interface ClientProfile extends Client {
+    creditAccount?: CreditAccount;
+}
