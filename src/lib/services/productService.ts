@@ -8,6 +8,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../hooks";
 import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("productService");
 
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
@@ -60,7 +62,7 @@ export const getProducts = async (): Promise<Product[]> => {
         // Sort by name by default
         return products.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-        console.error("Error fetching products:", error);
+        log.error("Error fetching products:", error);
         return [];
     }
 };
@@ -74,7 +76,7 @@ export const getProductById = async (productId: string): Promise<Product | null>
         }
         return null;
     } catch (error) {
-        console.error("Error fetching product by ID:", error);
+        log.error("Error fetching product by ID:", error);
         return null;
     }
 };
@@ -117,15 +119,15 @@ export const addProduct = async (
                         updateDoc(productDocRef, { compatibilityTags: result.suggestedTags });
                     }
                 })
-                .catch(error => console.error(`Error generating AI tags for ${productData.name}:`, error));
-            }).catch(error => console.error("Error fetching existing products for AI tagging:", error));
+                .catch(error => log.error(`Error generating AI tags for ${productData.name}:`, error));
+                }).catch(error => log.error("Error fetching existing products for AI tagging:", error));
         }
         
         const finalProductDoc = await getDoc(productDocRef);
         return productFromDoc(finalProductDoc as DocumentData);
 
     } catch (error) {
-        console.error("Error adding product: ", error);
+        log.error("Error adding product: ", error);
         throw new Error("Failed to add product.");
     }
 };
@@ -149,7 +151,7 @@ export const updateProduct = async (
         }
         return productFromDoc(updatedDoc as DocumentData);
     } catch (error) {
-        console.error("Error updating product: ", error);
+        log.error("Error updating product: ", error);
         throw new Error("Failed to update product.");
     }
 };
@@ -181,7 +183,7 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 
         return suggestedProducts;
     } catch (error) {
-        console.error("Error fetching suggested products: ", error);
+        log.error("Error fetching suggested products: ", error);
         return [];
     }
 }
@@ -261,10 +263,10 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
                         updateDoc(productRef, { compatibilityTags: result.suggestedTags });
                     }
                 })
-                .catch(aiError => console.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
+                .catch(aiError => log.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
             }
         } catch (error) {
-            console.error("Error fetching products for AI tagging:", error);
+            log.error("Error fetching products for AI tagging:", error);
         }
     }
 
@@ -280,7 +282,7 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
         });
         await batch.commit();
     } catch (error) {
-        console.error("Error deleting products:", error);
+        log.error("Error deleting products:", error);
         throw new Error("Failed to delete products.");
     }
 };

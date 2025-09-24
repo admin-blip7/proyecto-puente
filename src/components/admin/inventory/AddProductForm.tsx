@@ -16,6 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
+import CurrencyInput from "@/components/ui/currency-input";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("AddProductForm");
 
 interface AddProductFormProps {
   consignors: Consignor[];
@@ -78,12 +81,12 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
   const handleSaveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
-    console.log("Creando nuevo producto con datos:", formData);
+    log.info("Creando nuevo producto con datos:", formData);
 
     try {
       await addProduct(formData);
       
-      console.log("¡Éxito! Producto creado en Firestore.");
+      log.info("¡Éxito! Producto creado en Firestore.");
       toast({
         title: "Producto Agregado",
         description: `El producto "${formData.name}" ha sido creado exitosamente.`,
@@ -93,7 +96,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
       router.refresh();
 
     } catch (error) {
-      console.error("ERROR AL CREAR EN FIRESTORE:", error);
+      log.error("ERROR AL CREAR EN FIRESTORE:", error);
       toast({
         variant: "destructive",
         title: "Error al Crear",
@@ -163,11 +166,24 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cost">Costo de Compra</Label>
-                    <Input id="cost" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleCostChange} />
+                    <CurrencyInput 
+                       id="cost" 
+                       name="cost" 
+                       value={formData.cost} 
+                       onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
+                       showCurrencyLabel={false}
+                     />
                   </div>
                   <div>
                     <Label htmlFor="price">Precio de Venta</Label>
-                    <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} disabled={formData.ownershipType === 'Familiar'} />
+                    <CurrencyInput 
+                       id="price" 
+                       name="price" 
+                       value={formData.price} 
+                       onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
+                       disabled={formData.ownershipType === 'Familiar'}
+                       showCurrencyLabel={false}
+                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

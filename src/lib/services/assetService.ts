@@ -13,6 +13,8 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("assetService");
 
 const ASSETS_COLLECTION = "fixed_assets";
 
@@ -42,8 +44,8 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(assetFromDoc);
     } catch (error) {
-        console.error("Error fetching assets: ", error);
-        throw new Error("Failed to fetch assets.");
+        log.error("Error fetching assets: ", error);
+        return [];
     }
 }
 
@@ -70,8 +72,8 @@ export const addAsset = async (
         };
 
     } catch (error) {
-        console.error("Error adding asset: ", error);
-        throw new Error("Failed to add asset.");
+        log.error("Error adding asset: ", error);
+        throw error;
     }
 };
 

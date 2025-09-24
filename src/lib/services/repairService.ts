@@ -1,6 +1,8 @@
 import { db } from "@/lib/firebase";
 import { RepairOrder, RepairPart, Product } from "@/types";
 import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, DocumentData, QueryDocumentSnapshot, runTransaction, writeBatch, increment } from "firebase/firestore";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("repairService");
 
 const REPAIRS_COLLECTION = "repair_orders";
 const PRODUCTS_COLLECTION = "products";
@@ -35,7 +37,7 @@ export const getRepairOrders = async (): Promise<RepairOrder[]> => {
         const orders = querySnapshot.docs.map(repairOrderFromDoc);
         return orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     } catch (error) {
-        console.error("Error fetching repair orders:", error);
+        log.error("Error fetching repair orders:", error);
         return [];
     }
 };
@@ -77,7 +79,7 @@ export const addRepairOrder = async (orderData: Omit<RepairOrder, 'id' | 'orderI
         return newOrder;
 
     } catch (error) {
-        console.error("Error adding repair order: ", error);
+        log.error("Error adding repair order: ", error);
         throw new Error("Failed to add repair order.");
     }
 };
@@ -87,7 +89,7 @@ export const updateRepairOrder = async (orderId: string, dataToUpdate: Partial<R
         const orderRef = doc(db, REPAIRS_COLLECTION, orderId);
         await updateDoc(orderRef, dataToUpdate);
     } catch (error) {
-        console.error("Error updating repair order:", error);
+        log.error("Error updating repair order:", error);
         throw new Error("Failed to update repair order.");
     }
 }

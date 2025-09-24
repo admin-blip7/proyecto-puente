@@ -21,6 +21,7 @@ import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
 import { Skeleton } from "../ui/skeleton";
 import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
 import { getClientsWithCredit } from "@/lib/services/creditService";
+import { formatCurrency } from "@/lib/utils";
 
 
 interface POSClientProps {
@@ -177,7 +178,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
         setActiveSession(null);
         setClosingDrawer(false);
-        toast({ title: "Turno Cerrado", description: `Diferencia de caja: $${closedSession.difference?.toFixed(2)}.`})
+        toast({ title: "Turno Cerrado", description: `Diferencia de caja: ${formatCurrency(closedSession.difference || 0)}.`})
     } catch(error) {
         toast({ variant: 'destructive', title: "Error", description: "No se pudo cerrar el turno de caja."})
     }
@@ -218,7 +219,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                   <p className="flex-1 font-medium">{p.name}</p>
                   <Button variant="outline" size="sm" onClick={() => addToCart(p, 1)}>
                     <PlusCircle className="mr-2 h-4 w-4"/>
-                    ${p.price.toFixed(2)}
+                    {formatCurrency(p.price)}
                   </Button>
                 </div>
               ))}

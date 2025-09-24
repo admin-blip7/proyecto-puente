@@ -2,8 +2,13 @@
 
 import { LabelSettings } from "@/types";
 import JsBarcode from 'jsbarcode';
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
+import { formatMXNAmount } from "@/lib/validation/currencyValidation";
+
+const MM_TO_PX = 3.7795275591;
+
+const mmToPixels = (mm: number) => mm * MM_TO_PX;
 
 interface LabelPreviewProps {
   settings: LabelSettings;
@@ -16,26 +21,38 @@ const sampleItem = {
 }
 
 export default function LabelPreview({ settings }: LabelPreviewProps) {
-    const previewRefs = useRef<(HTMLCanvasElement | null)[]>([]);
+    const barcodeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const previewMetrics = useMemo(() => {
+    const baseWidthPx = mmToPixels(settings.width);
+    const baseHeightPx = mmToPixels(settings.height);
+    const maxWidthPx = 420;
+    const maxHeightPx = 240;
+    const scale = Math.min(1, maxWidthPx / baseWidthPx, maxHeightPx / baseHeightPx);
+
+    return {
+        baseWidthPx,
+        baseHeightPx,
+        scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+    };
+  }, [settings.width, settings.height]);
 
   useEffect(() => {
+    if (!barcodeCanvasRef.current) return;
     try {
-        previewRefs.current.forEach((canvas, index) => {
-            if (canvas) {
-                JsBarcode(canvas, sampleItem.sku, {
-                    format: "CODE128",
-                    displayValue: false,
-                    height: settings.barcodeHeight,
-                    width: 1.5,
-                    margin: 0,
-                });
-            }
-        })
-    } catch(e) {
-        // Can fail if SKU is invalid during typing
-        console.error(e);
+        barcodeCanvasRef.current.width = previewMetrics.baseWidthPx;
+        barcodeCanvasRef.current.height = settings.barcodeHeight;
+        JsBarcode(barcodeCanvasRef.current, sampleItem.sku, {
+            format: "CODE128",
+            displayValue: false,
+            height: settings.barcodeHeight,
+            width: 1.5,
+            margin: 0,
+        });
+    } catch (error) {
+        console.error("Barcode preview failed", error);
     }
-  }, [settings.barcodeHeight, sampleItem.sku, settings.width]); // Re-run on width change too
+  }, [previewMetrics.baseWidthPx, settings.barcodeHeight]);
 
   const labelStyle: React.CSSProperties = {
     width: `${settings.width}mm`,
@@ -44,31 +61,48 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
   };
 
   return (
-    <div 
-        className="grid grid-cols-3 gap-2 p-2 border bg-white"
-        style={{
-            width: "215.9mm", // US Letter width
-            minHeight: "100mm",
-        }}
-    >
-      {[...Array(9)].map((_, index) => (
-        <div 
-            key={index}
-            style={labelStyle}
-            className="border border-dashed p-1 flex flex-col items-center justify-center break-words text-black"
+    <div className="w-full flex justify-center">
+        <div
+            className="border border-dashed bg-white shadow-sm"
+            style={{
+                width: previewMetrics.baseWidthPx * previewMetrics.scale,
+                height: previewMetrics.baseHeightPx * previewMetrics.scale,
+                padding: 8,
+                boxSizing: "content-box",
+            }}
         >
-             {settings.includeLogo && settings.logoUrl && (
-                <Image src={settings.logoUrl} alt="logo" width={20} height={20} className="object-contain" />
-            )}
-            {settings.content.showStoreName && <p className="font-bold leading-tight">{settings.storeName}</p>}
-            {settings.content.showProductName && <p className="font-bold leading-tight text-center">{sampleItem.name}</p>}
+            <div
+                className="h-full w-full flex flex-col items-center justify-center text-black"
+                style={{
+                    ...labelStyle,
+                    transform: `scale(${previewMetrics.scale})`,
+                    transformOrigin: "top left",
+                }}
+            >
+                {settings.includeLogo && settings.logoUrl && (
+                    <Image src={settings.logoUrl} alt="logo" width={24} height={24} className="object-contain" />
+                )}
+                {settings.content.showStoreName && (
+                    <p className="font-bold leading-tight text-center">{settings.storeName}</p>
+                )}
+                {settings.content.showProductName && (
+                    <p className="font-semibold leading-tight text-center">{sampleItem.name}</p>
+                )}
 
-            <canvas ref={el => previewRefs.current[index] = el} className="w-full"></canvas>
-            
-            {settings.content.showSku && <p className="tracking-widest" style={{ fontSize: `${settings.fontSize-1}px` }}>{sampleItem.sku}</p>}
-            {settings.content.showPrice && <p className="font-bold" style={{ fontSize: `${settings.fontSize+2}px`}}>${sampleItem.price.toFixed(2)}</p>}
+                <canvas ref={barcodeCanvasRef} className="w-full" />
+
+                {settings.content.showSku && (
+                    <p className="tracking-widest" style={{ fontSize: `${settings.fontSize - 1}px` }}>
+                        {sampleItem.sku}
+                    </p>
+                )}
+                {settings.content.showPrice && (
+                    <p className="font-bold" style={{ fontSize: `${settings.fontSize + 2}px` }}>
+                        {formatMXNAmount(sampleItem.price)}
+                    </p>
+                )}
+            </div>
         </div>
-      ))}
     </div>
   );
 }

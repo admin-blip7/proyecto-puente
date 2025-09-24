@@ -12,6 +12,8 @@ import {
   DocumentData,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("accountService");
 
 const ACCOUNTS_COLLECTION = "accounts";
 
@@ -31,8 +33,8 @@ export const getAccounts = async (): Promise<Account[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(accountFromDoc);
   } catch (error) {
-    console.error("Error fetching accounts: ", error);
-    throw new Error("Failed to fetch accounts.");
+    log.error("Error fetching accounts: ", error);
+    throw error;
   }
 };
 
@@ -46,8 +48,8 @@ export const addAccount = async (
       ...accountData,
     };
   } catch (error) {
-    console.error("Error adding account: ", error);
-    throw new Error("Failed to add account.");
+    log.error("Error adding account: ", error);
+    throw error;
   }
 };
 
@@ -59,8 +61,8 @@ export const updateAccount = async (
     const accountRef = doc(db, ACCOUNTS_COLLECTION, accountId);
     await updateDoc(accountRef, dataToUpdate);
   } catch (error) {
-    console.error("Error updating account: ", error);
-    throw new Error("Failed to update account.");
+    log.error("Error updating account: ", error);
+    throw error;
   }
 };
 
@@ -70,7 +72,7 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
         // Add checks here to prevent deletion if balance is not 0 or if it's linked
         await deleteDoc(accountRef);
     } catch (error) {
-        console.error("Error deleting account:", error);
-        throw new Error("Failed to delete account.")
+        log.error("Error deleting account:", error);
+        throw error;
     }
 }

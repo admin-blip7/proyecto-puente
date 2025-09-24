@@ -100,8 +100,8 @@ export default function CreateWarrantyDialog({
         saleId: sale.saleId,
         productId: values.productId,
         productName: selectedItem.name,
-        customerName: sale.customerName,
-        customerPhone: sale.customerPhone,
+        customerName: sale.customerName || undefined,
+        customerPhone: sale.customerPhone || undefined,
         reason: values.reason,
       };
 

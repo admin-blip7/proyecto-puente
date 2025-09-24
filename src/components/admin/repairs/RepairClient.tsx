@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { getStatusVariant } from "@/lib/utils";
+import { formatCurrency, getStatusVariant } from "@/lib/utils";
 import PrintRepairDocumentsDialog from "./PrintRepairDocumentsDialog";
 import {
   DropdownMenu,
@@ -191,7 +191,7 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
                                 {order.status}
                             </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">${order.totalPrice.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(order.totalPrice)}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

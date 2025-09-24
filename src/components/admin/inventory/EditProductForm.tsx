@@ -16,6 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
+import CurrencyInput from "@/components/ui/currency-input";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("EditProductForm");
 
 interface EditProductFormProps {
   product: Product;
@@ -69,12 +72,12 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
   const handleSaveChanges = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
-    console.log("Guardando datos:", formData);
+    log.info("Guardando datos:", formData);
 
     try {
       await updateProduct(product.id, formData);
       
-      console.log("¡Éxito! Producto actualizado en Firestore.");
+      log.info("¡Éxito! Producto actualizado en Firestore.");
       toast({
         title: "Producto Actualizado",
         description: `El producto "${formData.name}" ha sido guardado exitosamente.`,
@@ -84,16 +87,16 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
       router.refresh();
 
     } catch (error) {
-      console.error("ERROR AL GUARDAR EN FIRESTORE:", error);
+      log.error("ERROR AL GUARDAR EN FIRESTORE:", error);
       toast({
         variant: "destructive",
         title: "Error al Guardar",
         description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+     } finally {
+       setIsLoading(false);
+     }
+   };
   
   const formMethodsForSelector = {
     watch: (fieldName: keyof Product) => formData[fieldName],
@@ -155,11 +158,24 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cost">Costo de Compra</Label>
-                    <Input id="cost" name="cost" type="number" step="0.01" value={formData.cost} onChange={handleCostChange} />
+                    <CurrencyInput 
+                      id="cost" 
+                      name="cost" 
+                      value={formData.cost} 
+                      onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
+                      showCurrencyLabel={false}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="price">Precio de Venta</Label>
-                    <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} disabled={formData.ownershipType === 'Familiar'} />
+                    <CurrencyInput 
+                      id="price" 
+                      name="price" 
+                      value={formData.price} 
+                      onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
+                      disabled={formData.ownershipType === 'Familiar'}
+                      showCurrencyLabel={false}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

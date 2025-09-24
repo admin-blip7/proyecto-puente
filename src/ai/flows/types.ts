@@ -123,3 +123,31 @@ export const GenerateDebtStrategyOutputSchema = z.object({
   avalanche: StrategySchema.describe("The Avalanche Method strategy, focusing on paying off the highest-interest debts first to save money."),
 });
 export type GenerateDebtStrategyOutput = z.infer<typeof GenerateDebtStrategyOutputSchema>;
+
+// Types for: generate-product-image
+export const GenerateProductImageInputSchema = z.object({
+  productName: z.string().describe("The name of the product for which to generate an image."),
+  productDescription: z.string().optional().describe("Optional description of the product."),
+});
+export type GenerateProductImageInput = z.infer<typeof GenerateProductImageInputSchema>;
+
+export const GenerateProductImageOutputSchema = z.object({
+  imageUrl: z.string().describe("The URL of the generated product image."),
+  altText: z.string().describe("Alternative text description for the image."),
+});
+export type GenerateProductImageOutput = z.infer<typeof GenerateProductImageOutputSchema>;
+
+// Types for: optimize-product-image
+export const OptimizeProductImageInputSchema = z.object({
+  imageUrl: z.string().describe("The URL of the image to optimize."),
+  targetWidth: z.number().optional().describe("Target width for optimization."),
+  targetHeight: z.number().optional().describe("Target height for optimization."),
+});
+export type OptimizeProductImageInput = z.infer<typeof OptimizeProductImageInputSchema>;
+
+export const OptimizeProductImageOutputSchema = z.object({
+  optimizedImageUrl: z.string().describe("The URL of the optimized image."),
+  originalSize: z.number().describe("Original file size in bytes."),
+  optimizedSize: z.number().describe("Optimized file size in bytes."),
+});
+export type OptimizeProductImageOutput = z.infer<typeof OptimizeProductImageOutputSchema>;

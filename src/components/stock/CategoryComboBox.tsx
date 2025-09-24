@@ -5,11 +5,12 @@ import { createPortal } from 'react-dom'
 import { useStablePortal } from '@/components/infra/useStablePortal'
 import { useControlledInput } from '@/hooks/useControlledInput'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { searchCategories, createCategory } from '@/lib/firebase/firestore.categories'
+import { searchCategories, createCategory } from '@/lib/services/categoryService'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 import { Loader2, PlusCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("CategoryComboBox");
 
 type Option = { id: string; label: string }
 interface Props {
@@ -50,9 +51,9 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
     const q = debounced.trim()
     setIsLoading(true);
     
-    searchCategories(q).then(rows => {
+    searchCategories(q).then((rows: any) => {
         if (!active) return // Prevent state update if component has unmounted
-        setOptions((rows ?? []).filter(Boolean))
+        setOptions((rows ?? []).filter(Boolean).map((category: any) => ({ id: category.id, label: category.name })))
         setIsLoading(false);
     }).catch(() => {
         if(active) setIsLoading(false);
@@ -76,7 +77,7 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
         setOptions(prev => [newOption, ...prev]);
         handleSelect(newOption);
     } catch(err) {
-        console.error("Failed to create category", err);
+        log.error("Failed to create category", err);
     } finally {
         setIsLoading(false);
     }
@@ -93,7 +94,8 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
                 <li key={opt.id} role="option" tabIndex={0}
                     className="px-3 py-2 hover:bg-accent cursor-pointer"
                     onMouseDown={(e) => e.preventDefault()} // Prevent blur on click
-                    onClick={() => handleSelect(opt)}>
+                    onClick={() => handleSelect(opt)}
+                    aria-selected={value === opt.label}>
                 {opt.label}
                 </li>
             ))}
@@ -101,8 +103,9 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
                  <li role="option" tabIndex={0}
                     className="px-3 py-2 hover:bg-accent cursor-pointer flex items-center gap-2 text-primary"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleCreate(debounced.trim())}>
-                    <PlusCircle className='h-4 w-4' /> Crear "{debounced.trim()}"
+                    onClick={() => handleCreate(debounced.trim())}
+                    aria-selected={false}>
+                    <PlusCircle className='h-4 w-4' /> Crear &quot;{debounced.trim()}&quot;
                 </li>
             )}
             {options.length === 0 && !isLoading && (debounced.length === 0 || !allowCreate) && (
@@ -111,7 +114,7 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
         </>
       )}
     </ul>
-  ), [options, isLoading, handleSelect, handleCreate, debounced, allowCreate])
+  ), [options, isLoading, handleSelect, handleCreate, debounced, allowCreate, value])
 
   const dropdownContent = (
     <div className="absolute left-0 right-0 z-50 mt-1">{popup}</div>

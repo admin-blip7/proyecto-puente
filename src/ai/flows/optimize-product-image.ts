@@ -8,29 +8,29 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { 
-    OptimizeImageInputSchema,
-    OptimizeImageOutputSchema,
-    OptimizeImageInput,
-    OptimizeImageOutput
+import {
+    OptimizeProductImageInputSchema,
+    OptimizeProductImageOutputSchema,
+    OptimizeProductImageInput,
+    OptimizeProductImageOutput
 } from './types';
 
-export async function optimizeProductImage(input: OptimizeImageInput): Promise<OptimizeImageOutput> {
+export async function optimizeProductImage(input: OptimizeProductImageInput): Promise<OptimizeProductImageOutput> {
     return optimizeProductImageFlow(input);
 }
 
 
 const optimizeProductImageFlow = ai.defineFlow(
-    {
-      name: 'optimizeProductImageFlow',
-      inputSchema: OptimizeImageInputSchema,
-      outputSchema: OptimizeImageOutputSchema,
+  {
+    name: 'optimizeProductImageFlow',
+    inputSchema: OptimizeProductImageInputSchema,
+    outputSchema: OptimizeProductImageOutputSchema,
     },
     async (input) => {
         const { media } = await ai.generate({
             model: 'googleai/gemini-2.5-flash-image-preview',
             prompt: [
-              { media: { url: input.photoDataUri } },
+              { media: { url: input.imageUrl } },
               { text: "Toma el objeto principal de esta imagen, aísla perfectamente de su fondo original y colócalo sobre un fondo blanco puro (#FFFFFF). Genera una iluminación de estudio uniforme y añade una sutil sombra debajo del objeto para darle un aspecto realista y profesional." },
             ],
             config: {
@@ -43,7 +43,9 @@ const optimizeProductImageFlow = ai.defineFlow(
         }
         
         return {
-            optimizedImageUri: media.url,
+            optimizedImageUrl: media.url,
+            originalSize: 0, // Placeholder - would need actual implementation
+            optimizedSize: 0, // Placeholder - would need actual implementation
         };
     }
 );

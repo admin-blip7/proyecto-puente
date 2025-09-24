@@ -8,6 +8,8 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("settingsService");
 
 const SETTINGS_COLLECTION = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
@@ -61,7 +63,7 @@ export const getTicketSettings = async (): Promise<TicketSettings> => {
             if (parsed.success) {
                 return parsed.data;
             } else {
-                console.warn("Invalid ticket settings in Firestore, returning defaults.", parsed.error);
+                log.warn("Invalid ticket settings in Firestore, returning defaults.", parsed.error);
                 return defaultTicketSettings;
             }
         } else {
@@ -69,7 +71,7 @@ export const getTicketSettings = async (): Promise<TicketSettings> => {
             return defaultTicketSettings;
         }
     } catch (error) {
-        console.error("Error fetching ticket settings: ", error);
+        log.error("Error fetching ticket settings: ", error);
         return defaultTicketSettings;
     }
 }
@@ -85,7 +87,7 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
         }, { merge: true });
 
     } catch (error) {
-        console.error("Error saving ticket settings: ", error);
+        log.error("Error saving ticket settings: ", error);
         throw new Error("Failed to save ticket settings.");
     }
 };
@@ -119,7 +121,7 @@ export const getLabelSettings = async (): Promise<LabelSettings> => {
             if (parsed.success) {
                 return parsed.data;
             } else {
-                console.warn("Invalid label settings in Firestore, returning defaults.", parsed.error);
+                log.warn("Invalid label settings in Firestore, returning defaults.", parsed.error);
                 return defaultLabelSettings;
             }
         } else {
@@ -127,7 +129,7 @@ export const getLabelSettings = async (): Promise<LabelSettings> => {
             return defaultLabelSettings;
         }
     } catch (error) {
-        console.error("Error fetching label settings: ", error);
+        log.error("Error fetching label settings: ", error);
         return defaultLabelSettings;
     }
 }
@@ -142,7 +144,7 @@ export const saveLabelSettings = async (settings: LabelSettings): Promise<void> 
         }, { merge: true });
 
     } catch (error) {
-        console.error("Error saving label settings: ", error);
+        log.error("Error saving label settings: ", error);
         throw new Error("Failed to save label settings.");
     }
 };

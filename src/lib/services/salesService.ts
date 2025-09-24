@@ -4,7 +4,8 @@ import { Sale, CartItem, Product, CashSession } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction, query, where, limit, orderBy, increment } from "firebase/firestore";
 import { v4 as uuidv4 } from 'uuid';
 import { getProductById } from "./productService";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("salesService");
 const SALES_COLLECTION = "sales";
 const PRODUCTS_COLLECTION = "products";
 const INVENTORY_LOGS_COLLECTION = "inventory_logs";
@@ -35,7 +36,7 @@ export const getSales = async (): Promise<Sale[]> => {
         const sales = querySnapshot.docs.map(saleFromDoc);
         return sales.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
     } catch (error) {
-        console.error("Error fetching sales:", error);
+        log.error("Error fetching sales:", error);
         return [];
     }
 };

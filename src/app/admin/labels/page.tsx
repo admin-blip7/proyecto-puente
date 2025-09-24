@@ -5,11 +5,17 @@ import { Menu } from "lucide-react";
 import { getProducts } from "@/lib/services/productService";
 import LabelPrinterClient from "@/components/admin/labels/LabelPrinterClient";
 import { getLabelSettings } from "@/lib/services/settingsService";
+import { getConsignors } from "@/lib/services/consignorService";
+import { getSuppliers } from "@/lib/services/supplierService";
 
 
 export default async function LabelsPage() {
-    const initialProducts = await getProducts();
-    const labelSettings = await getLabelSettings();
+    const [initialProducts, labelSettings, consignors, suppliers] = await Promise.all([
+        getProducts(),
+        getLabelSettings(),
+        getConsignors(),
+        getSuppliers(),
+    ]);
    
     return (
         <div className="flex h-screen w-full flex-row">
@@ -30,7 +36,12 @@ export default async function LabelsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-              <LabelPrinterClient allProducts={initialProducts} settings={labelSettings} />
+              <LabelPrinterClient 
+                allProducts={initialProducts} 
+                settings={labelSettings} 
+                consignors={consignors}
+                suppliers={suppliers}
+              />
             </main>
         </div>
     )

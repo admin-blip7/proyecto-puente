@@ -35,6 +35,51 @@ export interface Consignor {
     balanceDue: number;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  contactInfo: string;
+  notes: string;
+  totalPurchasedYTD: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  orderNumber: string;
+  supplier: string;
+  totalAmount: number;
+  status: 'pending' | 'received' | 'cancelled';
+  items: PurchaseOrderItem[];
+  shippingInfo?: {
+    address?: string;
+    trackingNumber?: string;
+    estimatedDelivery?: Date;
+  };
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  history: PurchaseOrderHistoryEntry[];
+}
+
+export interface PurchaseOrderItem {
+  productId: string;
+  productName: string;
+  sku?: string;
+  qty: number;
+  unitCost: number;
+  totalCost: number;
+}
+
+export interface PurchaseOrderHistoryEntry {
+  action: string;
+  status: string;
+  timestamp: Date;
+  user: string;
+  notes?: string;
+}
+
 export interface SaleItem {
   productId: string;
   name: string;
@@ -267,6 +312,7 @@ export const TicketSettingsSchema = z.object({
     showQrCode: z.boolean(),
     qrCodeUrl: z.string().url().or(z.literal("")).optional(),
   }),
+  visualLayout: z.string().optional(), // JSON string of VisualElement[]
 });
 
 export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
@@ -285,12 +331,31 @@ export const LabelSettingsSchema = z.object({
         showPrice: z.boolean(),
         showStoreName: z.boolean(),
     }),
+    visualLayout: z.string().optional(), // JSON string of VisualElement[]
 });
 
 export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
 
+export interface LabelPrintProductContext {
+    id?: string;
+    name: string;
+    sku: string;
+    price?: number;
+    cost?: number;
+    stock?: number;
+    ownershipType?: OwnershipType;
+    consignorName?: string;
+    supplierName?: string;
+}
+
+export interface LabelPrintItem {
+    product: LabelPrintProductContext;
+    quantity: number;
+}
+
 export const ContractTemplateSchema = z.object({
     content: z.string(),
+    visualLayout: z.string().optional(), // JSON string of VisualElement[]
 });
 
 export type ContractTemplateSettings = z.infer<typeof ContractTemplateSchema>;

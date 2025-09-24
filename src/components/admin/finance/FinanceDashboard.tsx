@@ -19,6 +19,7 @@ import StatCard from "./StatCard";
 import { DatePickerWithRange } from "./DatePickerWithRange";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from 'recharts';
 import PeakHoursHeatmap from "./PeakHoursHeatmap";
+import { formatCurrency as formatCurrencyMXN } from "@/lib/utils";
 
 interface FinanceDashboardProps {
   initialExpenses: Expense[];
@@ -32,7 +33,7 @@ interface FinanceDashboardProps {
 }
 
 const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+    return formatCurrencyMXN(value);
 };
 
 const calculateMetrics = (
@@ -154,7 +155,7 @@ const calculateMetrics = (
     const activityByHour: Record<number, Record<number, number>> = {};
     for (let i = 0; i < 7; i++) activityByHour[i] = {};
 
-    [...salesInRange, ...repairsInRange].forEach(transaction => {
+    [...salesInRange, ...repairsInRange].forEach((transaction: any) => {
         const date = 'createdAt' in transaction ? transaction.createdAt : transaction.completedAt!;
         const day = (getDay(date) + 6) % 7; // Monday = 0
         const hour = getHours(date);

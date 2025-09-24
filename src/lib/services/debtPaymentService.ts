@@ -10,7 +10,8 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("debtPaymentService");
 const DEBT_PAYMENTS_COLLECTION = "debt_payments";
 const DEBTS_COLLECTION = "debts";
 const ACCOUNTS_COLLECTION = "accounts";
@@ -74,10 +75,7 @@ export const addDebtPayment = async (
         });
 
     } catch (error) {
-        console.error("Error processing debt payment: ", error);
-        if (error instanceof Error) {
-            throw error; // Re-throw the original error to be caught by the UI
-        }
-        throw new Error("Failed to process payment.");
+        log.error("Error processing debt payment: ", error);
+        throw error;
     }
 };

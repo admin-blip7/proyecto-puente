@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getConsignors } from "@/lib/services/consignorService";
 import { parseStockEntryCommand } from "@/ai/flows/parse-stock-entry-command";
-import { cn, generateAndPrintLabels } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,7 +38,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     const [consignors, setConsignors] = useState<Consignor[]>([]);
     const [isListening, setIsListening] = useState(false);
 
-    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const recognitionRef = useRef<any>(null);
     const searchContainerRef = useRef<HTMLDivElement>(null);
 
     const { userProfile } = useAuth();
@@ -50,7 +51,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         getConsignors().then(setConsignors);
         
         if (typeof window !== 'undefined') {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
             if (SpeechRecognition) {
                 const recognition = new SpeechRecognition();
                 recognition.continuous = false;
@@ -59,13 +60,13 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
 
                 recognition.onstart = () => setIsListening(true);
                 recognition.onend = () => setIsListening(false);
-                recognition.onerror = (event) => {
+                recognition.onerror = (event: any) => {
                     console.error('Speech recognition error', event.error);
                     toast({ variant: 'destructive', title: "Error de Voz", description: "No se pudo iniciar el reconocimiento de voz." });
                     setIsListening(false);
                 };
 
-                recognition.onresult = async (event) => {
+                recognition.onresult = async (event: any) => {
                     const transcript = event.results[event.results.length - 1][0].transcript.trim();
                     toast({ title: "Comando reconocido", description: transcript });
                     try {
@@ -222,13 +223,18 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
             
             const labelsToPrint = processedItems.map(p => ({
-                name: p.name,
-                sku: p.sku,
-                price: p.price,
+                product: {
+                    id: p.productId,
+                    name: p.name,
+                    sku: p.sku,
+                    price: p.price,
+                    cost: p.cost,
+                    ownershipType: p.ownershipType,
+                },
                 quantity: p.quantity,
             }));
 
-            generateAndPrintLabels(labelsToPrint, labelSettings);
+            await generateAndPrintLabels(labelsToPrint, labelSettings);
 
             setEntryList([]);
         } catch (error) {
@@ -248,46 +254,112 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                         <CardDescription>Busca productos existentes, crea nuevos o usa tu voz para agregarlos a la lista de ingreso.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                       <div ref={searchContainerRef}>
+                       <div ref={searchContainerRef} className="space-y-4">
                             <div className="flex flex-col sm:flex-row items-center gap-4">
-                                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                                    <PopoverTrigger asChild className="w-full">
-                                        <div className="relative">
-                                             <Input
+                                {/* Enhanced Search Bar */}
+                                <div className="w-full relative">
+                                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={popoverOpen}
+                                                className="w-full justify-between h-12 text-left font-normal"
+                                                onClick={() => setPopoverOpen(true)}
+                                            >
+                                                <span className={cn(
+                                                    "truncate",
+                                                    !searchQuery && "text-muted-foreground"
+                                                )}>
+                                                    {searchQuery || "Buscar producto por SKU o nombre..."}
+                                                </span>
+                                                <div className="flex items-center gap-2 ml-2">
+                                                    {searchQuery && (
+                                                        <div
+                                                            className="h-6 w-6 p-0 hover:bg-destructive/10 rounded-sm flex items-center justify-center cursor-pointer text-sm font-medium"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSearchQuery("");
+                                                                setPopoverOpen(false);
+                                                            }}
+                                                        >
+                                                            ×
+                                                        </div>
+                                                    )}
+                                                    <div className="h-4 w-4 shrink-0 opacity-50">
+                                                        ⌄
+                                                    </div>
+                                                </div>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                           <Command>
+                                              <CommandInput
                                                 placeholder="Buscar producto por SKU o nombre..."
                                                 value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                onFocus={() => setPopoverOpen(true)}
-                                                className="w-full"
-                                            />
-                                        </div>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-1 w-[--radix-popover-trigger-width]" align="start">
-                                       <Command>
-                                          <CommandInput
-                                            placeholder="Buscar producto por SKU o nombre..."
-                                            value={searchQuery}
-                                            onValueChange={setSearchQuery}
-                                          />
-                                          <CommandList>
-                                            {filteredProducts.length === 0 && searchQuery.length > 0 ? (
-                                                <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                            ) : (
-                                                <CommandGroup>
-                                                    {filteredProducts.slice(0, 50).map(product => (
-                                                        <CommandItem key={product.id} onSelect={() => handleSelectProduct(product)} className="cursor-pointer">
-                                                            <span>{product.name}</span>
-                                                            <span className="text-xs text-muted-foreground ml-auto">{product.sku}</span>
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            )}
-                                          </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
+                                                onValueChange={setSearchQuery}
+                                                className="h-12"
+                                              />
+                                              <CommandList className="max-h-[300px]">
+                                                {searchQuery.length === 0 ? (
+                                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                                        Escribe para buscar productos existentes
+                                                    </div>
+                                                ) : filteredProducts.length === 0 ? (
+                                                    <div className="p-4 text-center">
+                                                        <div className="text-sm text-muted-foreground mb-2">
+                                                            No se encontraron productos
+                                                        </div>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                handleAddNewProduct(searchQuery);
+                                                                setSearchQuery("");
+                                                                setPopoverOpen(false);
+                                                            }}
+                                                            className="w-full"
+                                                        >
+                                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                                            Crear "{searchQuery}"
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <CommandGroup>
+                                                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                                                            {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+                                                        </div>
+                                                        {filteredProducts.slice(0, 50).map(product => (
+                                                            <CommandItem 
+                                                                key={product.id} 
+                                                                onSelect={() => handleSelectProduct(product)} 
+                                                                className="cursor-pointer flex items-center justify-between p-3 hover:bg-accent"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-medium">{product.name}</span>
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        SKU: {product.sku} • ${product.price.toFixed(2)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    Stock: {product.stock || 0}
+                                                                </div>
+                                                            </CommandItem>
+                                                        ))}
+                                                        {filteredProducts.length > 50 && (
+                                                            <div className="p-2 text-xs text-center text-muted-foreground border-t">
+                                                                Mostrando los primeros 50 resultados
+                                                            </div>
+                                                        )}
+                                                    </CommandGroup>
+                                                )}
+                                              </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                
                                 <div className="flex w-full sm:w-auto items-center gap-2">
-                                    <Button onClick={() => handleAddNewProduct()} className="w-full">
+                                    <Button onClick={() => handleAddNewProduct()} className="w-full sm:w-auto">
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         Crear Nuevo
                                     </Button>
@@ -301,6 +373,18 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                     </Button>
                                 </div>
                             </div>
+                            
+                            {/* Quick Stats */}
+                            {entryList.length > 0 && (
+                                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm">
+                                    <span className="text-muted-foreground">
+                                        {entryList.length} producto{entryList.length !== 1 ? 's' : ''} en la lista
+                                    </span>
+                                    <span className="font-medium">
+                                        Total: ${entryList.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toFixed(2)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -310,103 +394,196 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                         <CardTitle>Lista de Ingreso</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[120px]">SKU</TableHead>
-                                        <TableHead>Nombre Producto</TableHead>
-                                        <TableHead className="w-[140px]">Tipo Propiedad</TableHead>
-                                        <TableHead className="w-[160px]">Consignador</TableHead>
-                                        <TableHead className="w-[90px] text-right">Cantidad</TableHead>
-                                        <TableHead className="w-[110px] text-right">Costo</TableHead>
-                                        <TableHead className="w-[110px] text-right">Precio Venta</TableHead>
-                                        <TableHead className="w-[50px]"></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {entryList.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={8} className="h-24 text-center">La lista de ingreso está vacía.</TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        entryList.map(item => (
-                                            <TableRow key={item.id}>
-                                                <TableCell>
-                                                    <Input value={item.sku} readOnly={!item.isNew} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} className={cn(!item.isNew && "bg-muted/50 text-xs")} />
-                                                </TableCell>
-                                                <TableCell>
-                                                     <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
-                                                        <SelectTrigger><SelectValue/></SelectTrigger>
-                                                        <SelectContent>
-                                                            {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {item.ownershipType === 'Consigna' && (
+                        {/* Desktop Enhanced Two-Row View */}
+                        <div className="hidden md:block space-y-4">
+                            {entryList.length === 0 ? (
+                                <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                                    La lista de ingreso está vacía.
+                                </div>
+                            ) : (
+                                entryList.map(item => (
+                                    <div key={item.id} className="border rounded-lg p-4 space-y-4 bg-card hover:bg-accent/5 transition-colors">
+                                        {/* Primera fila: Información básica del producto */}
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                            <div className="col-span-2">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">SKU</Label>
+                                                <Input 
+                                                    value={item.sku} 
+                                                    readOnly={!item.isNew} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} 
+                                                    className={cn(!item.isNew && "bg-muted/50 text-xs", "h-9")} 
+                                                />
+                                            </div>
+                                            <div className="col-span-4">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre del Producto</Label>
+                                                <Input 
+                                                    value={item.name} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} 
+                                                    className="h-9"
+                                                    placeholder="Ingrese el nombre del producto"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Cantidad</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    value={item.quantity} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} 
+                                                    onFocus={(e) => {
+                                                        if (e.target.value === '0') {
+                                                            e.target.select();
+                                                        }
+                                                    }}
+                                                    className="text-right h-9" 
+                                                    min="1"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Propiedad</Label>
+                                                <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue/>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="col-span-1 flex justify-end">
+                                                <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="h-9 w-9">
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Segunda fila: Información financiera y consignador */}
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                            <div className="col-span-3">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Costo Unitario</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    value={item.cost} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} 
+                                                    onFocus={(e) => {
+                                                        if (e.target.value === '0') {
+                                                            e.target.select();
+                                                        }
+                                                    }}
+                                                    className="text-right h-9" 
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Precio de Venta</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    value={item.price} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} 
+                                                    onFocus={(e) => {
+                                                        if (e.target.value === '0') {
+                                                            e.target.select();
+                                                        }
+                                                    }}
+                                                    disabled={item.ownershipType === 'Familiar'} 
+                                                    className="text-right h-9" 
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                            <div className="col-span-4">
+                                                {item.ownershipType === 'Consigna' ? (
+                                                    <>
+                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Consignador</Label>
                                                         <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
-                                                            <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                                            <SelectTrigger className="h-9">
+                                                                <SelectValue placeholder="Seleccionar consignador..."/>
+                                                            </SelectTrigger>
                                                             <SelectContent>
                                                                 {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                    </>
+                                                ) : (
+                                                    <div className="h-9 flex items-center">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {item.ownershipType === 'Familiar' && 'Precio automático = Costo'}
+                                                            {item.ownershipType === 'Propio' && 'Producto propio'}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Total</Label>
+                                                <div className="h-9 flex items-center justify-end">
+                                                    <span className="text-sm font-medium">
+                                                        ${((item.cost || 0) * (item.quantity || 0)).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
-                        {/* Mobile Card View */}
+                        {/* Mobile Enhanced Card View */}
                         <div className="md:hidden space-y-4">
                         {entryList.length === 0 ? (
-                                <p className="text-center text-muted-foreground py-10">La lista de ingreso está vacía.</p>
+                                <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                                    La lista de ingreso está vacía.
+                                </div>
                         ) : (
                             entryList.map(item => (
                                 <Card key={item.id} className="relative">
-                                    <CardContent className="p-4 space-y-3">
+                                    <CardContent className="p-4 space-y-4">
                                         <div className="absolute top-2 right-2">
                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveItem(item.id)}>
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
                                         </div>
-                                        <div className="space-y-1">
-                                            <Label>Nombre Producto</Label>
-                                            <Input value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        
+                                        {/* Primera fila móvil: Información básica */}
+                                        <div className="space-y-3">
                                             <div className="space-y-1">
-                                                <Label>SKU</Label>
-                                                <Input value={item.sku} readOnly={!item.isNew} onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} className={cn(!item.isNew && "bg-muted/50 text-xs")} />
+                                                <Label className="text-xs font-medium text-muted-foreground">Nombre del Producto</Label>
+                                                <Input 
+                                                    value={item.name} 
+                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} 
+                                                    placeholder="Ingrese el nombre del producto"
+                                                />
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label>Cantidad</Label>
-                                                <Input type="number" value={item.quantity} onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} className="text-right" />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-medium text-muted-foreground">SKU</Label>
+                                                    <Input 
+                                                        value={item.sku} 
+                                                        readOnly={!item.isNew} 
+                                                        onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} 
+                                                        className={cn(!item.isNew && "bg-muted/50 text-xs")} 
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-medium text-muted-foreground">Cantidad</Label>
+                                                    <Input 
+                                                        type="number" 
+                                                        value={item.quantity} 
+                                                        onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} 
+                                                        onFocus={(e) => {
+                                                            if (e.target.value === '0') {
+                                                                e.target.select();
+                                                            }
+                                                        }}
+                                                        className="text-right" 
+                                                        min="1"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 gap-2">
+                                        
+                                        {/* Segunda fila móvil: Configuración */}
+                                        <div className="space-y-3">
                                             <div className="space-y-1">
-                                                <Label>Tipo de Propiedad</Label>
+                                                <Label className="text-xs font-medium text-muted-foreground">Tipo de Propiedad</Label>
                                                 <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
                                                     <SelectTrigger><SelectValue placeholder="Tipo Propiedad" /></SelectTrigger>
                                                     <SelectContent>
@@ -416,24 +593,57 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                             </div>
                                             {item.ownershipType === 'Consigna' && (
                                                 <div className="space-y-1">
-                                                    <Label>Consignador</Label>
+                                                    <Label className="text-xs font-medium text-muted-foreground">Consignador</Label>
                                                     <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
-                                                        <SelectTrigger><SelectValue placeholder="Seleccionar..."/></SelectTrigger>
+                                                        <SelectTrigger><SelectValue placeholder="Seleccionar consignador..."/></SelectTrigger>
                                                         <SelectContent>
                                                             {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
                                             )}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                             <div className="space-y-1">
-                                                <Label>Costo</Label>
-                                                <Input type="number" step="0.01" value={item.cost} onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} className="text-right" />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                 <div className="space-y-1">
+                                                    <Label className="text-xs font-medium text-muted-foreground">Costo Unitario</Label>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        value={item.cost} 
+                                                        onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)} 
+                                                        onFocus={(e) => {
+                                                            if (e.target.value === '0') {
+                                                                e.target.select();
+                                                            }
+                                                        }}
+                                                        className="text-right" 
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-medium text-muted-foreground">Precio de Venta</Label>
+                                                    <Input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        value={item.price} 
+                                                        onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} 
+                                                        onFocus={(e) => {
+                                                            if (e.target.value === '0') {
+                                                                e.target.select();
+                                                            }
+                                                        }}
+                                                        disabled={item.ownershipType === 'Familiar'} 
+                                                        className="text-right" 
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label>Precio Venta</Label>
-                                                <Input type="number" step="0.01" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} disabled={item.ownershipType === 'Familiar'} className="text-right" />
+                                            
+                                            {/* Total para móvil */}
+                                            <div className="flex justify-between items-center p-2 bg-muted/30 rounded text-sm">
+                                                <span className="text-muted-foreground">Total del producto:</span>
+                                                <span className="font-medium">
+                                                    ${((item.cost || 0) * (item.quantity || 0)).toFixed(2)}
+                                                </span>
                                             </div>
                                         </div>
                                     </CardContent>

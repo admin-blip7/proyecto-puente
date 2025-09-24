@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Package, Building, DollarSign } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 interface BalanceSheetClientProps {
     assets: FixedAsset[];
@@ -31,7 +32,7 @@ export default function BalanceSheetClient({ assets, inventoryValue, fixedAssets
                     <Package className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">${inventoryValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">{formatCurrency(inventoryValue)}</div>
                     <p className="text-xs text-muted-foreground">Valor total del inventario disponible.</p>
                 </CardContent>
             </Card>
@@ -41,7 +42,7 @@ export default function BalanceSheetClient({ assets, inventoryValue, fixedAssets
                     <Building className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">${fixedAssetsValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">{formatCurrency(fixedAssetsValue)}</div>
                     <p className="text-xs text-muted-foreground">Valor actual de los activos depreciados.</p>
                 </CardContent>
             </Card>
@@ -51,7 +52,7 @@ export default function BalanceSheetClient({ assets, inventoryValue, fixedAssets
                     <DollarSign className="h-4 w-4 text-primary-foreground/80" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">${totalAssets.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">{formatCurrency(totalAssets)}</div>
                     <p className="text-xs text-primary-foreground/80">Valor total de la empresa.</p>
                 </CardContent>
             </Card>
@@ -78,15 +79,15 @@ export default function BalanceSheetClient({ assets, inventoryValue, fixedAssets
                                 <TableRow key={asset.id}>
                                     <TableCell className="font-medium">{asset.name}</TableCell>
                                     <TableCell>{asset.category}</TableCell>
-                                    <TableCell className="text-right">${asset.purchaseCost.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-semibold">${asset.currentValue.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(asset.purchaseCost)}</TableCell>
+                                    <TableCell className="text-right font-semibold">{formatCurrency(asset.currentValue)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                         <TableFoot>
                             <TableRow>
                                 <TableCell colSpan={3} className="text-right font-bold text-lg">Total Activos Fijos</TableCell>
-                                <TableCell className="text-right font-bold text-lg">${fixedAssetsValue.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-bold text-lg">{formatCurrency(fixedAssetsValue)}</TableCell>
                             </TableRow>
                         </TableFoot>
                     </Table>

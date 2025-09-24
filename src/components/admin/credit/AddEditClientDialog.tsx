@@ -262,8 +262,8 @@ return (
                                         <Button type="button" variant="outline" className="w-full" onClick={() => idFileInputRef.current?.click()} disabled={!isEditMode || isUploading}>
                                             {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                             {isUploading ? "Subiendo..." : (idPreview ? "Reemplazar Credencial (INE)" : "Subir Credencial (INE)")}
-                                            <input ref={idFileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleIdUpload} disabled={!isEditMode || isUploading} />
                                         </Button>
+                                        <input ref={idFileInputRef} type="file" accept="image/*" className="sr-only" onChange={handleIdUpload} disabled={!isEditMode || isUploading} />
                                     </div>
                                 </TooltipTrigger>
                                 {!isEditMode && (

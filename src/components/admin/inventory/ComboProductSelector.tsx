@@ -10,6 +10,9 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, X } from "lucide-react";
 
+// Array constante para usar como fallback estable y no crear nuevas referencias en cada render
+const EMPTY_COMBO_IDS: string[] = [];
+
 interface ComboProductSelectorProps {
   form: {
     watch: (name: keyof Product) => any;
@@ -23,14 +26,15 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
   const [comboSearch, setComboSearch] = useState("");
   const { watch, setValue, getValues } = form;
 
-  const comboProductIds = watch("comboProductIds") || [];
+  // Evitamos crear [] en cada render para no cambiar dependencias de los useMemo
+  const comboProductIds: string[] = watch("comboProductIds") ?? EMPTY_COMBO_IDS;
 
   const comboProducts = useMemo(() => {
     return allProducts.filter(p => comboProductIds.includes(p.id));
   }, [allProducts, comboProductIds]);
 
   const filteredComboOptions = useMemo(() => {
-    return allProducts.filter(p => 
+    return allProducts.filter((p: any) => 
         !comboProductIds.includes(p.id) &&
         p.name.toLowerCase().includes(comboSearch.toLowerCase())
     );
@@ -39,7 +43,7 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
   const handleToggleComboProduct = (productId: string) => {
     const currentIds = getValues("comboProductIds") || [];
     const newIds = currentIds.includes(productId) 
-        ? currentIds.filter(id => id !== productId)
+        ? currentIds.filter((id: string) => id !== productId)
         : [...currentIds, productId];
     setValue("comboProductIds", newIds);
   };

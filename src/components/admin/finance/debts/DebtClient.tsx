@@ -17,6 +17,7 @@ import DebtStrategyDialog from './DebtStrategyDialog';
 import AddEditDebtDialog from './AddEditDebtDialog';
 import DeleteDebtDialog from './DeleteDebtDialog';
 import AddDebtPaymentDialog from './AddDebtPaymentDialog';
+import { formatCurrency } from "@/lib/utils";
 
 interface DebtClientProps {
     initialDebts: Debt[];
@@ -100,7 +101,7 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                     <CardTitle>Deuda Total</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-3xl font-bold">${totalDebt.toFixed(2)}</p>
+                    <p className="text-3xl font-bold">{formatCurrency(totalDebt)}</p>
                 </CardContent>
             </Card>
 
@@ -137,11 +138,11 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                         </DropdownMenu>
                                     </CardHeader>
                                     <CardContent className='space-y-3'>
-                                        <div className='text-2xl font-mono'>${debt.currentBalance.toFixed(2)}</div>
+                                        <div className='text-2xl font-mono'>{formatCurrency(debt.currentBalance ?? 0)}</div>
                                         {debt.totalLimit && (
                                             <div>
                                                 <div className='flex justify-between text-xs text-muted-foreground mb-1'>
-                                                    <span>Límite: ${debt.totalLimit.toFixed(2)}</span>
+                                                    <span>Límite: {formatCurrency(debt.totalLimit ?? 0)}</span>
                                                     <span>Uso: {usage.toFixed(1)}%</span>
                                                 </div>
                                                 <Progress value={usage} />
@@ -169,7 +170,7 @@ export default function DebtClient({ initialDebts, initialAccounts }: DebtClient
                                         <p className='text-sm text-muted-foreground'>{debt.debtType}</p>
                                     </div>
                                     <div className='flex items-center gap-4'>
-                                        <p className='font-semibold text-lg'>${debt.currentBalance.toFixed(2)}</p>
+                                        <p className='font-semibold text-lg'>{formatCurrency(debt.currentBalance ?? 0)}</p>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">

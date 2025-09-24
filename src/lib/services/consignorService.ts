@@ -1,8 +1,9 @@
 import { db } from "@/lib/firebase";
 import { Consignor } from "@/types";
 import { collection, getDocs, doc, DocumentData, QueryDocumentSnapshot, serverTimestamp, Transaction, updateDoc, increment, addDoc, deleteDoc } from "firebase/firestore";
-
-const CONSIGNORS_COLLECTION = "consignors";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("consignorService");
+ const CONSIGNORS_COLLECTION = "consignors";
 
 const consignorFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Consignor => {
     const data = doc.data();
@@ -20,7 +21,7 @@ export const getConsignors = async (): Promise<Consignor[]> => {
         const consignors = querySnapshot.docs.map(consignorFromDoc);
         return consignors.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-        console.error("Error fetching consignors:", error);
+        log.error("Error fetching consignors:", error);
         return [];
     }
 }
@@ -37,7 +38,7 @@ export const addConsignor = async (data: Omit<Consignor, 'id' | 'balanceDue'>): 
             balanceDue: 0
         };
     } catch (error) {
-        console.error("Error adding consignor:", error);
+        log.error("Error adding consignor:", error);
         throw new Error("Failed to add consignor.");
     }
 };
@@ -47,7 +48,7 @@ export const updateConsignorInfo = async (consignorId: string, data: Partial<Omi
         const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
         await updateDoc(consignorRef, data);
     } catch (error) {
-        console.error("Error updating consignor:", error);
+        log.error("Error updating consignor:", error);
         throw new Error("Failed to update consignor.");
     }
 }
@@ -57,7 +58,7 @@ export const deleteConsignor = async (consignorId: string): Promise<void> => {
         const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
         await deleteDoc(consignorRef);
     } catch (error) {
-        console.error("Error deleting consignor:", error);
+        log.error("Error deleting consignor:", error);
         throw new Error("Failed to delete consignor.");
     }
 }

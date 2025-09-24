@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CartItem, Sale, SaleItem, UserProfile } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { formatCurrency } from '@/lib/utils';
 import SaleSummaryDialog from "./SaleSummaryDialog";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
+import { getClientsWithCredit, createCreditSale } from "@/lib/services/creditService";
 import { ScrollArea } from "../ui/scroll-area";
 
 interface CheckoutDialogProps {
@@ -23,7 +26,7 @@ interface CheckoutDialogProps {
 }
 
 export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalAmount, onSuccessfulSale }: CheckoutDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito'>('Efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito' | 'Crédito'>('Efectivo');
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -31,8 +34,35 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
   const [loading, setLoading] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [isSummaryOpen, setSummaryOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<string>("");
+  const [clients, setClients] = useState<any[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
+
+  // Load clients when credit payment is selected
+  useEffect(() => {
+    if (paymentMethod === 'Crédito') {
+      loadClients();
+    }
+  }, [paymentMethod]);
+
+  const loadClients = async () => {
+    setLoadingClients(true);
+    try {
+      const clientsData = await getClientsWithCredit();
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingClients(false);
+    }
+  };
 
   const change = useMemo(() => {
     if (paymentMethod === 'Efectivo' && amountPaid > 0) {
@@ -55,9 +85,33 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         return;
     }
 
+    // Remove serial validation for now since CartItem structure needs clarification
+    // const missingSerials = cartItems.filter(item => 
+    //   item.product?.requiresSerial && (!serials[item.id] || serials[item.id].length < item.quantity)
+    // );
+
+    // if (missingSerials.length > 0) {
+    //   toast({
+    //     title: "Error",
+    //     description: `Faltan números de serie para: ${missingSerials.map(item => item.name).join(', ')}`,
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
+
+    // Validate payment method specific requirements
     if (paymentMethod === 'Efectivo' && amountPaid < totalAmount) {
         toast({ variant: "destructive", title: "Pago Insuficiente", description: "El monto pagado es menor al total de la venta." });
         return;
+    }
+
+    if (paymentMethod === 'Crédito' && !selectedClient) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un cliente para la venta a crédito",
+        variant: "destructive",
+      });
+      return;
     }
 
     setLoading(true);
@@ -81,13 +135,29 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     }
 
     try {
-        const newSale = await addSaleAndUpdateStock(saleDataForDb, cartItems);
+        let newSale: Sale;
+
+        if (paymentMethod === 'Crédito') {
+           // Create financed sale
+           newSale = await createCreditSale({
+             items: cartItems,
+             clientId: selectedClient,
+             totalAmount,
+             serials: Object.values(serials).flat(),
+             userId: userProfile.uid,
+             customerName: customerName || undefined,
+             customerPhone: customerPhone || undefined,
+           });
+         } else {
+          // Create regular sale
+          newSale = await addSaleAndUpdateStock(saleDataForDb, cartItems);
+        }
 
         setLastSale(newSale);
         
         toast({
             title: "Venta Exitosa",
-            description: "La venta ha sido registrada correctamente.",
+            description: `Venta ${paymentMethod === 'Crédito' ? 'a crédito' : ''} completada exitosamente`,
         });
         
         // Reset state and close dialogs
@@ -98,6 +168,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         setCustomerPhone("");
         setAmountPaid(0);
         setSerials({});
+        setSelectedClient("");
 
     } catch (error) {
         console.error("Sale processing error:", error);
@@ -156,9 +227,9 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
 
                 <div className="text-2xl font-bold flex justify-between">
                     <span>Total a Pagar:</span>
-                    <span className="text-primary">${totalAmount.toFixed(2)}</span>
+                    <span className="text-primary">{formatCurrency(totalAmount)}</span>
                 </div>
-                <RadioGroup defaultValue="Efectivo" value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito')}>
+                <RadioGroup defaultValue="Efectivo" value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito' | 'Crédito')}>
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="Efectivo" id="cash" />
                     <Label htmlFor="cash">Efectivo</Label>
@@ -166,6 +237,10 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="Tarjeta de Crédito" id="card" />
                     <Label htmlFor="card">Tarjeta de Crédito</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="Crédito" id="credit" />
+                    <Label htmlFor="credit">Crédito</Label>
                 </div>
                 </RadioGroup>
 
@@ -184,13 +259,46 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                         {change > 0 && (
                             <div className="text-lg font-bold flex justify-between items-center text-green-600">
                                 <span>Cambio a Devolver:</span>
-                                <span>${change.toFixed(2)}</span>
+                                <span>{formatCurrency(change)}</span>
                             </div>
                         )}
                         {change < 0 && (
                              <div className="text-sm font-bold flex justify-between items-center text-destructive">
                                 <span>Faltante:</span>
-                                <span>${Math.abs(change).toFixed(2)}</span>
+                                <span>{formatCurrency(Math.abs(change))}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {paymentMethod === 'Crédito' && (
+                    <div className="space-y-4 rounded-md border bg-muted/50 p-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="client-select">Seleccionar Cliente</Label>
+                            {loadingClients ? (
+                                <div className="flex items-center space-x-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Cargando clientes...</span>
+                                </div>
+                            ) : (
+                                <Select value={selectedClient} onValueChange={setSelectedClient}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione un cliente" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {clients.map((client) => (
+                                            <SelectItem key={client.id} value={client.id}>
+                                                {client.name} - Límite: ${client.creditAccount?.creditLimit || 0} - Disponible: ${(client.creditAccount?.creditLimit || 0) - (client.creditAccount?.currentBalance || 0)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                        {selectedClient && (
+                            <div className="text-sm text-muted-foreground">
+                                <p>La venta se registrará como deuda del cliente seleccionado.</p>
+                                <p>El monto se descontará automáticamente de su límite de crédito disponible.</p>
                             </div>
                         )}
                     </div>

@@ -7,6 +7,8 @@ import { UserProfile } from "@/types";
 import { usePathname, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth, db } from "@/lib/firebase";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("AuthProvider");
 
 interface AuthContextType {
   user: User | null;
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firebaseSignOut(auth);
         router.push("/login");
     } catch(error) {
-        console.error("Error signing out: ", error);
+        log.error("Error signing out: ", error);
     }
   };
 

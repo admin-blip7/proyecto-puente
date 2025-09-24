@@ -9,7 +9,8 @@ import {
   increment,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("creditPaymentService");
 const CLIENT_PAYMENTS_COLLECTION = "client_payments";
 const CREDIT_ACCOUNTS_COLLECTION = "credit_accounts";
 const ACCOUNTS_COLLECTION = "accounts";
@@ -63,10 +64,7 @@ export const addClientPayment = async (
         });
 
     } catch (error) {
-        console.error("Error processing client payment: ", error);
-        if (error instanceof Error) {
-            throw error;
-        }
-        throw new Error("Failed to process payment.");
+        log.error("Error processing client payment: ", error);
+        throw error;
     }
 };

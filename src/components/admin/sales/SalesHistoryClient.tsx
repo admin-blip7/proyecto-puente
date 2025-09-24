@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -130,7 +130,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${filteredDailyCost.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(filteredDailyCost)}</div>
             <p className="text-xs text-muted-foreground">Costo de los productos vendidos hoy</p>
           </CardContent>
         </Card>
@@ -140,7 +140,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${filteredDailyProfit.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(filteredDailyProfit)}</div>
             <p className="text-xs text-muted-foreground">Ganancia total de las ventas de hoy</p>
           </CardContent>
         </Card>
@@ -190,7 +190,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                     {sale.paymentMethod}
                                 </Badge>
                                 </TableCell>
-                                <TableCell className="text-right">${sale.totalAmount.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(sale.totalAmount)}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -234,11 +234,11 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                                     <TableCell>{item.name}</TableCell>
                                                     <TableCell>{renderSerials(item)}</TableCell>
                                                     <TableCell className="text-right">{item.quantity}</TableCell>
-                                                    <TableCell className="text-right">${item.priceAtSale.toFixed(2)}</TableCell>
-                                                    <TableCell className="text-right">${cost.toFixed(2)}</TableCell>
-                                                    <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
-                                                    ${profit.toFixed(2)}
-                                                    </TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
+                                    <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
+                                    {formatCurrency(profit)}
+                                    </TableCell>
                                                 </TableRow>
                                                 );
                                             })}

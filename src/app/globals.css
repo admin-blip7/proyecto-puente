@@ -2,6 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fuentes Gilroy */
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy';
+  src: url('/font/Gilroy-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy Light';
+  src: url('/font/Gilroy-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy Thin';
+  src: url('/font/Gilroy-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy UltraLight';
+  src: url('/font/Gilroy-UltraLight.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gilroy Heavy';
+  src: url('/font/Gilroy-Heavy.ttf') format('truetype');
+  font-weight: 950;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     --background: 0 0% 7%; /* #121212 */
@@ -64,48 +145,101 @@
 [data-radix-dialog-content] {
   display: flex !important;
   flex-direction: column !important;
-  max-height: calc(100dvh - 2rem) !important; /* deja margen con borde/padding */
+  max-height: 95vh !important; /* altura responsiva para móviles */
   contain: layout size style;
 }
 
-/* 2) Evita que header/footer se “estiren” y colapsen el body */
+/* 2) Evita que header/footer se "estiren" y colapsen el body */
 [data-radix-dialog-content] > * {
   flex-shrink: 0;
 }
 
-/* 3) Haz que el área principal scrollee.
-   Casos comunes legacy: el form directo, o un contenedor con clase "modal-body" o "content" */
+/* 3) Área scrolleable principal - mejorada para móviles */
 [data-radix-dialog-content] form,
 [data-radix-dialog-content] .modal-body,
 [data-radix-dialog-content] .content,
-[data-radix-dialog-content] main {
+[data-radix-dialog-content] .dialog-body,
+[data-radix-dialog-content] main,
+[data-radix-scroll-area-viewport] {
   flex: 1 1 auto !important;
-  min-height: 0 !important;                 /* clave para permitir overflow en flex */
+  min-height: 0 !important;
   overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  /* Mejoras para móviles */
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
 }
 
-/* 4) Si algunos modales viejos metieron otro contenedor intermedio, dales min-height:0
-   para que no bloqueen el scroll del nieto */
+/* 4) Contenedores intermedios */
 [data-radix-dialog-content] > .wrapper,
 [data-radix-dialog-content] > .container,
 [data-radix-dialog-content] > .body {
   min-height: 0 !important;
+  flex: 1 1 auto !important;
 }
 
-/* 5) Body lock de Radix (no tocar), pero asegura scroll DENTRO del dialog */
-body[data-scroll-locked="1"] {
+/* 5) Body lock de Radix - DESACTIVADO para permitir scroll global */
+/* body[data-scroll-locked="1"] {
   overflow: hidden !important;
+} */
+
+/* 6) ScrollArea viewport - DESACTIVADO para evitar conflictos */
+/* body[data-scroll-locked="1"] [data-radix-scroll-area-viewport] {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+} */
+
+/* 7) Mejoras específicas para móviles */
+@media (max-width: 640px) {
+  [data-radix-dialog-content] {
+    width: 95vw !important;
+    height: 95vh !important;
+    max-height: 95vh !important;
+    margin: 2.5vh auto !important;
+  }
+  
+  /* Asegurar que el contenido scrolleable funcione en móviles */
+  [data-radix-dialog-content] form,
+  [data-radix-dialog-content] .modal-body,
+  [data-radix-dialog-content] .content,
+  [data-radix-dialog-content] .dialog-body {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
 }
 
-/* 6) (Opcional) Si algún modal viejo usó ScrollArea y te chocaba:
-   deja que su viewport también pueda scrollear bajo el lock */
-body[data-scroll-locked="1"] [data-radix-scroll-area-viewport] {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+/* 8) iOS: utilidades generales y mejoras para móviles */
+html, body { 
+  height: 100%; 
+  -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable both-edges;
+  /* Asegurar scroll en móviles */
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
-/* 7) iOS: utilidades generales ya probadas */
-html, body { height: 100%; }
-:root { scrollbar-gutter: stable both-edges; }
+/* 9) Mejoras específicas para navegación móvil */
+@media (max-width: 768px) {
+  /* Asegurar que el body principal siempre permita scroll */
+  body {
+    position: static !important;
+    overflow: auto !important;
+    height: auto !important;
+    width: auto !important;
+  }
+  
+  /* Sidebar móvil - asegurar scroll interno */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+  
+  /* Contenido principal en móviles */
+  main, .main-content, #__next {
+    overflow: visible !important;
+    height: auto !important;
+    touch-action: auto !important;
+  }
+}

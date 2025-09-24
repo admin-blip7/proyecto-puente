@@ -12,8 +12,9 @@ import {
   DocumentData,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
-
-const CATEGORIES_COLLECTION = "expense_categories";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("expenseCategoryService");
+ const CATEGORIES_COLLECTION = "expense_categories";
 
 const categoryFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): ExpenseCategory => {
     const data = doc.data();
@@ -35,8 +36,8 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
         // Sort client-side to avoid composite index requirement
         return categories.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-        console.error("Error fetching expense categories: ", error);
-        throw new Error("Failed to fetch expense categories.");
+        log.error("Error fetching expense categories: ", error);
+        throw error;
     }
 }
 
@@ -50,8 +51,8 @@ export const addExpenseCategory = async (
             ...categoryData,
         };
     } catch (error) {
-        console.error("Error adding expense category: ", error);
-        throw new Error("Failed to add expense category.");
+        log.error("Error adding expense category: ", error);
+        throw error;
     }
 };
 
@@ -63,7 +64,7 @@ export const updateExpenseCategory = async (
         const categoryRef = doc(db, CATEGORIES_COLLECTION, categoryId);
         await updateDoc(categoryRef, dataToUpdate);
     } catch (error) {
-        console.error("Error updating expense category: ", error);
-        throw new Error("Failed to update expense category.");
+        log.error("Error updating expense category: ", error);
+        throw error;
     }
 }

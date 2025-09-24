@@ -70,8 +70,9 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
             setForecastResult(result);
 
         } catch (error) {
-            console.error("Error generating forecast:", error);
-            toast({ variant: "destructive", title: "Error de IA", description: "No se pudo generar el pronóstico." });
+            // Suppress console.error to avoid ERR_ABORTED logs
+            // console.error("Error generating forecast:", error);
+            toast({ variant: "destructive", title: "Error de IA", description: "No se pudo generar el pronóstico. Verifica tu API key." });
         } finally {
             setIsLoading(false);
         }

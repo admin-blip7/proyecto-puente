@@ -48,6 +48,7 @@ const generateProductImageFlow = ai.defineFlow(
             
             return {
                 imageUrl: media.url,
+                altText: `Professional product image of ${input.productName}`,
             };
         } catch (error) {
             console.error("ERROR AL LLAMAR AL MODELO DE IA:", error);

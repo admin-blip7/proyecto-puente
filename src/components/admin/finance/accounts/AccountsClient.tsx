@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 interface AccountsClientProps {
   initialAccounts: Account[];
@@ -99,7 +100,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                       <TableCell>
                         <Badge variant="outline">{account.type}</Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-lg">${account.currentBalance.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono text-lg">{formatCurrency(account.currentBalance ?? 0)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

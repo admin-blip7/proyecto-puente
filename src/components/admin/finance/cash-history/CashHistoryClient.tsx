@@ -14,7 +14,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface CashHistoryClientProps {
   initialSessions: CashSession[];
@@ -28,10 +28,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
     return format(date, "dd MMM yyyy, HH:mm", { locale: es });
   }
   
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined || amount === null) return '$0.00';
-    return `${amount < 0 ? '-' : ''}$${Math.abs(amount).toFixed(2)}`;
-  }
+  // Usar util global de MXN para formateo consistente
 
   return (
     <>
@@ -68,15 +65,15 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                             <TableCell className="font-mono">{session.sessionId}</TableCell>
                             <TableCell>{formatDateTime(session.closedAt)}</TableCell>
                             <TableCell>{session.closedByName}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(session.startingFloat)}</TableCell>
-                            <TableCell className="text-right text-green-600">{formatCurrency(session.totalCashSales)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(session.expectedCashInDrawer)}</TableCell>
-                            <TableCell className="text-right font-bold">{formatCurrency(session.actualCashCount)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(session.startingFloat ?? 0)}</TableCell>
+                            <TableCell className="text-right text-green-600">{formatCurrency(session.totalCashSales ?? 0)}</TableCell>
+                            <TableCell className="text-right font-semibold">{formatCurrency(session.expectedCashInDrawer ?? 0)}</TableCell>
+                            <TableCell className="text-right font-bold">{formatCurrency(session.actualCashCount ?? 0)}</TableCell>
                             <TableCell className={cn("text-right font-bold", 
                                 session.difference && session.difference > 0 && "text-green-600",
                                 session.difference && session.difference < 0 && "text-red-600"
                             )}>
-                                {formatCurrency(session.difference)}
+                                {formatCurrency(session.difference ?? 0)}
                             </TableCell>
                         </TableRow>
                     ))}

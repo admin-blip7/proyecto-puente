@@ -2,6 +2,8 @@
 
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getLogger } from "@/lib/logger";
+const log = getLogger("documentService");
 
 
 /**
@@ -20,7 +22,7 @@ export const uploadFile = async (
         const downloadURL = await getDownloadURL(snapshot.ref);
         return downloadURL;
     } catch (error) {
-        console.error(`Error uploading file to ${path}:`, error);
-        throw new Error("File upload failed.");
+        log.error(`Error uploading file to ${path}:`, error);
+        throw error;
     }
 }

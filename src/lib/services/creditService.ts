@@ -1,7 +1,8 @@
 'use server';
 
 import { db } from "@/lib/firebase";
-import { Client, CreditAccount, ClientProfile, Product, UserProfile } from "@/types";
+import { Client, CreditAccount, ClientProfile, Product, UserProfile, CartItem, Sale } from "@/types";
+import { addInterestEarnings, generatePaymentPlan, generateContract } from "./financeService";
 import {
   collection,
   getDocs,
@@ -140,6 +141,137 @@ export const uploadClientDocument = async (
     });
 
     return downloadURL;
+};
+
+interface CreateCreditSaleParams {
+    items: CartItem[];
+    clientId: string;
+    totalAmount: number;
+    serials?: string[];
+    userId: string;
+    customerName?: string;
+    customerPhone?: string;
+}
+
+export const createCreditSale = async (params: CreateCreditSaleParams): Promise<Sale> => {
+    const { items, clientId, totalAmount, serials = [], userId, customerName, customerPhone } = params;
+
+    const saleId = `SALE-${uuidv4().split('-')[0].toUpperCase()}`;
+
+    // Get client and credit account
+    const clientDoc = await getDoc(doc(db, CLIENTS_COLLECTION, clientId));
+    if (!clientDoc.exists()) {
+        throw new Error('Cliente no encontrado');
+    }
+
+    const creditAccountQuery = query(
+        collection(db, CREDIT_ACCOUNTS_COLLECTION),
+        where('clientId', '==', clientId)
+    );
+    const creditAccountSnapshot = await getDocs(creditAccountQuery);
+    
+    if (creditAccountSnapshot.empty) {
+        throw new Error('Cuenta de crédito no encontrada');
+    }
+
+    const creditAccount = creditAccountSnapshot.docs[0].data() as CreditAccount;
+    const creditAccountRef = creditAccountSnapshot.docs[0].ref;
+
+    // Check credit limit
+    if (creditAccount.currentBalance + totalAmount > creditAccount.creditLimit) {
+        throw new Error('Límite de crédito insuficiente');
+    }
+
+    const sale: Omit<Sale, 'id'> = {
+        saleId,
+        items: items.map(item => ({
+            productId: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            priceAtSale: item.price,
+            cost: item.cost || 0,
+        })),
+        totalAmount,
+        paymentMethod: 'Crédito',
+        cashierId: userId,
+        cashierName: customerName || 'POS User',
+        customerName: clientDoc.data().name,
+        customerPhone: clientDoc.data().phone,
+        createdAt: new Date(),
+    };
+
+    await runTransaction(db, async (transaction) => {
+        // 1. Create the Sale record
+        const saleRef = doc(collection(db, SALES_COLLECTION));
+        transaction.set(saleRef, {
+            ...sale,
+            createdAt: serverTimestamp(),
+        });
+
+        // 2. Update credit account balance
+        transaction.update(creditAccountRef, {
+            currentBalance: increment(totalAmount)
+        });
+
+        // 3. Register interest earnings if there's an interest rate
+        if (creditAccount.interestRate && creditAccount.interestRate > 0) {
+            const interestAmount = totalAmount * (creditAccount.interestRate / 100);
+            await addInterestEarnings(
+                interestAmount,
+                clientId,
+                customerName || clientDoc.data().name,
+                `Ganancia por intereses de venta a crédito - ${saleId}`
+            );
+        }
+
+        // 4. Generate automatic payment plan
+        if (creditAccount.interestRate && creditAccount.interestRate > 0) {
+            const defaultTermInMonths = 12; // Default term, can be made configurable
+            await generatePaymentPlan(
+                clientId,
+                totalAmount,
+                creditAccount.interestRate,
+                defaultTermInMonths
+            );
+        }
+
+        // 5. Generate automatic contract
+        await generateContract(
+            clientId,
+            customerName || clientDoc.data().name,
+            clientDoc.data().address || '',
+            clientDoc.data().phone || '',
+            creditAccount.creditLimit,
+            creditAccount.interestRate || 0,
+            creditAccount.paymentDueDate
+        );
+
+        // 3. Update product stock and create inventory logs
+        for (const item of items) {
+            const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
+            const productDoc = await transaction.get(productRef);
+
+            if (!productDoc.exists() || productDoc.data().stock < item.quantity) {
+                throw new Error(`Stock insuficiente para ${item.name}`);
+            }
+
+            transaction.update(productRef, { stock: increment(-item.quantity) });
+
+            // Create inventory log
+            const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+            transaction.set(logRef, {
+                productId: item.id,
+                productName: item.name,
+                change: -item.quantity,
+                reason: 'Venta a Crédito',
+                updatedBy: userId,
+                createdAt: serverTimestamp(),
+                metadata: { saleId, cost: item.cost || 0 }
+            });
+        }
+    });
+
+    return { ...sale, id: saleId } as Sale;
 };
 
 interface CreateFinancedSaleParams {

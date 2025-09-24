@@ -16,7 +16,8 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("paymentService");
 const CONSIGNOR_PAYMENTS_COLLECTION = "consignor_payments";
 const CONSIGNORS_COLLECTION = "consignors";
 const STORAGE_PAYMENT_PROOFS_PATH = "payment_proofs";
@@ -46,8 +47,8 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(paymentFromDoc);
     } catch (error) {
-        console.error("Error fetching payment history: ", error);
-        throw new Error("Failed to fetch payment history.");
+        log.error("Error fetching payment history: ", error);
+        return [];
     }
 }
 
@@ -96,7 +97,7 @@ export const addConsignorPayment = async (
         });
 
     } catch (error) {
-        console.error("Error processing consignor payment: ", error);
-        throw new Error("Failed to process payment.");
+        log.error("Error processing consignor payment: ", error);
+        throw error;
     }
 };

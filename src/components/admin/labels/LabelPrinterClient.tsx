@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { Product, LabelSettings } from "@/types";
+import { Product, LabelSettings, Consignor, Supplier, LabelPrintItem } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,30 +9,42 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Printer, Search, Trash2, PlusCircle } from "lucide-react";
-import { generateAndPrintLabels } from "@/lib/utils";
+import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-interface PrintListItem {
-    id: string;
-    name: string;
-    sku: string;
-    price: number;
-    quantity: number;
-}
-
 
 interface LabelPrinterClientProps {
     allProducts: Product[];
     settings: LabelSettings;
+    consignors: Consignor[];
+    suppliers: Supplier[];
 }
 
-export default function LabelPrinterClient({ allProducts, settings }: LabelPrinterClientProps) {
+export default function LabelPrinterClient({ allProducts, settings, consignors, suppliers }: LabelPrinterClientProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [popoverOpen, setPopoverOpen] = useState(false);
-    const [printList, setPrintList] = useState<PrintListItem[]>([]);
+    const [printList, setPrintList] = useState<LabelPrintItem[]>([]);
 
     const searchContainerRef = useRef<HTMLDivElement>(null);
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
+
+    const consignorMap = useMemo(() => new Map(consignors.map((c) => [c.id, c.name])), [consignors]);
+    const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
+
+    const getProductKey = (product: LabelPrintItem['product']) => product.id ?? product.sku;
+
+    const resolveSupplierName = (product: Product): string | undefined => {
+        const candidate = product as Record<string, unknown>;
+        if (typeof candidate.supplierName === 'string' && candidate.supplierName.trim().length > 0) {
+            return candidate.supplierName;
+        }
+        if (typeof candidate.supplier === 'string' && candidate.supplier.trim().length > 0) {
+            return candidate.supplier;
+        }
+        if (typeof candidate.supplierId === 'string') {
+            return supplierMap.get(candidate.supplierId) ?? undefined;
+        }
+        return undefined;
+    };
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
@@ -47,47 +59,63 @@ export default function LabelPrinterClient({ allProducts, settings }: LabelPrint
     }, [searchQuery, allProducts]);
 
     const handleSelectProduct = (product: Product) => {
-        setPrintList(prev => {
-            const existingItem = prev.find(item => item.id === product.id);
-            if (existingItem) {
-                return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
-            }
-            return [...prev, {
-                id: product.id,
-                name: product.name,
-                sku: product.sku,
-                price: product.price,
+        const supplierName = resolveSupplierName(product);
+        const consignorName = product.consignorId ? consignorMap.get(product.consignorId) : undefined;
+
+        setPrintList((prev) => {
+            const candidate: LabelPrintItem = {
+                product: {
+                    id: product.id,
+                    name: product.name,
+                    sku: product.sku,
+                    price: product.price,
+                    cost: product.cost,
+                    stock: product.stock,
+                    ownershipType: product.ownershipType,
+                    consignorName,
+                    supplierName,
+                },
                 quantity: 1,
-            }];
+            };
+
+            const candidateKey = getProductKey(candidate.product);
+
+            const existingItem = prev.find((item) => getProductKey(item.product) === candidateKey);
+            if (existingItem) {
+                return prev.map((item) =>
+                    getProductKey(item.product) === candidateKey
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
+                );
+            }
+            return [...prev, candidate];
         });
         setSearchQuery("");
         setPopoverOpen(false);
     };
     
     const handleUpdateQuantity = (productId: string, quantity: number) => {
-        setPrintList(prev => prev.map(item => 
-            item.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item
+        setPrintList((prev) => prev.map((item) =>
+            getProductKey(item.product) === productId ? { ...item, quantity: Math.max(0, quantity) } : item
         ));
     };
 
     const handleRemoveItem = (productId: string) => {
-        setPrintList(prev => prev.filter(item => item.id !== productId));
+        setPrintList((prev) => prev.filter((item) => getProductKey(item.product) !== productId));
     };
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         if (printList.length === 0) return;
         
         const payload = printList
-            .filter(item => item.quantity > 0)
-            .map(item => ({
-                name: item.name,
-                sku: item.sku,
-                price: item.price,
+            .filter((item) => item.quantity > 0)
+            .map((item) => ({
+                product: { ...item.product },
                 quantity: item.quantity,
             }));
 
         if (payload.length > 0) {
-            generateAndPrintLabels(payload, settings);
+            await generateAndPrintLabels(payload, settings);
         }
     };
 
@@ -171,20 +199,20 @@ export default function LabelPrinterClient({ allProducts, settings }: LabelPrint
                                 </TableRow>
                             ) : (
                                 printList.map(item => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{item.name}</TableCell>
-                                        <TableCell>{item.sku}</TableCell>
+                                    <TableRow key={getProductKey(item.product)}>
+                                        <TableCell className="font-medium">{item.product.name}</TableCell>
+                                        <TableCell>{item.product.sku}</TableCell>
                                         <TableCell>
                                             <Input
                                                 type="number"
                                                 value={item.quantity}
-                                                onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 0)}
+                                                onChange={(e) => handleUpdateQuantity(getProductKey(item.product), parseInt(e.target.value) || 0)}
                                                 min="0"
                                                 className="h-8"
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
+                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(getProductKey(item.product))}>
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
                                         </TableCell>

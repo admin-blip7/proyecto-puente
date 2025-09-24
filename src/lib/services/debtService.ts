@@ -13,7 +13,8 @@ import {
   QueryDocumentSnapshot,
   serverTimestamp,
 } from "firebase/firestore";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("debtService");
 const DEBTS_COLLECTION = "debts";
 
 const debtFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Debt => {
@@ -38,8 +39,8 @@ export const getDebts = async (): Promise<Debt[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(debtFromDoc);
   } catch (error) {
-    console.error("Error fetching debts: ", error);
-    throw new Error("Failed to fetch debts.");
+    log.error("Error fetching debts: ", error);
+    return [];
   }
 };
 
@@ -57,8 +58,8 @@ export const addDebt = async (
       ...debtData,
     };
   } catch (error) {
-    console.error("Error adding debt: ", error);
-    throw new Error("Failed to add debt.");
+    log.error("Error adding debt: ", error);
+    throw error;
   }
 };
 
@@ -70,8 +71,8 @@ export const updateDebt = async (
     const debtRef = doc(db, DEBTS_COLLECTION, debtId);
     await updateDoc(debtRef, dataToUpdate);
   } catch (error) {
-    console.error("Error updating debt: ", error);
-    throw new Error("Failed to update debt.");
+    log.error("Error updating debt: ", error);
+    throw error;
   }
 };
 
@@ -80,7 +81,7 @@ export const deleteDebt = async (debtId: string): Promise<void> => {
         const debtRef = doc(db, DEBTS_COLLECTION, debtId);
         await deleteDoc(debtRef);
     } catch (error) {
-        console.error("Error deleting debt:", error);
-        throw new Error("Failed to delete debt.")
+        log.error("Error deleting debt:", error);
+        throw error;
     }
 }

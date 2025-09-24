@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { CashSession } from "@/types";
 import { Separator } from "../ui/separator";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 interface CloseCashDrawerDialogProps {
   isOpen: boolean;
@@ -78,24 +79,24 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         <div className="space-y-3 text-sm py-4">
             <div className="flex justify-between">
                 <span className="text-muted-foreground">Fondo de Caja Inicial:</span>
-                <span className="font-medium">${session.startingFloat.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(session.startingFloat ?? 0)}</span>
             </div>
             <div className="flex justify-between">
                 <span className="text-muted-foreground">Ventas en Efectivo:</span>
-                <span className="font-medium text-green-600">+ ${session.totalCashSales.toFixed(2)}</span>
+                <span className="font-medium text-green-600">+ {formatCurrency(session.totalCashSales ?? 0)}</span>
             </div>
              <div className="flex justify-between">
                 <span className="text-muted-foreground">Ventas con Tarjeta:</span>
-                <span className="font-medium">${session.totalCardSales.toFixed(2)}</span>
+                <span className="font-medium">{formatCurrency(session.totalCardSales ?? 0)}</span>
             </div>
             <div className="flex justify-between">
                 <span className="text-muted-foreground">Gastos de Caja:</span>
-                <span className="font-medium text-red-600">- ${session.totalCashPayouts.toFixed(2)}</span>
+                <span className="font-medium text-red-600">- {formatCurrency(session.totalCashPayouts ?? 0)}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-bold text-base">
                 <span>Efectivo Esperado en Caja:</span>
-                <span>${expectedCashInDrawer.toFixed(2)}</span>
+                <span>{formatCurrency(expectedCashInDrawer ?? 0)}</span>
             </div>
         </div>
 
@@ -128,7 +129,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                     difference < 0 && "bg-red-100 text-red-800",
                 )}>
                     <span>Diferencia (Sobrante/Faltante):</span>
-                    <span>{difference >= 0 ? '+' : '-'}${Math.abs(difference).toFixed(2)}</span>
+                    <span>{difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(difference))}</span>
                 </div>
              )}
             <DialogFooter>

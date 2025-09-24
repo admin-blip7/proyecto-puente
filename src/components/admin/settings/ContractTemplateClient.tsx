@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ContractTemplateSettings, ContractTemplateSchema } from "@/types";
@@ -11,10 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 import { saveContractTemplate } from "@/lib/services/settingsService";
 import { Save, Loader2, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import VisualEditor from "./visual-editor/VisualEditor";
 
 interface ContractTemplateClientProps {
   initialSettings: ContractTemplateSettings;
 }
+
+type EditorMode = "simple" | "visual";
 
 const placeholders = [
     { key: "{{CLIENT_NAME}}", description: "Nombre completo del cliente." },
@@ -32,12 +37,17 @@ const placeholders = [
 
 export default function ContractTemplateClient({ initialSettings }: ContractTemplateClientProps) {
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<EditorMode>("simple");
   const { toast } = useToast();
 
   const form = useForm<ContractTemplateSettings>({
     resolver: zodResolver(ContractTemplateSchema),
     defaultValues: initialSettings,
   });
+
+  const handleLayoutChange = useCallback((layout: any) => {
+    form.setValue("visualLayout", JSON.stringify(layout));
+  }, [form]);
 
   const onSubmit = async (values: ContractTemplateSettings) => {
     setLoading(true);
@@ -67,13 +77,18 @@ export default function ContractTemplateClient({ initialSettings }: ContractTemp
             <h1 className="text-2xl font-bold tracking-tight">Editor de Plantilla de Contrato</h1>
             <p className="text-muted-foreground">Define el texto base para los contratos de crédito. Usa los placeholders para insertar datos dinámicos.</p>
         </div>
+        <div className="flex items-center space-x-2">
+            <Label htmlFor="visual-mode-contract">Modo Visual</Label>
+            <Switch id="visual-mode-contract" onCheckedChange={(checked) => setMode(checked ? "visual" : "simple")} />
+        </div>
         <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isDirty}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Plantilla
         </Button>
       </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {mode === "simple" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
                 <Form {...form}>
                     <form>
@@ -117,6 +132,12 @@ export default function ContractTemplateClient({ initialSettings }: ContractTemp
                 </Card>
             </div>
        </div>
+      ) : (
+        <VisualEditor 
+            initialLayout={initialSettings.visualLayout ? JSON.parse(initialSettings.visualLayout) : undefined}
+            onLayoutChange={handleLayoutChange}
+        />
+      )}
     </>
   );
 }

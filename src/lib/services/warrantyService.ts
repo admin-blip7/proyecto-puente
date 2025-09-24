@@ -3,6 +3,8 @@ import { Warranty } from "@/types";
 import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from 'uuid';
+import { getLogger } from "@/lib/logger";
+const log = getLogger("warrantyService");
 
 const WARRANTIES_COLLECTION = "warranties";
 
@@ -30,7 +32,7 @@ export const getWarranties = async (): Promise<Warranty[]> => {
         const warranties = querySnapshot.docs.map(warrantyFromDoc);
         return warranties.sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
     } catch (error) {
-        console.error("Error fetching warranties:", error);
+        log.error("Error fetching warranties:", error);
         return [];
     }
 };
@@ -55,7 +57,7 @@ export const addWarranty = async (warrantyData: Omit<Warranty, 'id' | 'reportedA
         };
 
     } catch (error) {
-        console.error("Error adding warranty: ", error);
+        log.error("Error adding warranty: ", error);
         throw new Error("Failed to add warranty.");
     }
 };
@@ -71,7 +73,7 @@ export const updateWarranty = async (warrantyId: string, dataToUpdate: Partial<W
 
         await updateDoc(warrantyRef, updateData as any);
     } catch (error) {
-        console.error("Error updating warranty:", error);
+        log.error("Error updating warranty:", error);
         throw new Error("Failed to update warranty.");
     }
 };

@@ -3,6 +3,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from '@/lib/utils';
 
 interface ProductCardProps {
   product: Product;
@@ -28,7 +29,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
         </div>
       </CardContent>
       <CardFooter className="p-2 flex flex-col items-stretch mt-auto">
-        <p className="text-lg font-bold text-primary mb-2">${product.price.toFixed(2)}</p>
+        <p className="text-lg font-bold text-primary mb-2">{formatCurrency(product.price)}</p>
         <Button
           size="sm"
           className="rounded-md w-full text-xs"

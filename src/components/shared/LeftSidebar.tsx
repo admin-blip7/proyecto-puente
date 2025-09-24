@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette, Printer, Contact } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette, Printer, Contact, Zap, ShoppingCart, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,9 @@ const mainNavItems = [
     { href: '/', icon: Home, label: 'Punto de Venta' },
     { href: '/admin', icon: Package, label: 'Inventario'},
     { href: '/admin/stock-entry', icon: PackagePlus, label: 'Ingresar Stock'},
+    { href: '/admin/inventory/quick-po-intake', icon: Zap, label: 'Quick PO Intake'},
+    { href: '/admin/purchases', icon: ShoppingCart, label: 'Órdenes de Compra'},
+    { href: '/admin/suppliers', icon: Truck, label: 'Proveedores'},
     { href: '/admin/sales', icon: PieChart, label: 'Ventas' },
     { href: '/admin/repairs', icon: Wrench, label: 'Reparaciones' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Garantías' },

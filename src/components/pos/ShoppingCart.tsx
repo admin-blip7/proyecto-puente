@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut, CreditCard } from "lucide-react";
+import { formatCurrency } from '@/lib/utils';
 import CheckoutDialog from "./CheckoutDialog";
 import { useState, useMemo } from "react";
 import { Separator } from "../ui/separator";
@@ -97,7 +98,7 @@ export default function ShoppingCart({
               >
                 <div className="flex-1 space-y-1">
                   <p className="font-semibold leading-tight">{item.name}</p>
-                  <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
+                  <p className="font-bold text-primary">{formatCurrency(item.price)}</p>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2">
                   <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={(e) => { e.stopPropagation(); onUpdateQuantity(item.id, item.quantity - 1);}}>
@@ -125,7 +126,7 @@ export default function ShoppingCart({
                       <p className="flex-1 font-medium">{p.name}</p>
                       <Button variant="outline" size="sm" onClick={() => onAddToCart(p, 1)}>
                         <PlusCircle className="mr-2 h-4 w-4"/>
-                        ${p.price.toFixed(2)}
+                        {formatCurrency(p.price)}
                       </Button>
                     </div>
                   ))
@@ -169,16 +170,16 @@ export default function ShoppingCart({
             <>
               <div className="w-full flex justify-between text-muted-foreground">
                 <span>Items</span>
-                <span>${itemsTotal.toFixed(2)}</span>
+                <span>{formatCurrency(itemsTotal)}</span>
               </div>
               <div className="w-full flex justify-between text-muted-foreground">
                 <span>Discount</span>
-                <span>-${discount.toFixed(2)}</span>
+                <span>-{formatCurrency(discount)}</span>
               </div>
               <Separator />
               <div className="w-full flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span>${totalAmount.toFixed(2)}</span>
+                <span>{formatCurrency(totalAmount)}</span>
               </div>
             </>
           )}

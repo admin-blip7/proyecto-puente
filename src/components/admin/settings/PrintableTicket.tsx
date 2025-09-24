@@ -5,6 +5,7 @@ import Image from "next/image";
 import { QRCode } from "react-qrcode-logo";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatCurrency } from "@/lib/utils";
 
 interface PrintableTicketProps {
   settings: TicketSettings;
@@ -88,8 +89,8 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
                     <tr key={index}>
                         {body.showQuantity && <td className="align-top pr-1">{item.quantity}</td>}
                         <td className="align-top">{item.name}</td>
-                        {body.showUnitPrice && <td className="align-top text-right px-1">${item.priceAtSale.toFixed(2)}</td>}
-                        {body.showTotal && <td className="align-top text-right pl-1">${(item.priceAtSale * item.quantity).toFixed(2)}</td>}
+                        {body.showUnitPrice && <td className="align-top text-right px-1">{formatCurrency(item.priceAtSale ?? 0)}</td>}
+                        {body.showTotal && <td className="align-top text-right pl-1">{formatCurrency((item.priceAtSale ?? 0) * (item.quantity ?? 0))}</td>}
                     </tr>
                 ))}
             </tbody>
@@ -103,13 +104,13 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
         {footer.showSubtotal && (
             <div className="flex justify-between">
                 <span>SUBTOTAL:</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{formatCurrency(subtotal ?? 0)}</span>
             </div>
         )}
         {footer.showTaxes && (
             <div className="flex justify-between">
                 <span>IVA:</span>
-                <span>${tax.toFixed(2)}</span>
+                <span>{formatCurrency(tax ?? 0)}</span>
             </div>
         )}
         {footer.showDiscounts && (
@@ -120,7 +121,7 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
         )}
         <div className="flex justify-between font-bold text-lg border-t border-dashed border-black pt-1">
             <span>TOTAL:</span>
-            <span>${displaySale.totalAmount.toFixed(2)}</span>
+            <span>{formatCurrency(displaySale.totalAmount ?? 0)}</span>
         </div>
       </div>
       

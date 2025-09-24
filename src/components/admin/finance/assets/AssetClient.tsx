@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { runAnnualDepreciation } from "@/lib/services/assetService";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { formatMXNAmount } from "@/lib/validation/currencyValidation";
 
 interface AssetClientProps {
   initialAssets: FixedAsset[];
@@ -103,9 +104,9 @@ export default function AssetClient({ initialAssets }: AssetClientProps) {
                                 <TableCell className="font-medium">{asset.name}</TableCell>
                                 <TableCell><Badge variant="secondary">{asset.category}</Badge></TableCell>
                                 <TableCell>{format(asset.purchaseDate, "dd MMM yyyy", { locale: es })}</TableCell>
-                                <TableCell className="text-right font-semibold">${asset.purchaseCost.toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-bold text-primary">${asset.currentValue.toFixed(2)}</TableCell>
-                                <TableCell className="text-right text-destructive">-${annualDepreciation.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatMXNAmount(asset.purchaseCost ?? 0)}</TableCell>
+                                <TableCell className="text-right font-bold text-primary">{formatMXNAmount(asset.currentValue ?? 0)}</TableCell>
+                                <TableCell className="text-right text-destructive">-{formatMXNAmount(annualDepreciation ?? 0)}</TableCell>
                             </TableRow>
                         )
                     })}

@@ -21,6 +21,7 @@ import DeleteProductsDialog from "./DeleteProductsDialog";
 import BulkEditDialog from "./BulkEditDialog";
 import { getProducts } from "@/lib/services/productService";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 interface InventoryClientProps {
   initialProducts: Product[];
@@ -126,10 +127,10 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 <Table>
                 <TableHeader>
                     <TableRow>
-                    <TableHead padding="checkbox">
+                    <TableHead className="w-12">
                         <Checkbox 
                             checked={numSelected > 0 && numSelected === products.length ? true : (numSelected > 0 ? "indeterminate" : false)}
-                            onCheckedChange={handleSelectAll}
+                            onCheckedChange={(checked: any) => handleSelectAll(checked)}
                         />
                     </TableHead>
                     <TableHead>Nombre</TableHead>
@@ -144,7 +145,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 <TableBody>
                     {products.map((product) => (
                     <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) ? "selected" : ""}>
-                        <TableCell padding="checkbox">
+                        <TableCell className="w-12">
                             <Checkbox 
                                 checked={selectedProductIds.includes(product.id)}
                                 onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
@@ -162,7 +163,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <TableCell>
                             <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
                         </TableCell>
-                        <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
                         <TableCell className="text-right">{product.stock}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditPage(product.id)}>

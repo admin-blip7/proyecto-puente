@@ -17,7 +17,8 @@ import {
   increment,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
-
+import { getLogger } from "@/lib/logger";
+const log = getLogger("cashSessionService");
 const CASH_SESSIONS_COLLECTION = "cash_sessions";
 const ACCOUNTS_COLLECTION = "accounts";
 
@@ -55,8 +56,8 @@ export const getAllClosedSessions = async (): Promise<CashSession[]> => {
         // Sort client-side to avoid composite index
         return sessions.sort((a,b) => (b.closedAt?.getTime() || 0) - (a.closedAt?.getTime() || 0));
     } catch (error) {
-        console.error("Error fetching closed cash sessions: ", error);
-        throw new Error("Failed to fetch closed sessions.");
+        log.error("Error fetching closed cash sessions: ", error);
+        return [];
     }
 };
 
@@ -76,7 +77,7 @@ export const getCurrentOpenSession = async (userId: string): Promise<CashSession
         }
         return sessionFromDoc(querySnapshot.docs[0]);
     } catch (error) {
-        console.error("Error fetching open session: ", error);
+        log.error("Error fetching open session: ", error);
         throw new Error("Failed to fetch open session.");
     }
 }
@@ -110,7 +111,7 @@ export const openCashSession = async (
             openedAt: new Date(),
         };
     } catch (error) {
-        console.error("Error opening cash session:", error);
+        log.error("Error opening cash session:", error);
         throw new Error("Failed to open cash session.");
     }
 }
@@ -166,7 +167,7 @@ export const closeCashSession = async (
             closedAt: new Date(),
         };
     } catch (error) {
-        console.error("Error closing cash session:", error);
+        log.error("Error closing cash session:", error);
         throw new Error("Failed to close cash session.");
     }
 }

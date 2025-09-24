@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { DialogBody } from "@/components/ui/dialog-body";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -23,36 +24,20 @@ export function ModalForm() {
 
         <DialogContent
           // Tailwind: ancho máx y layout de columna
-          className={[
-            "p-0",                         // manejamos padding dentro de las secciones
-            "max-w-2xl w-[92vw]",          // ancho responsivo
-            "flex flex-col",               // columna: header (fixed), scroll (flex-1), footer (fixed)
-            // animaciones shadcn por si las usas
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
-            "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
-          ].join(" ")}
+          className="p-0 max-w-2xl w-[95vw] sm:w-[92vw] flex flex-col"
         >
           {/* HEADER (no scrollea) */}
-          <DialogHeader className="px-6 pt-6 pb-3 border-b">
+          <DialogHeader>
             <DialogTitle>Formulario largo</DialogTitle>
           </DialogHeader>
 
           {/* CONTENIDO SCROLLEABLE */}
-          <div
-            className={[
-              "dialog-scroll",                 // habilitada en globals.css para abrir scroll bajo lock
-              "flex-1 overflow-y-auto ios-scroll",
-              "px-6 py-4",
-              // Altura máxima basada en viewport dinámico: deja 4rem de margen total aprox
-              "max-h-[calc(100dvh-8rem)]",
-            ].join(" ")}
-          >
+          <DialogBody>
             <LongForm />
-          </div>
+          </DialogBody>
 
           {/* FOOTER (no scrollea) */}
-          <DialogFooter className="px-6 pt-3 pb-6 border-t">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button type="submit" form="long-form">Guardar</Button>
           </DialogFooter>
