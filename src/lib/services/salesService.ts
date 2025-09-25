@@ -62,11 +62,17 @@ export const addSaleAndUpdateStock = async (
 
     await runTransaction(db, async (transaction) => {
         // --- READ PHASE ---
-        const productsToUpdate = [];
-
-        for (const item of cartItems) {
+        const productReads = cartItems.map(item => {
             const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
-            const productDoc = await transaction.get(productRef);
+            return transaction.get(productRef);
+        });
+        const productDocs = await Promise.all(productReads);
+
+        // --- VALIDATION PHASE ---
+        const productsToUpdate = [];
+        for (let i = 0; i < productDocs.length; i++) {
+            const productDoc = productDocs[i];
+            const item = cartItems[i];
 
             if (!productDoc.exists()) {
                 throw new Error(`Producto ${item.name} no encontrado.`);
@@ -79,7 +85,7 @@ export const addSaleAndUpdateStock = async (
             }
             
             productsToUpdate.push({
-                ref: productRef,
+                ref: productDoc.ref,
                 id: item.id,
                 name: item.name,
                 newStock: newStock,
@@ -102,8 +108,10 @@ export const addSaleAndUpdateStock = async (
         finalSale = { ...saleData, id: saleRef.id, saleId, createdAt: new Date() };
 
         for (const product of productsToUpdate) {
+            // Update stock
             transaction.update(product.ref, { stock: product.newStock });
             
+            // Create inventory log
             const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
             transaction.set(logRef, {
                 productId: product.id,
@@ -115,6 +123,7 @@ export const addSaleAndUpdateStock = async (
                 metadata: { saleId: saleId, cost: product.cost }
             });
 
+            // If consignment, update consignor balance
             if (product.ownershipType === 'Consigna' && product.consignorId) {
                 const amountDue = product.cost * product.quantity;
                 const consignorRef = doc(db, CONSIGNORS_COLLECTION, product.consignorId);
@@ -122,6 +131,7 @@ export const addSaleAndUpdateStock = async (
             }
         }
         
+        // Update cash session totals if a session is active
         if (activeSessionRef) {
             if (saleData.paymentMethod === 'Efectivo') {
                 transaction.update(activeSessionRef, { totalCashSales: increment(saleData.totalAmount) });
