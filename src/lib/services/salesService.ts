@@ -1,4 +1,3 @@
-
 import { db } from "@/lib/firebase";
 import { Sale, CartItem, Product, CashSession } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, writeBatch, doc, DocumentData, QueryDocumentSnapshot, getDoc, runTransaction, query, where, limit, orderBy, increment } from "firebase/firestore";
@@ -45,6 +44,7 @@ export const addSaleAndUpdateStock = async (
     saleData: Omit<Sale, 'id' | 'saleId' | 'createdAt'>,
     cartItems: CartItem[]
 ): Promise<Sale> => {
+    console.log("Step 2: 'addSaleAndUpdateStock' function received data:", { saleData, cartItems });
     const saleId = `SALE-${uuidv4().split('-')[0].toUpperCase()}`;
 
     // Get active session outside transaction, as queries are not allowed inside.
@@ -60,86 +60,93 @@ export const addSaleAndUpdateStock = async (
 
     let finalSale: Sale | null = null;
 
-    await runTransaction(db, async (transaction) => {
-        // --- READ PHASE ---
-        const productReads = cartItems.map(item => {
-            const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
-            return transaction.get(productRef);
-        });
-        const productDocs = await Promise.all(productReads);
+    try {
+      await runTransaction(db, async (transaction) => {
+          // --- READ PHASE ---
+          const productReads = cartItems.map(item => {
+              const productRef = doc(db, PRODUCTS_COLLECTION, item.id);
+              return transaction.get(productRef);
+          });
+          const productDocs = await Promise.all(productReads);
 
-        // --- VALIDATION PHASE ---
-        const productsToUpdate = [];
-        for (let i = 0; i < productDocs.length; i++) {
-            const productDoc = productDocs[i];
-            const item = cartItems[i];
+          // --- VALIDATION PHASE ---
+          const productsToUpdate = [];
+          for (let i = 0; i < productDocs.length; i++) {
+              const productDoc = productDocs[i];
+              const item = cartItems[i];
 
-            if (!productDoc.exists()) {
-                throw new Error(`Producto ${item.name} no encontrado.`);
-            }
+              if (!productDoc.exists()) {
+                  throw new Error(`Producto ${item.name} no encontrado.`);
+              }
 
-            const productData = productDoc.data() as Product;
-            const newStock = productData.stock - item.quantity;
-            if (newStock < 0) {
-                throw new Error(`Stock insuficiente para ${item.name}.`);
-            }
-            
-            productsToUpdate.push({
-                ref: productDoc.ref,
-                id: item.id,
-                name: item.name,
-                newStock: newStock,
-                quantity: item.quantity,
-                cost: productData.cost,
-                ownershipType: productData.ownershipType,
-                consignorId: productData.consignorId,
-            });
-        }
-        
-        // --- WRITE PHASE ---
-        const saleRef = doc(collection(db, SALES_COLLECTION));
-        const newSaleData = {
-            ...saleData,
-            saleId: saleId,
-            createdAt: serverTimestamp(),
-            sessionId: activeSessionRef ? activeSessionRef.id : null,
-        }
-        transaction.set(saleRef, newSaleData);
-        finalSale = { ...saleData, id: saleRef.id, saleId, createdAt: new Date() };
+              const productData = productDoc.data() as Product;
+              const newStock = productData.stock - item.quantity;
+              if (newStock < 0) {
+                  throw new Error(`Stock insuficiente para ${item.name}.`);
+              }
+              
+              productsToUpdate.push({
+                  ref: productDoc.ref,
+                  id: item.id,
+                  name: item.name,
+                  newStock: newStock,
+                  quantity: item.quantity,
+                  cost: productData.cost,
+                  ownershipType: productData.ownershipType,
+                  consignorId: productData.consignorId,
+              });
+          }
+          
+          // --- WRITE PHASE ---
+          const saleRef = doc(collection(db, SALES_COLLECTION));
+          const newSaleData = {
+              ...saleData,
+              saleId: saleId,
+              createdAt: serverTimestamp(),
+              sessionId: activeSessionRef ? activeSessionRef.id : null,
+          }
+          transaction.set(saleRef, newSaleData);
+          finalSale = { ...saleData, id: saleRef.id, saleId, createdAt: new Date() };
 
-        for (const product of productsToUpdate) {
-            // Update stock
-            transaction.update(product.ref, { stock: product.newStock });
-            
-            // Create inventory log
-            const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
-            transaction.set(logRef, {
-                productId: product.id,
-                productName: product.name,
-                change: -product.quantity,
-                reason: 'Venta',
-                updatedBy: saleData.cashierId,
-                createdAt: serverTimestamp(),
-                metadata: { saleId: saleId, cost: product.cost }
-            });
+          for (const product of productsToUpdate) {
+              // Update stock
+              transaction.update(product.ref, { stock: product.newStock });
+              
+              // Create inventory log
+              const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+              transaction.set(logRef, {
+                  productId: product.id,
+                  productName: product.name,
+                  change: -product.quantity,
+                  reason: 'Venta',
+                  updatedBy: saleData.cashierId,
+                  createdAt: serverTimestamp(),
+                  metadata: { saleId: saleId, cost: product.cost }
+              });
 
-            // If consignment, update consignor balance
-            if (product.ownershipType === 'Consigna' && product.consignorId) {
-                const amountDue = product.cost * product.quantity;
-                const consignorRef = doc(db, CONSIGNORS_COLLECTION, product.consignorId);
-                transaction.update(consignorRef, { balanceDue: increment(amountDue) });
-            }
-        }
-        
-        // Update cash session totals if a session is active
-        if (activeSessionRef) {
-            if (saleData.paymentMethod === 'Efectivo') {
-                transaction.update(activeSessionRef, { totalCashSales: increment(saleData.totalAmount) });
-            } else {
-                transaction.update(activeSessionRef, { totalCardSales: increment(saleData.totalAmount) });
-            }
-        }
-    });
+              // If consignment, update consignor balance
+              if (product.ownershipType === 'Consigna' && product.consignorId) {
+                  const amountDue = product.cost * product.quantity;
+                  const consignorRef = doc(db, CONSIGNORS_COLLECTION, product.consignorId);
+                  transaction.update(consignorRef, { balanceDue: increment(amountDue) });
+              }
+          }
+          
+          // Update cash session totals if a session is active
+          if (activeSessionRef) {
+              if (saleData.paymentMethod === 'Efectivo') {
+                  transaction.update(activeSessionRef, { totalCashSales: increment(saleData.totalAmount) });
+              } else {
+                  transaction.update(activeSessionRef, { totalCardSales: increment(saleData.totalAmount) });
+              }
+          }
+      });
+      console.log("Step 3: Success! Transaction completed.");
+
+    } catch (error) {
+        console.error("Step 3: FATAL ERROR in sale transaction:", error);
+        throw new Error(`The sale transaction failed: ${error}`);
+    }
 
     if (!finalSale) {
         throw new Error("Failed to create sale object after transaction.");
