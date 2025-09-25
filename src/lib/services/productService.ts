@@ -190,87 +190,96 @@ export const getSuggestedProducts = async (tags: string[], excludeIds: string[])
 
 
 export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
+    console.log("Step 2: Backend function received data:", entryItems);
     const processedItems: StockEntryItem[] = [];
     const newProductsForTagging: { id: string; name: string }[] = [];
 
-    for (const item of entryItems) {
-        const isNewProduct = !item.productId;
-        const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
+    try {
+        for (const item of entryItems) {
+            const isNewProduct = !item.productId;
+            const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
 
-        await runTransaction(db, async (transaction) => {
-            const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
-            
-            if (productDoc && productDoc.exists()) {
-                transaction.update(productRef, {
-                    stock: increment(item.quantity),
-                    cost: item.cost,
-                    price: item.price,
-                    ownershipType: item.ownershipType,
-                    consignorId: item.consignorId || null,
-                });
-            } else {
-                const searchKeywords = generateSearchKeywords(item.name);
-                const newProductData = {
-                    name: item.name,
-                    sku: item.sku,
-                    price: item.price,
-                    cost: item.cost,
-                    stock: item.quantity,
+            await runTransaction(db, async (transaction) => {
+                const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
+                
+                if (productDoc && productDoc.exists()) {
+                    transaction.update(productRef, {
+                        stock: increment(item.quantity),
+                        cost: item.cost,
+                        price: item.price,
+                        ownershipType: item.ownershipType,
+                        consignorId: item.consignorId || null,
+                    });
+                } else {
+                    const searchKeywords = generateSearchKeywords(item.name);
+                    const newProductData = {
+                        name: item.name,
+                        sku: item.sku,
+                        price: item.price,
+                        cost: item.cost,
+                        stock: item.quantity,
+                        createdAt: serverTimestamp(),
+                        type: 'Venta',
+                        ownershipType: item.ownershipType,
+                        consignorId: item.consignorId || null,
+                        comboProductIds: [],
+                        compatibilityTags: [],
+                        searchKeywords: searchKeywords,
+                    };
+                    transaction.set(productRef, newProductData);
+                    item.productId = productRef.id;
+                    newProductsForTagging.push({ id: productRef.id, name: item.name });
+                }
+
+                const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
+                transaction.set(logRef, {
+                    productId: item.productId,
+                    productName: item.name,
+                    change: item.quantity,
+                    reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
+                    updatedBy: userId,
                     createdAt: serverTimestamp(),
-                    type: 'Venta',
-                    ownershipType: item.ownershipType,
-                    consignorId: item.consignorId || null,
-                    comboProductIds: [],
-                    compatibilityTags: [],
-                    searchKeywords: searchKeywords,
-                };
-                transaction.set(productRef, newProductData);
-                item.productId = productRef.id;
-                newProductsForTagging.push({ id: productRef.id, name: item.name });
-            }
-
-            const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
-            transaction.set(logRef, {
-                productId: item.productId,
-                productName: item.name,
-                change: item.quantity,
-                reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
-                updatedBy: userId,
-                createdAt: serverTimestamp(),
-                metadata: { cost: item.cost }
+                    metadata: { cost: item.cost }
+                });
             });
-        });
 
-        processedItems.push(item);
-    }
-    
-    if (newProductsForTagging.length > 0) {
-        try {
-            const allProducts = await getProducts();
-            const existingProductsForAI = allProducts.map(p => ({
-                name: p.name,
-                tags: p.compatibilityTags || [],
-            }));
-
-            for (const newProd of newProductsForTagging) {
-                suggestProductTags({
-                    productName: newProd.name,
-                    existingProducts: existingProductsForAI
-                })
-                .then(result => {
-                    if (result.suggestedTags.length > 0) {
-                        const productRef = doc(db, PRODUCTS_COLLECTION, newProd.id);
-                        updateDoc(productRef, { compatibilityTags: result.suggestedTags });
-                    }
-                })
-                .catch(aiError => log.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
-            }
-        } catch (error) {
-            log.error("Error fetching products for AI tagging:", error);
+            processedItems.push(item);
         }
-    }
+        
+        console.log("Step 3: Success! Data saved to Firestore.");
 
-    return processedItems;
+        if (newProductsForTagging.length > 0) {
+            try {
+                const allProducts = await getProducts();
+                const existingProductsForAI = allProducts.map(p => ({
+                    name: p.name,
+                    tags: p.compatibilityTags || [],
+                }));
+
+                for (const newProd of newProductsForTagging) {
+                    suggestProductTags({
+                        productName: newProd.name,
+                        existingProducts: existingProductsForAI
+                    })
+                    .then(result => {
+                        if (result.suggestedTags.length > 0) {
+                            const productRef = doc(db, PRODUCTS_COLLECTION, newProd.id);
+                            updateDoc(productRef, { compatibilityTags: result.suggestedTags });
+                        }
+                    })
+                    .catch(aiError => log.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
+                }
+            } catch (error) {
+                log.error("Error fetching products for AI tagging:", error);
+            }
+        }
+
+        return processedItems;
+
+    } catch (error) {
+        console.error("Step 3: ERROR WRITING TO FIRESTORE:", error);
+        throw new Error("Could not save to the database.");
+    }
 };
 
 export const deleteProducts = async (productIds: string[]): Promise<void> => {
