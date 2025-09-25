@@ -21,6 +21,9 @@ interface ContractTemplateClientProps {
 
 type EditorMode = "simple" | "visual";
 
+const CONTRACT_PAGE_WIDTH_MM = 216;
+const CONTRACT_PAGE_HEIGHT_MM = 279;
+
 const placeholders = [
     { key: "{{CLIENT_NAME}}", description: "Nombre completo del cliente." },
     { key: "{{CLIENT_ADDRESS}}", description: "Dirección completa del cliente." },
@@ -136,6 +139,8 @@ export default function ContractTemplateClient({ initialSettings }: ContractTemp
         <VisualEditor 
             initialLayout={initialSettings.visualLayout ? JSON.parse(initialSettings.visualLayout) : undefined}
             onLayoutChange={handleLayoutChange}
+            widthMm={CONTRACT_PAGE_WIDTH_MM}
+            heightMm={CONTRACT_PAGE_HEIGHT_MM}
         />
       )}
     </>

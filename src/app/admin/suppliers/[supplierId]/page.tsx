@@ -4,13 +4,11 @@ import SupplierDetailClient from "@/components/admin/suppliers/SupplierDetailCli
 import { getLogger } from "@/lib/logger";
 const log = getLogger("SupplierPage");
 
-interface SupplierDetailPageProps {
-  params: {
-    supplierId: string;
-  };
-}
+type SupplierDetailPageParams = {
+  supplierId: string;
+};
 
-export default async function SupplierDetailPage({ params }: SupplierDetailPageProps) {
+export default async function SupplierDetailPage({ params }: { params: SupplierDetailPageParams }) {
   const { supplierId } = params;
 
   try {

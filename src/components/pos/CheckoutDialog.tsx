@@ -57,7 +57,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     }
   }, [toast]);
 
-  // Load clients when credit payment is selected
   useEffect(() => {
     if (paymentMethod === 'Crédito') {
       loadClients();

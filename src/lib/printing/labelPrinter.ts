@@ -265,6 +265,14 @@ export const generateAndPrintLabels = async (
     return;
   }
 
+  type QRCodeWindow = typeof printWindow & {
+    QRCode?: {
+      toCanvas: (canvas: HTMLCanvasElement, value: string, options?: { width?: number; margin?: number; errorCorrectionLevel?: string }) => void;
+    };
+  };
+
+  const qrWindow = printWindow as QRCodeWindow;
+
   const barcodeJobs: BarcodeJob[] = [];
   const qrJobs: QRJob[] = [];
   const now = new Date();
@@ -425,12 +433,12 @@ export const generateAndPrintLabels = async (
     });
 
     const ensureQrLib = () => new Promise<void>((resolve) => {
-      if (printWindow.QRCode) {
+      if (qrWindow.QRCode) {
         resolve();
         return;
       }
       const check = setInterval(() => {
-        if (printWindow.QRCode) {
+        if (qrWindow.QRCode) {
           clearInterval(check);
           resolve();
         }
@@ -444,9 +452,9 @@ export const generateAndPrintLabels = async (
     ensureQrLib().then(() => {
       context.qrJobs.forEach((job) => {
         const canvas = printWindow.document.getElementById(job.id) as HTMLCanvasElement | null;
-        if (!canvas || !printWindow.QRCode) return;
+        if (!canvas || !qrWindow.QRCode) return;
         try {
-          printWindow.QRCode.toCanvas(canvas, job.value, { width: job.size, margin: 0, errorCorrectionLevel: 'H' });
+          qrWindow.QRCode.toCanvas(canvas, job.value, { width: job.size, margin: 0, errorCorrectionLevel: 'H' });
         } catch (error) {
           log.error(`Failed to generate QR for ${job.value}`, error);
         }

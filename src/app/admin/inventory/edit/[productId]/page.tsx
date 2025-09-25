@@ -8,12 +8,12 @@ import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 import { notFound } from 'next/navigation';
 
-// Using a unique, local type name for the page's props.
-interface InventoryEditPageProps {
+// Usando un nombre de tipo, único y local para las props de la página.
+type InventoryEditPageProps = {
   params: {
     productId: string;
   };
-}
+};
 
 export default async function EditProductPage({ params }: InventoryEditPageProps) {
     const { productId } = params;

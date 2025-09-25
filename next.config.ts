@@ -51,6 +51,28 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  webpack: (config) => {
+    const shouldSilenceWarning = (warning: any, matcher: { message?: string; resource?: string }) => {
+      const messageMatch = matcher.message ? warning.message?.includes(matcher.message) : true;
+      const resourceMatch = matcher.resource ? warning.module?.resource?.includes(matcher.resource) : true;
+      return Boolean(messageMatch && resourceMatch);
+    };
+
+    config.ignoreWarnings = config.ignoreWarnings || [];
+    config.ignoreWarnings.push(
+      (warning: any) =>
+        shouldSilenceWarning(warning, {
+          message: 'Critical dependency: the request of a dependency is an expression',
+          resource: '@opentelemetry/instrumentation',
+        }),
+      (warning: any) =>
+        shouldSilenceWarning(warning, {
+          message: 'require.extensions is not supported by webpack',
+        })
+    );
+
+    return config;
+  },
 };
 
 export default nextConfig;

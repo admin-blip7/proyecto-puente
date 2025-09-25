@@ -25,6 +25,9 @@ interface TicketDesignerClientProps {
 
 type EditorMode = "simple" | "visual";
 
+const TICKET_CANVAS_WIDTH_MM = 80;
+const TICKET_CANVAS_HEIGHT_MM = 200;
+
 export default function TicketDesignerClient({ initialSettings }: TicketDesignerClientProps) {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<EditorMode>("simple");
@@ -110,7 +113,14 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
         </div>
       )}
 
-      {mode === 'visual' && <VisualEditor initialLayout={initialLayout} onLayoutChange={handleLayoutChange} />}
+      {mode === 'visual' && (
+        <VisualEditor 
+          initialLayout={initialLayout} 
+          onLayoutChange={handleLayoutChange} 
+          widthMm={TICKET_CANVAS_WIDTH_MM}
+          heightMm={TICKET_CANVAS_HEIGHT_MM}
+        />
+      )}
 
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Vista Previa del Ticket</h2>

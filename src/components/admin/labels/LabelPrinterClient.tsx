@@ -33,14 +33,21 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     const getProductKey = (product: LabelPrintItem['product']) => product.id ?? product.sku;
 
     const resolveSupplierName = (product: Product): string | undefined => {
-        const candidate = product as Record<string, unknown>;
-        if (typeof candidate.supplierName === 'string' && candidate.supplierName.trim().length > 0) {
+        type SupplierCandidate = {
+            supplierName?: string;
+            supplier?: string;
+            supplierId?: string;
+        };
+
+        const candidate = product as unknown as SupplierCandidate;
+
+        if (candidate.supplierName && candidate.supplierName.trim().length > 0) {
             return candidate.supplierName;
         }
-        if (typeof candidate.supplier === 'string' && candidate.supplier.trim().length > 0) {
+        if (candidate.supplier && candidate.supplier.trim().length > 0) {
             return candidate.supplier;
         }
-        if (typeof candidate.supplierId === 'string') {
+        if (candidate.supplierId) {
             return supplierMap.get(candidate.supplierId) ?? undefined;
         }
         return undefined;

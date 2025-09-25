@@ -61,7 +61,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
   const getProduct = useCallback((productId: string) => {
     return products.find(p => p.id === productId);
-  }, [products])
+  }, [products]);
 
   const filteredSales = useMemo(() => {
     if (!excludeFamiliar) return sales;
@@ -119,7 +119,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
         <div className="flex items-center space-x-2">
             <Switch id="exclude-familiar" checked={excludeFamiliar} onCheckedChange={setExcludeFamiliar} />
-            <Label htmlFor="exclude-familiar">Excluir ventas &apos;Familiar&apos;</Label>
+            <Label htmlFor="exclude-familiar">Excluir ventas &quot;Familiar&quot;</Label>
         </div>
       </div>
 

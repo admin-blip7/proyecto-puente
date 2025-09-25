@@ -82,7 +82,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
         variant: "destructive",
       });
     }
-  }, [supplier.name]);
+  }, [supplier.name, toast]);
 
   useEffect(() => {
     loadPurchaseHistory();

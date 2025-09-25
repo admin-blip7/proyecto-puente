@@ -47,21 +47,21 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
 
-    const handleAddNewProduct = useCallback((name: string = '', quantity: number = 1) => {
-        const generateUniqueSku = () => {
-            const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
-            let newSku = '';
-            let isUnique = false;
-            
-            while (!isUnique) {
-                newSku = Math.floor(100000 + Math.random() * 900000).toString();
-                if (!existingSkus.has(newSku)) {
-                    isUnique = true;
-                }
+    const generateUniqueSku = useCallback(() => {
+        const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
+        let newSku = '';
+        let isUnique = false;
+        
+        while (!isUnique) {
+            newSku = Math.floor(100000 + Math.random() * 900000).toString();
+            if (!existingSkus.has(newSku)) {
+                isUnique = true;
             }
-            return newSku;
-        };
+        }
+        return newSku;
+    }, [allProducts, entryList]);
 
+    const handleAddNewProduct = useCallback((name: string = '', quantity: number = 1) => {
         const newSku = generateUniqueSku();
         setEntryList(prev => [...prev, {
             id: uuidv4(),
@@ -73,7 +73,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             ownershipType: 'Propio',
             isNew: true
         }]);
-    }, [allProducts, entryList]);
+    }, [generateUniqueSku]);
     
     useEffect(() => {
         getConsignors().then(setConsignors);
@@ -160,8 +160,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         setSearchQuery("");
         setPopoverOpen(false);
     };
-
-
+    
     const handleUpdateItem = useCallback((id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {

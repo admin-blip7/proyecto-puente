@@ -20,9 +20,15 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({ type, children, item, classNa
     }),
   }));
 
+  const handleRef = (node: HTMLDivElement | null) => {
+    if (node) {
+      drag(node);
+    }
+  };
+
   return (
     <div
-      ref={drag}
+      ref={handleRef}
       style={{ opacity: isDragging ? 0.5 : 1 }}
       className={cn(
         'p-2 border rounded-md cursor-move bg-muted text-sm hover:bg-muted/80 transition-colors',

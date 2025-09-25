@@ -38,8 +38,7 @@ export default function DeleteSupplierDialog({
             <p className="text-sm"><strong>Nombre:</strong> {supplier.name}</p>
             <p className="text-sm"><strong>Contacto:</strong> {supplier.contactInfo}</p>
             <p className="text-sm">
--              <strong>Total comprado (año):</strong> €{supplier.totalPurchasedYTD.toFixed(2)}
-+              <strong>Total comprado (año):</strong> {formatCurrency(supplier.totalPurchasedYTD ?? 0)}
+              <strong>Total comprado (año):</strong> {formatCurrency(supplier.totalPurchasedYTD ?? 0)}
             </p>
           </div>
         </div>
