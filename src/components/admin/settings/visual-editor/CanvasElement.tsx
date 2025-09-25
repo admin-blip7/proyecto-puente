@@ -1,9 +1,11 @@
+
 "use client";
 
 import React, { useMemo, useRef } from 'react';
 import { useDrag } from 'react-dnd';
 import { LABEL_PLACEHOLDERS, VisualElement } from './types';
 import { QRCode } from 'react-qrcode-logo';
+import Image from 'next/image';
 
 interface CanvasElementProps {
   element: VisualElement;
@@ -86,11 +88,12 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
     if (element.type === 'image') {
       const imageSrc = element.imageUrl || (typeof element.content === 'string' ? element.content : undefined);
       if (imageSrc) {
-        // eslint-disable-next-line @next/next/no-img-element
         return (
-          <img
+          <Image
             src={imageSrc}
             alt="Logo"
+            width={widthPx}
+            height={heightPx}
             className="w-full h-full object-contain"
           />
         );

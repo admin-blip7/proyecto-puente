@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -81,7 +82,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
         variant: "destructive",
       });
     }
-  }, [supplier.name, toast]);
+  }, [supplier.name]);
 
   useEffect(() => {
     loadPurchaseHistory();
