@@ -1,21 +1,21 @@
-
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { getProductById } from "@/lib/services/productService";
+import { getProductById, getProducts } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
-import { getProducts } from "@/lib/services/productService";
 import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
+import { notFound } from 'next/navigation';
 
-interface PageProps {
-    params: {
-        productId: string;
-    }
+// Tipo local y único para las props de la página
+interface InventoryEditPageProps {
+  params: {
+    productId: string;
+  };
 }
 
-export default async function EditProductPage({ params }: PageProps) {
+export default async function EditProductPage({ params }: InventoryEditPageProps) {
     const { productId } = params;
     
     // Fetch all necessary data in parallel
@@ -26,15 +26,7 @@ export default async function EditProductPage({ params }: PageProps) {
     ]);
 
     if (!product) {
-        return (
-             <div className="flex h-screen w-full flex-col items-center justify-center">
-                <h1 className="text-2xl font-bold">Producto no encontrado</h1>
-                <p className="text-muted-foreground">El producto que buscas no existe o ha sido eliminado.</p>
-                <Button asChild variant="link" className="mt-4">
-                    <Link href="/admin">Volver al Inventario</Link>
-                </Button>
-            </div>
-        )
+        notFound();
     }
 
     return (
