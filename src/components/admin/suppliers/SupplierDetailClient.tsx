@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,11 +49,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    loadPurchaseHistory();
-  }, [supplier.id]);
-
-  const loadPurchaseHistory = async () => {
+  const loadPurchaseHistory = useCallback(async () => {
     try {
       const q = query(
         collection(db, "purchase_orders"),
@@ -85,7 +81,11 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
         variant: "destructive",
       });
     }
-  };
+  }, [supplier.name, toast]);
+
+  useEffect(() => {
+    loadPurchaseHistory();
+  }, [loadPurchaseHistory]);
 
   const handleSaveNotes = async () => {
     setIsLoading(true);

@@ -58,7 +58,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
     setDraftWidth(selectedElement.width !== undefined ? String(selectedElement.width) : '');
     setDraftHeight(selectedElement.height !== undefined ? String(selectedElement.height) : '');
     setDraftFontSize(selectedElement.fontSize !== undefined ? String(selectedElement.fontSize) : '');
-  }, [selectedElement?.id, selectedElement?.width, selectedElement?.height, selectedElement?.fontSize]);
+  }, [selectedElement]);
 
   const handleDimensionChange = (field: 'width' | 'height' | 'fontSize') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {

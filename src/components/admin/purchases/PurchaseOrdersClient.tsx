@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -120,7 +120,7 @@ export default function PurchaseOrdersClient() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     let filtered = orders;
@@ -162,60 +162,7 @@ export default function PurchaseOrdersClient() {
     setFilteredOrders(filtered);
   }, [orders, searchTerm, statusFilter, sortOption]);
 
-  const updateOrderStatus = async (orderId: string, newStatus: PurchaseOrder['status'], notes?: string) => {
-    try {
-      const orderRef = doc(db, 'purchase_orders', orderId);
-      const updateData: any = {
-        status: newStatus,
-        updatedAt: serverTimestamp()
-      };
-
-      if (newStatus === 'received') {
-        updateData.actualDelivery = serverTimestamp();
-      }
-
-      await updateDoc(orderRef, updateData);
-
-      // Agregar entrada al historial
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        const baseHistoryEntry = {
-          action: `Estado cambiado a ${statusConfig[newStatus].label}`,
-          status: newStatus,
-          timestamp: new Date(), // Usar Date() en lugar de serverTimestamp() dentro de arrays
-          user: 'Usuario Actual', // Aquí deberías usar el usuario actual
-        } as const;
-
-        const historyEntry = notes && notes.trim()
-          ? { ...baseHistoryEntry, notes: notes.trim() }
-          : baseHistoryEntry;
-
-        await updateDoc(orderRef, {
-          history: [...(order.history || []), historyEntry]
-        });
-      }
-
-      toast({
-        title: "Estado actualizado",
-        description: `La orden ha sido marcada como ${statusConfig[newStatus].label.toLowerCase()}`,
-      });
-
-      // Si se marca como recibida, actualizar inventario
-      if (newStatus === 'received' && order) {
-        await updateInventoryFromOrder(order);
-      }
-
-    } catch (error) {
-      log.error('Error updating order status:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el estado de la orden",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateInventoryFromOrder = async (order: PurchaseOrder) => {
+  const updateInventoryFromOrder = useCallback(async (order: PurchaseOrder) => {
     try {
       for (const item of order.items) {
         // Validar que el producto tenga nombre antes de consultar/actualizar inventario
@@ -272,7 +219,61 @@ export default function PurchaseOrdersClient() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  const updateOrderStatus = useCallback(async (orderId: string, newStatus: PurchaseOrder['status'], notes?: string) => {
+    try {
+      const orderRef = doc(db, 'purchase_orders', orderId);
+      const updateData: any = {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      };
+
+      if (newStatus === 'received') {
+        updateData.actualDelivery = serverTimestamp();
+      }
+
+      await updateDoc(orderRef, updateData);
+
+      // Agregar entrada al historial
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const baseHistoryEntry = {
+          action: `Estado cambiado a ${statusConfig[newStatus].label}`,
+          status: newStatus,
+          timestamp: new Date(), // Usar Date() en lugar de serverTimestamp() dentro de arrays
+          user: 'Usuario Actual', // Aquí deberías usar el usuario actual
+        } as const;
+
+        const historyEntry = notes && notes.trim()
+          ? { ...baseHistoryEntry, notes: notes.trim() }
+          : baseHistoryEntry;
+
+        await updateDoc(orderRef, {
+          history: [...(order.history || []), historyEntry]
+        });
+      }
+
+      toast({
+        title: "Estado actualizado",
+        description: `La orden ha sido marcada como ${statusConfig[newStatus].label.toLowerCase()}`,
+      });
+
+      // Si se marca como recibida, actualizar inventario
+      if (newStatus === 'received' && order) {
+        await updateInventoryFromOrder(order);
+      }
+
+    } catch (error) {
+      log.error('Error updating order status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado de la orden",
+        variant: "destructive",
+      });
+    }
+  }, [orders, toast, updateInventoryFromOrder]);
+
 
   const handleReceiveOrder = async () => {
     if (!selectedOrder) return;

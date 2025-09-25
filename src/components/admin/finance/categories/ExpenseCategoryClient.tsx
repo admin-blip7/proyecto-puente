@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ExpenseCategory } from "@/types";
 import { getExpenseCategories, addExpenseCategory, updateExpenseCategory } from "@/lib/services/expenseCategoryService";
 import { Button } from "@/components/ui/button";
@@ -31,11 +31,7 @@ export default function ExpenseCategoryClient() {
     const [newCategoryName, setNewCategoryName] = useState("");
     const { toast } = useToast();
 
-    useEffect(() => {
-        loadCategories();
-    }, []);
-
-    const loadCategories = async () => {
+    const loadCategories = useCallback(async () => {
         setIsLoading(true);
         try {
             const fetchedCategories = await getExpenseCategories();
@@ -45,7 +41,11 @@ export default function ExpenseCategoryClient() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        loadCategories();
+    }, [loadCategories]);
     
     const handleAddNewCategory = async () => {
         if (!newCategoryName.trim()) {

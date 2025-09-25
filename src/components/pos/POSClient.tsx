@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Product, CartItem, SuggestedProduct, CashSession, ClientProfile } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
@@ -53,7 +53,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   }, [userProfile]);
 
 
-  const fetchSuggestions = async (item: CartItem) => {
+  const fetchSuggestions = useCallback(async (item: CartItem) => {
     if (!item?.compatibilityTags || item.compatibilityTags.length === 0) {
         setSuggestedProducts([]);
         return;
@@ -63,7 +63,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     const suggestions = await getSuggestedProducts(item.compatibilityTags, cartIds);
     setSuggestedProducts(suggestions);
     setIsLoadingSuggestions(false);
-  }
+  }, [cart]);
 
   useEffect(() => {
     if (selectedCartItem) {
@@ -71,7 +71,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     } else {
         setSuggestedProducts([]);
     }
-  }, [selectedCartItem, cart]);
+  }, [selectedCartItem, fetchSuggestions]);
 
 
   const addToCart = (product: Product | SuggestedProduct, quantity: number = 1) => {

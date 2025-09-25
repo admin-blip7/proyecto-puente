@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment, useMemo } from "react";
+import { useState, Fragment, useMemo, useCallback } from "react";
 import { Sale, Warranty, Product, SaleItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -59,9 +59,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     setOpenCollapsibles(prev => ({...prev, [saleId]: !prev[saleId]}));
   }
 
-  const getProduct = (productId: string) => {
+  const getProduct = useCallback((productId: string) => {
     return products.find(p => p.id === productId);
-  }
+  }, [products])
 
   const filteredSales = useMemo(() => {
     if (!excludeFamiliar) return sales;
@@ -72,7 +72,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         return product?.ownershipType !== 'Familiar';
       });
     });
-  }, [sales, excludeFamiliar, products]);
+  }, [sales, excludeFamiliar, getProduct]);
 
   const { dailyCost: filteredDailyCost, dailyProfit: filteredDailyProfit } = useMemo(() => {
     const today = new Date();
@@ -94,7 +94,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
     return { dailyCost, dailyProfit };
 
-  }, [sales, excludeFamiliar, products]);
+  }, [sales, excludeFamiliar, getProduct]);
 
   const renderSerials = (item: SaleItem) => {
     if (!item.serials || item.serials.length === 0) {
@@ -119,7 +119,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
         <div className="flex items-center space-x-2">
             <Switch id="exclude-familiar" checked={excludeFamiliar} onCheckedChange={setExcludeFamiliar} />
-            <Label htmlFor="exclude-familiar">Excluir ventas 'Familiar'</Label>
+            <Label htmlFor="exclude-familiar">Excluir ventas &apos;Familiar&apos;</Label>
         </div>
       </div>
 

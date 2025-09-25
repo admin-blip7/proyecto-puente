@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CartItem, Sale, SaleItem, UserProfile } from "@/types";
+import { CartItem, Sale, SaleItem, UserProfile, ClientProfile } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -40,14 +40,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
-  // Load clients when credit payment is selected
-  useEffect(() => {
-    if (paymentMethod === 'Crédito') {
-      loadClients();
-    }
-  }, [paymentMethod]);
-
-  const loadClients = async () => {
+  const loadClients = useCallback(async () => {
     setLoadingClients(true);
     try {
       const clientsData = await getClientsWithCredit();
@@ -62,7 +55,14 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     } finally {
       setLoadingClients(false);
     }
-  };
+  }, [toast]);
+
+  // Load clients when credit payment is selected
+  useEffect(() => {
+    if (paymentMethod === 'Crédito') {
+      loadClients();
+    }
+  }, [paymentMethod, loadClients]);
 
   const change = useMemo(() => {
     if (paymentMethod === 'Efectivo' && amountPaid > 0) {
