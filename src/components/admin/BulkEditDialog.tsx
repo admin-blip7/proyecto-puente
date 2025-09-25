@@ -142,7 +142,7 @@ export default function BulkEditDialog({
           <DialogTitle>Edición Masiva de Productos</DialogTitle>
           <DialogDescription>
             Aplicar cambios a <span className="font-bold">{numProducts} producto(s)</span> seleccionados. 
-            Los campos que dejes vacíos o en "ninguno" no se modificarán.
+            Los campos que dejes vacíos o en &quot;ninguno&quot; no se modificarán.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

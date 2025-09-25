@@ -61,7 +61,7 @@ export default function DebtStrategyDialog({ isOpen, onOpenChange, debts }: Debt
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
                             {isLoading ? "Analizando..." : "Generar Estrategias"}
                         </Button>
-                        {debts.length === 0 && <p className="text-xs text-destructive">No tienes deudas de tipo "Tarjeta de Crédito" para analizar.</p>}
+                        {debts.length === 0 && <p className="text-xs text-destructive">No tienes deudas de tipo &quot;Tarjeta de Crédito&quot; para analizar.</p>}
                     </div>
                 )}
 

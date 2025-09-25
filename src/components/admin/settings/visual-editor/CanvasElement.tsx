@@ -87,6 +87,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
       const imageSrc = element.imageUrl || (typeof element.content === 'string' ? element.content : undefined);
       if (imageSrc) {
         return (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageSrc}
             alt="Logo"

@@ -46,7 +46,35 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     const router = useRouter();
     
     useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
-    
+
+    const generateUniqueSku = useCallback(() => {
+        const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
+        let newSku = '';
+        let isUnique = false;
+        
+        while (!isUnique) {
+            newSku = Math.floor(100000 + Math.random() * 900000).toString();
+            if (!existingSkus.has(newSku)) {
+                isUnique = true;
+            }
+        }
+        return newSku;
+    }, [allProducts, entryList]);
+
+    const handleAddNewProduct = useCallback((name: string = '', quantity: number = 1) => {
+        const newSku = generateUniqueSku();
+        setEntryList(prev => [...prev, {
+            id: uuidv4(),
+            sku: newSku,
+            name: name,
+            quantity: quantity,
+            price: 0,
+            cost: 0,
+            ownershipType: 'Propio',
+            isNew: true
+        }]);
+    }, [generateUniqueSku]);
+
     useEffect(() => {
         getConsignors().then(setConsignors);
         
@@ -83,7 +111,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                 recognitionRef.current = recognition;
             }
         }
-    }, [toast]);
+    }, [toast, handleAddNewProduct]);
 
     const handleMicClick = () => {
         if (!recognitionRef.current) {
@@ -133,35 +161,6 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         setPopoverOpen(false);
     };
     
-    const generateUniqueSku = () => {
-        const existingSkus = new Set([...allProducts.map(p => p.sku), ...entryList.map(item => item.sku)]);
-        let newSku = '';
-        let isUnique = false;
-        
-        while (!isUnique) {
-            newSku = Math.floor(100000 + Math.random() * 900000).toString();
-            if (!existingSkus.has(newSku)) {
-                isUnique = true;
-            }
-        }
-        return newSku;
-    };
-
-
-    const handleAddNewProduct = (name: string = '', quantity: number = 1) => {
-        const newSku = generateUniqueSku();
-        setEntryList(prev => [...prev, {
-            id: uuidv4(),
-            sku: newSku,
-            name: name,
-            quantity: quantity,
-            price: 0,
-            cost: 0,
-            ownershipType: 'Propio',
-            isNew: true
-        }]);
-    };
-
     const handleUpdateItem = useCallback((id: string, field: keyof StockEntryItem, value: string | number | OwnershipType) => {
         setEntryList(prev => prev.map(item => {
             if (item.id === id) {
@@ -320,7 +319,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                             className="w-full"
                                                         >
                                                             <PlusCircle className="mr-2 h-4 w-4" />
-                                                            Crear "{searchQuery}"
+                                                            Crear &quot;{searchQuery}&quot;
                                                         </Button>
                                                     </div>
                                                 ) : (

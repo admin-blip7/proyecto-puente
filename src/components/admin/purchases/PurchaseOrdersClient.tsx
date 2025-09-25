@@ -120,7 +120,7 @@ export default function PurchaseOrdersClient() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     let filtered = orders;

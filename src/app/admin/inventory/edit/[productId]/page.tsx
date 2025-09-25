@@ -1,4 +1,3 @@
-
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -10,8 +9,12 @@ import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 
 
-export default async function EditProductPage({ params }: { params: { productId: string } }) {
-    const { productId } = params;
+type EditProductPageParams = {
+    productId: string;
+};
+
+export default async function EditProductPage({ params }: { params: Promise<EditProductPageParams> }) {
+    const { productId } = await params;
     
     // Fetch all necessary data in parallel
     const [product, consignors, allProducts] = await Promise.all([

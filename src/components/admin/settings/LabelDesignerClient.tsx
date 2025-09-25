@@ -121,7 +121,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         const processedLayout = await prepareVisualLayoutForSave(values.visualLayout);
         const payload: LabelSettings = {
             ...values,
-            visualLayout: processedLayout,
+            visualLayout: processedLayout ?? undefined,
         };
         const layoutSize = payload.visualLayout ? payload.visualLayout.length : 0;
         if (layoutSize > 1000000) {
