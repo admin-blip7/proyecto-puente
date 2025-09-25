@@ -9,8 +9,13 @@ import { getProducts } from "@/lib/services/productService";
 import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 
+interface PageProps {
+    params: {
+        productId: string;
+    }
+}
 
-export default async function EditProductPage({ params }: { params: { productId: string } }) {
+export default async function EditProductPage({ params }: PageProps) {
     const { productId } = params;
     
     // Fetch all necessary data in parallel
