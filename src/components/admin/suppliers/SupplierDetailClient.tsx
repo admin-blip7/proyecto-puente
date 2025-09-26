@@ -82,7 +82,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
         variant: "destructive",
       });
     }
-  }, [supplier.name, toast]);
+  }, [supplier.name]);
 
   useEffect(() => {
     loadPurchaseHistory();
@@ -99,7 +99,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
         title: "Éxito",
         description: "Notas actualizadas correctamente",
       });
-    } catch (error) {
+    } catch (error) => {
       log.error("Error updating notes:", error);
       toast({
         title: "Error",
