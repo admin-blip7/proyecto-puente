@@ -11,13 +11,13 @@ import Link from "next/link";
 import { notFound } from 'next/navigation';
 
 // Define la interfaz local para las props de la página
-interface PageProps {
+type Props = {
   params: {
     productId: string;
   };
-}
+};
 
-const EditProductPage: FC<PageProps> = async ({ params }) => {
+const EditProductPage: FC<Props> = async ({ params }) => {
   const { productId } = params;
   
   // Fetch all necessary data in parallel
