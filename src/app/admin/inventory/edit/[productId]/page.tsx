@@ -10,14 +10,13 @@ import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 import { notFound } from 'next/navigation';
 
-// Define la interfaz local para las props de la página
 type Props = {
   params: {
     productId: string;
   };
 };
 
-const EditProductPage: FC<Props> = async ({ params }) => {
+export default async function EditProductPage({ params }: Props) {
   const { productId } = params;
   
   // Fetch all necessary data in parallel
@@ -59,5 +58,3 @@ const EditProductPage: FC<Props> = async ({ params }) => {
       </div>
   );
 };
-
-export default EditProductPage;
