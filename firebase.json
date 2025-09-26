@@ -17,5 +17,11 @@
       "enabled": true
     },
     "singleProjectMode": true
+  },
+  "hosting": {
+    "source": ".",
+    "runtime": {
+      "name": "nodejs20"
+    }
   }
 }
