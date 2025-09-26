@@ -8,14 +8,14 @@ import EditProductForm from "@/components/admin/inventory/EditProductForm";
 import Link from "next/link";
 import { notFound } from 'next/navigation';
 
-// Usando un nombre de tipo, único y local para las props de la página.
-type InventoryEditPageProps = {
-  params: {
-    productId: string;
-  };
-};
+// No exportar ni declarar 'PageProps' o 'InventoryEditPageProps' como tipo global/reutilizable.
+// Tipar los parámetros directamente y de forma local.
 
-export default async function EditProductPage({ params }: InventoryEditPageProps) {
+export default async function EditProductPage({ 
+    params 
+}: { 
+    params: { productId: string };
+}) {
     const { productId } = params;
     
     // Fetch all necessary data in parallel
