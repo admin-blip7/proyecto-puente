@@ -16,6 +16,9 @@ import SaleSummaryDialog from "./SaleSummaryDialog";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
 import { getClientsWithCredit, createCreditSale } from "@/lib/services/creditService";
 import { ScrollArea } from "../ui/scroll-area";
+import { getLogger } from "@/lib/logger";
+
+const log = getLogger("CheckoutDialog");
 
 interface CheckoutDialogProps {
   isOpen: boolean;
@@ -46,7 +49,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
       const clientsData = await getClientsWithCredit();
       setClients(clientsData);
     } catch (error) {
-      console.error('Error loading clients:', error);
+      log.error('Error loading clients:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los clientes",
@@ -84,21 +87,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         return;
     }
 
-    // Remove serial validation for now since CartItem structure needs clarification
-    // const missingSerials = cartItems.filter(item => 
-    //   item.product?.requiresSerial && (!serials[item.id] || serials[item.id].length < item.quantity)
-    // );
-
-    // if (missingSerials.length > 0) {
-    //   toast({
-    //     title: "Error",
-    //     description: `Faltan números de serie para: ${missingSerials.map(item => item.name).join(', ')}`,
-    //     variant: "destructive",
-    //   });
-    //   return;
-    // }
-
-    // Validate payment method specific requirements
     if (paymentMethod === 'Efectivo' && amountPaid < totalAmount) {
         toast({ variant: "destructive", title: "Pago Insuficiente", description: "El monto pagado es menor al total de la venta." });
         return;
@@ -135,9 +123,10 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
 
     try {
         let newSale: Sale;
+        
+        console.log("Step 1: Sending sale data to the backend...", saleDataForDb);
 
         if (paymentMethod === 'Crédito') {
-           // Create financed sale
            newSale = await createCreditSale({
              items: cartItems,
              clientId: selectedClient,
@@ -148,7 +137,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
              customerPhone: customerPhone || undefined,
            });
          } else {
-          // Create regular sale
           newSale = await addSaleAndUpdateStock(saleDataForDb, cartItems);
         }
 
@@ -159,7 +147,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             description: `Venta ${paymentMethod === 'Crédito' ? 'a crédito' : ''} completada exitosamente`,
         });
         
-        // Reset state and close dialogs
         onSuccessfulSale();
         onOpenChange(false);
         setSummaryOpen(true);
@@ -170,7 +157,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         setSelectedClient("");
 
     } catch (error) {
-        console.error("Sale processing error:", error);
+        log.error("Sale processing error:", error);
         toast({
             variant: "destructive",
             title: "Error en la Venta",

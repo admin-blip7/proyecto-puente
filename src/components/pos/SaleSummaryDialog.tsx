@@ -8,12 +8,60 @@ import { useRef, useState, useEffect } from "react";
 import { Sale, TicketSettings } from "@/types";
 import { getTicketSettings } from "@/lib/services/settingsService";
 import PrintableTicket from "../admin/settings/PrintableTicket";
+import { formatCurrency } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface SaleSummaryDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   sale: Sale;
 }
+
+// Helper to generate plain text for Android printing
+const generatePlainTextTicket = (sale: Sale, settings: TicketSettings): string => {
+    let text = "";
+    const separator = "-".repeat(40) + "\n";
+
+    // Header
+    if (settings.header.show.storeName && settings.header.storeName) text += `${settings.header.storeName}\n`;
+    if (settings.header.show.address && settings.header.address) text += `${settings.header.address}\n`;
+    if (settings.header.show.phone && settings.header.phone) text += `Tel: ${settings.header.phone}\n`;
+    if (settings.header.show.rfc && settings.header.rfc) text += `RFC: ${settings.header.rfc}\n`;
+    text += separator;
+
+    // Sale Info
+    text += `Folio: ${sale.saleId}\n`;
+    text += `Fecha: ${format(sale.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}\n`;
+    text += `Cajero: ${sale.cashierName}\n`;
+    if (sale.customerName) text += `Cliente: ${sale.customerName}\n`;
+    text += separator;
+
+    // Items
+    text += "CANT  PRODUCTO             IMPORTE\n";
+    sale.items.forEach(item => {
+        const name = item.name.substring(0, 20).padEnd(20);
+        const price = formatCurrency(item.priceAtSale * item.quantity).padStart(10);
+        text += `${item.quantity.toString().padEnd(4)}  ${name} ${price}\n`;
+    });
+    text += separator;
+
+    // Totals
+    const subtotal = sale.items.reduce((sum, item) => sum + (item.priceAtSale * item.quantity), 0);
+    const tax = subtotal * 0.16; // Assuming 16% tax
+    
+    if (settings.footer.showSubtotal) text += `SUBTOTAL: ${formatCurrency(subtotal).padStart(29)}\n`;
+    if (settings.footer.showTaxes) text += `IVA: ${formatCurrency(tax).padStart(35)}\n`;
+    text += `TOTAL: ${formatCurrency(sale.totalAmount).padStart(33)}\n`;
+    text += separator;
+
+    // Footer
+    if (settings.footer.thankYouMessage) text += `${settings.footer.thankYouMessage}\n`;
+    if (settings.footer.additionalInfo) text += `${settings.footer.additionalInfo}\n`;
+
+    return text;
+};
+
 
 export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSummaryDialogProps) {
   const printAreaRef = useRef<HTMLDivElement>(null);
@@ -29,48 +77,72 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
     }
   }, [isOpen]);
 
-  const handlePrint = () => {
-    const printContent = printAreaRef.current?.innerHTML;
-    if (printContent) {
-      const printWindow = window.open('', '', 'height=800,width=400');
-      if (printWindow) {
-        printWindow.document.write('<html><head><title>Recibo de Venta</title>');
-        // Injecting tailwind-like styles for printing
-        printWindow.document.write(`
-          <style>
-            body { font-family: 'Courier New', Courier, monospace; margin: 0; }
-            .ticket-preview { width: 80mm; background-color: white; color: black; padding: 12px; font-size: 14px; }
-            .text-center { text-align: center; }
-            .space-y-1 > * + * { margin-top: 0.25rem; }
-            .mb-4 { margin-bottom: 1rem; }
-            .font-bold { font-weight: 700; }
-            .text-lg { font-size: 1.125rem; }
-            hr { border-style: dashed; border-color: black; margin-top: 0.5rem; margin-bottom: 0.5rem; border-top-width: 1px; }
-            table { width: 100%; }
-            .pb-1 { padding-bottom: 0.25rem; }
-            .text-left { text-align: left; }
-            .text-right { text-align: right; }
-            .align-top { vertical-align: top; }
-            .space-y-1 > * + * { margin-top: 0.25rem; }
-            .pt-1 { padding-top: 0.25rem; }
-            .flex { display: flex; }
-            .justify-between { justify-content: space-between; }
-            .justify-center { justify-content: center; }
-            .mt-4 { margin-top: 1rem; }
-            .pt-2 { padding-top: 0.5rem; }
-            .text-xs { font-size: 0.75rem; }
-            .text-sm { font-size: 0.875rem; }
-            .text-base { font-size: 1rem; }
-          </style>
-        `);
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(printContent);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }
+  const handlePrint = async () => {
+    if (!settings) return;
+
+    const isAndroid = /android/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+        const plainTextTicket = generatePlainTextTicket(sale, settings);
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: `Recibo Venta ${sale.saleId}`,
+                    text: plainTextTicket,
+                });
+            } else {
+                alert("La API para compartir no está disponible en este navegador. Copia el texto manualmente.");
+            }
+        } catch (error) {
+            console.error("Error al compartir:", error);
+            alert("No se pudo abrir el diálogo para compartir/imprimir.");
+        }
+    } else {
+        // Standard HTML printing for other devices
+        const printContent = printAreaRef.current?.innerHTML;
+        if (printContent) {
+            const printWindow = window.open('', '', 'height=800,width=400');
+            if (printWindow) {
+                printWindow.document.write('<html><head><title>Recibo de Venta</title>');
+                printWindow.document.write(`
+                  <style>
+                    body { font-family: 'Courier New', Courier, monospace; margin: 0; }
+                    .ticket-preview { width: 80mm; background-color: white; color: black; padding: 12px; font-size: 14px; }
+                    .text-center { text-align: center; }
+                    .space-y-1 > * + * { margin-top: 0.25rem; }
+                    .mb-4 { margin-bottom: 1rem; }
+                    .font-bold { font-weight: 700; }
+                    .text-lg { font-size: 1.125rem; }
+                    hr { border-style: dashed; border-color: black; margin-top: 0.5rem; margin-bottom: 0.5rem; border-top-width: 1px; }
+                    table { width: 100%; }
+                    .pb-1 { padding-bottom: 0.25rem; }
+                    .text-left { text-align: left; }
+                    .text-right { text-align: right; }
+                    .align-top { vertical-align: top; }
+                    .space-y-1 > * + * { margin-top: 0.25rem; }
+                    .pt-1 { padding-top: 0.25rem; }
+                    .flex { display: flex; }
+                    .justify-between { justify-content: space-between; }
+                    .justify-center { justify-content: center; }
+                    .mt-4 { margin-top: 1rem; }
+                    .pt-2 { padding-top: 0.5rem; }
+                    .text-xs { font-size: 0.75rem; }
+                    .text-sm { font-size: 0.875rem; }
+                    .text-base { font-size: 1rem; }
+                  </style>
+                `);
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(printContent);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.focus();
+                
+                setTimeout(() => {
+                  printWindow.print();
+                  printWindow.close();
+                }, 250);
+            }
+        }
     }
   };
 
