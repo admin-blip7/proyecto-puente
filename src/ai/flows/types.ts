@@ -63,24 +63,6 @@ export const GenerateSalesSummaryOutputSchema = z.object({
 });
 export type GenerateSalesSummaryOutput = z.infer<typeof GenerateSalesSummaryOutputSchema>;
 
-// Types for: suggest-product-tags
-const ExistingProductSchema = z.object({
-  name: z.string(),
-  tags: z.array(z.string()),
-});
-
-export const SuggestTagsInputSchema = z.object({
-  productName: z.string().describe("The name of the product for which to suggest tags."),
-  productDescription: z.string().optional().describe("The description of the product."),
-  existingProducts: z.array(ExistingProductSchema).describe("A list of existing products with their current tags to provide context."),
-});
-export type SuggestTagsInput = z.infer<typeof SuggestTagsInputSchema>;
-
-export const SuggestTagsOutputSchema = z.object({
-  suggestedTags: z.array(z.string()).describe("An array of suggested compatibility tags. The tags should be short, in lowercase, and use hyphens instead of spaces (e.g., 'iphone-15-pro', 'carga-rapida', 'accesorios-samsung')."),
-});
-export type SuggestTagsOutput = z.infer<typeof SuggestTagsOutputSchema>;
-
 // Types for: parse-stock-entry-command
 export const StockEntryCommandInputSchema = z.object({
   command: z.string().describe('The transcribed voice command from the user.'),

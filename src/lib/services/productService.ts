@@ -2,12 +2,12 @@
 'use server';
 
 import { db, storage } from "@/lib/firebase";
-import { Product, StockEntryItem, SuggestedProduct, BulkUpdateData } from "@/types";
+import { Product, StockEntryItem, BulkUpdateData } from "@/types";
 import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../hooks";
-import { suggestProductTags } from "@/ai/flows/suggest-product-tags";
+
 import { getLogger } from "@/lib/logger";
 const log = getLogger("productService");
 
@@ -101,27 +101,6 @@ export const addProduct = async (
 
         await setDoc(productDocRef, dataToSave);
 
-        // Asynchronously generate tags without blocking the return
-        if (productData.name) {
-             getProducts().then(allProducts => {
-                const existingProductsForAI = allProducts.map(p => ({
-                    name: p.name,
-                    tags: p.compatibilityTags || [],
-                }));
-
-                suggestProductTags({
-                    productName: productData.name,
-                    productDescription: "", // Optional: add description if available
-                    existingProducts: existingProductsForAI,
-                })
-                .then(result => {
-                    if (result.suggestedTags && result.suggestedTags.length > 0) {
-                        updateDoc(productDocRef, { compatibilityTags: result.suggestedTags });
-                    }
-                })
-                .catch(error => log.error(`Error generating AI tags for ${productData.name}:`, error));
-                }).catch(error => log.error("Error fetching existing products for AI tagging:", error));
-        }
         
         const finalProductDoc = await getDoc(productDocRef);
         return productFromDoc(finalProductDoc as DocumentData);
@@ -157,36 +136,7 @@ export const updateProduct = async (
 };
 
 
-export const getSuggestedProducts = async (tags: string[], excludeIds: string[]): Promise<SuggestedProduct[]> => {
-    if (tags.length === 0 || tags.length > 10) {
-        return [];
-    }
 
-    const q = query(
-        collection(db, PRODUCTS_COLLECTION),
-        where('compatibilityTags', 'array-contains-any', tags),
-        limit(10)
-    );
-
-    try {
-        const querySnapshot = await getDocs(q);
-        const suggestedProducts = querySnapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    name: data.name,
-                    price: Number(data.price || 0),
-                };
-            })
-            .filter(p => !excludeIds.includes(p.id)); 
-
-        return suggestedProducts;
-    } catch (error) {
-        log.error("Error fetching suggested products: ", error);
-        return [];
-    }
-}
 
 
 export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
@@ -247,32 +197,6 @@ export const processStockEntry = async (entryItems: StockEntryItem[], userId: st
         }
         
         console.log("Step 3: Success! Data saved to Firestore.");
-
-        if (newProductsForTagging.length > 0) {
-            try {
-                const allProducts = await getProducts();
-                const existingProductsForAI = allProducts.map(p => ({
-                    name: p.name,
-                    tags: p.compatibilityTags || [],
-                }));
-
-                for (const newProd of newProductsForTagging) {
-                    suggestProductTags({
-                        productName: newProd.name,
-                        existingProducts: existingProductsForAI
-                    })
-                    .then(result => {
-                        if (result.suggestedTags.length > 0) {
-                            const productRef = doc(db, PRODUCTS_COLLECTION, newProd.id);
-                            updateDoc(productRef, { compatibilityTags: result.suggestedTags });
-                        }
-                    })
-                    .catch(aiError => log.error(`Failed to generate AI tags for ${newProd.name}:`, aiError));
-                }
-            } catch (error) {
-                log.error("Error fetching products for AI tagging:", error);
-            }
-        }
 
         return processedItems;
 

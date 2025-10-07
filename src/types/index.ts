@@ -21,12 +21,6 @@ export interface Product {
   searchKeywords?: string[];
 }
 
-export interface SuggestedProduct {
-  id: string;
-  name: string;
-  price: number;
-}
-
 
 export interface Consignor {
     id: string;

@@ -1,10 +1,10 @@
 "use client";
 
-import { CartItem, SuggestedProduct, Product } from "@/types";
+import { CartItem, Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MinusCircle, PlusCircle, Receipt, Wand2, Package, LogOut, CreditCard } from "lucide-react";
+import { MinusCircle, PlusCircle, Receipt, Package, LogOut, CreditCard } from "lucide-react";
 import { formatCurrency } from '@/lib/utils';
 import CheckoutDialog from "./CheckoutDialog";
 import { useState, useMemo } from "react";
@@ -24,8 +24,7 @@ interface ShoppingCartProps {
   isSheet?: boolean;
   selectedCartItem: CartItem | null;
   onSelectItem: (item: CartItem) => void;
-  suggestedProducts: SuggestedProduct[];
-  onAddToCart: (product: Product | SuggestedProduct, quantity?: number) => void;
+  onAddToCart: (product: Product, quantity?: number) => void;
   onCloseSession: () => void;
   onFinanceSale: () => void;
 }
@@ -37,7 +36,6 @@ export default function ShoppingCart({
   isSheet = false, 
   selectedCartItem, 
   onSelectItem,
-  suggestedProducts,
   onAddToCart,
   onCloseSession,
   onFinanceSale,
@@ -47,6 +45,8 @@ export default function ShoppingCart({
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const isMobile = useIsMobile();
+  
+  
 
   const itemsTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const discount = 0; // Placeholder for future discount logic
@@ -117,28 +117,6 @@ export default function ShoppingCart({
     </ScrollArea>
   );
 
-  const renderSuggestionsContent = () => (
-     <ScrollArea className="h-full">
-        <div className="px-6 py-4 space-y-4">
-            {suggestedProducts.length > 0 ? (
-                 suggestedProducts.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 text-sm">
-                      <p className="flex-1 font-medium">{p.name}</p>
-                      <Button variant="outline" size="sm" onClick={() => onAddToCart(p, 1)}>
-                        <PlusCircle className="mr-2 h-4 w-4"/>
-                        {formatCurrency(p.price)}
-                      </Button>
-                    </div>
-                  ))
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                    <p className="text-muted-foreground">Selecciona un producto del carrito para ver sugerencias.</p>
-                </div>
-            )}
-        </div>
-     </ScrollArea>
-  );
-
 
   return (
     <>
@@ -153,12 +131,10 @@ export default function ShoppingCart({
         <CardContent className="p-0 flex-1 min-h-0">
           {isMobile ? (
              <Tabs defaultValue="cart" className="w-full h-full flex flex-col">
-                <TabsList className="grid w-full grid-cols-2 mx-auto sticky top-0 px-6">
+                <TabsList className="grid w-full grid-cols-1 mx-auto sticky top-0 px-6">
                     <TabsTrigger value="cart">Mi Pedido</TabsTrigger>
-                    <TabsTrigger value="suggestions">Sugerencias</TabsTrigger>
                 </TabsList>
                 <TabsContent value="cart" className="flex-1 overflow-y-auto">{renderCartContent()}</TabsContent>
-                <TabsContent value="suggestions" className="flex-1 overflow-y-auto">{renderSuggestionsContent()}</TabsContent>
             </Tabs>
           ) : (
             renderCartContent()

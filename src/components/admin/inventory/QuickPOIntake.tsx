@@ -64,20 +64,10 @@ interface ParsedItem {
   productName?: string;
   cost?: number;
   salePrice?: number;
-  suggestions?: ProductSuggestion[];
   // Prorrateo de envío
   allocatedShippingPerUnit?: number;
   totalAllocatedShipping?: number;
   finalCost?: number;
-}
-
-interface ProductSuggestion {
-  id: string;
-  name: string;
-  keywords: string[];
-  defaultCost?: number;
-  defaultSalePrice?: number;
-  score: number;
 }
 
 interface ShippingInfo {
@@ -183,51 +173,7 @@ export default function QuickPOIntake() {
     }
   }, []);
 
-  const searchProductsByRawName = useCallback(async (rawName: string): Promise<ProductSuggestion[]> => {
-    try {
-      const tokens = tokenizeText(rawName).slice(0, 5); // Limit to 5 tokens for performance
-      if (tokens.length === 0) return [];
 
-      const productsRef = collection(db, "products");
-      const q = query(productsRef, where("keywords", "array-contains-any", tokens));
-      const querySnapshot = await getDocs(q);
-
-      const suggestions: ProductSuggestion[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        let score = 0;
-        
-        // Simple scoring: +1 for each token found in name
-        const normalizedName = normalizeText(data.name || "");
-        tokens.forEach(token => {
-          if (normalizedName.includes(token)) {
-            score += 1;
-          }
-        });
-
-        if (score > 0) {
-          suggestions.push({
-            id: doc.id,
-            name: data.name,
-            keywords: data.keywords || [],
-            defaultCost: data.defaultCost,
-            defaultSalePrice: data.defaultSalePrice,
-            score
-          });
-        }
-      });
-
-      // Sort by score descending and return top 5
-      return suggestions
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5);
-        
-    } catch (error) {
-      log.error("Error searching products:", error);
-      return [];
-    }
-  }, [tokenizeText, normalizeText]);
 
   // Función para buscar productos en el inventario
   const searchProducts = useCallback(async (searchQuery: string) => {
@@ -310,8 +256,7 @@ export default function QuickPOIntake() {
       productId: product.id,
       productName: product.name,
       cost: product.cost,
-      salePrice: product.price,
-      suggestions: []
+      salePrice: product.price
     };
 
     setParsedItems(prev => [...prev, newItem]);
@@ -354,12 +299,7 @@ export default function QuickPOIntake() {
       for (const line of lines) {
         const parsed = parseLine(line);
         if (parsed) {
-          // Search for product suggestions
-          const suggestions = await searchProductsByRawName(parsed.rawName);
-          items.push({
-            ...parsed,
-            suggestions
-          });
+          items.push(parsed);
         }
       }
 
@@ -378,7 +318,7 @@ export default function QuickPOIntake() {
     } finally {
       setSearchingProducts(false);
     }
-  }, [rawText, parseLine, searchProductsByRawName, toast]);
+  }, [rawText, parseLine, toast]);
 
   const handleCopyNormalizedNames = useCallback(() => {
     const normalizedLines = parsedItems.map(item => 
@@ -398,18 +338,6 @@ export default function QuickPOIntake() {
       });
     });
   }, [parsedItems, toast]);
-
-  const handleSelectSuggestion = useCallback((itemIndex: number, suggestion: ProductSuggestion) => {
-    setParsedItems(prev => prev.map((item, index) => 
-      index === itemIndex ? {
-        ...item,
-        productId: suggestion.id,
-        productName: suggestion.name,
-        cost: suggestion.defaultCost || item.cost,
-        salePrice: suggestion.defaultSalePrice || item.salePrice
-      } : item
-    ));
-  }, []);
 
   const handleUpdateItem = useCallback((index: number, field: keyof ParsedItem, value: any) => {
     setParsedItems(prev => prev.map((item, i) => 
@@ -542,7 +470,7 @@ export default function QuickPOIntake() {
         ...(notes?.trim() && { notes: notes.trim() }), // Solo incluir notes si tiene contenido
         createdBy: 'Usuario Actual', // Aquí deberías usar el usuario autenticado
         shipping: cleanShipping,
-        items: itemsWithAllocation.map(({ suggestions, ...item }) => item), // Guardar items con costo final
+        items: itemsWithAllocation.map((item) => item), // Guardar items con costo final
         history: [{
           action: `Orden ${isOrdered ? 'creada y ordenada' : 'creada como borrador'}`,
           status: isOrdered ? "ordered" : "draft",
@@ -659,7 +587,7 @@ export default function QuickPOIntake() {
         ...(notes?.trim() && { notes: notes.trim() }),
         createdBy: 'Usuario Actual',
         shipping: cleanShipping,
-        items: itemsWithAllocation.map(({ suggestions, ...item }) => item),
+        items: itemsWithAllocation.map((item) => item),
         history: [{
           action: 'Orden creada y mercancía recibida directamente',
           status: "received",
@@ -946,24 +874,7 @@ export default function QuickPOIntake() {
                     )}
                   </div>
 
-                  {/* Suggestions */}
-                  {item.suggestions && item.suggestions.length > 0 && (
-                    <div>
-                      <Label>Sugerencias</Label>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {item.suggestions.map((suggestion) => (
-                          <Badge
-                            key={suggestion.id}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                            onClick={() => handleSelectSuggestion(index, suggestion)}
-                          >
-                            {suggestion.name} (score: {suggestion.score})
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
                 </div>
               ))}
             </div>
