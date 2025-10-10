@@ -1,0 +1,1475 @@
+[
+{
+  "name": "Cable 1 Hora iphone cbnip liquidacion 35",
+  "sku": "510256",
+  "price": 35,
+  "cost": 10,
+  "stock": 20,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cable",
+    "hora",
+    "iphone",
+    "cbnip",
+    "liquidacion",
+    "35",
+    "cable hora",
+    "cable iphone",
+    "cable cbnip",
+    "cable liquidacion",
+    "cable 35",
+    "hora iphone",
+    "hora cbnip",
+    "hora liquidacion",
+    "hora 35",
+    "iphone cbnip",
+    "iphone liquidacion",
+    "iphone 35",
+    "cbnip liquidacion",
+    "cbnip 35",
+    "liquidacion 35",
+    "cable 1 hora iphone cbnip liquidacion 35"
+  ],
+  "createdAt": {
+    "_seconds": 1759451092,
+    "_nanoseconds": 334000000
+  },
+  "firestore_id": "1Ncw5PzFIJ4bIxgli8Yi"
+},
+{
+  "name": "Honor x5b negro",
+  "sku": "241649",
+  "price": 2300,
+  "cost": 1739,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Consigna",
+  "consignorId": "nSpWGlOZVotxIOLoVBn2",
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "honor",
+    "x5b",
+    "negro",
+    "honor x5b",
+    "honor negro",
+    "x5b negro",
+    "honor x5b negro"
+  ],
+  "createdAt": {
+    "_seconds": 1759449462,
+    "_nanoseconds": 443000000
+  },
+  "firestore_id": "3VGWOnXorfVIND3Sl9ky"
+},
+{
+  "name": "Iphone 16",
+  "sku": "759698",
+  "price": 16500,
+  "cost": 16500,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "16",
+    "iphone 16"
+  ],
+  "createdAt": {
+    "_seconds": 1759442934,
+    "_nanoseconds": 370000000
+  },
+  "stock": 1,
+  "updatedAt": {
+    "_seconds": 1759805519,
+    "_nanoseconds": 488000000
+  },
+  "firestore_id": "3ccx4fI0bBUrNciMBcx0"
+},
+{
+  "name": "Teclado Mecánico RGB",
+  "sku": "KB-RGB-001",
+  "price": 2499.99,
+  "cost": 1800,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "category": "Accesorios",
+  "description": "Teclado mecánico con retroiluminación RGB, switches azules",
+  "tags": [
+    "teclado",
+    "mecánico",
+    "rgb",
+    "gaming"
+  ],
+  "searchKeywords": [
+    "teclado",
+    "mecánico",
+    "rgb",
+    "gaming",
+    "teclado mecánico",
+    "teclado rgb"
+  ],
+  "imageUrl": "",
+  "barcode": "123456789014",
+  "createdAt": {
+    "_seconds": 1759449885,
+    "_nanoseconds": 691000000
+  },
+  "stock": 3,
+  "firestore_id": "59WgMieCvay2KoCjN5Fb"
+},
+{
+  "name": "iPhone 12",
+  "sku": "",
+  "price": 0,
+  "cost": 5400,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12"
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502323,
+    "_nanoseconds": 268000000
+  },
+  "firestore_id": "A9iisfNqCOdEQ9Ka3XqT"
+},
+{
+  "name": "Redmi A5",
+  "sku": "933356",
+  "price": 2500,
+  "cost": 1739,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Consigna",
+  "consignorId": "nSpWGlOZVotxIOLoVBn2",
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "redmi",
+    "a5",
+    "redmi a5"
+  ],
+  "createdAt": {
+    "_seconds": 1759449050,
+    "_nanoseconds": 186000000
+  },
+  "firestore_id": "Ap9pSJMsiNOqd7YOQbMB"
+},
+{
+  "name": "Vortex A24",
+  "sku": "262080",
+  "price": 1800,
+  "cost": 800,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "vortex",
+    "a24",
+    "vortex a24"
+  ],
+  "createdAt": {
+    "_seconds": 1759451442,
+    "_nanoseconds": 541000000
+  },
+  "firestore_id": "BNV8sT54V1qzJGAyfTev"
+},
+{
+  "sku": "581377",
+  "price": 80,
+  "cost": 10,
+  "stock": 51,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "createdAt": {
+    "_seconds": 1759448212,
+    "_nanoseconds": 953000000
+  },
+  "reorderPoint": 0,
+  "searchKeywords": [
+    "cable",
+    "japi",
+    "tipo",
+    "1m",
+    "cable japi",
+    "cable tipo",
+    "cable 1m",
+    "japi tipo",
+    "japi 1m",
+    "tipo 1m",
+    "cable japi tipo c 1m"
+  ],
+  "name": "Cable japi tipo c 1m",
+  "id": "CbIIajISFZ2M8l3irJa0",
+  "firestore_id": "CbIIajISFZ2M8l3irJa0"
+},
+{
+  "name": "Redmi 14 c 128 GB ",
+  "sku": "382506",
+  "price": 2800,
+  "cost": 1800,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "redmi",
+    "14",
+    "128",
+    "gb",
+    "redmi 14",
+    "redmi 128",
+    "redmi gb",
+    "14 128",
+    "14 gb",
+    "128 gb",
+    "redmi 14 c 128 gb "
+  ],
+  "createdAt": {
+    "_seconds": 1759448533,
+    "_nanoseconds": 499000000
+  },
+  "stock": 0,
+  "firestore_id": "DHYPiEKa6YvlmpYiKFxT"
+},
+{
+  "name": "Vortex CB68",
+  "sku": "109642",
+  "price": 1800,
+  "cost": 800,
+  "stock": 7,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "vortex",
+    "cb68",
+    "vortex cb68"
+  ],
+  "createdAt": {
+    "_seconds": 1759450015,
+    "_nanoseconds": 309000000
+  },
+  "firestore_id": "FEl5zVWbNbcDR60l557p"
+},
+{
+  "sku": "630570",
+  "price": 80,
+  "cost": 15,
+  "stock": 154,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "createdAt": {
+    "_seconds": 1759449065,
+    "_nanoseconds": 556000000
+  },
+  "reorderPoint": 0,
+  "searchKeywords": [
+    "cable",
+    "1hora",
+    "iphone",
+    "2.1a",
+    "1m",
+    "cable 1hora",
+    "cable iphone",
+    "cable 2.1a",
+    "cable 1m",
+    "1hora iphone",
+    "1hora 2.1a",
+    "1hora 1m",
+    "iphone 2.1a",
+    "iphone 1m",
+    "2.1a 1m",
+    " cable 1hora iphone 2.1a 1m"
+  ],
+  "name": " Cable 1Hora iphone 2.1A 1M",
+  "id": "HNdEcPHKF1Je514r3WhH",
+  "firestore_id": "HNdEcPHKF1Je514r3WhH"
+},
+{
+  "name": "Hiking R1 4G",
+  "sku": "379068",
+  "price": 950,
+  "cost": 603,
+  "stock": 3,
+  "type": "Venta",
+  "ownershipType": "Consigna",
+  "consignorId": "nSpWGlOZVotxIOLoVBn2",
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "hiking",
+    "r1",
+    "4g",
+    "hiking r1",
+    "hiking 4g",
+    "r1 4g",
+    "hiking r1 4g"
+  ],
+  "createdAt": {
+    "_seconds": 1759450735,
+    "_nanoseconds": 105000000
+  },
+  "firestore_id": "HphVWZV6FHyxTIvw0muN"
+},
+{
+  "name": "iPhone 12 ",
+  "sku": "",
+  "price": 0,
+  "cost": 5800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12",
+    "iphone 12 "
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759520936,
+    "_nanoseconds": 842000000
+  },
+  "firestore_id": "JoMWCVc0RJxuBM6ApVQD"
+},
+{
+  "name": "iPhone 12",
+  "sku": "",
+  "price": 0,
+  "cost": 5400,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12"
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502319,
+    "_nanoseconds": 765000000
+  },
+  "firestore_id": "LGfSra5xbpdvtAOvKyha"
+},
+{
+  "name": "Zte A51",
+  "sku": "350818",
+  "price": 2000,
+  "cost": 1300,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "zte",
+    "a51",
+    "zte a51"
+  ],
+  "createdAt": {
+    "_seconds": 1759450583,
+    "_nanoseconds": 596000000
+  },
+  "firestore_id": "LJmI3TjVIIetmXiKZz2t"
+},
+{
+  "name": "Cargador oppo super vooc R17 codigo 160927",
+  "sku": "824870",
+  "price": 150,
+  "cost": 85,
+  "stock": 5,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cargador",
+    "oppo",
+    "super",
+    "vooc",
+    "r17",
+    "codigo",
+    "160927",
+    "cargador oppo",
+    "cargador super",
+    "cargador vooc",
+    "cargador r17",
+    "cargador codigo",
+    "cargador 160927",
+    "oppo super",
+    "oppo vooc",
+    "oppo r17",
+    "oppo codigo",
+    "oppo 160927",
+    "super vooc",
+    "super r17",
+    "super codigo",
+    "super 160927",
+    "vooc r17",
+    "vooc codigo",
+    "vooc 160927",
+    "r17 codigo",
+    "r17 160927",
+    "codigo 160927",
+    "cargador oppo super vooc r17 codigo 160927"
+  ],
+  "createdAt": {
+    "_seconds": 1759452076,
+    "_nanoseconds": 171000000
+  },
+  "firestore_id": "MGzIoNNTeGH7kAr4pdvX"
+},
+{
+  "name": "Uno premier pro ",
+  "sku": "225012",
+  "price": 1100,
+  "cost": 600,
+  "stock": 3,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "uno",
+    "premier",
+    "pro",
+    "uno premier",
+    "uno pro",
+    "premier pro",
+    "uno premier pro "
+  ],
+  "createdAt": {
+    "_seconds": 1759451260,
+    "_nanoseconds": 286000000
+  },
+  "firestore_id": "N4N3pDgYuAWPoarztbLV"
+},
+{
+  "name": "Senwa Disco s301 ",
+  "sku": "3249202",
+  "price": 399,
+  "cost": 200,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "senwa",
+    "disco",
+    "s301",
+    "senwa disco",
+    "senwa s301",
+    "disco s301",
+    "senwa disco s301 "
+  ],
+  "category": "Other",
+  "createdAt": {
+    "_seconds": 1759453067,
+    "_nanoseconds": 622000000
+  },
+  "firestore_id": "NcHa4sNhBPxcENSz1NYd"
+},
+{
+  "name": "Xandos x5",
+  "sku": "744475",
+  "price": 600,
+  "cost": 300,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "xandos",
+    "x5",
+    "xandos x5"
+  ],
+  "createdAt": {
+    "_seconds": 1759451060,
+    "_nanoseconds": 657000000
+  },
+  "firestore_id": "QFRehLkRLOSi9yruGlBE"
+},
+{
+  "sku": "632406",
+  "price": 150,
+  "cost": 65,
+  "stock": 3,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "createdAt": {
+    "_seconds": 1759447481,
+    "_nanoseconds": 696000000
+  },
+  "reorderPoint": 0,
+  "searchKeywords": [
+    "cargador",
+    "gan",
+    "20w",
+    "1hora",
+    "lightning",
+    "para",
+    "iphone",
+    "cargador gan",
+    "cargador 20w",
+    "cargador 1hora",
+    "cargador lightning",
+    "cargador para",
+    "cargador iphone",
+    "gan 20w",
+    "gan 1hora",
+    "gan lightning",
+    "gan para",
+    "gan iphone",
+    "20w 1hora",
+    "20w lightning",
+    "20w para",
+    "20w iphone",
+    "1hora lightning",
+    "1hora para",
+    "1hora iphone",
+    "lightning para",
+    "lightning iphone",
+    "para iphone",
+    "cargador gan 20w 1hora lightning para iphone"
+  ],
+  "name": "Cargador GaN 20W 1Hora Lightning Para Iphone",
+  "id": "Syjae6OmD2PLXkV8jD47",
+  "firestore_id": "Syjae6OmD2PLXkV8jD47"
+},
+{
+  "name": "Cargador de auto para iPhone 13 pro max",
+  "sku": "319592",
+  "price": 150,
+  "cost": 65,
+  "stock": 8,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cargador",
+    "de",
+    "auto",
+    "para",
+    "iphone",
+    "13",
+    "pro",
+    "max",
+    "cargador de",
+    "cargador auto",
+    "cargador para",
+    "cargador iphone",
+    "cargador 13",
+    "cargador pro",
+    "cargador max",
+    "de auto",
+    "de para",
+    "de iphone",
+    "de 13",
+    "de pro",
+    "de max",
+    "auto para",
+    "auto iphone",
+    "auto 13",
+    "auto pro",
+    "auto max",
+    "para iphone",
+    "para 13",
+    "para pro",
+    "para max",
+    "iphone 13",
+    "iphone pro",
+    "iphone max",
+    "13 pro",
+    "13 max",
+    "pro max",
+    "cargador de auto para iphone 13 pro max"
+  ],
+  "createdAt": {
+    "_seconds": 1759451533,
+    "_nanoseconds": 144000000
+  },
+  "firestore_id": "U78VTR8NcTkj6yogA5Dr"
+},
+{
+  "name": "Cubot IA30 negro",
+  "sku": "579365",
+  "price": 2500,
+  "cost": 2000,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cubot",
+    "ia30",
+    "negro",
+    "cubot ia30",
+    "cubot negro",
+    "ia30 negro",
+    "cubot ia30 negro"
+  ],
+  "createdAt": {
+    "_seconds": 1759448772,
+    "_nanoseconds": 489000000
+  },
+  "firestore_id": "UeXAT2Z6qxPGbL0TlLdF"
+},
+{
+  "name": "Logic F11L",
+  "sku": "445716",
+  "price": 800,
+  "cost": 400,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "logic",
+    "f11l",
+    "logic f11l"
+  ],
+  "createdAt": {
+    "_seconds": 1759450648,
+    "_nanoseconds": 870000000
+  },
+  "firestore_id": "VQK4ww4ivSZQ72gIHQf8"
+},
+{
+  "name": "Cubot kingkong naranja",
+  "sku": "785567",
+  "price": 2500,
+  "cost": 2000,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cubot",
+    "kingkong",
+    "naranja",
+    "cubot kingkong",
+    "cubot naranja",
+    "kingkong naranja",
+    "cubot kingkong naranja"
+  ],
+  "createdAt": {
+    "_seconds": 1759448866,
+    "_nanoseconds": 312000000
+  },
+  "stock": 0,
+  "firestore_id": "WKIspLGhwCoQNsif5v1h"
+},
+{
+  "name": "Acer sospiro a61Lx",
+  "sku": "345322",
+  "price": 1800,
+  "cost": 1300,
+  "stock": 6,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "acer",
+    "sospiro",
+    "a61lx",
+    "acer sospiro",
+    "acer a61lx",
+    "sospiro a61lx",
+    "acer sospiro a61lx"
+  ],
+  "createdAt": {
+    "_seconds": 1759449630,
+    "_nanoseconds": 506000000
+  },
+  "firestore_id": "WT4oISTM3DIVei1El2RH"
+},
+{
+  "name": "iPhone 12 ",
+  "sku": "",
+  "price": 0,
+  "cost": 5800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12",
+    "iphone 12 "
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502189,
+    "_nanoseconds": 766000000
+  },
+  "firestore_id": "WdQSSVDfaR3sNKcZuf3Z"
+},
+{
+  "name": "Senwa star s40",
+  "sku": "810993",
+  "price": 1000,
+  "cost": 600,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "senwa",
+    "star",
+    "s40",
+    "senwa star",
+    "senwa s40",
+    "star s40",
+    "senwa star s40"
+  ],
+  "createdAt": {
+    "_seconds": 1759450833,
+    "_nanoseconds": 366000000
+  },
+  "firestore_id": "Zlq24cQRaQQxkfVk5hJd"
+},
+{
+  "name": "Naomicase N3",
+  "sku": "225651",
+  "price": 1800,
+  "cost": 1300,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "naomicase",
+    "n3",
+    "naomicase n3"
+  ],
+  "createdAt": {
+    "_seconds": 1759449235,
+    "_nanoseconds": 509000000
+  },
+  "firestore_id": "aDOAbXWYsHln9I5hE5pL"
+},
+{
+  "name": "Smartphone Samsung Galaxy A54",
+  "sku": "SAM-A54-001",
+  "price": 8999.99,
+  "cost": 7000,
+  "stock": 7,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "category": "Celulares",
+  "description": "Samsung Galaxy A54 5G, 128GB, cámara triple, pantalla Super AMOLED",
+  "tags": [
+    "smartphone",
+    "samsung",
+    "galaxy",
+    "celular"
+  ],
+  "searchKeywords": [
+    "smartphone",
+    "samsung",
+    "galaxy",
+    "a54",
+    "celular",
+    "samsung galaxy",
+    "galaxy a54"
+  ],
+  "imageUrl": "",
+  "barcode": "123456789016",
+  "createdAt": {
+    "_seconds": 1759449886,
+    "_nanoseconds": 643000000
+  },
+  "firestore_id": "bOZEkpx4QEjjyjkdKySn"
+},
+{
+  "name": "Samsung a06 64gb ",
+  "sku": "969094",
+  "price": 2000,
+  "cost": 1500,
+  "stock": 6,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "samsung",
+    "a06",
+    "64gb",
+    "samsung a06",
+    "samsung 64gb",
+    "a06 64gb",
+    "samsung a06 64gb "
+  ],
+  "createdAt": {
+    "_seconds": 1759448943,
+    "_nanoseconds": 644000000
+  },
+  "firestore_id": "c8xqGzHRiB52reHcGVGV"
+},
+{
+  "name": "Cubo iPhone 20 W",
+  "sku": "388067",
+  "price": 150,
+  "cost": 35,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cubo",
+    "iphone",
+    "20",
+    "cubo iphone",
+    "cubo 20",
+    "iphone 20",
+    "cubo iphone 20 w"
+  ],
+  "createdAt": {
+    "_seconds": 1759448544,
+    "_nanoseconds": 544000000
+  },
+  "stock": 17,
+  "firestore_id": "gt9taYyuYiXXh0LUOcqR"
+},
+{
+  "name": "Iphone 12",
+  "sku": "",
+  "price": 0,
+  "cost": 5800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12"
+  ],
+  "category": "Other",
+  "createdAt": {
+    "_seconds": 1759501675,
+    "_nanoseconds": 378000000
+  },
+  "firestore_id": "hOzbdHepOee24Rq8bveK"
+},
+{
+  "name": "Poco c71 ",
+  "sku": "543133",
+  "price": 2500,
+  "cost": 1500,
+  "stock": 4,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "poco",
+    "c71",
+    "poco c71",
+    "poco c71 "
+  ],
+  "createdAt": {
+    "_seconds": 1759449529,
+    "_nanoseconds": 977000000
+  },
+  "firestore_id": "i4nbIY03bJqnkaoeFctt"
+},
+{
+  "name": "cargador de 5W USB para iphone",
+  "sku": "737677",
+  "price": 100,
+  "cost": 45,
+  "stock": 18,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cargador",
+    "de",
+    "5w",
+    "usb",
+    "para",
+    "iphone",
+    "cargador de",
+    "cargador 5w",
+    "cargador usb",
+    "cargador para",
+    "cargador iphone",
+    "de 5w",
+    "de usb",
+    "de para",
+    "de iphone",
+    "5w usb",
+    "5w para",
+    "5w iphone",
+    "usb para",
+    "usb iphone",
+    "para iphone",
+    "cargador de 5w usb para iphone"
+  ],
+  "createdAt": {
+    "_seconds": 1759451817,
+    "_nanoseconds": 921000000
+  },
+  "firestore_id": "jKIemYk3PYS4qnuz13yj"
+},
+{
+  "name": "iPhone 12",
+  "sku": "",
+  "price": 0,
+  "cost": 5400,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12"
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502317,
+    "_nanoseconds": 355000000
+  },
+  "firestore_id": "lB6W7d2TQdq0OOfJcm6M"
+},
+{
+  "name": "Redmi A3",
+  "sku": "354825",
+  "price": 2500,
+  "cost": 1500,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "redmi",
+    "a3",
+    "redmi a3"
+  ],
+  "createdAt": {
+    "_seconds": 1759449859,
+    "_nanoseconds": 757000000
+  },
+  "firestore_id": "mu6tmlO2eIhyBvPFpbYw"
+},
+{
+  "name": "iPhone 12",
+  "sku": "",
+  "price": 0,
+  "cost": 5400,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12"
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502322,
+    "_nanoseconds": 109000000
+  },
+  "firestore_id": "nljjo2TmoRv4brlJ644d"
+},
+{
+  "name": "C7 cloud ",
+  "sku": "147932",
+  "price": 1500,
+  "cost": 700,
+  "stock": 3,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "c7",
+    "cloud",
+    "c7 cloud",
+    "c7 cloud "
+  ],
+  "createdAt": {
+    "_seconds": 1759450934,
+    "_nanoseconds": 862000000
+  },
+  "firestore_id": "nvIN0XGQxQtxZ6R1mNDK"
+},
+{
+  "name": "C8 cloud ",
+  "sku": "184739",
+  "price": 1800,
+  "cost": 1000,
+  "stock": 3,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "c8",
+    "cloud",
+    "c8 cloud",
+    "c8 cloud "
+  ],
+  "createdAt": {
+    "_seconds": 1759450900,
+    "_nanoseconds": 624000000
+  },
+  "firestore_id": "oYzCuw90ENNlP1M7sCX2"
+},
+{
+  "name": "iPhone 12 ",
+  "sku": "",
+  "price": 0,
+  "cost": 5800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12",
+    "iphone 12 "
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502200,
+    "_nanoseconds": 203000000
+  },
+  "firestore_id": "pHwEiCgZ74er0CQrL8go"
+},
+{
+  "name": "Redmi A3 64GB",
+  "sku": "586174",
+  "price": 2500,
+  "cost": 1534,
+  "type": "Venta",
+  "ownershipType": "Consigna",
+  "consignorId": "nSpWGlOZVotxIOLoVBn2",
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "redmi",
+    "a3",
+    "64gb",
+    "redmi a3",
+    "redmi 64gb",
+    "a3 64gb",
+    "redmi a3 64gb"
+  ],
+  "createdAt": {
+    "_seconds": 1759448668,
+    "_nanoseconds": 464000000
+  },
+  "reorderPoint": 0,
+  "id": "rUCbU7CbfTQLASCExAnr",
+  "stock": 5,
+  "firestore_id": "rUCbU7CbfTQLASCExAnr"
+},
+{
+  "name": "Soho style",
+  "sku": "733500",
+  "price": 1100,
+  "cost": 600,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "soho",
+    "style",
+    "soho style"
+  ],
+  "createdAt": {
+    "_seconds": 1759450375,
+    "_nanoseconds": 663000000
+  },
+  "firestore_id": "rYvRk7NzvtUvY7vJWXAe"
+},
+{
+  "name": "Cable Lightning USB 1M",
+  "sku": "244047",
+  "price": 100,
+  "cost": 20,
+  "stock": 13,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cable",
+    "lightning",
+    "usb",
+    "1m",
+    "cable lightning",
+    "cable usb",
+    "cable 1m",
+    "lightning usb",
+    "lightning 1m",
+    "usb 1m",
+    "cable lightning usb 1m"
+  ],
+  "createdAt": {
+    "_seconds": 1759450270,
+    "_nanoseconds": 325000000
+  },
+  "firestore_id": "s1FpnODwh0X3fPiGt4sC"
+},
+{
+  "name": "Zte A55",
+  "sku": "430578",
+  "price": 2200,
+  "cost": 1400,
+  "stock": 6,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "zte",
+    "a55",
+    "zte a55"
+  ],
+  "createdAt": {
+    "_seconds": 1759450242,
+    "_nanoseconds": 427000000
+  },
+  "firestore_id": "uMIRL9LYqQjOV8Uqx0Ee"
+},
+{
+  "name": "Cable 1Hora tipo C 2.1A 2M",
+  "sku": "534385",
+  "price": 80,
+  "cost": 15,
+  "stock": 36,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cable",
+    "1hora",
+    "tipo",
+    "2.1a",
+    "2m",
+    "cable 1hora",
+    "cable tipo",
+    "cable 2.1a",
+    "cable 2m",
+    "1hora tipo",
+    "1hora 2.1a",
+    "1hora 2m",
+    "tipo 2.1a",
+    "tipo 2m",
+    "2.1a 2m",
+    "cable 1hora tipo c 2.1a 2m"
+  ],
+  "createdAt": {
+    "_seconds": 1759449890,
+    "_nanoseconds": 637000000
+  },
+  "firestore_id": "uQtHblGzlqIvLNgguVrd"
+},
+{
+  "name": "Tablet samsung A9",
+  "sku": "478547",
+  "price": 2600,
+  "cost": 1600,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "tablet",
+    "samsung",
+    "a9",
+    "tablet samsung",
+    "tablet a9",
+    "samsung a9",
+    "tablet samsung a9"
+  ],
+  "createdAt": {
+    "_seconds": 1759451496,
+    "_nanoseconds": 116000000
+  },
+  "firestore_id": "vD7uyKHvdqTAipDzJiqS"
+},
+{
+  "name": "iPhone 12 ",
+  "sku": "",
+  "price": 0,
+  "cost": 5800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Familiar",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "iphone",
+    "12",
+    "iphone 12",
+    "iphone 12 "
+  ],
+  "category": "Refurbished Phone",
+  "createdAt": {
+    "_seconds": 1759502218,
+    "_nanoseconds": 778000000
+  },
+  "firestore_id": "vWRsxmzIIPqdWvbQTqNI"
+},
+{
+  "name": "Tablet Atouch",
+  "sku": "946309",
+  "price": 1250,
+  "cost": 800,
+  "stock": 1,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "tablet",
+    "atouch",
+    "tablet atouch"
+  ],
+  "createdAt": {
+    "_seconds": 1759451522,
+    "_nanoseconds": 998000000
+  },
+  "firestore_id": "x7xDtYzwTZaZ5zbaPjk5"
+},
+{
+  "name": "Blue view 4",
+  "sku": "988148",
+  "price": 1500,
+  "cost": 600,
+  "stock": 10,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "blue",
+    "view",
+    "blue view",
+    "blue view 4"
+  ],
+  "createdAt": {
+    "_seconds": 1759450466,
+    "_nanoseconds": 433000000
+  },
+  "firestore_id": "xM041H8V70pSdZkTMsfE"
+},
+{
+  "name": "Cargador inalámbrico magnético 1Hora 15W",
+  "sku": "720423",
+  "price": 150,
+  "cost": 60,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cargador",
+    "inalámbrico",
+    "magnético",
+    "1hora",
+    "15w",
+    "cargador inalámbrico",
+    "cargador magnético",
+    "cargador 1hora",
+    "cargador 15w",
+    "inalámbrico magnético",
+    "inalámbrico 1hora",
+    "inalámbrico 15w",
+    "magnético 1hora",
+    "magnético 15w",
+    "1hora 15w",
+    "cargador inalámbrico magnético 1hora 15w"
+  ],
+  "createdAt": {
+    "_seconds": 1759451246,
+    "_nanoseconds": 975000000
+  },
+  "firestore_id": "yvwnyeI1DK6yrG02Emfi"
+},
+{
+  "name": "Foxx A55",
+  "sku": "382598",
+  "price": 1100,
+  "cost": 500,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "foxx",
+    "a55",
+    "foxx a55"
+  ],
+  "createdAt": {
+    "_seconds": 1759449795,
+    "_nanoseconds": 365000000
+  },
+  "stock": 6,
+  "updatedAt": {
+    "_seconds": 1759805713,
+    "_nanoseconds": 312000000
+  },
+  "firestore_id": "zhz1XAoldFWPlT0RyTgY"
+},
+{
+  "name": "Redmi 13 128 gb ",
+  "sku": "271051",
+  "price": 2800,
+  "cost": 1800,
+  "stock": 2,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "redmi",
+    "13",
+    "128",
+    "gb",
+    "redmi 13",
+    "redmi 128",
+    "redmi gb",
+    "13 128",
+    "13 gb",
+    "128 gb",
+    "redmi 13 128 gb "
+  ],
+  "createdAt": {
+    "_seconds": 1759448399,
+    "_nanoseconds": 579000000
+  },
+  "firestore_id": "zqnDTMAbkDOGaRVzD1nr"
+},
+{
+  "name": "Cable USB-C iphone tipo c a tipo c 1 M",
+  "sku": "787720",
+  "price": 100,
+  "cost": 35,
+  "stock": 4,
+  "type": "Venta",
+  "ownershipType": "Propio",
+  "consignorId": null,
+  "comboProductIds": [],
+  "compatibilityTags": [],
+  "searchKeywords": [
+    "cable",
+    "usb-c",
+    "iphone",
+    "tipo",
+    "cable usb-c",
+    "cable iphone",
+    "cable tipo",
+    "usb-c iphone",
+    "usb-c tipo",
+    "iphone tipo",
+    "tipo tipo",
+    "cable usb-c iphone tipo c a tipo c 1 m"
+  ],
+  "createdAt": {
+    "_seconds": 1759450720,
+    "_nanoseconds": 189000000
+  },
+  "firestore_id": "zvfoSJiLPgqu1hHPIMRf"
+}
+]

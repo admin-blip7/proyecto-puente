@@ -1,0 +1,330 @@
+[
+{
+  "startingFloat": 0,
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "openedByName": "Admin de Tienda",
+  "totalCardSales": 0,
+  "sessionId": "CS-66839725",
+  "totalCashPayouts": 0,
+  "openedAt": {
+    "_seconds": 1758956850,
+    "_nanoseconds": 570000000
+  },
+  "totalCashSales": 5982.98,
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "expectedCashInDrawer": 5982.98,
+  "closedByName": "Admin de Tienda",
+  "difference": -5982.98,
+  "closedAt": {
+    "_seconds": 1759948553,
+    "_nanoseconds": 733000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "1ZHUpU3vocHqJuN5GwzA"
+},
+{
+  "sessionId": "CS-CABDAA5E",
+  "openedByName": "Admin de Tienda",
+  "totalCardSales": 0,
+  "startingFloat": 0,
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "totalCashPayouts": 0,
+  "openedAt": {
+    "_seconds": 1758952986,
+    "_nanoseconds": 472000000
+  },
+  "totalCashSales": 10000,
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "expectedCashInDrawer": 10000,
+  "closedByName": "Admin de Tienda",
+  "difference": -10000,
+  "closedAt": {
+    "_seconds": 1758953469,
+    "_nanoseconds": 322000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "2AstdLiTT2DfjB3ZmH1f"
+},
+{
+  "status": "Abierto",
+  "expectedCashInDrawer": 0,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "openedByName": "New User",
+  "startingFloat": 0,
+  "openedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "sessionId": "CS-C5122B61",
+  "openedAt": {
+    "_seconds": 1758758050,
+    "_nanoseconds": 318000000
+  },
+  "totalCashSales": 38150,
+  "firestore_id": "310T5SQ18QntRQXeYrdo"
+},
+{
+  "startingFloat": 234,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "openedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "openedByName": "New User",
+  "sessionId": "CS-86DB72B8",
+  "openedAt": {
+    "_seconds": 1757555461,
+    "_nanoseconds": 751000000
+  },
+  "totalCashSales": 380,
+  "closedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "actualCashCount": 890,
+  "expectedCashInDrawer": 614,
+  "closedByName": "New User",
+  "difference": 276,
+  "closedAt": {
+    "_seconds": 1758131259,
+    "_nanoseconds": 637000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "58ViWxrm1spoXe9DgdXa"
+},
+{
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "totalCashPayouts": 0,
+  "sessionId": "CS-78CA2421",
+  "totalCardSales": 0,
+  "startingFloat": 0,
+  "openedByName": "Admin de Tienda",
+  "openedAt": {
+    "_seconds": 1758143187,
+    "_nanoseconds": 500000000
+  },
+  "totalCashSales": 11800,
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "expectedCashInDrawer": 200,
+  "closedByName": "Admin de Tienda",
+  "difference": -200,
+  "closedAt": {
+    "_seconds": 1758952524,
+    "_nanoseconds": 151000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "8QtO9yUyrA3VzqOkSMgk"
+},
+{
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "totalCashPayouts": 0,
+  "startingFloat": 876,
+  "sessionId": "CS-CD798208",
+  "expectedCashInDrawer": 876,
+  "openedByName": "Admin de Tienda",
+  "totalCardSales": 0,
+  "totalCashSales": 0,
+  "openedAt": {
+    "_seconds": 1758954200,
+    "_nanoseconds": 370000000
+  },
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 876,
+  "closedByName": "Admin de Tienda",
+  "difference": 0,
+  "closedAt": {
+    "_seconds": 1758954213,
+    "_nanoseconds": 255000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "G7mkkuT22mV5iskVIxWS"
+},
+{
+  "sessionId": "CS-540F5B2C",
+  "openedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "openedByName": "New User",
+  "startingFloat": 200,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "openedAt": {
+    "_seconds": 1757022449,
+    "_nanoseconds": 946000000
+  },
+  "totalCashSales": 1100,
+  "closedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "actualCashCount": 2000,
+  "expectedCashInDrawer": 1100,
+  "closedByName": "New User",
+  "difference": 900,
+  "closedAt": {
+    "_seconds": 1757220893,
+    "_nanoseconds": 201000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "HL0To55LsPxZMpV9iGax"
+},
+{
+  "sessionId": "CS-BE00D23B",
+  "status": "Abierto",
+  "openedBy": "vDcUCTJkWZfDPMvuWNAbQg1q2Mn1",
+  "openedByName": "Admin de Tienda",
+  "startingFloat": 0,
+  "totalCashSales": 0,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "expectedCashInDrawer": 0,
+  "openedAt": {
+    "_seconds": 1759249100,
+    "_nanoseconds": 506000000
+  },
+  "firestore_id": "Kdfo6VpeEJ2AAxeDAwoB"
+},
+{
+  "totalCardSales": 0,
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "openedByName": "Admin de Tienda",
+  "sessionId": "CS-DE82B31E",
+  "expectedCashInDrawer": 0,
+  "startingFloat": 0,
+  "totalCashPayouts": 0,
+  "totalCashSales": 0,
+  "openedAt": {
+    "_seconds": 1758955037,
+    "_nanoseconds": 37000000
+  },
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "closedByName": "Admin de Tienda",
+  "difference": 0,
+  "closedAt": {
+    "_seconds": 1758956057,
+    "_nanoseconds": 530000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "Ur0nj2nRFPpIdEBVzlpy"
+},
+{
+  "sessionId": "CS-EA7B5C28",
+  "status": "Abierto",
+  "openedBy": "wXUbuRfvDNYgoJT4T4Cs5T8VVu73",
+  "openedByName": "Admin de Tienda",
+  "startingFloat": 0,
+  "totalCashSales": 0,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "expectedCashInDrawer": 0,
+  "openedAt": {
+    "_seconds": 1759255401,
+    "_nanoseconds": 939000000
+  },
+  "firestore_id": "Yxdl1mCI0izShwckJZmx"
+},
+{
+  "openedByName": "Admin de Tienda",
+  "sessionId": "CS-7FC2173A",
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "totalCardSales": 0,
+  "startingFloat": 765,
+  "totalCashPayouts": 0,
+  "openedAt": {
+    "_seconds": 1758954101,
+    "_nanoseconds": 617000000
+  },
+  "totalCashSales": 10000,
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "expectedCashInDrawer": 10765,
+  "closedByName": "Admin de Tienda",
+  "difference": -10765,
+  "closedAt": {
+    "_seconds": 1758954150,
+    "_nanoseconds": 77000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "h6e3QEcDLkDeITxIOaJr"
+},
+{
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "sessionId": "CS-5712D098",
+  "openedByName": "Admin de Tienda",
+  "startingFloat": 5454,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "expectedCashInDrawer": 5454,
+  "openedAt": {
+    "_seconds": 1758954540,
+    "_nanoseconds": 220000000
+  },
+  "totalCashSales": 11000,
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 5454,
+  "closedByName": "Admin de Tienda",
+  "difference": 0,
+  "closedAt": {
+    "_seconds": 1758954578,
+    "_nanoseconds": 610000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "j2OuGWQeYs5LO4FTtrwH"
+},
+{
+  "expectedCashInDrawer": 0,
+  "sessionId": "CS-457426D9",
+  "startingFloat": 0,
+  "totalCashSales": 0,
+  "openedByName": "Admin de Tienda",
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "openedAt": {
+    "_seconds": 1758954799,
+    "_nanoseconds": 274000000
+  },
+  "closedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "actualCashCount": 0,
+  "closedByName": "Admin de Tienda",
+  "difference": 0,
+  "closedAt": {
+    "_seconds": 1758955031,
+    "_nanoseconds": 616000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "t3RIeJtPUnhmD6Blnojw"
+},
+{
+  "openedByName": "New User",
+  "sessionId": "CS-E5431522",
+  "startingFloat": 0,
+  "openedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "totalCashPayouts": 0,
+  "totalCardSales": 0,
+  "openedAt": {
+    "_seconds": 1758141452,
+    "_nanoseconds": 576000000
+  },
+  "totalCashSales": 7600,
+  "closedBy": "glbnNqBw1mNtQQbhY4JlmWh4IMB2",
+  "actualCashCount": 7500,
+  "expectedCashInDrawer": 7600,
+  "closedByName": "New User",
+  "difference": -100,
+  "closedAt": {
+    "_seconds": 1758758036,
+    "_nanoseconds": 766000000
+  },
+  "status": "Cerrado",
+  "firestore_id": "wnzPY9l8QInLeY3Nb49X"
+},
+{
+  "sessionId": "CS-FA7FC921",
+  "status": "Abierto",
+  "openedBy": "G45hCl4gZCWVk5BYoAVo9JuV8AC2",
+  "openedByName": "Admin de Tienda",
+  "startingFloat": 0,
+  "totalCardSales": 0,
+  "totalCashPayouts": 0,
+  "expectedCashInDrawer": 0,
+  "openedAt": {
+    "_seconds": 1759954163,
+    "_nanoseconds": 375000000
+  },
+  "totalCashSales": 13249.97,
+  "firestore_id": "yRVX59DWX6gwWunDspcZ"
+}
+]

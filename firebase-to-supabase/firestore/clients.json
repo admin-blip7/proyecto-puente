@@ -1,0 +1,34 @@
+[
+{
+  "name": "BRAYAN CECILIO MOLINA SANCHEZ",
+  "phone": "2224219292",
+  "address": "General Porfirio Diaz 4",
+  "employmentInfo": {
+    "workplace": "22 Electronic Group",
+    "workPhone": "2224219292"
+  },
+  "clientId": "CLIENT-ED9C98BD",
+  "documents": {},
+  "createdAt": {
+    "_seconds": 1758443226,
+    "_nanoseconds": 899000000
+  },
+  "firestore_id": "cXokV8JqfHq8MI2Kd5wh"
+},
+{
+  "name": "BRAYAN CECILIO MOLINA SANCHEZ",
+  "phone": "2224219292",
+  "address": "General Porfirio Diaz 4",
+  "employmentInfo": {
+    "workplace": "22 Electronic Group",
+    "workPhone": "2224219292"
+  },
+  "clientId": "CLIENT-C78ED010",
+  "documents": {},
+  "createdAt": {
+    "_seconds": 1758441992,
+    "_nanoseconds": 58000000
+  },
+  "firestore_id": "eXI9VsNAaL9WJ6o4z7li"
+}
+]

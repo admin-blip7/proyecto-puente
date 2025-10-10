@@ -1,0 +1,49 @@
+[
+{
+  "accountId": "ACC-3F7BEDAA",
+  "clientId": "eXI9VsNAaL9WJ6o4z7li",
+  "creditLimit": 6000,
+  "currentBalance": 0,
+  "status": "Al Corriente",
+  "paymentDueDate": {
+    "_seconds": 1758441945,
+    "_nanoseconds": 864000000
+  },
+  "firestore_id": "GLxqY9fKCr2EUkXaXnS0"
+},
+{
+  "accountId": "ACC-7C23D7C6",
+  "clientId": "cXokV8JqfHq8MI2Kd5wh",
+  "creditLimit": 9800,
+  "currentBalance": 0,
+  "status": "Al Corriente",
+  "paymentDueDate": {
+    "_seconds": 1758443197,
+    "_nanoseconds": 673000000
+  },
+  "interestRate": 120,
+  "firestore_id": "LHdDh7PuocJMaDOKzWer"
+},
+{
+  "accountId": "ACC-0AC104C0",
+  "clientId": "cXokV8JqfHq8MI2Kd5wh",
+  "creditLimit": 7500,
+  "currentBalance": 7500,
+  "status": "Al Corriente",
+  "paymentDueDate": {
+    "_seconds": 1758534589,
+    "_nanoseconds": 637000000
+  },
+  "interestRate": 220,
+  "financeTerms": {
+    "productId": "ApnovNoSO7kjo8I0thOI",
+    "productName": "iPhone 13 ",
+    "productPrice": 7500,
+    "downPayment": 0,
+    "annualInterestRate": 220,
+    "paymentFrequency": "Semanal",
+    "term": 8
+  },
+  "firestore_id": "mvRRjp1nsjrRwCnOoQLb"
+}
+]

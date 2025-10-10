@@ -1,0 +1,12 @@
+[
+{
+  "name": "Renta",
+  "isActive": true,
+  "firestore_id": "13eaK80jiMsW0BfI8lWy"
+},
+{
+  "name": "Sueldo",
+  "isActive": true,
+  "firestore_id": "xlJV2rJUfP022r4aVehC"
+}
+]
