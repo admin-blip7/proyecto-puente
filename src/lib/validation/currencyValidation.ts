@@ -26,15 +26,18 @@ export const validateMXNAmount = (amount: number): { isValid: boolean; error?: s
     return { isValid: false, error: 'El monto debe ser un número finito' };
   }
 
-  // Validar que el monto tenga máximo 2 decimales (centavos)
-  const decimalPlaces = (amount.toString().split('.')[1] || '').length;
+  // Normalizar primero para manejar problemas de precisión de punto flotante
+  const normalizedAmount = normalizeMXNAmount(amount);
+
+  // Validar que el monto normalizado tenga máximo 2 decimales (centavos)
+  const decimalPlaces = (normalizedAmount.toString().split('.')[1] || '').length;
   if (decimalPlaces > 2) {
     return { isValid: false, error: 'El monto no puede tener más de 2 decimales (centavos)' };
   }
 
   // Validar límite máximo razonable para transacciones
   const MAX_TRANSACTION_AMOUNT = 999999999.99; // 999 millones de pesos
-  if (amount > MAX_TRANSACTION_AMOUNT) {
+  if (normalizedAmount > MAX_TRANSACTION_AMOUNT) {
     return { isValid: false, error: `El monto no puede exceder $${MAX_TRANSACTION_AMOUNT.toLocaleString('es-MX')} MXN` };
   }
 
@@ -84,9 +87,11 @@ export const validateTransaction = (
 
 /**
  * Normaliza un monto para asegurar que tenga máximo 2 decimales
+ * Usa una estrategia más robusta para manejar problemas de precisión de punto flotante
  */
 export const normalizeMXNAmount = (amount: number): number => {
-  return Math.round(amount * 100) / 100;
+  // Convertir a string y luego a número con precisión fija para evitar errores de punto flotante
+  return parseFloat(amount.toFixed(2));
 };
 
 /**

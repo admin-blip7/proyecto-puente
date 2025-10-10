@@ -1,23 +1,38 @@
 "use client";
 
 import { createContext, useState, useEffect, ReactNode } from "react";
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { UserProfile } from "@/types";
+import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { auth, db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabaseClient";
+import { UserProfile } from "@/types";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("AuthProvider");
 
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const buildUserProfile = (user: User | null): UserProfile | null => {
+  if (!user) return null;
+  const metadata = user.user_metadata ?? {};
+  const name = (metadata.name as string) || (metadata.full_name as string) || user.email?.split("@")[0] || "Usuario";
+  const metaRole = (metadata.role as string) || "Admin";
+  const role: UserProfile["role"] = metaRole === "Cajero" ? "Cajero" : "Admin";
+
+  return {
+    uid: user.id,
+    name,
+    email: user.email ?? "",
+    role,
+  };
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -27,47 +42,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      if (user) {
-        setUser(user);
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUserProfile(userDoc.data() as UserProfile);
-        } else {
-          // For now, let's create a mock profile if it doesn't exist
-          const mockProfile: UserProfile = {
-            uid: user.uid,
-            name: user.displayName || "New User",
-            email: user.email!,
-            role: "Admin", // Default to Admin for now
-          };
-          setUserProfile(mockProfile);
-        }
+    if (!supabase) {
+      log.error("Supabase client is not configured");
+      setLoading(false);
+      return;
+    }
 
-        if (pathname === '/login') {
-          router.push('/');
-        }
-      } else {
+    const syncSession = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        log.error("Error fetching session", error);
+        setSession(null);
         setUser(null);
         setUserProfile(null);
-        if (pathname !== '/login') {
-          router.push('/login');
+        setLoading(false);
+        if (pathname !== "/login") {
+          router.push("/login");
         }
+        return;
       }
+
+      const currentSession = data.session ?? null;
+      const supabaseUser = currentSession?.user ?? null;
+      setUser(supabaseUser);
+      setUserProfile(buildUserProfile(supabaseUser));
       setLoading(false);
+
+      if (supabaseUser && pathname === "/login") {
+        router.push("/");
+      }
+      if (!supabaseUser && pathname !== "/login") {
+        router.push("/login");
+      }
+    };
+
+    syncSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      const supabaseUser = newSession?.user ?? null;
+      setUser(supabaseUser);
+      setUserProfile(buildUserProfile(supabaseUser));
+      setLoading(false);
+
+      if (supabaseUser) {
+        if (pathname === "/login") {
+          router.push("/");
+        }
+      } else if (pathname !== "/login") {
+        router.push("/login");
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      listener?.subscription?.unsubscribe();
+    };
   }, [router, pathname]);
 
   const signOut = async () => {
+    if (!supabase) return;
     try {
-        await firebaseSignOut(auth);
-        router.push("/login");
-    } catch(error) {
-        log.error("Error signing out: ", error);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      router.push("/login");
+    } catch (error) {
+      log.error("Error signing out", error);
     }
   };
 
@@ -75,9 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="w-full max-w-sm space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       </div>
     );

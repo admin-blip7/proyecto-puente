@@ -1,115 +1,131 @@
-import { db } from "@/lib/firebase";
-import { FixedAsset, AssetCategory, DepreciationMethod } from "@/types";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  doc,
-  query,
-  orderBy,
-  DocumentData,
-  QueryDocumentSnapshot,
-  writeBatch,
-} from "firebase/firestore";
+"use server";
+
 import { v4 as uuidv4 } from "uuid";
+import { FixedAsset } from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("assetService");
 
-const ASSETS_COLLECTION = "fixed_assets";
+const ASSETS_TABLE = "fixed_assets";
 
-const assetFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): FixedAsset => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        assetId: data.assetId,
-        name: data.name,
-        category: data.category,
-        purchaseDate: data.purchaseDate.toDate(),
-        purchaseCost: data.purchaseCost,
-        usefulLifeYrs: data.usefulLifeYrs,
-        salvageValue: data.salvageValue,
-        currentValue: data.currentValue,
-        depreciationMethod: data.depreciationMethod,
-        lastDepreciationDate: data.lastDepreciationDate.toDate(),
-    }
-}
+const mapAsset = (row: any): FixedAsset => ({
+  id: row?.firestore_id ?? row?.id ?? "",
+  assetId: row?.assetId ?? "",
+  name: row?.name ?? "",
+  category: row?.category ?? "Otro",
+  purchaseDate: toDate(row?.purchaseDate),
+  purchaseCost: Number(row?.purchaseCost ?? 0),
+  usefulLifeYrs: Number(row?.usefulLifeYrs ?? 1),
+  salvageValue: Number(row?.salvageValue ?? 0),
+  currentValue: Number(row?.currentValue ?? 0),
+  depreciationMethod: row?.depreciationMethod ?? "Lineal",
+  lastDepreciationDate: toDate(row?.lastDepreciationDate),
+});
 
 export const getAssets = async (): Promise<FixedAsset[]> => {
-    const q = query(
-        collection(db, ASSETS_COLLECTION),
-        orderBy("purchaseDate", "desc")
-    );
-    try {
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(assetFromDoc);
-    } catch (error) {
-        log.error("Error fetching assets: ", error);
-        return [];
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(ASSETS_TABLE)
+      .select("*")
+      .order("purchaseDate", { ascending: false });
+
+    if (error) {
+      throw error;
     }
-}
+
+    return (data ?? []).map(mapAsset);
+  } catch (error) {
+    log.error("Error fetching assets", error);
+    return [];
+  }
+};
 
 export const addAsset = async (
-    assetData: Omit<FixedAsset, 'id' | 'assetId' | 'currentValue' | 'lastDepreciationDate'>
+  assetData: Omit<FixedAsset, "id" | "assetId" | "currentValue" | "lastDepreciationDate">
 ): Promise<FixedAsset> => {
-    const assetId = `ASSET-${uuidv4().split('-')[0].toUpperCase()}`;
-    
-    try {
-        const docRef = await addDoc(collection(db, ASSETS_COLLECTION), {
-            ...assetData,
-            assetId,
-            currentValue: assetData.purchaseCost,
-            lastDepreciationDate: assetData.purchaseDate,
-            createdAt: serverTimestamp(),
-        });
-        
-        return {
-            id: docRef.id,
-            assetId,
-            ...assetData,
-            currentValue: assetData.purchaseCost,
-            lastDepreciationDate: assetData.purchaseDate,
-        };
+  const supabase = getSupabaseServerClient();
+  const assetId = `ASSET-${uuidv4().split("-")[0].toUpperCase()}`;
+  const firestoreId = uuidv4();
 
-    } catch (error) {
-        log.error("Error adding asset: ", error);
-        throw error;
+  try {
+    const payload = {
+      firestore_id: firestoreId,
+      assetId,
+      name: assetData.name,
+      category: assetData.category,
+      purchaseDate: assetData.purchaseDate.toISOString(),
+      purchaseCost: assetData.purchaseCost,
+      usefulLifeYrs: assetData.usefulLifeYrs,
+      salvageValue: assetData.salvageValue,
+      currentValue: assetData.purchaseCost,
+      depreciationMethod: assetData.depreciationMethod,
+      lastDepreciationDate: assetData.purchaseDate.toISOString(),
+      createdAt: nowIso(),
+    };
+
+    const { data, error } = await supabase
+      .from(ASSETS_TABLE)
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw error ?? new Error("Failed to add asset");
     }
+
+    return mapAsset(data);
+  } catch (error) {
+    log.error("Error adding asset", error);
+    throw error;
+  }
 };
 
 export const runAnnualDepreciation = async (): Promise<number> => {
-    const assetsSnapshot = await getDocs(collection(db, ASSETS_COLLECTION));
-    const batch = writeBatch(db);
-    let updatedCount = 0;
-    const today = new Date();
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.from(ASSETS_TABLE).select("*");
+  if (error) {
+    log.error("Error loading assets for depreciation", error);
+    throw error;
+  }
 
-    assetsSnapshot.forEach(docSnap => {
-        const asset = assetFromDoc(docSnap);
-        const yearsSinceLastDepreciation = (today.getTime() - asset.lastDepreciationDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
+  const assets = (data ?? []).map(mapAsset);
+  const today = new Date();
+  let updatedCount = 0;
 
-        if (yearsSinceLastDepreciation >= 1) {
-            const annualDepreciation = (asset.purchaseCost - asset.salvageValue) / asset.usefulLifeYrs;
-            let depreciationToApply = annualDepreciation * Math.floor(yearsSinceLastDepreciation);
-            
-            let newValue = asset.currentValue - depreciationToApply;
-            if (newValue < asset.salvageValue) {
-                depreciationToApply = asset.currentValue - asset.salvageValue;
-                newValue = asset.salvageValue;
-            }
+  for (const asset of assets) {
+    const yearsSinceLast =
+      (today.getTime() - asset.lastDepreciationDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
 
-            if (depreciationToApply > 0) {
-                batch.update(docSnap.ref, { 
-                    currentValue: newValue,
-                    lastDepreciationDate: today 
-                });
-                updatedCount++;
-            }
+    if (yearsSinceLast >= 1) {
+      const annual = (asset.purchaseCost - asset.salvageValue) / asset.usefulLifeYrs;
+      let depreciation = annual * Math.floor(yearsSinceLast);
+      let newValue = asset.currentValue - depreciation;
+
+      if (newValue < asset.salvageValue) {
+        depreciation = asset.currentValue - asset.salvageValue;
+        newValue = asset.salvageValue;
+      }
+
+      if (depreciation > 0) {
+        const { error: updateError } = await supabase
+          .from(ASSETS_TABLE)
+          .update({
+            currentValue: newValue,
+            lastDepreciationDate: today.toISOString(),
+          })
+          .or(`firestore_id.eq.${asset.id},id.eq.${asset.id}`);
+
+        if (!updateError) {
+          updatedCount += 1;
+        } else {
+          log.warn("Failed to update asset depreciation", { assetId: asset.id, error: updateError });
         }
-    });
-
-    if (updatedCount > 0) {
-        await batch.commit();
+      }
     }
-    
-    return updatedCount;
+  }
+
+  return updatedCount;
 };

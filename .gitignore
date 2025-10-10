@@ -1,45 +1,85 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Supabase migration secrets
+firebase-to-supabase/**/supabase-service.json
 
-# dependencies
-/node_modules
+# Dependencies
+node_modules/
 /.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+.pnp.js
+yarn-error.log
 
-# testing
-/coverage
+# Build outputs
+.next/
+.next/cache/
+dist/
+out/
+build/
 
-# next.js
-/.next/
-/out/
+# Environment variables
+.env*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# production
-/build
-
-# misc
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
 .DS_Store
-*.pem
 
-# debug
+# OS
+Thumbs.db
+desktop.ini
+
+# Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+lerna-debug.log*
 
-# vercel
-.vercel
+# Coverage
+coverage/
+.nyc_output/
+.jest/
 
-# typescript
+# Firebase
+.firebase/
+firebase-debug.log*
+ui-debug.log*
+database-debug.log*
+firestore-debug.log*
+pubsub-debug.log*
+*.firebaserc
+emulators/
+
+# Next.js
+__next/
+.vercel/
+.turbo
+
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-.genkit/*
-.env*
+# PWA
+public/sw.js
+public/workbox-*.js
+public/worker-*.js
+public/sw.js.map
+public/workbox-*.js.map
+public/worker-*.js.map
 
-# firebase
-firebase-debug.log
-firestore-debug.log
+# Testing
+/cypress/videos/
+/cypress/screenshots/
+
+# Misc
+.cache/
+.temp/
+.swc/

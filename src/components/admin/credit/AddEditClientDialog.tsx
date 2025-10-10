@@ -199,16 +199,16 @@ return (
                         <h4 className="font-semibold text-lg mb-3">Información Personal</h4>
                         <div className="space-y-4">
                             <FormField name="name" control={form.control} render={({ field }) => (
-                                <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel htmlFor="client-name">Nombre Completo</FormLabel><FormControl><Input id="client-name" {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                              <FormField name="phone" control={form.control} render={({ field }) => (
-                                <FormItem><FormLabel>Teléfono Celular</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel htmlFor="client-phone">Teléfono Celular</FormLabel><FormControl><Input id="client-phone" {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                              <FormField name="address" control={form.control} render={({ field }) => (
-                                <FormItem><FormLabel>Dirección Particular</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel htmlFor="client-address">Dirección Particular</FormLabel><FormControl><Textarea id="client-address" {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                              <FormField name="curp" control={form.control} render={({ field }) => (
-                                <FormItem><FormLabel>CURP (Opcional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel htmlFor="client-curp">CURP (Opcional)</FormLabel><FormControl><Input id="client-curp" {...field} /></FormControl><FormMessage /></FormItem>
                             )}/>
                         </div>
                     </div>

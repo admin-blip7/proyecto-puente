@@ -17,6 +17,8 @@ interface CanvasProps {
   labelWidthMm: number;
   labelHeightMm: number;
   scale: number;
+  showGrid?: boolean;
+  isFlipped?: boolean;
   onCreateElement: (item: CanvasDropItem, position: { x: number; y: number }) => void;
   moveElement: (id: string, x: number, y: number) => void;
   onSelectElement: (id: string | null) => void;
@@ -28,6 +30,8 @@ const Canvas: React.FC<CanvasProps> = ({
   labelWidthMm,
   labelHeightMm,
   scale,
+  showGrid = false,
+  isFlipped = false,
   onCreateElement,
   moveElement,
   onSelectElement,
@@ -37,10 +41,27 @@ const Canvas: React.FC<CanvasProps> = ({
   const pxPerMm = useMemo(() => mmToPixels(1, scale), [scale]);
   const widthPx = useMemo(() => mmToPixels(labelWidthMm, scale), [labelWidthMm, scale]);
   const heightPx = useMemo(() => mmToPixels(labelHeightMm, scale), [labelHeightMm, scale]);
+  
+  // Generate grid pattern
+  const gridPattern = useMemo(() => {
+    if (!showGrid) return undefined;
+    const gridSize = 5; // 5mm grid
+    const gridPx = mmToPixels(gridSize, scale);
+    
+    return {
+      backgroundImage: `
+        linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
+      `,
+      backgroundSize: `${gridPx}px ${gridPx}px`,
+    };
+  }, [showGrid, scale]);
 
   const [{ isOver }, drop] = useDrop<CanvasDropItem, void, { isOver: boolean }>(() => ({
     accept: ['text', 'image', 'qrcode', 'barcode', 'placeholder', 'canvas-element'],
     drop: (item, monitor) => {
+      console.log('Canvas drop received item:', item);
+      
       if (item.id) {
         const delta = monitor.getDifferenceFromInitialOffset();
         if (!delta) return;
@@ -61,10 +82,13 @@ const Canvas: React.FC<CanvasProps> = ({
         y: clientOffset.y - bounds.top,
       };
 
-      onCreateElement(item, {
+      const positionMm = {
         x: pixelsToMm(positionPx.x, scale),
         y: pixelsToMm(positionPx.y, scale),
-      });
+      };
+      
+      console.log('Creating element at position:', positionMm);
+      onCreateElement(item, positionMm);
     },
     collect: (monitor) => ({
       isOver: monitor.isOver({ shallow: true }),
@@ -83,6 +107,7 @@ const Canvas: React.FC<CanvasProps> = ({
           height: heightPx,
           border: isOver ? '2px dashed #22c55e' : '1px solid #d4d4d8',
           transition: 'border-color 0.2s ease',
+          ...gridPattern,
         }}
         onClick={(event) => {
           if (event.target === event.currentTarget) {
@@ -90,16 +115,25 @@ const Canvas: React.FC<CanvasProps> = ({
           }
         }}
       >
-        {elements.map((element) => (
-          <CanvasElement
-            key={element.id}
-            element={element}
-            scale={scale}
-            pxPerMm={pxPerMm}
-            onSelect={onSelectElement}
-            isSelected={element.id === selectedElementId}
-          />
-        ))}
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            transform: isFlipped ? 'rotate(180deg)' : 'none',
+            transformOrigin: 'center',
+          }}
+        >
+          {elements.map((element) => (
+            <CanvasElement
+              key={element.id}
+              element={element}
+              scale={scale}
+              pxPerMm={pxPerMm}
+              onSelect={onSelectElement}
+              isSelected={element.id === selectedElementId}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

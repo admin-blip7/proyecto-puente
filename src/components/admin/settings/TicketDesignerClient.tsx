@@ -13,24 +13,14 @@ import TicketHeaderSettings from "./TicketHeaderSettings";
 import TicketBodySettings from "./TicketBodySettings";
 import TicketFooterSettings from "./TicketFooterSettings";
 import TicketPreview from "./TicketPreview";
-import VisualEditor from "./visual-editor/VisualEditor";
-import { VisualElement } from "./visual-editor/types";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Loader2, Save } from "lucide-react";
 
 interface TicketDesignerClientProps {
   initialSettings: TicketSettings;
 }
 
-type EditorMode = "simple" | "visual";
-
-const TICKET_CANVAS_WIDTH_MM = 80;
-const TICKET_CANVAS_HEIGHT_MM = 200;
-
 export default function TicketDesignerClient({ initialSettings }: TicketDesignerClientProps) {
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<EditorMode>("simple");
   const { toast } = useToast();
 
   const form = useForm<TicketSettings>({
@@ -38,15 +28,7 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
     defaultValues: initialSettings,
   });
 
-  const handleLayoutChange = useCallback((layout: any) => {
-    form.setValue("visualLayout", JSON.stringify(layout));
-  }, [form]);
-
   const watchedSettings = form.watch();
-
-  const initialLayout = initialSettings.visualLayout
-    ? JSON.parse(initialSettings.visualLayout)
-    : [];
 
   const onSubmit = async (values: TicketSettings) => {
     setLoading(true);
@@ -75,18 +57,14 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
             <h1 className="text-2xl font-bold tracking-tight">Diseñador de Tickets</h1>
             <p className="text-muted-foreground\">Personaliza el contenido y la apariencia de tus tickets de venta.</p>
         </div>
-        <div className="flex items-center space-x-2">
-            <Label htmlFor="visual-mode">Modo Visual</Label>
-            <Switch id="visual-mode" onCheckedChange={(checked: boolean) => setMode(checked ? "visual" : "simple")} />
-        </div>
+        
         <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isDirty}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar Diseño
         </Button>
       </div>
 
-      {mode === "simple" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
             <h3 className="font-semibold text-lg mb-2">Opciones de Personalización</h3>
             <Form {...form}>
@@ -106,25 +84,6 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
              </div>
           </div>
         </div>
-      ) : (
-        <div>
-          <h2 className="text-xl font-bold">Editor Visual Próximamente</h2>
-          <p>Aquí es donde irá el editor de arrastrar y soltar para tickets.</p>
-        </div>
-      )}
-
-      {mode === 'visual' && (
-        <VisualEditor 
-          initialLayout={initialLayout} 
-          onLayoutChange={handleLayoutChange} 
-          widthMm={TICKET_CANVAS_WIDTH_MM}
-          heightMm={TICKET_CANVAS_HEIGHT_MM}
-        />
-      )}
-
-      <div className="mt-8">
-        <h2 className="text-xl font-bold mb-4">Vista Previa del Ticket</h2>
-      </div>
     </>
   );
 }

@@ -1,274 +1,344 @@
 
 'use server';
 
-import { db, storage } from "@/lib/firebase";
 import { Product, StockEntryItem, BulkUpdateData } from "@/types";
-import { collection, getDocs, addDoc, serverTimestamp, DocumentData, QueryDocumentSnapshot, writeBatch, doc, runTransaction, getDoc, updateDoc, where, query, limit, arrayUnion, arrayRemove, increment, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
-import { useAuth } from "../hooks";
-
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("productService");
 
-const PRODUCTS_COLLECTION = "products";
-const INVENTORY_LOGS_COLLECTION = "inventory_logs";
-const STORAGE_PRODUCT_IMAGES_PATH = "product-images";
+const PRODUCTS_TABLE = "products";
+const INVENTORY_LOGS_TABLE = "inventory_logs";
 
 const generateSearchKeywords = (name: string): string[] => {
-    if (!name) return [];
-    const lowerCaseName = name.toLowerCase();
-    const parts = lowerCaseName.split(' ').filter(p => p.length > 1); // Ignore single letters
-    const keywords = new Set<string>(parts);
+  if (!name) return [];
+  const lowerCaseName = name.toLowerCase();
+  const parts = lowerCaseName.split(" ").filter((p) => p.length > 1);
+  const keywords = new Set<string>(parts);
 
-    // Add combinations
-    for (let i = 0; i < parts.length; i++) {
-        for (let j = i + 1; j < parts.length; j++) {
-            keywords.add(`${parts[i]} ${parts[j]}`);
-        }
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      keywords.add(`${parts[i]} ${parts[j]}`);
     }
-    
-    // Add full name
-    keywords.add(lowerCaseName);
+  }
 
-    return Array.from(keywords);
-}
+  keywords.add(lowerCaseName);
+  return Array.from(keywords);
+};
 
+const normalizeId = (row: any) => row?.id ?? row?.firestore_id;
 
-const productFromDoc = (doc: QueryDocumentSnapshot<DocumentData> | DocumentData): Product => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        name: data.name,
-        sku: data.sku,
-        price: Number(data.price || 0),
-        cost: Number(data.cost || 0),
-        stock: Number(data.stock || 0),
-        createdAt: data.createdAt?.toDate(),
-        type: data.type || 'Venta',
-        ownershipType: data.ownershipType || 'Propio',
-        consignorId: data.consignorId,
-        reorderPoint: Number(data.reorderPoint || 0),
-        comboProductIds: data.comboProductIds || [],
-        compatibilityTags: data.compatibilityTags || [],
-        searchKeywords: data.searchKeywords || [],
-    };
-}
+const mapProduct = (row: any): Product => ({
+  id: normalizeId(row),
+  name: row?.name ?? "",
+  sku: row?.sku ?? "",
+  price: Number(row?.price ?? 0),
+  cost: Number(row?.cost ?? 0),
+  stock: Number(row?.stock ?? 0),
+  createdAt: toDate(row?.createdAt),
+  type: row?.type ?? "Venta",
+  ownershipType: row?.ownershipType ?? "Propio",
+  consignorId: row?.consignorId ?? undefined,
+  reorderPoint: row?.reorderPoint !== null ? Number(row?.reorderPoint) : undefined,
+  comboProductIds: Array.isArray(row?.comboProductIds) ? row.comboProductIds : [],
+  compatibilityTags: Array.isArray(row?.compatibilityTags) ? row.compatibilityTags : [],
+  searchKeywords: Array.isArray(row?.searchKeywords) ? row.searchKeywords : [],
+});
+
+const fetchProductRow = async (productId: string) => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select("*")
+    .or(`id.eq.${productId},firestore_id.eq.${productId}`)
+    .maybeSingle();
+
+  if (error) {
+    log.error("Error fetching product", error);
+    throw error;
+  }
+
+  return data ?? null;
+};
 
 export const getProducts = async (): Promise<Product[]> => {
-    try {
-        const querySnapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
-        const products = querySnapshot.docs.map(productFromDoc);
-        // Sort by name by default
-        return products.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-        log.error("Error fetching products:", error);
-        return [];
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(PRODUCTS_TABLE)
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) {
+      throw error;
     }
+
+    return (data ?? []).map(mapProduct);
+  } catch (error) {
+    log.error("Error fetching products:", error);
+    return [];
+  }
 };
 
 export const getProductById = async (productId: string): Promise<Product | null> => {
-    try {
-        const docRef = doc(db, PRODUCTS_COLLECTION, productId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return productFromDoc(docSnap as DocumentData);
-        }
-        return null;
-    } catch (error) {
-        log.error("Error fetching product by ID:", error);
-        return null;
-    }
+  try {
+    const row = await fetchProductRow(productId);
+    return row ? mapProduct(row) : null;
+  } catch (error) {
+    log.error("Error fetching product by ID:", error);
+    return null;
+  }
 };
 
 export const addProduct = async (
-    productData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords'>
+  productData: Omit<Product, "id" | "createdAt" | "searchKeywords">
 ): Promise<Product> => {
-    
-    const productDocRef = doc(collection(db, PRODUCTS_COLLECTION));
-    
-    try {
-        const searchKeywords = generateSearchKeywords(productData.name);
-        const dataToSave = {
-            ...productData,
-            price: Number(productData.price) || 0,
-            cost: Number(productData.cost) || 0,
-            stock: Number(productData.stock) || 0,
-            reorderPoint: Number(productData.reorderPoint) || 0,
-            createdAt: serverTimestamp(),
-            searchKeywords: searchKeywords,
-        };
+  const supabase = getSupabaseServerClient();
+  const searchKeywords = generateSearchKeywords(productData.name);
+  const createdAt = nowIso();
+  const newId = uuidv4();
 
-        await setDoc(productDocRef, dataToSave);
+  const payload = {
+    id: newId,
+    firestore_id: newId,
+    name: productData.name,
+    sku: productData.sku,
+    price: Number(productData.price ?? 0),
+    cost: Number(productData.cost ?? 0),
+    stock: Number(productData.stock ?? 0),
+    type: productData.type ?? "Venta",
+    ownershipType: productData.ownershipType ?? "Propio",
+    consignorId: productData.consignorId ?? null,
+    reorderPoint: productData.reorderPoint ?? 0,
+    comboProductIds: productData.comboProductIds ?? [],
+    compatibilityTags: productData.compatibilityTags ?? [],
+    searchKeywords,
+    createdAt,
+  };
 
-        
-        const finalProductDoc = await getDoc(productDocRef);
-        return productFromDoc(finalProductDoc as DocumentData);
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .insert(payload)
+    .select("*")
+    .single();
 
-    } catch (error) {
-        log.error("Error adding product: ", error);
-        throw new Error("Failed to add product.");
-    }
+  if (error) {
+    log.error("Error adding product", error);
+    throw new Error("Failed to add product.");
+  }
+
+  return mapProduct(data);
 };
 
 export const updateProduct = async (
-    productId: string,
-    productData: Partial<Omit<Product, 'id' | 'createdAt'>>
+  productId: string,
+  productData: Partial<Omit<Product, "id" | "createdAt">>
 ): Promise<Product> => {
-    const productDocRef = doc(db, PRODUCTS_COLLECTION, productId);
-    let dataToUpdate: DocumentData = { ...productData };
+  const supabase = getSupabaseServerClient();
+  const existingRow = await fetchProductRow(productId);
+  if (!existingRow) {
+    throw new Error("Product not found");
+  }
 
-    if (productData.name) {
-        dataToUpdate.searchKeywords = generateSearchKeywords(productData.name);
-    }
-    
-    try {
-        await updateDoc(productDocRef, dataToUpdate);
-        const updatedDoc = await getDoc(productDocRef);
-        if (!updatedDoc.exists()) {
-            throw new Error("Product not found after update.");
-        }
-        return productFromDoc(updatedDoc as DocumentData);
-    } catch (error) {
-        log.error("Error updating product: ", error);
-        throw new Error("Failed to update product.");
-    }
+  const searchKeywords = productData.name
+    ? generateSearchKeywords(productData.name)
+    : existingRow.searchKeywords ?? [];
+
+  const { error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .update({
+      name: productData.name ?? existingRow.name,
+      sku: productData.sku ?? existingRow.sku,
+      price: productData.price ?? existingRow.price ?? 0,
+      cost: productData.cost ?? existingRow.cost ?? 0,
+      stock: productData.stock ?? existingRow.stock ?? 0,
+      type: productData.type ?? existingRow.type ?? "Venta",
+      ownershipType: productData.ownershipType ?? existingRow.ownershipType ?? "Propio",
+      consignorId: productData.consignorId ?? existingRow.consignorId ?? null,
+      reorderPoint: productData.reorderPoint ?? existingRow.reorderPoint ?? 0,
+      comboProductIds: productData.comboProductIds ?? existingRow.comboProductIds ?? [],
+      compatibilityTags: productData.compatibilityTags ?? existingRow.compatibilityTags ?? [],
+      searchKeywords,
+    })
+    .eq("firestore_id", existingRow.firestore_id ?? productId);
+
+  if (error) {
+    log.error("Error updating product", error);
+    throw new Error("Failed to update product.");
+  }
+
+  const updatedRow = await fetchProductRow(productId);
+  if (!updatedRow) {
+    throw new Error("Product not found after update.");
+  }
+
+  return mapProduct(updatedRow);
 };
 
+export const processStockEntry = async (
+  entryItems: StockEntryItem[],
+  userId: string
+): Promise<StockEntryItem[]> => {
+  const supabase = getSupabaseServerClient();
+  const processedItems: StockEntryItem[] = [];
 
+  try {
+    for (const item of entryItems) {
+      let productId = item.productId;
+      let isNewProduct = false;
 
+      if (!productId) {
+        const newProduct = await addProduct({
+          id: "", // ignored
+          name: item.name,
+          sku: item.sku,
+          price: item.price,
+          cost: item.cost,
+          stock: item.quantity,
+          type: "Venta",
+          ownershipType: item.ownershipType,
+          consignorId: item.consignorId,
+          reorderPoint: 0,
+          comboProductIds: [],
+          compatibilityTags: [],
+        } as Omit<Product, "id" | "createdAt" | "searchKeywords">);
 
-
-export const processStockEntry = async (entryItems: StockEntryItem[], userId: string): Promise<StockEntryItem[]> => {
-    console.log("Step 2: Backend function received data:", entryItems);
-    const processedItems: StockEntryItem[] = [];
-    const newProductsForTagging: { id: string; name: string }[] = [];
-
-    try {
-        for (const item of entryItems) {
-            const isNewProduct = !item.productId;
-            const productRef = isNewProduct ? doc(collection(db, PRODUCTS_COLLECTION)) : doc(db, PRODUCTS_COLLECTION, item.productId!);
-
-            await runTransaction(db, async (transaction) => {
-                const productDoc = !isNewProduct ? await transaction.get(productRef) : null;
-                
-                if (productDoc && productDoc.exists()) {
-                    transaction.update(productRef, {
-                        stock: increment(item.quantity),
-                        cost: item.cost,
-                        price: item.price,
-                        ownershipType: item.ownershipType,
-                        consignorId: item.consignorId || null,
-                    });
-                } else {
-                    const searchKeywords = generateSearchKeywords(item.name);
-                    const newProductData = {
-                        name: item.name,
-                        sku: item.sku,
-                        price: item.price,
-                        cost: item.cost,
-                        stock: item.quantity,
-                        createdAt: serverTimestamp(),
-                        type: 'Venta',
-                        ownershipType: item.ownershipType,
-                        consignorId: item.consignorId || null,
-                        comboProductIds: [],
-                        compatibilityTags: [],
-                        searchKeywords: searchKeywords,
-                    };
-                    transaction.set(productRef, newProductData);
-                    item.productId = productRef.id;
-                    newProductsForTagging.push({ id: productRef.id, name: item.name });
-                }
-
-                const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
-                transaction.set(logRef, {
-                    productId: item.productId,
-                    productName: item.name,
-                    change: item.quantity,
-                    reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
-                    updatedBy: userId,
-                    createdAt: serverTimestamp(),
-                    metadata: { cost: item.cost }
-                });
-            });
-
-            processedItems.push(item);
+        productId = newProduct.id;
+        item.productId = productId;
+        isNewProduct = true;
+      } else {
+        const row = await fetchProductRow(productId);
+        if (!row) {
+          throw new Error(`Producto ${productId} no encontrado.`);
         }
-        
-        console.log("Step 3: Success! Data saved to Firestore.");
 
-        return processedItems;
+        const currentStock = Number(row.stock ?? 0);
+        const { error: updateError } = await supabase
+          .from(PRODUCTS_TABLE)
+          .update({
+            stock: currentStock + item.quantity,
+            cost: item.cost,
+            price: item.price,
+            ownershipType: item.ownershipType,
+            consignorId: item.consignorId ?? null,
+          })
+          .eq("firestore_id", row.firestore_id ?? productId);
 
-    } catch (error) {
-        console.error("Step 3: ERROR WRITING TO FIRESTORE:", error);
-        throw new Error("Could not save to the database.");
+        if (updateError) {
+          throw updateError;
+        }
+      }
+
+      const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
+        productId,
+        productName: item.name,
+        change: item.quantity,
+        reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
+        updatedBy: userId,
+        createdAt: nowIso(),
+        metadata: { cost: item.cost },
+      });
+
+      if (logError) {
+        log.error("Error saving inventory log", logError);
+        throw logError;
+      }
+
+      processedItems.push(item);
     }
+
+    return processedItems;
+  } catch (error) {
+    log.error("Error processing stock entry", error);
+    throw new Error("Could not save to the database.");
+  }
 };
 
 export const deleteProducts = async (productIds: string[]): Promise<void> => {
-    try {
-        const batch = writeBatch(db);
-        productIds.forEach(id => {
-            const productRef = doc(db, PRODUCTS_COLLECTION, id);
-            batch.delete(productRef);
-        });
-        await batch.commit();
-    } catch (error) {
-        log.error("Error deleting products:", error);
-        throw new Error("Failed to delete products.");
-    }
+  if (!productIds.length) return;
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .delete()
+    .in("firestore_id", productIds);
+
+  if (error) {
+    log.error("Error deleting products", error);
+    throw new Error("Failed to delete products.");
+  }
 };
 
-export const bulkUpdateProducts = async (productIds: string[], updateData: BulkUpdateData): Promise<void> => {
-    await runTransaction(db, async (transaction) => {
-        const productDocs = await Promise.all(productIds.map(id => transaction.get(doc(db, PRODUCTS_COLLECTION, id))));
+export const bulkUpdateProducts = async (
+  productIds: string[],
+  updateData: BulkUpdateData
+): Promise<void> => {
+  if (!productIds.length) return;
+  const supabase = getSupabaseServerClient();
 
-        for (const productDoc of productDocs) {
-            if (!productDoc.exists()) continue;
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select("firestore_id, price, cost, compatibilityTags")
+    .in("firestore_id", productIds);
 
-            const productRef = productDoc.ref;
-            const currentData = productDoc.data();
-            let newData: { [key: string]: any } = {};
+  if (error) {
+    log.error("Error fetching products for bulk update", error);
+    throw error;
+  }
 
-            if (updateData.price) {
-                let newPrice = currentData.price;
-                if (updateData.price.mode === 'fixed') {
-                    newPrice = updateData.price.value;
-                } else if (updateData.price.mode === 'amount') {
-                    newPrice += updateData.price.value;
-                } else if (updateData.price.mode === 'percent') {
-                    newPrice *= (1 + updateData.price.value / 100);
-                }
-                newData.price = Math.max(0, newPrice);
-            }
+  for (const row of data ?? []) {
+    const updates: Record<string, unknown> = {};
 
-            if (updateData.cost) {
-                 let newCost = currentData.cost;
-                if (updateData.cost.mode === 'fixed') {
-                    newCost = updateData.cost.value;
-                } else if (updateData.cost.mode === 'amount') {
-                    newCost += updateData.cost.value;
-                } else if (updateData.cost.mode === 'percent') {
-                    newCost *= (1 + updateData.cost.value / 100);
-                }
-                newData.cost = Math.max(0, newCost);
-            }
+    if (updateData.price) {
+      let newPrice = Number(row.price ?? 0);
+      const value = updateData.price.value;
+      if (updateData.price.mode === "fixed") newPrice = value;
+      if (updateData.price.mode === "amount") newPrice += value;
+      if (updateData.price.mode === "percent") newPrice *= 1 + value / 100;
+      updates.price = Math.max(0, newPrice);
+    }
 
-            if (updateData.tagsToAdd && updateData.tagsToAdd.length > 0) {
-                newData.compatibilityTags = arrayUnion(...updateData.tagsToAdd);
-            }
-             if (updateData.tagsToRemove && updateData.tagsToRemove.length > 0) {
-                 if (newData.compatibilityTags) {
-                     newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
-                 } else {
-                    newData.compatibilityTags = arrayRemove(...updateData.tagsToRemove);
-                 }
-            }
-            
-            if (Object.keys(newData).length > 0) {
-                transaction.update(productRef, newData);
-            }
+    if (updateData.cost) {
+      let newCost = Number(row.cost ?? 0);
+      const value = updateData.cost.value;
+      if (updateData.cost.mode === "fixed") newCost = value;
+      if (updateData.cost.mode === "amount") newCost += value;
+      if (updateData.cost.mode === "percent") newCost *= 1 + value / 100;
+      updates.cost = Math.max(0, newCost);
+    }
+
+    if (updateData.tagsToAdd?.length || updateData.tagsToRemove?.length) {
+      const currentTags = Array.isArray(row.compatibilityTags)
+        ? [...row.compatibilityTags]
+        : [];
+
+      if (updateData.tagsToAdd?.length) {
+        for (const tag of updateData.tagsToAdd) {
+          if (!currentTags.includes(tag)) currentTags.push(tag);
         }
-    });
+      }
+
+      if (updateData.tagsToRemove?.length) {
+        for (const tag of updateData.tagsToRemove) {
+          const index = currentTags.indexOf(tag);
+          if (index >= 0) currentTags.splice(index, 1);
+        }
+      }
+
+      updates.compatibilityTags = currentTags;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase
+        .from(PRODUCTS_TABLE)
+        .update(updates)
+        .eq("firestore_id", row.firestore_id);
+
+      if (updateError) {
+        log.error("Error updating product in bulk operation", updateError);
+        throw updateError;
+      }
+    }
+  }
 };

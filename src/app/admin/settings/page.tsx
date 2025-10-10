@@ -12,7 +12,7 @@ import ContractTemplateClient from "@/components/admin/settings/ContractTemplate
 export default async function SettingsPage() {
     const [initialTicketSettings, initialLabelSettings, initialContractTemplate] = await Promise.all([
         getTicketSettings(),
-        getLabelSettings(),
+        getLabelSettings("product"), // Load product settings by default
         getContractTemplate()
     ]);
    

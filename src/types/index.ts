@@ -306,10 +306,13 @@ export const TicketSettingsSchema = z.object({
     showQrCode: z.boolean(),
     qrCodeUrl: z.string().url().or(z.literal("")).optional(),
   }),
-  visualLayout: z.string().optional(), // JSON string of VisualElement[]
+  visualLayout: z.string().nullable().optional(), // JSON string of VisualElement[]
 });
 
 export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
+
+export const labelTypes = ["product", "repair"] as const;
+export type LabelType = typeof labelTypes[number];
 
 export const LabelSettingsSchema = z.object({
     width: z.coerce.number().positive(),
@@ -325,10 +328,12 @@ export const LabelSettingsSchema = z.object({
         showPrice: z.boolean(),
         showStoreName: z.boolean(),
     }),
-    visualLayout: z.string().optional(), // JSON string of VisualElement[]
+    visualLayout: z.string().nullable().optional(), // JSON string of VisualElement[]
 });
 
-export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
+export type LabelSettings = z.infer<typeof LabelSettingsSchema> & {
+    labelType: LabelType;
+};
 
 export interface LabelPrintProductContext {
     id?: string;
@@ -349,7 +354,7 @@ export interface LabelPrintItem {
 
 export const ContractTemplateSchema = z.object({
     content: z.string(),
-    visualLayout: z.string().optional(), // JSON string of VisualElement[]
+    visualLayout: z.string().nullable().optional(), // JSON string of VisualElement[]
 });
 
 export type ContractTemplateSettings = z.infer<typeof ContractTemplateSchema>;

@@ -1,103 +1,98 @@
-import { db, storage } from "@/lib/firebase";
-import { ConsignorPayment, PaymentMethod } from "@/types";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  runTransaction,
-  doc,
-  query,
-  where,
-  orderBy,
-  DocumentData,
-  QueryDocumentSnapshot,
-  increment,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+"use server";
+
 import { v4 as uuidv4 } from "uuid";
+import { ConsignorPayment } from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { toDate, nowIso } from "@/lib/supabase/utils";
+import { uploadFile } from "./documentService";
+import { updateConsignorBalance } from "./consignorService";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("paymentService");
-const CONSIGNOR_PAYMENTS_COLLECTION = "consignor_payments";
-const CONSIGNORS_COLLECTION = "consignors";
+
+const CONSIGNOR_PAYMENTS_TABLE = "consignor_payments";
 const STORAGE_PAYMENT_PROOFS_PATH = "payment_proofs";
 
-const paymentFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): ConsignorPayment => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        paymentId: data.paymentId,
-        consignorId: data.consignorId,
-        amountPaid: data.amountPaid,
-        paymentDate: data.paymentDate.toDate(),
-        paymentMethod: data.paymentMethod,
-        proofOfPaymentUrl: data.proofOfPaymentUrl,
-        notes: data.notes,
-    }
-}
+const mapPayment = (row: any): ConsignorPayment => ({
+  id: row?.firestore_id ?? row?.id ?? "",
+  paymentId: row?.paymentId ?? "",
+  consignorId: row?.consignorId ?? "",
+  amountPaid: Number(row?.amountPaid ?? 0),
+  paymentDate: toDate(row?.paymentDate),
+  paymentMethod: row?.paymentMethod ?? "Efectivo",
+  proofOfPaymentUrl: row?.proofOfPaymentUrl ?? "",
+  notes: row?.notes ?? undefined,
+});
 
 export const getConsignorPayments = async (consignorId: string): Promise<ConsignorPayment[]> => {
-    const q = query(
-        collection(db, CONSIGNOR_PAYMENTS_COLLECTION),
-        where("consignorId", "==", consignorId),
-        orderBy("paymentDate", "desc")
-    );
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(CONSIGNOR_PAYMENTS_TABLE)
+      .select("*")
+      .eq("consignorId", consignorId)
+      .order("paymentDate", { ascending: false });
 
-    try {
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(paymentFromDoc);
-    } catch (error) {
-        log.error("Error fetching payment history: ", error);
-        return [];
+    if (error) {
+      throw error;
     }
-}
 
-
-const uploadProofOfPayment = async (file: File, consignorId: string, paymentId: string): Promise<string> => {
-    const filePath = `${STORAGE_PAYMENT_PROOFS_PATH}/${consignorId}/${paymentId}-${file.name}`;
-    const storageRef = ref(storage, filePath);
-    await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
+    return (data ?? []).map(mapPayment);
+  } catch (error) {
+    log.error("Error fetching payment history", error);
+    return [];
+  }
 };
 
+const uploadProofOfPayment = async (
+  file: File,
+  consignorId: string,
+  paymentId: string
+): Promise<string> => {
+  const filePath = `${STORAGE_PAYMENT_PROOFS_PATH}/${consignorId}/${paymentId}-${file.name}`;
+  return uploadFile(file, filePath);
+};
 
 export const addConsignorPayment = async (
-    paymentData: Omit<ConsignorPayment, 'id' | 'paymentId' | 'paymentDate' | 'proofOfPaymentUrl'>,
-    proofFile: File
-) => {
-    const paymentId = `PAY-${uuidv4().split('-')[0].toUpperCase()}`;
-    const { consignorId, amountPaid } = paymentData;
+  paymentData: Omit<ConsignorPayment, "id" | "paymentId" | "paymentDate" | "proofOfPaymentUrl">,
+  proofFile: File
+): Promise<void> => {
+  const paymentId = `PAY-${uuidv4().split("-")[0].toUpperCase()}`;
+  const { consignorId, amountPaid } = paymentData;
 
-    if (!consignorId) {
-        throw new Error("Consignor ID is required.");
+  if (!consignorId) {
+    throw new Error("Consignor ID is required.");
+  }
+  if (!proofFile) {
+    throw new Error("Proof of payment file is required.");
+  }
+
+  const supabase = getSupabaseServerClient();
+
+  try {
+    const proofOfPaymentUrl = await uploadProofOfPayment(proofFile, consignorId, paymentId);
+    const firestoreId = uuidv4();
+    const paymentDate = nowIso();
+
+    const payload = {
+      firestore_id: firestoreId,
+      paymentId,
+      consignorId,
+      amountPaid,
+      paymentDate,
+      paymentMethod: paymentData.paymentMethod,
+      proofOfPaymentUrl,
+      notes: paymentData.notes ?? null,
+    };
+
+    const { error: insertError } = await supabase.from(CONSIGNOR_PAYMENTS_TABLE).insert(payload);
+    if (insertError) {
+      throw insertError;
     }
-    if (!proofFile) {
-        throw new Error("Proof of payment file is required.");
-    }
 
-    try {
-        const proofOfPaymentUrl = await uploadProofOfPayment(proofFile, consignorId, paymentId);
-
-        await runTransaction(db, async (transaction) => {
-            const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
-            const paymentRef = doc(collection(db, CONSIGNOR_PAYMENTS_COLLECTION));
-
-            // 1. Create the payment record
-            transaction.set(paymentRef, {
-                ...paymentData,
-                paymentId,
-                proofOfPaymentUrl,
-                paymentDate: serverTimestamp(),
-            });
-
-            // 2. Decrement the consignor's balance
-            transaction.update(consignorRef, {
-                balanceDue: increment(-amountPaid)
-            });
-        });
-
-    } catch (error) {
-        log.error("Error processing consignor payment: ", error);
-        throw error;
-    }
+    await updateConsignorBalance(consignorId, -amountPaid);
+  } catch (error) {
+    log.error("Error processing consignor payment", error);
+    throw error;
+  }
 };

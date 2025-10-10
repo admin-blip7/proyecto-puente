@@ -24,8 +24,7 @@ import {
 import { Supplier } from "@/types";
 import { updateSupplier } from "@/lib/services/supplierService";
 import { useRouter } from "next/navigation";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabaseClient";
 import { getLogger } from "@/lib/logger";
 import { formatCurrency } from "@/lib/utils";
 const log = getLogger("SupplierDetailClient");
@@ -53,27 +52,29 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
 
   const loadPurchaseHistory = useCallback(async () => {
     try {
-      const q = query(
-        collection(db, "purchase_orders"),
-        where("supplier", "==", supplier.name),
-        orderBy("createdAt", "desc")
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const orders: PurchaseOrder[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        orders.push({
-          id: doc.id,
-          orderNumber: data.orderNumber,
-          totalAmount: data.totalAmount || 0,
-          status: data.status,
-          createdAt: data.createdAt,
-          items: data.items || []
-        });
-      });
-      
+      if (!supabase) {
+        throw new Error("Supabase client is not configured");
+      }
+
+      const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("*")
+        .eq("supplier", supplier.name)
+        .order("createdAt", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const orders = (data ?? []).map((row) => ({
+        id: row.firestore_id ?? row.id,
+        orderNumber: row.orderNumber,
+        totalAmount: Number(row.totalAmount ?? 0),
+        status: row.status,
+        createdAt: row.createdAt,
+        items: Array.isArray(row.items) ? row.items : [],
+      }));
+
       setPurchaseHistory(orders);
     } catch (error) {
       log.error("Error loading purchase history:", error);
@@ -116,7 +117,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
 
   function formatDate(timestamp: any): any {
     if (!timestamp) return "N/A";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'short',

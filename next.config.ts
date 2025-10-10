@@ -46,12 +46,18 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: "https",
-        hostname: "firebasestorage.googleapis.com",
-      }
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'aaftjwktzpnyjwklroww.supabase.co',
+        pathname: '/**',
+      },
     ],
   },
-  webpack: (config) => {
+  webpack: (config, { dev, isServer }) => {
     const shouldSilenceWarning = (warning: any, matcher: { message?: string; resource?: string }) => {
       const messageMatch = matcher.message ? warning.message?.includes(matcher.message) : true;
       const resourceMatch = matcher.resource ? warning.module?.resource?.includes(matcher.resource) : true;
@@ -70,6 +76,23 @@ const nextConfig: NextConfig = {
           message: 'require.extensions is not supported by webpack',
         })
     );
+
+    // Mejorar configuración para desarrollo
+    if (dev && !isServer) {
+      // Optimizar HMR y source maps para desarrollo
+      config.devtool = 'eval-cheap-module-source-map';
+      
+      // Configuración para mejor HMR
+      if (config.watchOptions) {
+        config.watchOptions.poll = 1000;
+        config.watchOptions.aggregateTimeout = 300;
+      }
+    }
+
+    // Optimizar source maps para producción
+    if (!dev) {
+      config.devtool = 'hidden-source-map';
+    }
 
     return config;
   },

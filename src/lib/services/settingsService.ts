@@ -1,19 +1,23 @@
-import { db, storage } from "@/lib/firebase";
-import { TicketSettings, TicketSettingsSchema, LabelSettings, LabelSettingsSchema, ContractTemplateSettings, ContractTemplateSchema } from "@/types";
+"use server";
+
 import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { v4 as uuidv4 } from "uuid";
+  TicketSettings,
+  TicketSettingsSchema,
+  LabelSettings,
+  LabelSettingsSchema,
+  ContractTemplateSettings,
+  ContractTemplateSchema,
+  LabelType,
+} from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("settingsService");
 
-const SETTINGS_COLLECTION = "settings";
+const SETTINGS_TABLE = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
-const LABEL_SETTINGS_DOC_ID = "label_design";
+const LABEL_SETTINGS_DOC_ID_BASE = "label_design";
 const CONTRACT_TEMPLATE_DOC_ID = "contract_template";
 
 
@@ -53,49 +57,101 @@ const defaultTicketSettings: TicketSettings = {
     }
 }
 
-export const getTicketSettings = async (): Promise<TicketSettings> => {
-    try {
-        const docRef = doc(db, SETTINGS_COLLECTION, TICKET_SETTINGS_DOC_ID);
-        const docSnap = await getDoc(docRef);
+const stripMeta = (row: any) => {
+  if (!row) return null;
+  const {
+    firestore_id,
+    id,
+    created_at,
+    createdAt,
+    updatedAt,
+    lastUpdated,
+    ...rest
+  } = row;
+  if (lastUpdated) {
+    rest.lastUpdated = lastUpdated;
+  }
+  // Handle null visualLayout values by setting them to undefined
+  if (rest.visualLayout === null) {
+    rest.visualLayout = undefined;
+  }
+  return rest;
+};
 
-        if (docSnap.exists()) {
-            const parsed = TicketSettingsSchema.safeParse(docSnap.data());
-            if (parsed.success) {
-                return parsed.data;
-            } else {
-                log.warn("Invalid ticket settings in Firestore, returning defaults.", parsed.error);
-                return defaultTicketSettings;
-            }
-        } else {
-            await setDoc(docRef, { ...defaultTicketSettings, lastUpdated: serverTimestamp() });
-            return defaultTicketSettings;
-        }
-    } catch (error) {
-        log.error("Error fetching ticket settings: ", error);
-        return defaultTicketSettings;
+const fetchSettingsDoc = async (docId: string) => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(SETTINGS_TABLE)
+    .select("*")
+    .eq("firestore_id", docId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? { row: data, supabase } : { row: null, supabase };
+};
+
+const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>) => {
+  const { row, supabase } = await fetchSettingsDoc(docId);
+  const timestamp = nowIso();
+  const data = {
+    firestore_id: docId,
+    ...payload,
+    lastUpdated: timestamp,
+  };
+
+  if (row) {
+    const { error } = await supabase
+      .from(SETTINGS_TABLE)
+      .update(data)
+      .eq("firestore_id", docId);
+    if (error) {
+      throw error;
     }
-}
+  } else {
+    const { error } = await supabase.from(SETTINGS_TABLE).insert(data);
+    if (error) {
+      throw error;
+    }
+  }
+};
+
+export const getTicketSettings = async (): Promise<TicketSettings> => {
+  try {
+    const { row } = await fetchSettingsDoc(TICKET_SETTINGS_DOC_ID);
+    if (row) {
+      const parsed = TicketSettingsSchema.safeParse(stripMeta(row));
+      if (parsed.success) {
+        return parsed.data;
+      }
+      log.warn("Invalid ticket settings in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(TICKET_SETTINGS_DOC_ID, defaultTicketSettings);
+    }
+  } catch (error) {
+    log.error("Error fetching ticket settings", error);
+  }
+  return defaultTicketSettings;
+};
 
 
 export const saveTicketSettings = async (settings: TicketSettings): Promise<void> => {
-    try {
-        const validatedSettings = TicketSettingsSchema.parse(settings);
-        const settingsRef = doc(db, SETTINGS_COLLECTION, TICKET_SETTINGS_DOC_ID);
-        await setDoc(settingsRef, {
-            ...validatedSettings,
-            lastUpdated: serverTimestamp()
-        }, { merge: true });
-
-    } catch (error) {
-        log.error("Error saving ticket settings: ", error);
-        throw new Error("Failed to save ticket settings.");
-    }
+  try {
+    const validated = TicketSettingsSchema.parse(settings);
+    await upsertSettingsDoc(TICKET_SETTINGS_DOC_ID, validated);
+  } catch (error) {
+    log.error("Error saving ticket settings", error);
+    throw new Error("Failed to save ticket settings.");
+  }
 };
 
 
 // --- LABEL SETTINGS ---
 
-const defaultLabelSettings: LabelSettings = {
+const createDefaultLabelSettings = (): Omit<LabelSettings, 'labelType'> => ({
     width: 58, 
     height: 40, 
     fontSize: 9,
@@ -109,44 +165,47 @@ const defaultLabelSettings: LabelSettings = {
         showPrice: true,
         showStoreName: false,
     },
+});
+
+const defaultLabelSettings = createDefaultLabelSettings();
+
+export const getLabelSettings = async (labelType: LabelType = "product"): Promise<LabelSettings> => {
+  try {
+    const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
+    const { row } = await fetchSettingsDoc(docId);
+    if (row) {
+      const rowData = stripMeta(row);
+      const parsed = LabelSettingsSchema.safeParse(rowData);
+      if (parsed.success) {
+        return {
+          ...parsed.data,
+          labelType,
+        };
+      }
+      
+      log.warn("Invalid label settings in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(docId, createDefaultLabelSettings());
+    }
+  } catch (error) {
+    log.error("Error fetching label settings", error);
+  }
+  return {
+    ...createDefaultLabelSettings(),
+    labelType,
+  };
 };
 
-export const getLabelSettings = async (): Promise<LabelSettings> => {
-    try {
-        const docRef = doc(db, SETTINGS_COLLECTION, LABEL_SETTINGS_DOC_ID);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const parsed = LabelSettingsSchema.safeParse(docSnap.data());
-            if (parsed.success) {
-                return parsed.data;
-            } else {
-                log.warn("Invalid label settings in Firestore, returning defaults.", parsed.error);
-                return defaultLabelSettings;
-            }
-        } else {
-            await setDoc(docRef, { ...defaultLabelSettings, lastUpdated: serverTimestamp() });
-            return defaultLabelSettings;
-        }
-    } catch (error) {
-        log.error("Error fetching label settings: ", error);
-        return defaultLabelSettings;
-    }
-}
-
 export const saveLabelSettings = async (settings: LabelSettings): Promise<void> => {
-    try {
-        const validatedSettings = LabelSettingsSchema.parse(settings);
-        const settingsRef = doc(db, SETTINGS_COLLECTION, LABEL_SETTINGS_DOC_ID);
-        await setDoc(settingsRef, {
-            ...validatedSettings,
-            lastUpdated: serverTimestamp()
-        }, { merge: true });
-
-    } catch (error) {
-        log.error("Error saving label settings: ", error);
-        throw new Error("Failed to save label settings.");
-    }
+  try {
+    const { labelType, ...settingsToSave } = settings;
+    const validated = LabelSettingsSchema.parse(settingsToSave);
+    const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
+    await upsertSettingsDoc(docId, validated);
+  } catch (error) {
+    log.error("Error saving label settings", error);
+    throw new Error("Failed to save label settings.");
+  }
 };
 
 
@@ -170,18 +229,24 @@ _________________________
 };
 
 export const getContractTemplate = async (): Promise<ContractTemplateSettings> => {
-    const docRef = doc(db, SETTINGS_COLLECTION, CONTRACT_TEMPLATE_DOC_ID);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        const parsed = ContractTemplateSchema.safeParse(docSnap.data());
-        if (parsed.success) return parsed.data;
+  try {
+    const { row } = await fetchSettingsDoc(CONTRACT_TEMPLATE_DOC_ID);
+    if (row) {
+      const parsed = ContractTemplateSchema.safeParse(stripMeta(row));
+      if (parsed.success) {
+        return parsed.data;
+      }
+      log.warn("Invalid contract template in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(CONTRACT_TEMPLATE_DOC_ID, defaultContractTemplateSettings);
     }
-    await setDoc(docRef, { ...defaultContractTemplateSettings, lastUpdated: serverTimestamp() });
-    return defaultContractTemplateSettings;
+  } catch (error) {
+    log.error("Error fetching contract template", error);
+  }
+  return defaultContractTemplateSettings;
 };
 
 export const saveContractTemplate = async (settings: ContractTemplateSettings): Promise<void> => {
-    const validatedSettings = ContractTemplateSchema.parse(settings);
-    const settingsRef = doc(db, SETTINGS_COLLECTION, CONTRACT_TEMPLATE_DOC_ID);
-    await setDoc(settingsRef, { ...validatedSettings, lastUpdated: serverTimestamp() }, { merge: true });
+  const validated = ContractTemplateSchema.parse(settings);
+  await upsertSettingsDoc(CONTRACT_TEMPLATE_DOC_ID, validated);
 };

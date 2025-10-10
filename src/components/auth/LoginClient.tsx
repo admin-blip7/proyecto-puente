@@ -5,16 +5,13 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db, sendPasswordResetEmail } from "@/lib/firebase";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { StoreIcon, Eye, EyeOff, Loader2 } from "lucide-react";
-import { UserProfile } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,10 +29,6 @@ const formSchema = z.object({
   email: z.string().email({ message: "Por favor ingrese un correo válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
-
-const resetFormSchema = z.object({
-    resetEmail: z.string().email({ message: "Por favor ingrese un correo válido." })
-})
 
 export default function LoginClient() {
   const [loading, setLoading] = useState(false);
@@ -61,7 +54,16 @@ export default function LoginClient() {
     }
     setResetLoading(true);
     try {
-        await sendPasswordResetEmail(auth, resetEmail);
+        if (!supabase) {
+          throw new Error("Supabase no está configurado");
+        }
+        const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+        const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+          redirectTo: origin ? `${origin}/login` : undefined,
+        });
+        if (error) {
+          throw error;
+        }
         toast({
             title: "Correo Enviado",
             description: "Si existe una cuenta con ese correo, recibirás instrucciones para restablecer tu contraseña."
@@ -70,7 +72,7 @@ export default function LoginClient() {
         toast({
             variant: "destructive",
             title: "Error",
-            description: "No se pudo enviar el correo de restablecimiento."
+            description: error?.message || "No se pudo enviar el correo de restablecimiento."
         })
     } finally {
         setResetLoading(false);
@@ -81,40 +83,48 @@ export default function LoginClient() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-      // Try to sign in
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      if (!supabase) {
+        throw new Error("Supabase no está configurado");
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (error) {
+        if (error.message?.toLowerCase().includes("invalid")) {
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: values.email,
+            password: values.password,
+            options: {
+              data: {
+                name: "Admin de Tienda",
+                role: "Admin",
+              },
+            },
+          });
+
+          if (signUpError) {
+            throw signUpError;
+          }
+
+          toast({
+            title: "Cuenta creada",
+            description: "Se ha creado una nueva cuenta. Revisa tu correo para confirmar el acceso si es necesario.",
+          });
+        } else {
+          throw error;
+        }
+      }
+
       router.push("/");
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        // If user not found, create a new user (for demo purposes)
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-          const user = userCredential.user;
-          
-          // Create user profile in Firestore
-          const userProfile: UserProfile = {
-            uid: user.uid,
-            name: user.displayName || "Admin de Tienda",
-            email: user.email!,
-            role: "Admin",
-          };
-          await setDoc(doc(db, "users", user.uid), userProfile);
-          
-          router.push("/");
-        } catch (createError: any) {
-          toast({
-            variant: "destructive",
-            title: "Error de registro",
-            description: createError.message,
-          });
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error de inicio de sesión",
-          description: "Credenciales incorrectas. Por favor, intente de nuevo.",
-        });
-      }
+      toast({
+        variant: "destructive",
+        title: "Error de inicio de sesión",
+        description: error.message || "No fue posible iniciar sesión.",
+      });
     } finally {
       setLoading(false);
     }

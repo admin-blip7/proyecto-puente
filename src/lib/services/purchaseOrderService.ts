@@ -1,196 +1,281 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  getDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  serverTimestamp,
-  Timestamp 
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderHistoryEntry } from "@/types";
+"use server";
+
+import { v4 as uuidv4 } from "uuid";
+import { PurchaseOrder, PurchaseOrderHistoryEntry } from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("purchaseOrderService");
 
-// Crear nueva orden de compra
-export async function addPurchaseOrder(orderData: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+const PURCHASE_ORDERS_TABLE = "purchase_orders";
+
+const mapHistoryEntry = (entry: any): PurchaseOrderHistoryEntry => ({
+  action: entry?.action ?? "",
+  status: entry?.status ?? "pending",
+  timestamp: toDate(entry?.timestamp),
+  user: entry?.user ?? "",
+  notes: entry?.notes ?? undefined,
+});
+
+const mapPurchaseOrder = (row: any): PurchaseOrder => ({
+  id: row?.firestore_id ?? row?.id ?? "",
+  orderNumber: row?.orderNumber ?? "",
+  supplier: row?.supplier ?? "",
+  totalAmount: Number(row?.totalAmount ?? 0),
+  status: row?.status ?? "pending",
+  items: Array.isArray(row?.items) ? row.items : [],
+  shippingInfo: row?.shippingInfo ?? undefined,
+  notes: row?.notes ?? undefined,
+  createdAt: toDate(row?.createdAt),
+  updatedAt: toDate(row?.updatedAt),
+  history: Array.isArray(row?.history) ? row.history.map(mapHistoryEntry) : [],
+});
+
+const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+
+const fetchOrderRow = async (id: string) => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(PURCHASE_ORDERS_TABLE)
+    .select("*")
+    .or(orIdFilter(id))
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? null;
+};
+
+export async function addPurchaseOrder(
+  orderData: Omit<PurchaseOrder, "id" | "createdAt" | "updatedAt">
+): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, "purchase_orders"), {
-      ...orderData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    log.info("Starting addPurchaseOrder", { 
+      orderNumber: orderData.orderNumber,
+      supplier: orderData.supplier,
+      status: orderData.status,
+      totalAmount: orderData.totalAmount,
+      itemsCount: orderData.items?.length || 0
     });
-    return docRef.id;
+
+    const supabase = getSupabaseServerClient();
+    const firestoreId = uuidv4();
+    const timestamp = nowIso();
+
+    const payload = {
+      firestore_id: firestoreId,
+      orderNumber: orderData.orderNumber,
+      supplier: orderData.supplier,
+      totalAmount: orderData.totalAmount,
+      status: orderData.status,
+      items: orderData.items ?? [],
+      shippingInfo: orderData.shippingInfo ?? null,
+      notes: orderData.notes ?? null,
+      history: orderData.history ?? [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    log.info("Inserting purchase order with payload", { 
+      firestoreId,
+      payloadKeys: Object.keys(payload),
+      payloadTypes: Object.entries(payload).reduce((acc, [key, value]) => {
+        acc[key] = typeof value;
+        return acc;
+      }, {} as Record<string, string>)
+    });
+
+    const { data, error } = await supabase.from(PURCHASE_ORDERS_TABLE).insert(payload).select();
+    
+    if (error) {
+      log.error("Supabase insert error", { 
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+
+    log.info("Purchase order inserted successfully", { firestoreId, data: data?.[0] });
+    return firestoreId;
   } catch (error) {
-    log.error("Error adding purchase order:", error);
+    log.error("Error adding purchase order", error);
     throw error;
   }
 }
 
-// Obtener orden de compra por ID
 export async function getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
   try {
-    const docRef = doc(db, "purchase_orders", id);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as PurchaseOrder;
-    }
-    return null;
+    const row = await fetchOrderRow(id);
+    return row ? mapPurchaseOrder(row) : null;
   } catch (error) {
-    log.error("Error getting purchase order:", error);
+    log.error("Error getting purchase order", error);
     throw error;
   }
 }
 
-// Obtener todas las órdenes de compra
 export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
   try {
-    const q = query(collection(db, "purchase_orders"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as PurchaseOrder;
-    });
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(PURCHASE_ORDERS_TABLE)
+      .select("*")
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapPurchaseOrder);
   } catch (error) {
-    log.error("Error getting purchase orders:", error);
+    log.error("Error getting purchase orders", error);
     throw error;
   }
 }
 
-// Obtener órdenes de compra por proveedor
 export async function getPurchaseOrdersBySupplier(supplierName: string): Promise<PurchaseOrder[]> {
   try {
-    const q = query(
-      collection(db, "purchase_orders"),
-      where("supplier", "==", supplierName),
-      orderBy("createdAt", "desc")
-    );
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as PurchaseOrder;
-    });
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(PURCHASE_ORDERS_TABLE)
+      .select("*")
+      .eq("supplier", supplierName)
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapPurchaseOrder);
   } catch (error) {
-    log.error("Error getting purchase orders by supplier:", error);
+    log.error("Error getting purchase orders by supplier", error);
     throw error;
   }
 }
 
-// Actualizar orden de compra
-export async function updatePurchaseOrder(id: string, updates: Partial<PurchaseOrder>): Promise<void> {
-  try {
-    const docRef = doc(db, "purchase_orders", id);
-    await updateDoc(docRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    log.error("Error updating purchase order:", error);
-    throw error;
-  }
-}
-
-// Actualizar estado de orden de compra
-export async function updatePurchaseOrderStatus(
-  id: string, 
-  status: PurchaseOrder['status'], 
-  notes?: string,
-  user: string = 'Usuario Actual'
+export async function updatePurchaseOrder(
+  id: string,
+  updates: Partial<PurchaseOrder>
 ): Promise<void> {
   try {
-    const docRef = doc(db, "purchase_orders", id);
-    const docSnap = await getDoc(docRef);
-    
-    if (!docSnap.exists()) {
+    const supabase = getSupabaseServerClient();
+    const sanitizedUpdates: Record<string, any> = {};
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value instanceof Date) {
+        sanitizedUpdates[key] = value.toISOString();
+      } else {
+        sanitizedUpdates[key] = value;
+      }
+    });
+    sanitizedUpdates.updatedAt = nowIso();
+
+    const { error } = await supabase
+      .from(PURCHASE_ORDERS_TABLE)
+      .update(sanitizedUpdates)
+      .or(orIdFilter(id));
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    log.error("Error updating purchase order", error);
+    throw error;
+  }
+}
+
+export async function updatePurchaseOrderStatus(
+  id: string,
+  status: PurchaseOrder["status"],
+  notes?: string,
+  user: string = "Usuario Actual"
+): Promise<void> {
+  try {
+    const row = await fetchOrderRow(id);
+    if (!row) {
       throw new Error("Purchase order not found");
     }
-    
-    const currentData = docSnap.data() as PurchaseOrder;
-    const newHistoryEntry: PurchaseOrderHistoryEntry = {
+
+    const history: any[] = Array.isArray(row.history) ? row.history : [];
+    const newHistoryEntry = {
       action: `Estado cambiado a ${status}`,
       status,
-      timestamp: new Date(),
+      timestamp: nowIso(),
       user,
-      notes
+      notes: notes ?? null,
     };
-    
-    await updateDoc(docRef, {
-      status,
-      history: [...(currentData.history || []), newHistoryEntry],
-      updatedAt: serverTimestamp(),
-    });
+
+    const { error } = await getSupabaseServerClient()
+      .from(PURCHASE_ORDERS_TABLE)
+      .update({
+        status,
+        history: [...history, newHistoryEntry],
+        updatedAt: nowIso(),
+      })
+      .or(orIdFilter(id));
+
+    if (error) {
+      throw error;
+    }
   } catch (error) {
-    log.error("Error updating purchase order status:", error);
+    log.error("Error updating purchase order status", error);
     throw error;
   }
 }
 
-// Agregar entrada al historial
 export async function addPurchaseOrderHistoryEntry(
-  id: string, 
-  entry: Omit<PurchaseOrderHistoryEntry, 'timestamp'>
+  id: string,
+  entry: Omit<PurchaseOrderHistoryEntry, "timestamp">
 ): Promise<void> {
   try {
-    const docRef = doc(db, "purchase_orders", id);
-    const docSnap = await getDoc(docRef);
-    
-    if (!docSnap.exists()) {
+    const row = await fetchOrderRow(id);
+    if (!row) {
       throw new Error("Purchase order not found");
     }
-    
-    const currentData = docSnap.data() as PurchaseOrder;
-    const newHistoryEntry: PurchaseOrderHistoryEntry = {
+
+    const history: any[] = Array.isArray(row.history) ? row.history : [];
+    const newHistoryEntry = {
       ...entry,
-      timestamp: new Date()
+      timestamp: nowIso(),
     };
-    
-    await updateDoc(docRef, {
-      history: [...(currentData.history || []), newHistoryEntry],
-      updatedAt: serverTimestamp(),
-    });
+
+    const { error } = await getSupabaseServerClient()
+      .from(PURCHASE_ORDERS_TABLE)
+      .update({
+        history: [...history, newHistoryEntry],
+        updatedAt: nowIso(),
+      })
+      .or(orIdFilter(id));
+
+    if (error) {
+      throw error;
+    }
   } catch (error) {
-    log.error("Error adding purchase order history entry:", error);
+    log.error("Error adding purchase order history entry", error);
     throw error;
   }
 }
 
-// Eliminar orden de compra
 export async function deletePurchaseOrder(id: string): Promise<void> {
   try {
-    const docRef = doc(db, "purchase_orders", id);
-    await deleteDoc(docRef);
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from(PURCHASE_ORDERS_TABLE)
+      .delete()
+      .or(orIdFilter(id));
+
+    if (error) {
+      throw error;
+    }
   } catch (error) {
-    log.error("Error deleting purchase order:", error);
+    log.error("Error deleting purchase order", error);
     throw error;
   }
 }
 
-// Obtener estadísticas de órdenes de compra por proveedor
 export async function getPurchaseOrderStatsBySupplier(supplierName: string): Promise<{
   totalOrders: number;
   totalAmount: number;
@@ -200,45 +285,41 @@ export async function getPurchaseOrderStatsBySupplier(supplierName: string): Pro
 }> {
   try {
     const orders = await getPurchaseOrdersBySupplier(supplierName);
-    
-    const stats = {
+    return {
       totalOrders: orders.length,
       totalAmount: orders.reduce((sum, order) => sum + order.totalAmount, 0),
-      pendingOrders: orders.filter(order => order.status === 'pending').length,
-      receivedOrders: orders.filter(order => order.status === 'received').length,
-      cancelledOrders: orders.filter(order => order.status === 'cancelled').length,
+      pendingOrders: orders.filter((order) => order.status === "pending").length,
+      receivedOrders: orders.filter((order) => order.status === "received").length,
+      cancelledOrders: orders.filter((order) => order.status === "cancelled").length,
     };
-    
-    return stats;
   } catch (error) {
-    log.error("Error getting purchase order stats:", error);
+    log.error("Error getting purchase order stats", error);
     throw error;
   }
 }
 
-// Buscar órdenes de compra por número de orden
 export async function searchPurchaseOrdersByNumber(orderNumber: string): Promise<PurchaseOrder[]> {
   try {
-    const q = query(
-      collection(db, "purchase_orders"),
-      where("orderNumber", ">=", orderNumber),
-      where("orderNumber", "<=", orderNumber + '\uf8ff'),
-      orderBy("orderNumber"),
-      limit(10)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as PurchaseOrder;
-    });
+    const supabase = getSupabaseServerClient();
+    const normalizedNumber = orderNumber?.trim();
+    if (!normalizedNumber) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from(PURCHASE_ORDERS_TABLE)
+      .select("*")
+      .ilike("orderNumber", `${normalizedNumber}%`)
+      .order("orderNumber", { ascending: true })
+      .limit(10);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapPurchaseOrder);
   } catch (error) {
-    log.error("Error searching purchase orders:", error);
+    log.error("Error searching purchase orders", error);
     throw error;
   }
 }

@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, where, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -95,32 +93,38 @@ export default function PurchaseOrdersClient() {
   const [receiveNotes, setReceiveNotes] = useState('');
   const [sortOption, setSortOption] = useState<string>('none');
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'purchase_orders'),
-      orderBy('createdAt', 'desc')
-    );
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/purchase-orders");
+      if (!response.ok) {
+        throw new Error("Error al cargar órdenes");
+      }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const data = await response.json();
+      const ordersData = (data.orders ?? []).map((order: any) => ({
+        ...order,
+        createdAt: order.createdAt ?? order.created_at,
+        updatedAt: order.updatedAt ?? order.updated_at,
+        id: order.id ?? order.firestore_id,
       })) as PurchaseOrder[];
-      
+
       setOrders(ordersData);
-      setLoading(false);
-    }, (error) => {
+    } catch (error) {
       log.error('Error loading purchase orders:', error);
-      setLoading(false);
       toast({
         title: "Error",
         description: "No se pudieron cargar las órdenes de compra",
         variant: "destructive",
       });
-    });
-
-    return () => unsubscribe();
+    } finally {
+      setLoading(false);
+    }
   }, [toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   useEffect(() => {
     let filtered = orders;
@@ -162,96 +166,24 @@ export default function PurchaseOrdersClient() {
     setFilteredOrders(filtered);
   }, [orders, searchTerm, statusFilter, sortOption]);
 
-  const updateInventoryFromOrder = useCallback(async (order: PurchaseOrder) => {
-    try {
-      for (const item of order.items) {
-        // Validar que el producto tenga nombre antes de consultar/actualizar inventario
-        if (!item.productName || typeof item.productName !== 'string') {
-          log.warn('Elemento de orden sin nombre de producto. Se omite actualización de inventario.', { item });
-          continue;
-        }
-
-        // Buscar el producto en el inventario
-        const inventoryQuery = query(
-          collection(db, 'inventory'),
-          where('name', '==', item.productName)
-        );
-        
-        const inventorySnapshot = await getDocs(inventoryQuery);
-        const addQty = (item.quantity ?? item.qty ?? 0) as number;
-        const unitCost = (item.finalCost ?? item.unitCost ?? item.cost ?? item.unitPrice ?? 0) as number;
-        const unitPrice = (item.salePrice ?? item.price ?? 0) as number;
-        
-        if (!inventorySnapshot.empty) {
-          // Actualizar stock existente
-          const inventoryDoc = inventorySnapshot.docs[0];
-          const currentStock = inventoryDoc.data().stock || 0;
-          
-          await updateDoc(inventoryDoc.ref, {
-            stock: (currentStock || 0) + addQty,
-            lastUpdated: serverTimestamp()
-          });
-        } else {
-          // Crear nuevo producto en inventario
-          await addDoc(collection(db, 'inventory'), {
-            name: item.productName,
-            sku: item.sku || `AUTO-${Date.now()}`,
-            stock: addQty,
-            price: unitPrice,
-            cost: unitCost,
-            category: 'Compras',
-            createdAt: serverTimestamp(),
-            lastUpdated: serverTimestamp()
-          });
-        }
-      }
-
-      toast({
-        title: "Inventario actualizado",
-        description: "Los productos han sido agregados al inventario",
-      });
-
-    } catch (error) {
-      log.error('Error updating inventory:', error);
-      toast({
-        title: "Advertencia",
-        description: "La orden fue recibida pero hubo un error actualizando el inventario",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
-
   const updateOrderStatus = useCallback(async (orderId: string, newStatus: PurchaseOrder['status'], notes?: string) => {
     try {
-      const orderRef = doc(db, 'purchase_orders', orderId);
-      const updateData: any = {
-        status: newStatus,
-        updatedAt: serverTimestamp()
-      };
+      const response = await fetch('/api/purchase-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'updateStatus',
+          orderId,
+          newStatus,
+          notes: notes ?? null,
+          userId: 'Usuario Actual',
+        }),
+      });
 
-      if (newStatus === 'received') {
-        updateData.actualDelivery = serverTimestamp();
-      }
-
-      await updateDoc(orderRef, updateData);
-
-      // Agregar entrada al historial
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        const baseHistoryEntry = {
-          action: `Estado cambiado a ${statusConfig[newStatus].label}`,
-          status: newStatus,
-          timestamp: new Date(), // Usar Date() en lugar de serverTimestamp() dentro de arrays
-          user: 'Usuario Actual', // Aquí deberías usar el usuario actual
-        } as const;
-
-        const historyEntry = notes && notes.trim()
-          ? { ...baseHistoryEntry, notes: notes.trim() }
-          : baseHistoryEntry;
-
-        await updateDoc(orderRef, {
-          history: [...(order.history || []), historyEntry]
-        });
+      if (!response.ok) {
+        throw new Error('No se pudo actualizar el estado');
       }
 
       toast({
@@ -259,11 +191,7 @@ export default function PurchaseOrdersClient() {
         description: `La orden ha sido marcada como ${statusConfig[newStatus].label.toLowerCase()}`,
       });
 
-      // Si se marca como recibida, actualizar inventario
-      if (newStatus === 'received' && order) {
-        await updateInventoryFromOrder(order);
-      }
-
+      await fetchOrders();
     } catch (error) {
       log.error('Error updating order status:', error);
       toast({
@@ -272,7 +200,7 @@ export default function PurchaseOrdersClient() {
         variant: "destructive",
       });
     }
-  }, [orders, toast, updateInventoryFromOrder]);
+  }, [fetchOrders, toast]);
 
 
   const handleReceiveOrder = async () => {
@@ -301,8 +229,16 @@ export default function PurchaseOrdersClient() {
     const ok = typeof window !== 'undefined' ? window.confirm(`¿Eliminar la orden ${order.orderNumber}? Esta acción no se puede deshacer.`) : true;
     if (!ok) return;
     try {
-      await deleteDoc(doc(db, 'purchase_orders', order.id));
+      const response = await fetch(`/api/purchase-orders?orderId=${order.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Error eliminando la orden');
+      }
+
       toast({ title: 'Orden eliminada', description: `La orden ${order.orderNumber} fue eliminada.` });
+      await fetchOrders();
     } catch (error) {
       log.error('Error deleting order:', error);
       toast({ title: 'Error', description: 'No se pudo eliminar la orden', variant: 'destructive' });

@@ -26,14 +26,14 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
   const previewMetrics = useMemo(() => {
     const baseWidthPx = mmToPixels(settings.width);
     const baseHeightPx = mmToPixels(settings.height);
-    const maxWidthPx = 420;
-    const maxHeightPx = 240;
-    const scale = Math.min(1, maxWidthPx / baseWidthPx, maxHeightPx / baseHeightPx);
+    
+    // No scaling limits - show actual label dimensions
+    const scale = 1;
 
     return {
         baseWidthPx,
         baseHeightPx,
-        scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+        scale,
     };
   }, [settings.width, settings.height]);
 
@@ -60,6 +60,9 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
     fontSize: `${settings.fontSize}px`,
   };
 
+  // Calculate logo size based on label dimensions (approximately 15% of label height)
+  const logoSize = Math.max(12, Math.min(settings.height * 0.15, settings.width * 0.25));
+
   return (
     <div className="w-full flex justify-center">
         <div
@@ -80,7 +83,13 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
                 }}
             >
                 {settings.includeLogo && settings.logoUrl && (
-                    <Image src={settings.logoUrl} alt="logo" width={24} height={24} className="object-contain" />
+                    <Image 
+                        src={settings.logoUrl} 
+                        alt="logo" 
+                        width={Math.round(logoSize)} 
+                        height={Math.round(logoSize)} 
+                        className="object-contain" 
+                    />
                 )}
                 {settings.content.showStoreName && (
                     <p className="font-bold leading-tight text-center">{settings.storeName}</p>

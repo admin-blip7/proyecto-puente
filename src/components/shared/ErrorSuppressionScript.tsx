@@ -4,51 +4,59 @@ import { useEffect } from 'react';
 
 export default function ErrorSuppressionScript() {
   useEffect(() => {
-    const suppressEnabled = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_SUPPRESS_DEV_ERRORS === 'true';
-    if (suppressEnabled) {
+    // Only run in development
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       const originalError = console.error;
+      
       console.error = (...args: any[]) => {
-        const message = args.join(' ');
+        try {
+          // Convert arguments to string safely
+          const message = args.map(arg => {
+            if (typeof arg === 'string') return arg;
+            if (arg && typeof arg === 'object' && arg.message) return arg.message;
+            return String(arg || '');
+          }).join(' ');
 
-        // Do NOT suppress critical or permission errors
-        if (
-          message.toLowerCase().includes('permission') ||
-          message.includes('PERMISSION_DENIED') ||
-          message.toLowerCase().includes('unhandled')
-        ) {
-          return originalError.apply(console, args);
+          // Suppress specific development errors
+          const suppressPatterns = [
+            'ERR_ABORTED',
+            'net::ERR_',
+            'Failed to fetch',
+            'NetworkError',
+            'AbortError',
+            '@vite/client',
+            'vite',
+            'HMR'
+          ];
+
+          const shouldSuppress = suppressPatterns.some(pattern => message.includes(pattern));
+
+          // Don't suppress critical errors
+          const criticalPatterns = ['permission', 'PERMISSION_DENIED', 'unhandled'];
+          const isCritical = criticalPatterns.some(pattern => 
+            message.toLowerCase().includes(pattern)
+          );
+
+          if (shouldSuppress && !isCritical) {
+            console.debug('[suppressed-dev]', message);
+            return;
+          }
+
+          // Log other errors normally
+          originalError.apply(console, args);
+        } catch (e) {
+          // Fallback to original console.error if anything fails
+          originalError.apply(console, args);
         }
-
-        // Suppress ERR_ABORTED and similar transient network errors in dev only
-        if (
-          message.includes('ERR_ABORTED') ||
-          message.includes('net::ERR_') ||
-          message.includes('Failed to fetch') ||
-          message.includes('NetworkError') ||
-          message.includes('AbortError')
-        ) {
-          // Log at debug level to keep trace without noise
-          console.debug('[suppressed-dev]', message);
-          return;
-        }
-
-        // Suppress Vite client/HMR noise only in dev
-        if (
-          message.includes('@vite/client') ||
-          message.includes('vite') ||
-          message.includes('HMR')
-        ) {
-          console.debug('[suppressed-dev]', message);
-          return;
-        }
-
-        // Allow other errors to be logged
-        originalError.apply(console, args);
       };
 
-      // Cleanup function to restore original console.error
+      // Cleanup function
       return () => {
-        console.error = originalError;
+        try {
+          console.error = originalError;
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       };
     }
   }, []);

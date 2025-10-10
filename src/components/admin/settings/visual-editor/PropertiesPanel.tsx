@@ -7,8 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/lib/supabaseClient';
 import { nanoid } from 'nanoid';
 import { Loader2 } from 'lucide-react';
 
@@ -112,10 +111,26 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
       if (!file) return;
       try {
         setUploadingLogo(true);
+        if (!supabase) {
+          throw new Error('Supabase client no disponible');
+        }
+
         const extension = file.name.split('.').pop() || 'png';
-        const storageRef = ref(storage, `label-assets/${nanoid()}.${extension}`);
-        await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(storageRef);
+        const filePath = `${nanoid()}.${extension}`;
+        const arrayBuffer = await file.arrayBuffer();
+        const { error: uploadError } = await supabase.storage
+          .from('label-assets')
+          .upload(filePath, arrayBuffer, {
+            contentType: file.type || 'image/png',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data } = supabase.storage.from('label-assets').getPublicUrl(filePath);
+        const downloadUrl = data.publicUrl;
         if (!selectedElement) return;
         onUpdateElement(selectedElement.id, {
           imageUrl: downloadUrl,

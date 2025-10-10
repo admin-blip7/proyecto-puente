@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { RepairStatus, Warranty, CreditAccountStatus } from "@/types";
-import { formatMXNAmount, validateMXNAmount } from "@/lib/validation/currencyValidation";
+import { formatMXNAmount, validateMXNAmount, normalizeMXNAmount } from "@/lib/validation/currencyValidation";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("utils");
@@ -11,12 +11,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const formatCurrency = (value: number) => {
-  const validation = validateMXNAmount(value);
+  // Normalizar primero para manejar problemas de precisión de punto flotante
+  const normalizedValue = normalizeMXNAmount(value);
+  const validation = validateMXNAmount(normalizedValue);
   if (!validation.isValid) {
-    log.warn(`Intento de formatear monto inválido: ${value}. Error: ${validation.error}`);
+    log.warn(`Intento de formatear monto inválido: ${value} (normalizado: ${normalizedValue}). Error: ${validation.error}`);
     return "$0.00 MXN";
   }
-  return formatMXNAmount(value);
+  return formatMXNAmount(normalizedValue);
 };
 
 export const getWarrantyStatusVariant = (status: Warranty["status"]) => {

@@ -18,7 +18,9 @@ import PropertiesPanel from './PropertiesPanel';
 import { clamp, mmToPixels, roundTo } from './utils';
 import { normalizeVisualEditorData } from '@/lib/printing/visualLayoutTypes';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Trash2, RotateCcw } from 'lucide-react';
 
 interface VisualEditorProps {
   initialLayout?: VisualEditorData;
@@ -41,15 +43,23 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     elements: normalizedInitial.elements,
     selectedElementId: null,
   });
+  const [showGrid, setShowGrid] = useState(true);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [currentWidth, setCurrentWidth] = useState(widthMm);
+  const [currentHeight, setCurrentHeight] = useState(heightMm);
 
   const scale = useMemo(() => {
-    const widthPx = mmToPixels(Math.max(widthMm, MIN_DIMENSION_MM));
-    const heightPx = mmToPixels(Math.max(heightMm, MIN_DIMENSION_MM));
-    const maxWidthPx = 520;
-    const maxHeightPx = 360;
-    const computed = Math.min(1, maxWidthPx / widthPx, maxHeightPx / heightPx);
+    // No scaling limits - show actual label dimensions in visual editor
+    const widthPx = mmToPixels(Math.max(currentWidth, MIN_DIMENSION_MM));
+    const heightPx = mmToPixels(Math.max(currentHeight, MIN_DIMENSION_MM));
+    
+    // Only limit scaling for extremely large labels to prevent viewport overflow
+    const maxViewportWidth = 1200; // Much larger than before
+    const maxViewportHeight = 800; // Much larger than before
+    
+    const computed = Math.min(1, maxViewportWidth / widthPx, maxViewportHeight / heightPx);
     return Number.isFinite(computed) && computed > 0 ? computed : 1;
-  }, [widthMm, heightMm]);
+  }, [currentWidth, currentHeight]);
 
   const findPlaceholder = useCallback(
     (placeholderKey?: PlaceholderKey): PlaceholderDefinition | undefined =>
@@ -62,36 +72,36 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
       if (type === 'placeholder' && placeholder) {
         if (placeholder.kind === 'barcode') {
           return {
-            width: clamp(Math.min(widthMm * 0.8, widthMm - 4), MIN_DIMENSION_MM, widthMm),
-            height: clamp(Math.min(heightMm * 0.4, 18), MIN_DIMENSION_MM, heightMm),
+            width: clamp(Math.min(currentWidth * 0.8, currentWidth - 4), MIN_DIMENSION_MM, currentWidth),
+            height: clamp(Math.min(currentHeight * 0.4, 18), MIN_DIMENSION_MM, currentHeight),
             fontSize: 11,
           };
         }
         return {
-          width: clamp(Math.min(widthMm * 0.6, 38), MIN_DIMENSION_MM, widthMm),
-          height: clamp(8, MIN_DIMENSION_MM, heightMm),
+          width: clamp(Math.min(currentWidth * 0.6, 38), MIN_DIMENSION_MM, currentWidth),
+          height: clamp(8, MIN_DIMENSION_MM, currentHeight),
           fontSize: 11,
         };
       }
 
       switch (type) {
         case 'text':
-          return { width: clamp(35, MIN_DIMENSION_MM, widthMm), height: clamp(10, MIN_DIMENSION_MM, heightMm), fontSize: 12 };
+          return { width: clamp(35, MIN_DIMENSION_MM, currentWidth), height: clamp(10, MIN_DIMENSION_MM, currentHeight), fontSize: 12 };
         case 'image':
-          return { width: clamp(25, MIN_DIMENSION_MM, widthMm), height: clamp(20, MIN_DIMENSION_MM, heightMm), fontSize: 10 };
+          return { width: clamp(25, MIN_DIMENSION_MM, currentWidth), height: clamp(20, MIN_DIMENSION_MM, currentHeight), fontSize: 10 };
         case 'qrcode':
-          return { width: clamp(25, MIN_DIMENSION_MM, widthMm), height: clamp(25, MIN_DIMENSION_MM, heightMm), fontSize: 10 };
+          return { width: clamp(25, MIN_DIMENSION_MM, currentWidth), height: clamp(25, MIN_DIMENSION_MM, currentHeight), fontSize: 10 };
         case 'barcode':
           return {
-            width: clamp(Math.min(widthMm * 0.9, widthMm - 4), MIN_DIMENSION_MM, widthMm),
-            height: clamp(Math.min(heightMm * 0.35, 18), MIN_DIMENSION_MM, heightMm),
+            width: clamp(Math.min(currentWidth * 0.9, currentWidth - 4), MIN_DIMENSION_MM, currentWidth),
+            height: clamp(Math.min(currentHeight * 0.35, 18), MIN_DIMENSION_MM, currentHeight),
             fontSize: 10,
           };
         default:
-          return { width: clamp(30, MIN_DIMENSION_MM, widthMm), height: clamp(10, MIN_DIMENSION_MM, heightMm), fontSize: 11 };
+          return { width: clamp(30, MIN_DIMENSION_MM, currentWidth), height: clamp(10, MIN_DIMENSION_MM, currentHeight), fontSize: 11 };
       }
     },
-    [heightMm, widthMm]
+    [currentHeight, currentWidth]
   );
 
   const clampElementToCanvas = useCallback(
@@ -100,10 +110,10 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     const coercedType = element.type === 'placeholder' ? 'text' : element.type;
     const defaults = getDefaultConfig(element.type, placeholder);
 
-    const width = clamp(element.width ?? defaults.width, MIN_DIMENSION_MM, widthMm);
-    const height = clamp(element.height ?? defaults.height, MIN_DIMENSION_MM, heightMm);
-      const maxX = Math.max(0, widthMm - width);
-      const maxY = Math.max(0, heightMm - height);
+    const width = clamp(element.width ?? defaults.width, MIN_DIMENSION_MM, currentWidth);
+    const height = clamp(element.height ?? defaults.height, MIN_DIMENSION_MM, currentHeight);
+      const maxX = Math.max(0, currentWidth - width);
+      const maxY = Math.max(0, currentHeight - height);
       const x = roundTo(clamp(element.x ?? 0, 0, maxX), 2);
       const y = roundTo(clamp(element.y ?? 0, 0, maxY), 2);
 
@@ -118,7 +128,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         fontFamily: element.fontFamily ?? 'Inter',
       };
     },
-    [findPlaceholder, getDefaultConfig, heightMm, widthMm]
+    [findPlaceholder, getDefaultConfig, currentHeight, currentWidth]
   );
 
   useEffect(() => {
@@ -141,16 +151,56 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     });
   }, [editorState.elements, onLayoutChange]);
 
+  useEffect(() => {
+    setCurrentWidth(widthMm);
+    setCurrentHeight(heightMm);
+  }, [widthMm, heightMm]);
+
+  const handleFlipLabel = useCallback(() => {
+    setIsFlipped(!isFlipped);
+    const newWidth = currentHeight;
+    const newHeight = currentWidth;
+    
+    setCurrentWidth(newWidth);
+    setCurrentHeight(newHeight);
+    
+    // Adjust elements positions and dimensions
+    setEditorState(prev => ({
+      ...prev,
+      elements: prev.elements.map(element => {
+        // Swap width and height for the element
+        const newElementWidth = Math.min(element.height, newWidth);
+        const newElementHeight = Math.min(element.width, newHeight);
+        
+        // Calculate new position to keep element within bounds
+        const maxX = Math.max(0, newWidth - newElementWidth);
+        const maxY = Math.max(0, newHeight - newElementHeight);
+        const newX = Math.min(element.y, maxX);
+        const newY = Math.min(element.x, maxY);
+        
+        return {
+          ...element,
+          x: newX,
+          y: newY,
+          width: newElementWidth,
+          height: newElementHeight,
+        };
+      }),
+    }));
+  }, [isFlipped, currentWidth, currentHeight]);
+
   const handleCreateElement = useCallback(
     (item: DropPayload, position: { x: number; y: number }) => {
+      console.log('handleCreateElement called with:', { item, position });
+      
       const placeholder = findPlaceholder(item.placeholderKey);
       const elementType: VisualElement['type'] = item.type === 'placeholder' ? 'text' : (item.type as VisualElement['type']);
       const defaults = getDefaultConfig(elementType, placeholder);
 
       const width = defaults.width;
       const height = defaults.height;
-      const x = roundTo(clamp(position.x - width / 2, 0, Math.max(0, widthMm - width)), 2);
-      const y = roundTo(clamp(position.y - height / 2, 0, Math.max(0, heightMm - height)), 2);
+      const x = roundTo(clamp(position.x - width / 2, 0, Math.max(0, currentWidth - width)), 2);
+      const y = roundTo(clamp(position.y - height / 2, 0, Math.max(0, currentHeight - height)), 2);
 
       const newElement: VisualElement = clampElementToCanvas({
         id: nanoid(),
@@ -182,7 +232,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         selectedElementId: newElement.id,
       }));
     },
-    [clampElementToCanvas, findPlaceholder, getDefaultConfig, heightMm, widthMm]
+    [clampElementToCanvas, findPlaceholder, getDefaultConfig, currentHeight, currentWidth]
   );
 
   const moveElement = useCallback(
@@ -255,11 +305,28 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         </div>
 
         <div className="flex-1 relative p-4">
+          <div className="absolute top-2 right-2 z-10 bg-background border rounded-md p-2 space-y-2">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="show-grid" className="text-sm">Cuadrícula</Label>
+              <Switch id="show-grid" checked={showGrid} onCheckedChange={setShowGrid} />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFlipLabel}
+              className="w-full justify-start"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Voltear Etiqueta
+            </Button>
+          </div>
           <Canvas
             elements={editorState.elements}
-            labelWidthMm={widthMm}
-            labelHeightMm={heightMm}
+            labelWidthMm={currentWidth}
+            labelHeightMm={currentHeight}
             scale={scale}
+            showGrid={showGrid}
+            isFlipped={isFlipped}
             onCreateElement={handleCreateElement}
             moveElement={moveElement}
             onSelectElement={handleSelectElement}

@@ -1,72 +1,136 @@
-import { db } from "@/lib/firebase";
-import { Consignor } from "@/types";
-import { collection, getDocs, doc, DocumentData, QueryDocumentSnapshot, serverTimestamp, Transaction, updateDoc, increment, addDoc, deleteDoc } from "firebase/firestore";
-import { getLogger } from "@/lib/logger";
-const log = getLogger("consignorService");
- const CONSIGNORS_COLLECTION = "consignors";
+"use server";
 
-const consignorFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): Consignor => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        name: data.name,
-        contactInfo: data.contactInfo,
-        balanceDue: data.balanceDue,
-    };
-}
+import { v4 as uuidv4 } from "uuid";
+import { Consignor } from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { getLogger } from "@/lib/logger";
+
+const log = getLogger("consignorService");
+
+const CONSIGNORS_TABLE = "consignors";
+
+const mapConsignor = (row: any): Consignor => ({
+  id: row?.firestore_id ?? row?.id ?? "",
+  name: row?.name ?? "",
+  contactInfo: row?.contactInfo ?? "",
+  balanceDue: Number(row?.balanceDue ?? 0),
+});
+
+const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
 
 export const getConsignors = async (): Promise<Consignor[]> => {
-    try {
-        const querySnapshot = await getDocs(collection(db, CONSIGNORS_COLLECTION));
-        const consignors = querySnapshot.docs.map(consignorFromDoc);
-        return consignors.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-        log.error("Error fetching consignors:", error);
-        return [];
-    }
-}
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .select("*")
+      .order("name", { ascending: true });
 
-export const addConsignor = async (data: Omit<Consignor, 'id' | 'balanceDue'>): Promise<Consignor> => {
-    try {
-        const docRef = await addDoc(collection(db, CONSIGNORS_COLLECTION), {
-            ...data,
-            balanceDue: 0
-        });
-        return {
-            id: docRef.id,
-            ...data,
-            balanceDue: 0
-        };
-    } catch (error) {
-        log.error("Error adding consignor:", error);
-        throw new Error("Failed to add consignor.");
+    if (error) {
+      throw error;
     }
+
+    return (data ?? []).map(mapConsignor);
+  } catch (error) {
+    log.error("Error fetching consignors", error);
+    return [];
+  }
 };
 
-export const updateConsignorInfo = async (consignorId: string, data: Partial<Omit<Consignor, 'id' | 'balanceDue'>>): Promise<void> => {
-    try {
-        const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
-        await updateDoc(consignorRef, data);
-    } catch (error) {
-        log.error("Error updating consignor:", error);
-        throw new Error("Failed to update consignor.");
+export const addConsignor = async (
+  data: Omit<Consignor, "id" | "balanceDue">
+): Promise<Consignor> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const firestoreId = uuidv4();
+    const payload = {
+      firestore_id: firestoreId,
+      name: data.name,
+      contactInfo: data.contactInfo,
+      balanceDue: 0,
+    };
+
+    const { data: inserted, error } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (error || !inserted) {
+      throw error ?? new Error("Failed to add consignor");
     }
-}
+
+    return mapConsignor(inserted);
+  } catch (error) {
+    log.error("Error adding consignor", error);
+    throw new Error("Failed to add consignor.");
+  }
+};
+
+export const updateConsignorInfo = async (
+  consignorId: string,
+  data: Partial<Omit<Consignor, "id" | "balanceDue">>
+): Promise<void> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .update(data)
+      .or(orIdFilter(consignorId));
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    log.error("Error updating consignor", error);
+    throw new Error("Failed to update consignor.");
+  }
+};
 
 export const deleteConsignor = async (consignorId: string): Promise<void> => {
-    try {
-        const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
-        await deleteDoc(consignorRef);
-    } catch (error) {
-        log.error("Error deleting consignor:", error);
-        throw new Error("Failed to delete consignor.");
+  try {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .delete()
+      .or(orIdFilter(consignorId));
+
+    if (error) {
+      throw error;
     }
-}
+  } catch (error) {
+    log.error("Error deleting consignor", error);
+    throw new Error("Failed to delete consignor.");
+  }
+};
 
+export const updateConsignorBalance = async (
+  consignorId: string,
+  amountToAdd: number
+): Promise<void> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .select("firestore_id,balanceDue")
+      .or(orIdFilter(consignorId))
+      .maybeSingle();
 
-export const updateConsignorBalance = async (transaction: Transaction, consignorId: string, amountToAdd: number) => {
-    const consignorRef = doc(db, CONSIGNORS_COLLECTION, consignorId);
-    // This function must be called within a transaction to ensure atomicity.
-    // It will increment the balanceDue by the specified amount.
-    transaction.update(consignorRef, { balanceDue: increment(amountToAdd) });
-}
+    if (error || !data) {
+      throw error ?? new Error("Consignor not found");
+    }
+
+    const newBalance = Number(data.balanceDue ?? 0) + amountToAdd;
+    const { error: updateError } = await supabase
+      .from(CONSIGNORS_TABLE)
+      .update({ balanceDue: newBalance })
+      .eq("firestore_id", data.firestore_id ?? consignorId);
+
+    if (updateError) {
+      throw updateError;
+    }
+  } catch (error) {
+    log.error("Error updating consignor balance", error);
+    throw error;
+  }
+};

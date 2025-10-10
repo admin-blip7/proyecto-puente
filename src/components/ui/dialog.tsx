@@ -44,6 +44,8 @@ const DialogContent = React.forwardRef<
       // Desactivar el bloqueo automático de scroll de Radix
       onOpenAutoFocus={(e) => e.preventDefault()}
       onPointerDownOutside={(e) => e.preventDefault()}
+      // Proporcionar aria-describedby por defecto para evitar warnings de accesibilidad
+      aria-describedby={props['aria-describedby'] || undefined}
       className={cn(
         // Posicionamiento y tamaño responsivo
         "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",

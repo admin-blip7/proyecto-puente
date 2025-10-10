@@ -1,160 +1,232 @@
-import { db } from "@/lib/firebase";
-import { RepairOrder, RepairPart, Product } from "@/types";
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, DocumentData, QueryDocumentSnapshot, runTransaction, writeBatch, increment } from "firebase/firestore";
+"use server";
+
+import { v4 as uuidv4 } from "uuid";
+import { RepairOrder, Product } from "@/types";
+import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+
 const log = getLogger("repairService");
 
-const REPAIRS_COLLECTION = "repair_orders";
-const PRODUCTS_COLLECTION = "products";
-const INVENTORY_LOGS_COLLECTION = "inventory_logs";
+const REPAIRS_TABLE = "repair_orders";
+const PRODUCTS_TABLE = "products";
+const INVENTORY_LOGS_TABLE = "inventory_logs";
 
-const repairOrderFromDoc = (doc: QueryDocumentSnapshot<DocumentData>): RepairOrder => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        orderId: data.orderId,
-        status: data.status,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        deviceBrand: data.deviceBrand,
-        deviceModel: data.deviceModel,
-        deviceSerialIMEI: data.deviceSerialIMEI,
-        reportedIssue: data.reportedIssue,
-        technicianNotes: data.technicianNotes,
-        partsUsed: data.partsUsed || [],
-        laborCost: data.laborCost || 0,
-        totalCost: data.totalCost || 0,
-        totalPrice: data.totalPrice || 0,
-        profit: data.profit || 0,
-        createdAt: data.createdAt.toDate(),
-        completedAt: data.completedAt ? data.completedAt.toDate() : undefined,
-    };
-}
+const mapRepairOrder = (row: any): RepairOrder => ({
+  id: row?.firestore_id ?? row?.id ?? "",
+  orderId: row?.orderId ?? "",
+  status: row?.status ?? "Recibido",
+  customerName: row?.customerName ?? "",
+  customerPhone: row?.customerPhone ?? "",
+  deviceBrand: row?.deviceBrand ?? "",
+  deviceModel: row?.deviceModel ?? "",
+  deviceSerialIMEI: row?.deviceSerialIMEI ?? "",
+  reportedIssue: row?.reportedIssue ?? "",
+  technicianNotes: row?.technicianNotes ?? undefined,
+  partsUsed: Array.isArray(row?.partsUsed) ? row.partsUsed : [],
+  laborCost: Number(row?.laborCost ?? 0),
+  totalCost: Number(row?.totalCost ?? 0),
+  totalPrice: Number(row?.totalPrice ?? 0),
+  profit: Number(row?.profit ?? 0),
+  createdAt: toDate(row?.createdAt),
+  completedAt: row?.completedAt ? toDate(row.completedAt) : undefined,
+});
+
+const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
 
 export const getRepairOrders = async (): Promise<RepairOrder[]> => {
-    try {
-        const querySnapshot = await getDocs(collection(db, REPAIRS_COLLECTION));
-        const orders = querySnapshot.docs.map(repairOrderFromDoc);
-        return orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    } catch (error) {
-        log.error("Error fetching repair orders:", error);
-        return [];
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(REPAIRS_TABLE)
+      .select("*")
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      throw error;
     }
+
+    return (data ?? []).map(mapRepairOrder);
+  } catch (error) {
+    log.error("Error fetching repair orders", error);
+    return [];
+  }
 };
 
 const getNextOrderId = async (): Promise<string> => {
-    const querySnapshot = await getDocs(collection(db, REPAIRS_COLLECTION));
-    const count = querySnapshot.size;
-    return `REP-${(count + 1).toString().padStart(4, '0')}`;
-}
+  const supabase = getSupabaseServerClient();
+  const { count, error } = await supabase
+    .from(REPAIRS_TABLE)
+    .select("id", { count: "exact", head: true });
 
-export const addRepairOrder = async (orderData: Omit<RepairOrder, 'id' | 'orderId' | 'createdAt' | 'status' | 'partsUsed' | 'laborCost' | 'totalCost' | 'totalPrice' | 'profit'>): Promise<RepairOrder> => {
-    try {
-        const orderId = await getNextOrderId();
-        const docRef = await addDoc(collection(db, REPAIRS_COLLECTION), {
-            ...orderData,
-            orderId: orderId,
-            status: 'Recibido',
-            partsUsed: [],
-            laborCost: 0,
-            totalCost: 0,
-            totalPrice: 0,
-            profit: 0,
-            createdAt: serverTimestamp(),
-        });
+  if (error) {
+    throw error;
+  }
 
-        const newOrder: RepairOrder = {
-            id: docRef.id,
-            orderId: orderId,
-            status: 'Recibido',
-            partsUsed: [],
-            laborCost: 0,
-            totalCost: 0,
-            totalPrice: 0,
-            profit: 0,
-            createdAt: new Date(),
-            ...orderData,
-        };
-        
-        return newOrder;
-
-    } catch (error) {
-        log.error("Error adding repair order: ", error);
-        throw new Error("Failed to add repair order.");
-    }
+  const next = (Number(count ?? 0) + 1).toString().padStart(4, "0");
+  return `REP-${next}`;
 };
 
-export const updateRepairOrder = async (orderId: string, dataToUpdate: Partial<RepairOrder>): Promise<void> => {
-    try {
-        const orderRef = doc(db, REPAIRS_COLLECTION, orderId);
-        await updateDoc(orderRef, dataToUpdate);
-    } catch (error) {
-        log.error("Error updating repair order:", error);
-        throw new Error("Failed to update repair order.");
+export const addRepairOrder = async (
+  orderData: Omit<RepairOrder, "id" | "orderId" | "createdAt" | "status" | "partsUsed" | "laborCost" | "totalCost" | "totalPrice" | "profit">
+): Promise<RepairOrder> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const orderId = await getNextOrderId();
+    const firestoreId = uuidv4();
+    const createdAt = nowIso();
+
+    const payload = {
+      firestore_id: firestoreId,
+      orderId,
+      status: "Recibido" as const,
+      customerName: orderData.customerName,
+      customerPhone: orderData.customerPhone,
+      deviceBrand: orderData.deviceBrand,
+      deviceModel: orderData.deviceModel,
+      deviceSerialIMEI: orderData.deviceSerialIMEI,
+      reportedIssue: orderData.reportedIssue,
+      technicianNotes: orderData.technicianNotes ?? null,
+      partsUsed: [],
+      laborCost: 0,
+      totalCost: 0,
+      totalPrice: 0,
+      profit: 0,
+      createdAt,
+      completedAt: null,
+    };
+
+    const { data, error } = await supabase
+      .from(REPAIRS_TABLE)
+      .insert(payload)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw error ?? new Error("Failed to add repair order");
     }
-}
+
+    return mapRepairOrder(data);
+  } catch (error) {
+    log.error("Error adding repair order", error);
+    throw new Error("Failed to add repair order.");
+  }
+};
+
+export const updateRepairOrder = async (
+  orderId: string,
+  dataToUpdate: Partial<RepairOrder>
+): Promise<void> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const updates: Record<string, any> = { ...dataToUpdate };
+    if (dataToUpdate.createdAt instanceof Date) {
+      updates.createdAt = dataToUpdate.createdAt.toISOString();
+    }
+    if (dataToUpdate.completedAt instanceof Date) {
+      updates.completedAt = dataToUpdate.completedAt.toISOString();
+    }
+
+    const { error } = await supabase
+      .from(REPAIRS_TABLE)
+      .update(updates)
+      .or(orIdFilter(orderId));
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    log.error("Error updating repair order", error);
+    throw new Error("Failed to update repair order.");
+  }
+};
 
 export const addPartToRepairOrder = async (
-    order: RepairOrder,
-    part: Product,
-    quantity: number,
-    userId: string
-  ): Promise<RepairOrder> => {
-    const productRef = doc(db, PRODUCTS_COLLECTION, part.id);
-    const orderRef = doc(db, REPAIRS_COLLECTION, order.id);
-  
-    return runTransaction(db, async (transaction) => {
-      // --- READ PHASE ---
-      const productDoc = await transaction.get(productRef);
-      
-      if (!productDoc.exists() || productDoc.data().stock < quantity) {
-        throw new Error("Stock insuficiente o producto no encontrado.");
-      }
-      
-      // --- WRITE PHASE ---
-      const newStock = productDoc.data().stock - quantity;
-      transaction.update(productRef, { stock: newStock });
-  
-      const logRef = doc(collection(db, INVENTORY_LOGS_COLLECTION));
-      transaction.set(logRef, {
-        productId: part.id,
-        productName: part.name,
-        change: -quantity,
-        reason: "Uso en Reparación",
-        updatedBy: userId,
-        createdAt: serverTimestamp(),
-        metadata: { repairOrderId: order.orderId, cost: part.cost }
-      });
-  
-      const existingPartIndex = order.partsUsed.findIndex(p => p.productId === part.id);
-      let newPartsUsed = [...order.partsUsed];
-  
-      if (existingPartIndex > -1) {
-        newPartsUsed[existingPartIndex].quantity += quantity;
-      } else {
-        newPartsUsed.push({
-          productId: part.id,
-          name: part.name,
-          quantity: quantity,
-          cost: part.cost,
-          price: part.price,
-        });
-      }
-      
-      const newTotalCost = newPartsUsed.reduce((sum, p) => sum + (p.cost * p.quantity), 0);
-      const newTotalPrice = newPartsUsed.reduce((sum, p) => sum + (p.price * p.quantity), 0) + order.laborCost;
-      const newProfit = newTotalPrice - newTotalCost;
-  
-      const updatedOrderData: Partial<RepairOrder> = {
-        partsUsed: newPartsUsed,
-        totalCost: newTotalCost,
-        totalPrice: newTotalPrice,
-        profit: newProfit
-      };
-      
-      transaction.update(orderRef, updatedOrderData);
-  
-      return { ...order, ...updatedOrderData };
+  order: RepairOrder,
+  part: Product,
+  quantity: number,
+  userId: string
+): Promise<RepairOrder> => {
+  const supabase = getSupabaseServerClient();
+
+  const { data: productRow, error: productError } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select("firestore_id,stock,cost,price,name")
+    .or(orIdFilter(part.id))
+    .maybeSingle();
+
+  if (productError || !productRow) {
+    throw new Error("Producto no encontrado.");
+  }
+
+  const currentStock = Number(productRow.stock ?? 0);
+  if (currentStock < quantity) {
+    throw new Error("Stock insuficiente o producto no encontrado.");
+  }
+
+  const newStock = currentStock - quantity;
+  const { error: stockError } = await supabase
+    .from(PRODUCTS_TABLE)
+    .update({ stock: newStock })
+    .eq("firestore_id", productRow.firestore_id ?? part.id);
+
+  if (stockError) {
+    throw new Error("No se pudo actualizar el stock del producto.");
+  }
+
+  const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
+    firestore_id: uuidv4(),
+    productId: productRow.firestore_id ?? part.id,
+    productName: productRow.name ?? part.name,
+    change: -quantity,
+    reason: "Uso en Reparación",
+    updatedBy: userId,
+    createdAt: nowIso(),
+    metadata: { repairOrderId: order.orderId, cost: part.cost },
+  });
+
+  if (logError) {
+    throw new Error("No se pudo registrar el movimiento de inventario.");
+  }
+
+  const existingPartIndex = order.partsUsed.findIndex((p) => p.productId === part.id);
+  const newPartsUsed = [...order.partsUsed];
+
+  if (existingPartIndex > -1) {
+    newPartsUsed[existingPartIndex].quantity += quantity;
+  } else {
+    newPartsUsed.push({
+      productId: part.id,
+      name: part.name,
+      quantity,
+      cost: part.cost,
+      price: part.price,
     });
+  }
+
+  const newTotalCost = newPartsUsed.reduce((sum, p) => sum + p.cost * p.quantity, 0);
+  const newTotalPrice =
+    newPartsUsed.reduce((sum, p) => sum + p.price * p.quantity, 0) + order.laborCost;
+  const newProfit = newTotalPrice - newTotalCost;
+
+  const updatedOrderData = {
+    partsUsed: newPartsUsed,
+    totalCost: newTotalCost,
+    totalPrice: newTotalPrice,
+    profit: newProfit,
   };
+
+  const { error: orderUpdateError, data: updatedOrderRow } = await supabase
+    .from(REPAIRS_TABLE)
+    .update(updatedOrderData)
+    .or(orIdFilter(order.id))
+    .select("*")
+    .single();
+
+  if (orderUpdateError || !updatedOrderRow) {
+    throw new Error("No se pudo actualizar la orden de reparación.");
+  }
+
+  return mapRepairOrder(updatedOrderRow);
+};
 

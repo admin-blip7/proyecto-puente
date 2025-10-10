@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment, useMemo, useCallback } from "react";
+import React, { useState, Fragment, useMemo, useCallback } from "react";
 import { Sale, Warranty, Product, SaleItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
@@ -34,11 +34,30 @@ interface SalesHistoryClientProps {
 }
 
 export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
-  const [sales, setSales] = useState<Sale[]>(initialSales);
+  const [sales, setSales] = useState<Sale[]>(() => initialSales);
+  
+  // Sync sales state with initialSales prop if it changes
+  React.useEffect(() => {
+    setSales(prevSales => {
+      // Only update if the sales arrays are different
+      if (prevSales.length !== initialSales.length) {
+        return initialSales;
+      }
+      // Check if any sale has changed
+      for (let i = 0; i < initialSales.length; i++) {
+        if (prevSales[i]?.id !== initialSales[i]?.id || prevSales[i]?.saleId !== initialSales[i]?.saleId) {
+          return initialSales;
+        }
+      }
+      return prevSales; // Return the same array to avoid unnecessary re-renders
+    });
+  }, [initialSales]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [excludeFamiliar, setExcludeFamiliar] = useState(false);
+  const [sortField, setSortField] = useState<keyof Sale | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
 
   const handleOpenWarrantyDialog = (sale: Sale) => {
@@ -59,24 +78,146 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     setOpenCollapsibles(prev => ({...prev, [saleId]: !prev[saleId]}));
   }
 
+  const handleSort = (field: keyof Sale) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to descending for dates, ascending for others
+      setSortField(field);
+      setSortDirection(field === 'createdAt' ? 'desc' : 'asc');
+    }
+  };
+
+  
+
   const getProduct = useCallback((productId: string) => {
     return products.find(p => p.id === productId);
   }, [products]);
 
+  // Component for sortable header
+  const SortableHeader: React.FC<{
+    children: React.ReactNode;
+    field: keyof Sale;
+    className?: string;
+  }> = ({ children, field, className }) => {
+    const isActive = sortField === field;
+    const direction = isActive ? sortDirection : null;
+    
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`-ml-3 h-8 data-[state=open]:bg-accent font-medium ${className}`}
+        onClick={() => handleSort(field)}
+      >
+        <span>{children}</span>
+        {direction && (
+          direction === 'asc' ? (
+            <ChevronUp className="ml-2 h-3 w-3" />
+          ) : (
+            <ChevronDown className="ml-2 h-3 w-3" />
+          )
+        )}
+        {!direction && (
+          <ArrowUpDown className="ml-2 h-3 w-3 text-muted-foreground" />
+        )}
+      </Button>
+    );
+  };
+
+  // Deduplicate sales based on saleId to avoid React key warnings
+  const deduplicatedSales = useMemo(() => {
+    const seenIds = new Set();
+    const uniqueSales = [];
+    
+    for (const sale of sales) {
+      const id = sale.id || sale.saleId;
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueSales.push(sale);
+      }
+    }
+    
+    if (seenIds.size !== sales.length) {
+      console.warn(`Removed ${sales.length - uniqueSales.length} duplicate sales entries`);
+    }
+    
+    return uniqueSales;
+  }, [sales]);
+
+  const sortedSales = useMemo(() => {
+    if (!sortField) return deduplicatedSales;
+
+    return [...deduplicatedSales].sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // Handle special cases
+      if (sortField === 'customerName') {
+        aValue = a.customerName || '';
+        bValue = b.customerName || '';
+      } else if (sortField === 'totalAmount') {
+        aValue = Number(a.totalAmount) || 0;
+        bValue = Number(b.totalAmount) || 0;
+      } else if (sortField === 'createdAt') {
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+      }
+
+      // Handle null/undefined values
+      if (aValue === null || aValue === undefined) aValue = sortDirection === 'asc' ? '' : 0;
+      if (bValue === null || bValue === undefined) bValue = sortDirection === 'asc' ? '' : 0;
+
+      // Compare values
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [deduplicatedSales, sortField, sortDirection]);
+
   const filteredSales = useMemo(() => {
-    if (!excludeFamiliar) return sales;
+    if (!excludeFamiliar) return sortedSales;
     // Filter out sales that consist ENTIRELY of 'Familiar' products
-    return sales.filter(sale => {
+    return sortedSales.filter(sale => {
       return sale.items.some(item => {
         const product = getProduct(item.productId);
         return product?.ownershipType !== 'Familiar';
       });
     });
-  }, [sales, excludeFamiliar, getProduct]);
+  }, [sortedSales, excludeFamiliar, getProduct]);
+
+  // Debug: Log sales data to check for invalid keys and duplicates
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // Check for sales with invalid IDs
+      const invalidSales = sales.filter(sale => !sale.id && !sale.saleId);
+      if (invalidSales.length > 0) {
+        console.warn('Sales with invalid IDs found:', invalidSales.length);
+      }
+      
+      // Check for duplicate saleIds
+      const saleIds = sales.map(s => s.saleId).filter(Boolean);
+      const duplicateIds = saleIds.filter((id, index) => saleIds.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        console.warn('Duplicate saleIds found:', [...new Set(duplicateIds)]);
+      }
+      
+      console.log('Total sales loaded:', sales.length);
+    }
+  }, [sales]);
+
+  // Reset sort when sales data changes significantly
+  React.useEffect(() => {
+    if (sales.length !== initialSales.length) {
+      setSortField(null);
+      setSortDirection('desc');
+    }
+  }, [sales.length, initialSales.length]);
 
   const { dailyCost: filteredDailyCost, dailyProfit: filteredDailyProfit } = useMemo(() => {
     const today = new Date();
-    const todaySales = sales.filter(sale => format(sale.createdAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
+    const todaySales = sortedSales.filter(sale => format(sale.createdAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
 
     let dailyCost = 0;
     let dailyProfit = 0;
@@ -94,16 +235,16 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
     return { dailyCost, dailyProfit };
 
-  }, [sales, excludeFamiliar, getProduct]);
+  }, [sortedSales, excludeFamiliar, getProduct]);
 
-  const renderSerials = (item: SaleItem) => {
+  const renderSerials = (item: SaleItem, saleId: string) => {
     if (!item.serials || item.serials.length === 0) {
       return <p className="text-xs text-muted-foreground italic">Sin series</p>;
     }
     return (
       <div className="flex flex-wrap gap-1">
         {item.serials.map((serial, index) => (
-          <Badge key={index} variant="outline" className="font-mono text-xs">
+          <Badge key={`${item.productId}-${saleId}-serial-${index}-${serial}`} variant="outline" className="font-mono text-xs">
             <Hash className="w-3 h-3 mr-1" />
             {serial}
           </Badge>
@@ -157,22 +298,39 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 <TableHeader>
                     <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>ID Venta</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Cajero</TableHead>
-                    <TableHead>Método de Pago</TableHead>
-                    <TableHead className="text-right">Monto Total</TableHead>
+                    <TableHead>
+                      <SortableHeader field="saleId">ID Venta</SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader field="createdAt">Fecha</SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader field="customerName">Cliente</SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader field="cashierName">Cajero</SortableHeader>
+                    </TableHead>
+                    <TableHead>
+                      <SortableHeader field="paymentMethod">Método de Pago</SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <SortableHeader field="totalAmount" className="justify-end">Monto Total</SortableHeader>
+                    </TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredSales.map((sale) => (
-                      <Fragment key={sale.id}>
-                          <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(sale.id)}>
+                    {filteredSales.map((sale, index) => {
+                      // Create a unique key that combines sale id, saleId, timestamp and index to ensure uniqueness
+                      const uniqueKey = `${sale.id || sale.saleId}-${sale.createdAt.getTime()}-${index}`;
+                      const collapsibleKey = uniqueKey;
+                      
+                      return (
+                      <Fragment key={uniqueKey}>
+                          <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
                                 <TableCell>
                                   <Button variant="ghost" size="icon">
-                                      {openCollapsibles[sale.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                       <span className="sr-only">Toggle details</span>
                                   </Button>
                                 </TableCell>
@@ -208,7 +366,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                     </DropdownMenu>
                                 </TableCell>
                             </TableRow>
-                            {openCollapsibles[sale.id] && (
+                            {openCollapsibles[collapsibleKey] && (
                               <TableRow>
                                   <TableCell colSpan={8} className="p-0 border-0">
                                       <div className="p-4 bg-muted/50">
@@ -225,14 +383,14 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                             </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                            {sale.items.map(item => {
+                                            {sale.items.map((item, itemIndex) => {
                                                 const product = getProduct(item.productId);
                                                 const cost = product?.cost || 0;
                                                 const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
                                                 return (
-                                                <TableRow key={item.productId}>
+                                                <TableRow key={`${uniqueKey}-item-${itemIndex}-${item.productId}-${item.serials?.join('-') || 'no-serials'}`}>
                                                     <TableCell>{item.name}</TableCell>
-                                                    <TableCell>{renderSerials(item)}</TableCell>
+                                                    <TableCell>{renderSerials(item, sale.saleId)}</TableCell>
                                                     <TableCell className="text-right">{item.quantity}</TableCell>
                                                     <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
@@ -249,7 +407,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                               </TableRow>
                             )}
                         </Fragment>
-                    ))}
+                      );
+                    })}
                 </TableBody>
                 </Table>
             </div>

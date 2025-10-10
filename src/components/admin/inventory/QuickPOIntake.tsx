@@ -12,22 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import AddEditSupplierDialog from "@/components/admin/suppliers/AddEditSupplierDialog";
 import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc, 
-  doc, 
-  setDoc, 
-  serverTimestamp,
-  getDoc,
-  updateDoc,
-  runTransaction,
-  increment,
-  limit
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { 
   Package, 
   Search, 
   Copy, 
@@ -46,7 +30,6 @@ import {
   X
 } from "lucide-react";
 import { Product } from "@/types";
-import { updateSupplierPurchaseTotal, getSuppliers } from "@/lib/services/supplierService";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -100,15 +83,29 @@ interface PurchaseOrder {
   }>; // Historial de cambios
 }
 
-interface StockMovement {
-  createdAt: any;
-  type: "in" | "out";
-  reason: "purchase_receipt";
-  warehouseId: string;
-  lines: Array<{ productId: string; qty: number; cost?: number }>;
-}
-
 const log = getLogger("QuickPOIntake");
+
+async function quickIntakeApiRequest<T>(payload: Record<string, unknown>): Promise<T | null> {
+  try {
+    const response = await fetch("/api/quick-po-intake", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error("Solicitud fallida");
+    }
+
+    const data = (await response.json()) as T;
+    return data;
+  } catch (error) {
+    log.error("Quick intake API error", error);
+    return null;
+  }
+}
 export default function QuickPOIntake() {
   const { toast } = useToast();
   const router = useRouter();
@@ -193,48 +190,12 @@ export default function QuickPOIntake() {
         return;
       }
 
-      const productsRef = collection(db, "products");
-      const q = query(
-        productsRef, 
-        where("searchKeywords", "array-contains-any", tokens),
-        limit(10)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const products: Product[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        products.push({
-          id: doc.id,
-          name: data.name,
-          sku: data.sku || '',
-          price: data.price || 0,
-          cost: data.cost || 0,
-          stock: data.stock || 0,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          type: data.type || 'Venta',
-          ownershipType: data.ownershipType || 'Propio',
-          consignorId: data.consignorId,
-          reorderPoint: data.reorderPoint,
-          comboProductIds: data.comboProductIds || [],
-          compatibilityTags: data.compatibilityTags || [],
-          searchKeywords: data.searchKeywords || []
-        });
+      const response = await quickIntakeApiRequest<{ products: Product[] }>({
+        action: "searchProducts",
+        query: searchQuery,
       });
 
-      // Ordenar por relevancia (productos con más coincidencias primero)
-      const sortedProducts = products.sort((a, b) => {
-        const aMatches = tokens.filter(token => 
-          normalizeText(a.name).includes(token)
-        ).length;
-        const bMatches = tokens.filter(token => 
-          normalizeText(b.name).includes(token)
-        ).length;
-        return bMatches - aMatches;
-      });
-
-      setSearchResults(sortedProducts);
+      setSearchResults(response?.products ?? []);
       setShowSearchResults(true);
     } catch (error) {
       log.error("Error searching products:", error);
@@ -246,7 +207,7 @@ export default function QuickPOIntake() {
     } finally {
       setSearchingProducts(false);
     }
-  }, [tokenizeText, normalizeText, toast]);
+  }, [tokenizeText, toast]);
 
   // Función para agregar producto desde la búsqueda
   const addProductFromSearch = useCallback((product: Product) => {
@@ -274,8 +235,10 @@ export default function QuickPOIntake() {
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
-        const suppliersData = await getSuppliers();
-        setSuppliers(suppliersData);
+        const response = await quickIntakeApiRequest<{ suppliers: Supplier[] }>({ action: "listSuppliers" });
+        if (response?.suppliers) {
+          setSuppliers(response.suppliers);
+        }
       } catch (error) {
         log.error("Error loading suppliers:", error);
         toast({
@@ -346,49 +309,6 @@ export default function QuickPOIntake() {
   }, []);
 
   // Función auxiliar para actualizar el proveedor
-  const updateSupplierPurchaseTotal = useCallback(async (supplierName: string, amount: number) => {
-    if (!supplierName.trim() || amount <= 0) return;
-
-    try {
-      // Buscar el proveedor por nombre
-      const suppliersQuery = query(
-        collection(db, "suppliers"),
-        where("name", "==", supplierName.trim())
-      );
-      
-      const suppliersSnapshot = await getDocs(suppliersQuery);
-      
-      if (!suppliersSnapshot.empty) {
-        // Actualizar proveedor existente
-        const supplierDoc = suppliersSnapshot.docs[0];
-        const currentTotal = supplierDoc.data().totalPurchasedYTD || 0;
-        
-        await updateDoc(supplierDoc.ref, {
-          totalPurchasedYTD: currentTotal + amount,
-          updatedAt: serverTimestamp()
-        });
-        
-        log.info(`Proveedor ${supplierName} actualizado: +${formatCurrency(amount)}`);
-      } else {
-        // Crear nuevo proveedor si no existe
-        const newSupplier = {
-          name: supplierName.trim(),
-          contactInfo: "",
-          notes: `Proveedor creado automáticamente desde orden de compra`,
-          totalPurchasedYTD: amount,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-        
-        await addDoc(collection(db, "suppliers"), newSupplier);
-        log.info(`Nuevo proveedor ${supplierName} creado con total: ${formatCurrency(amount)}`);
-      }
-    } catch (error) {
-      log.error("Error updating supplier:", error);
-      // No lanzamos el error para no interrumpir el flujo principal
-    }
-  }, []);
-
   const handleSavePurchaseOrder = useCallback(async () => {
     // Validaciones
     if (parsedItems.length === 0) {
@@ -459,10 +379,11 @@ export default function QuickPOIntake() {
         Object.entries(shipping).filter(([_, value]) => value !== undefined && value !== '')
       );
 
+      const now = new Date();
       const purchaseOrder: PurchaseOrder = {
-        createdAt: serverTimestamp(),
-        orderDate: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: now,
+        orderDate: now,
+        updatedAt: now,
         status: isOrdered ? "ordered" : "draft",
         supplier: supplier.trim() || 'Proveedor no especificado',
         orderNumber,
@@ -479,18 +400,23 @@ export default function QuickPOIntake() {
           notes: `Orden creada con ${parsedItems.length} productos`
         }]
       };
+      const response = await quickIntakeApiRequest<{ order: any }>({
+        action: "savePurchaseOrder",
+        supplier: purchaseOrder.supplier,
+        orderNumber,
+        status: purchaseOrder.status,
+        totalAmount,
+        notes: purchaseOrder.notes ?? null,
+        shipping: purchaseOrder.shipping,
+        items: purchaseOrder.items,
+        history: purchaseOrder.history?.map((entry) => ({
+          ...entry,
+          timestamp: new Date().toISOString(),
+        })),
+      });
 
-      const docRef = await addDoc(collection(db, "purchase_orders"), purchaseOrder);
-      
-      // Verificar que se guardó correctamente
-      const savedDoc = await getDoc(docRef);
-      if (!savedDoc.exists()) {
-        throw new Error("Error al verificar el guardado de la orden");
-      }
-
-      // Actualizar el total de compras del proveedor si la orden está confirmada
-      if (isOrdered && totalAmount > 0) {
-        await updateSupplierPurchaseTotal(supplier.trim() || 'Proveedor no especificado', totalAmount);
+      if (!response) {
+        throw new Error("Error al guardar la orden de compra");
       }
 
       toast({
@@ -515,7 +441,7 @@ export default function QuickPOIntake() {
     } finally {
       setLoading(false);
     }
-  }, [parsedItems, isOrdered, shipping, supplier, notes, toast, updateSupplierPurchaseTotal]);
+  }, [parsedItems, isOrdered, shipping, supplier, notes, toast]);
 
   const handleConfirmArrivalAndStock = useCallback(async () => {
     if (parsedItems.length === 0) {
@@ -539,13 +465,9 @@ export default function QuickPOIntake() {
 
     setLoading(true);
     try {
-      const warehouseId = "main"; // Default warehouse
-      
-      // Calcular el total de la orden
       const baseTotal = parsedItems.reduce((sum, item) => sum + (((item.qty || 0)) * (item.cost || 0)), 0);
       const shippingCost = shipping.cost || 0;
 
-      // Prorrateo de envío
       let itemsWithAllocation: ParsedItem[] = parsedItems;
       if (shippingCost > 0) {
         const totalBase = baseTotal;
@@ -566,20 +488,16 @@ export default function QuickPOIntake() {
       }
 
       const totalAmount = baseTotal + shippingCost;
-
-      // Generar número de orden único
       const orderNumber = `PO-${Date.now()}`;
-
-      // Limpiar objeto shipping de valores undefined
       const cleanShipping = Object.fromEntries(
         Object.entries(shipping).filter(([_, value]) => value !== undefined && value !== '')
       );
 
-      // Crear la orden de compra como "received" (recibida)
+      const now = new Date();
       const purchaseOrder: PurchaseOrder = {
-        createdAt: serverTimestamp(),
-        orderDate: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: now,
+        orderDate: now,
+        updatedAt: now,
         status: "received",
         supplier: supplier.trim() || 'Proveedor no especificado',
         orderNumber,
@@ -591,57 +509,37 @@ export default function QuickPOIntake() {
         history: [{
           action: 'Orden creada y mercancía recibida directamente',
           status: "received",
-          timestamp: new Date(),
+          timestamp: now,
           user: 'Usuario Actual',
           notes: `Orden creada con ${parsedItems.length} productos e ingresada directamente a inventario`
         }]
       };
 
-      // Guardar la orden de compra
-      await addDoc(collection(db, "purchase_orders"), purchaseOrder);
+      const saveResponse = await quickIntakeApiRequest<{ order: any }>({
+        action: "savePurchaseOrder",
+        supplier: purchaseOrder.supplier,
+        orderNumber,
+        status: purchaseOrder.status,
+        totalAmount,
+        notes: purchaseOrder.notes ?? null,
+        shipping: purchaseOrder.shipping,
+        items: purchaseOrder.items,
+        history: purchaseOrder.history?.map((entry) => ({
+          ...entry,
+          timestamp: new Date().toISOString(),
+        })),
+      });
 
-      // Actualizar el total de compras del proveedor
-      if (totalAmount > 0) {
-        await updateSupplierPurchaseTotal(supplier.trim() || 'Proveedor no especificado', totalAmount);
+      if (!saveResponse?.order) {
+        throw new Error("No se pudo guardar la orden de compra");
       }
-      
-      // Create stock movement
-      const stockMovement: StockMovement = {
-        createdAt: serverTimestamp(),
-        type: "in",
-        reason: "purchase_receipt",
-        warehouseId,
-        lines: itemsWithAllocation
-          .filter(item => item.productId)
-          .map(item => ({
-            productId: item.productId!,
-            qty: item.qty || 0,
-            cost: item.finalCost ?? item.cost
-          }))
-      };
 
-      await addDoc(collection(db, "stock_movements"), stockMovement);
-
-      // Update stock for each product
-      for (const item of itemsWithAllocation.filter(i => i.productId)) {
-        const stockRef = doc(db, `products/${item.productId}/stock/${warehouseId}`);
-        const stockDoc = await getDoc(stockRef);
-        
-        if (stockDoc.exists()) {
-          // Update existing stock
-          const currentQty = stockDoc.data().qty || 0;
-          await updateDoc(stockRef, {
-            qty: currentQty + (item.qty || 0),
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          // Create new stock entry
-          await setDoc(stockRef, {
-            qty: item.qty || 0,
-            updatedAt: serverTimestamp()
-          });
-        }
-      }
+      await quickIntakeApiRequest({
+        action: "confirmArrival",
+        items: itemsWithAllocation,
+        userId: 'Usuario Actual',
+        purchaseOrderId: saveResponse.order.id ?? saveResponse.order.firestore_id ?? orderNumber,
+      });
 
       toast({
         title: "✅ Mercancía recibida e inventario actualizado",
@@ -665,7 +563,7 @@ export default function QuickPOIntake() {
     } finally {
       setLoading(false);
     }
-  }, [parsedItems, shipping, supplier, notes, toast, updateSupplierPurchaseTotal]);
+  }, [parsedItems, shipping, supplier, notes, toast]);
 
   const canSave = useMemo(() => parsedItems.length > 0 && !loading, [parsedItems.length, loading]);
 
