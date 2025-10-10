@@ -1,6 +1,5 @@
-# Firebase to Supabase Migration Guide
+# Firebase Studio
 
-* [Auth Migration](/auth)
-* [Firestore Data Migration](/firestore)
-* [Storage Migration](/storage)
-* [Migrating Functions](/functions)
+This is a NextJS starter in Firebase Studio.
+
+To get started, take a look at src/app/page.tsx.

@@ -1,0 +1,101 @@
+import type {NextConfig} from 'next';
+
+const nextConfig: NextConfig = {
+  /* config options here */
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/@vite/client',
+        destination: '/404',
+      },
+      // Suppress common development noise
+      {
+        source: '/_next/static/chunks/:path*',
+        destination: '/_next/static/chunks/:path*',
+      },
+      {
+        source: '/favicon.ico',
+        destination: '/favicon.ico',
+      },
+    ];
+  },
+  // Suppress console logs in production
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error']
+    } : false,
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'aaftjwktzpnyjwklroww.supabase.co',
+        pathname: '/**',
+      },
+    ],
+  },
+  webpack: (config, { dev, isServer }) => {
+    const shouldSilenceWarning = (warning: any, matcher: { message?: string; resource?: string }) => {
+      const messageMatch = matcher.message ? warning.message?.includes(matcher.message) : true;
+      const resourceMatch = matcher.resource ? warning.module?.resource?.includes(matcher.resource) : true;
+      return Boolean(messageMatch && resourceMatch);
+    };
+
+    config.ignoreWarnings = config.ignoreWarnings || [];
+    config.ignoreWarnings.push(
+      (warning: any) =>
+        shouldSilenceWarning(warning, {
+          message: 'Critical dependency: the request of a dependency is an expression',
+          resource: '@opentelemetry/instrumentation',
+        }),
+      (warning: any) =>
+        shouldSilenceWarning(warning, {
+          message: 'require.extensions is not supported by webpack',
+        })
+    );
+
+    // Mejorar configuración para desarrollo
+    if (dev && !isServer) {
+      // Optimizar HMR y source maps para desarrollo
+      config.devtool = 'eval-cheap-module-source-map';
+      
+      // Configuración para mejor HMR
+      if (config.watchOptions) {
+        config.watchOptions.poll = 1000;
+        config.watchOptions.aggregateTimeout = 300;
+      }
+    }
+
+    // Optimizar source maps para producción
+    if (!dev) {
+      config.devtool = 'hidden-source-map';
+    }
+
+    return config;
+  },
+};
+
+export default nextConfig;
