@@ -30,6 +30,12 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
   const [isLoading, setIsLoading] = useState(false);
   
   const componentRef = useRef<HTMLDivElement>(null);
+  const bindOnChangeRef = useRef(bind.onChange);
+  
+  // Update the ref whenever bind.onChange changes
+  useEffect(() => {
+    bindOnChangeRef.current = bind.onChange;
+  }, [bind.onChange]);
 
   useOnClickOutside(componentRef, () => setOpen(false));
   
@@ -37,9 +43,9 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
   // when the combobox is not focused. This is important for form resets or external updates.
   useEffect(() => {
     if (document.activeElement !== componentRef.current?.querySelector('input')) {
-      bind.onChange({ target: { value: value ?? '' } } as React.ChangeEvent<HTMLInputElement>);
+      bindOnChangeRef.current({ target: { value: value ?? '' } } as React.ChangeEvent<HTMLInputElement>);
     }
-  }, [value, bind]);
+  }, [value]);
 
 
   // This effect fetches categories based on the debounced search term.

@@ -149,7 +149,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     onLayoutChange({
       elements: editorState.elements,
     });
-  }, [editorState.elements, onLayoutChange]);
+  }, [editorState.elements]);
 
   useEffect(() => {
     setCurrentWidth(widthMm);
@@ -157,7 +157,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
   }, [widthMm, heightMm]);
 
   const handleFlipLabel = useCallback(() => {
-    setIsFlipped(!isFlipped);
+    setIsFlipped(prev => !prev);
     const newWidth = currentHeight;
     const newHeight = currentWidth;
     
@@ -187,7 +187,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         };
       }),
     }));
-  }, [isFlipped, currentWidth, currentHeight]);
+  }, [currentWidth, currentHeight]);
 
   const handleCreateElement = useCallback(
     (item: DropPayload, position: { x: number; y: number }) => {

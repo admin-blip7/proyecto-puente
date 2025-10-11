@@ -77,7 +77,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
     try {
       await updateProduct(product.id, formData);
       
-      log.info("¡Éxito! Producto actualizado en Firestore.");
+      log.info("¡Éxito! Producto actualizado.");
       toast({
         title: "Producto Actualizado",
         description: `El producto "${formData.name}" ha sido guardado exitosamente.`,
@@ -87,7 +87,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
       router.refresh();
 
     } catch (error) {
-      log.error("ERROR AL GUARDAR EN FIRESTORE:", error);
+      log.error("ERROR AL GUARDAR:", error);
       toast({
         variant: "destructive",
         title: "Error al Guardar",
