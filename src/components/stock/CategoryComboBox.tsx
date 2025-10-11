@@ -39,7 +39,7 @@ function CategoryComboBoxBase({ value, onChange, placeholder = 'Buscar categorí
     if (document.activeElement !== componentRef.current?.querySelector('input')) {
       bind.onChange({ target: { value: value ?? '' } } as React.ChangeEvent<HTMLInputElement>);
     }
-  }, [value, bind]);
+  }, [value]); // Removed bind from dependencies to prevent infinite loop
 
 
   // This effect fetches categories based on the debounced search term.

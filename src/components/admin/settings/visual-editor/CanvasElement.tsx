@@ -22,7 +22,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-  }));
+  }), [element.id]);
 
   const widthMm = element.width ?? 20;
   const heightMm = element.height ?? 10;

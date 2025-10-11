@@ -86,7 +86,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
     try {
       await addProduct(formData);
       
-      log.info("¡Éxito! Producto creado en Firestore.");
+      log.info("¡Éxito! Producto creado.");
       toast({
         title: "Producto Agregado",
         description: `El producto "${formData.name}" ha sido creado exitosamente.`,
@@ -96,7 +96,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
       router.refresh();
 
     } catch (error) {
-      log.error("ERROR AL CREAR EN FIRESTORE:", error);
+      log.error("ERROR AL GUARDAR:", error);
       toast({
         variant: "destructive",
         title: "Error al Crear",

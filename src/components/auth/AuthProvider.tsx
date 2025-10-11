@@ -49,11 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const syncSession = async () => {
+      if (!supabase) {
+        log.error("Supabase client is not available");
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         log.error("Error fetching session", error);
-        setSession(null);
         setUser(null);
         setUserProfile(null);
         setLoading(false);
@@ -78,6 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     syncSession();
+
+    if (!supabase) {
+      return;
+    }
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       const supabaseUser = newSession?.user ?? null;
