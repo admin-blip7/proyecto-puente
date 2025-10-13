@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
@@ -20,13 +20,14 @@ import { normalizeVisualEditorData } from '@/lib/printing/visualLayoutTypes';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 interface VisualEditorProps {
   initialLayout?: VisualEditorData;
   onLayoutChange: (layout: VisualEditorData) => void;
   widthMm: number;
   heightMm: number;
+  orientation?: 'horizontal' | 'vertical';
 }
 
 interface DropPayload {
@@ -36,7 +37,7 @@ interface DropPayload {
 
 const MIN_DIMENSION_MM = 5;
 
-const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChange, widthMm, heightMm }) => {
+const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChange, widthMm, heightMm, orientation = 'horizontal' }) => {
   const normalizedInitial = useMemo(() => normalizeVisualEditorData(initialLayout), [initialLayout]);
 
   const [editorState, setEditorState] = useState<VisualEditorState>({
@@ -44,9 +45,15 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     selectedElementId: null,
   });
   const [showGrid, setShowGrid] = useState(true);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [currentWidth, setCurrentWidth] = useState(widthMm);
-  const [currentHeight, setCurrentHeight] = useState(heightMm);
+  
+  // Calculate actual dimensions based on orientation
+  const currentWidth = useMemo(() => {
+    return orientation === 'vertical' ? heightMm : widthMm;
+  }, [orientation, widthMm, heightMm]);
+  
+  const currentHeight = useMemo(() => {
+    return orientation === 'vertical' ? widthMm : heightMm;
+  }, [orientation, widthMm, heightMm]);
 
   const scale = useMemo(() => {
     // No scaling limits - show actual label dimensions in visual editor
@@ -145,49 +152,40 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     }));
   }, [widthMm, heightMm, clampElementToCanvas]);
 
+  // Combine ref pattern with debouncing for maximum stability
+  const onLayoutChangeRef = useRef(onLayoutChange);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLayoutRef = useRef<string>('');
+  
   useEffect(() => {
-    onLayoutChange({
-      elements: editorState.elements,
-    });
+    onLayoutChangeRef.current = onLayoutChange;
+  }, [onLayoutChange]);
+  
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      const currentLayout = JSON.stringify(editorState.elements);
+      
+      // Only call onLayoutChange if the layout actually changed
+      if (currentLayout !== lastLayoutRef.current) {
+        lastLayoutRef.current = currentLayout;
+        onLayoutChangeRef.current({
+          elements: editorState.elements,
+        });
+      }
+    }, 300); // Increased debounce time to reduce frequency
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [editorState.elements]);
 
-  useEffect(() => {
-    setCurrentWidth(widthMm);
-    setCurrentHeight(heightMm);
-  }, [widthMm, heightMm]);
 
-  const handleFlipLabel = useCallback(() => {
-    setIsFlipped(prev => !prev);
-    const newWidth = currentHeight;
-    const newHeight = currentWidth;
-    
-    setCurrentWidth(newWidth);
-    setCurrentHeight(newHeight);
-    
-    // Adjust elements positions and dimensions
-    setEditorState(prev => ({
-      ...prev,
-      elements: prev.elements.map(element => {
-        // Swap width and height for the element
-        const newElementWidth = Math.min(element.height, newWidth);
-        const newElementHeight = Math.min(element.width, newHeight);
-        
-        // Calculate new position to keep element within bounds
-        const maxX = Math.max(0, newWidth - newElementWidth);
-        const maxY = Math.max(0, newHeight - newElementHeight);
-        const newX = Math.min(element.y, maxX);
-        const newY = Math.min(element.x, maxY);
-        
-        return {
-          ...element,
-          x: newX,
-          y: newY,
-          width: newElementWidth,
-          height: newElementHeight,
-        };
-      }),
-    }));
-  }, [currentWidth, currentHeight]);
 
   const handleCreateElement = useCallback(
     (item: DropPayload, position: { x: number; y: number }) => {
@@ -205,7 +203,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
       const newElement: VisualElement = clampElementToCanvas({
         id: nanoid(),
         type: elementType,
-        placeholderKey: elementType === 'barcode' ? 'sku' : placeholder?.key,
+        placeholderKey: elementType === 'barcode' ? 'barcode' : placeholder?.key,
         content:
           elementType === 'text'
             ? placeholder?.token ?? 'Nuevo Texto'
@@ -225,6 +223,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         showValue: elementType === 'barcode' ? true : undefined,
         barcodeFormat: elementType === 'barcode' ? 'code128' : undefined,
         qrPlaceholderKey: elementType === 'qrcode' ? placeholder?.key ?? 'sku' : undefined,
+        zIndex: Math.max(...editorState.elements.map(el => el.zIndex || 0), 0) + 1, // New elements on top
       });
 
       setEditorState((prev) => ({
@@ -271,6 +270,30 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     }));
   }, []);
 
+  const handleBringToFront = useCallback((id: string) => {
+    setEditorState((prev) => {
+      const maxZIndex = Math.max(...prev.elements.map(el => el.zIndex || 0), 0);
+      return {
+        ...prev,
+        elements: prev.elements.map((element) =>
+          element.id === id ? { ...element, zIndex: maxZIndex + 1 } : element
+        ),
+      };
+    });
+  }, []);
+
+  const handleSendToBack = useCallback((id: string) => {
+    setEditorState((prev) => {
+      const minZIndex = Math.min(...prev.elements.map(el => el.zIndex || 0), 0);
+      return {
+        ...prev,
+        elements: prev.elements.map((element) =>
+          element.id === id ? { ...element, zIndex: minZIndex - 1 } : element
+        ),
+      };
+    });
+  }, []);
+
   const selectedElement = editorState.elements.find((el) => el.id === editorState.selectedElementId) ?? null;
 
   return (
@@ -305,20 +328,11 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         </div>
 
         <div className="flex-1 relative p-4">
-          <div className="absolute top-2 right-2 z-10 bg-background border rounded-md p-2 space-y-2">
+          <div className="absolute top-2 right-2 z-10 bg-background border rounded-md p-2">
             <div className="flex items-center space-x-2">
               <Label htmlFor="show-grid" className="text-sm">Cuadrícula</Label>
               <Switch id="show-grid" checked={showGrid} onCheckedChange={setShowGrid} />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleFlipLabel}
-              className="w-full justify-start"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Voltear Etiqueta
-            </Button>
           </div>
           <Canvas
             elements={editorState.elements}
@@ -326,7 +340,6 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             labelHeightMm={currentHeight}
             scale={scale}
             showGrid={showGrid}
-            isFlipped={isFlipped}
             onCreateElement={handleCreateElement}
             moveElement={moveElement}
             onSelectElement={handleSelectElement}
@@ -352,6 +365,8 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             selectedElement={selectedElement}
             onUpdateElement={handleUpdateElement}
             onDeleteElement={handleDeleteElement}
+            onBringToFront={handleBringToFront}
+            onSendToBack={handleSendToBack}
           />
         </div>
       </div>

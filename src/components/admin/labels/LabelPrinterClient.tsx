@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { Product, LabelSettings, Consignor, Supplier, LabelPrintItem } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+
 import { Printer, Search, Trash2, PlusCircle } from "lucide-react";
 import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,9 +23,6 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     const [searchQuery, setSearchQuery] = useState("");
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [printList, setPrintList] = useState<LabelPrintItem[]>([]);
-
-    const searchContainerRef = useRef<HTMLDivElement>(null);
-    useOnClickOutside(searchContainerRef, () => setPopoverOpen(false));
 
     const consignorMap = useMemo(() => new Map(consignors.map((c) => [c.id, c.name])), [consignors]);
     const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
@@ -98,7 +95,6 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
             return [...prev, candidate];
         });
         setSearchQuery("");
-        setPopoverOpen(false);
     };
     
     const handleUpdateQuantity = (productId: string, quantity: number) => {
@@ -140,8 +136,8 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                     <CardTitle>1. Buscar y Agregar Productos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div ref={searchContainerRef}>
-                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <div>
+                        <Popover open={popoverOpen && searchQuery.length > 0} onOpenChange={setPopoverOpen}>
                             <PopoverTrigger asChild className="w-full">
                                 <div className="relative">
                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -149,7 +145,6 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                         placeholder="Buscar producto por SKU o nombre para agregar a la lista..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        onFocus={() => setPopoverOpen(true)}
                                         className="w-full pl-10"
                                     />
                                 </div>

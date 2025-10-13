@@ -18,7 +18,6 @@ interface CanvasProps {
   labelHeightMm: number;
   scale: number;
   showGrid?: boolean;
-  isFlipped?: boolean;
   onCreateElement: (item: CanvasDropItem, position: { x: number; y: number }) => void;
   moveElement: (id: string, x: number, y: number) => void;
   onSelectElement: (id: string | null) => void;
@@ -31,7 +30,6 @@ const Canvas: React.FC<CanvasProps> = ({
   labelHeightMm,
   scale,
   showGrid = false,
-  isFlipped = false,
   onCreateElement,
   moveElement,
   onSelectElement,
@@ -119,11 +117,11 @@ const Canvas: React.FC<CanvasProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            transform: isFlipped ? 'rotate(180deg)' : 'none',
-            transformOrigin: 'center',
           }}
         >
-          {elements.map((element) => (
+          {elements
+            .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)) // Sort by zIndex
+            .map((element) => (
             <CanvasElement
               key={element.id}
               element={element}

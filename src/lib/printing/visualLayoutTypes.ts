@@ -9,6 +9,7 @@ export interface VisualElement {
   y: number; // mm
   width: number; // mm
   height: number; // mm
+  zIndex?: number; // Layer order (higher values appear on top)
   content?: string;
   fontSize?: number;
   fontWeight?: 'normal' | 'bold';

@@ -83,10 +83,11 @@ const nextConfig: NextConfig = {
       config.devtool = 'eval-cheap-module-source-map';
       
       // Configuración para mejor HMR
-      if (config.watchOptions) {
-        config.watchOptions.poll = 1000;
-        config.watchOptions.aggregateTimeout = 300;
-      }
+      config.watchOptions = {
+        ...config.watchOptions,
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
     }
 
     // Optimizar source maps para producción

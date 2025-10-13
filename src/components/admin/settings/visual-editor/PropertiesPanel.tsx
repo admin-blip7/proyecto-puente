@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient';
 import { nanoid } from 'nanoid';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface PropertiesPanelProps {
   selectedElement: VisualElement | null;
   onUpdateElement: (id: string, newProps: Partial<VisualElement>) => void;
   onDeleteElement?: (id: string) => void;
+  onBringToFront?: (id: string) => void;
+  onSendToBack?: (id: string) => void;
 }
 
 const textElementTypes: VisualElement['type'][] = ['text', 'placeholder'];
@@ -35,7 +37,12 @@ const FONT_OPTIONS = [
   'Georgia',
 ];
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
+  selectedElement, 
+  onUpdateElement, 
+  onBringToFront, 
+  onSendToBack 
+}) => {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [draftWidth, setDraftWidth] = useState('');
@@ -176,6 +183,33 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
         )}
       </div>
 
+      {/* Layer Controls */}
+      <div className="space-y-2">
+        <Label>Capas</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onBringToFront?.(selectedElement.id)}
+            className="flex-1 flex items-center justify-center gap-1"
+          >
+            <ChevronUp className="h-3 w-3" />
+            Al frente
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onSendToBack?.(selectedElement.id)}
+            className="flex-1 flex items-center justify-center gap-1"
+          >
+            <ChevronDown className="h-3 w-3" />
+            Al fondo
+          </Button>
+        </div>
+      </div>
+
       {isTextElement && (
         <div className="space-y-2">
           <div className="space-y-1">
@@ -224,23 +258,41 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
       )}
 
       {isTextElement && (
-        <div className="space-y-1">
-          <Label htmlFor="fontSize">Tamaño de fuente (px)</Label>
-          <Input
-            id="fontSize"
-            type="number"
-            step="1"
-            min="6"
-            value={draftFontSize}
-            onChange={handleDimensionChange('fontSize')}
-            onBlur={commitDimension('fontSize')}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                commitDimension('fontSize')();
-              }
-            }}
-          />
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label htmlFor="fontSize">Tamaño de fuente (px)</Label>
+            <Input
+              id="fontSize"
+              type="number"
+              step="1"
+              min="6"
+              value={draftFontSize}
+              onChange={handleDimensionChange('fontSize')}
+              onBlur={commitDimension('fontSize')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitDimension('fontSize')();
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Alineación del texto</Label>
+            <Select
+              value={selectedElement.textAlign ?? 'center'}
+              onValueChange={(align) => onUpdateElement(selectedElement.id, { textAlign: align as 'left' | 'center' | 'right' })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Izquierda</SelectItem>
+                <SelectItem value="center">Centro</SelectItem>
+                <SelectItem value="right">Derecha</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 

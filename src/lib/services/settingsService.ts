@@ -95,27 +95,41 @@ const fetchSettingsDoc = async (docId: string) => {
 };
 
 const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>) => {
-  const { row, supabase } = await fetchSettingsDoc(docId);
-  const timestamp = nowIso();
-  const data = {
-    firestore_id: docId,
-    ...payload,
-    lastUpdated: timestamp,
-  };
+  try {
+    const { row, supabase } = await fetchSettingsDoc(docId);
+    const timestamp = nowIso();
+    const data = {
+      firestore_id: docId,
+      ...payload,
+      lastUpdated: timestamp,
+    };
 
-  if (row) {
-    const { error } = await supabase
-      .from(SETTINGS_TABLE)
-      .update(data)
-      .eq("firestore_id", docId);
-    if (error) {
-      throw error;
+    log.info("Upserting settings document", { docId, hasExistingRow: !!row });
+
+    if (row) {
+      const { error } = await supabase
+        .from(SETTINGS_TABLE)
+        .update(data)
+        .eq("firestore_id", docId);
+      if (error) {
+        log.error("Database update error", { error, docId });
+        throw new Error(`Database error: ${error.message}`);
+      }
+    } else {
+      const { error } = await supabase.from(SETTINGS_TABLE).insert(data);
+      if (error) {
+        log.error("Database insert error", { error, docId });
+        throw new Error(`Database error: ${error.message}`);
+      }
     }
-  } else {
-    const { error } = await supabase.from(SETTINGS_TABLE).insert(data);
-    if (error) {
-      throw error;
-    }
+    
+    log.info("Settings document upserted successfully", { docId });
+  } catch (error) {
+    log.error("Error in upsertSettingsDoc", { 
+      error: error instanceof Error ? error.message : String(error),
+      docId 
+    });
+    throw error;
   }
 };
 
@@ -152,8 +166,9 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
 // --- LABEL SETTINGS ---
 
 const createDefaultLabelSettings = (): Omit<LabelSettings, 'labelType'> => ({
-    width: 58, 
-    height: 40, 
+    width: 51, 
+    height: 102,
+    orientation: 'vertical',
     fontSize: 9,
     barcodeHeight: 30,
     includeLogo: false,
@@ -199,12 +214,42 @@ export const getLabelSettings = async (labelType: LabelType = "product"): Promis
 export const saveLabelSettings = async (settings: LabelSettings): Promise<void> => {
   try {
     const { labelType, ...settingsToSave } = settings;
-    const validated = LabelSettingsSchema.parse(settingsToSave);
+    // Ensure orientation has a default value if not provided
+    const dataToValidate = {
+      ...settingsToSave,
+      orientation: settingsToSave.orientation || 'horizontal',
+    };
+    
+    log.info("Attempting to save label settings", { labelType, dataToValidate });
+    
+    const validated = LabelSettingsSchema.parse(dataToValidate);
     const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
+    
+    log.info("Validation successful, saving to database", { docId });
+    
     await upsertSettingsDoc(docId, validated);
+    
+    log.info("Label settings saved successfully", { docId });
   } catch (error) {
-    log.error("Error saving label settings", error);
-    throw new Error("Failed to save label settings.");
+    log.error("Error saving label settings", { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      settings: JSON.stringify(settings, null, 2),
+      errorType: error?.constructor?.name
+    });
+    
+    // Check if it's a Zod validation error
+    if (error?.constructor?.name === 'ZodError') {
+      const zodError = error as any;
+      const issues = zodError.issues?.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+      throw new Error(`Error de validación: ${issues || zodError.message}`);
+    } else if (error instanceof Error && error.message.includes('validation')) {
+      throw new Error(`Error de validación: ${error.message}`);
+    } else if (error instanceof Error && error.message.includes('database')) {
+      throw new Error(`Error de base de datos: ${error.message}`);
+    } else {
+      throw new Error(`Failed to save label settings: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 };
 

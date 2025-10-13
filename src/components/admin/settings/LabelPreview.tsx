@@ -24,8 +24,12 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
     const barcodeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const previewMetrics = useMemo(() => {
-    const baseWidthPx = mmToPixels(settings.width);
-    const baseHeightPx = mmToPixels(settings.height);
+    // Apply orientation: swap dimensions if vertical
+    const actualWidth = settings.orientation === 'vertical' ? settings.height : settings.width;
+    const actualHeight = settings.orientation === 'vertical' ? settings.width : settings.height;
+    
+    const baseWidthPx = mmToPixels(actualWidth);
+    const baseHeightPx = mmToPixels(actualHeight);
     
     // No scaling limits - show actual label dimensions
     const scale = 1;
@@ -33,9 +37,11 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
     return {
         baseWidthPx,
         baseHeightPx,
+        actualWidth,
+        actualHeight,
         scale,
     };
-  }, [settings.width, settings.height]);
+  }, [settings.width, settings.height, settings.orientation]);
 
   useEffect(() => {
     if (!barcodeCanvasRef.current) return;
@@ -55,13 +61,13 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
   }, [previewMetrics.baseWidthPx, settings.barcodeHeight]);
 
   const labelStyle: React.CSSProperties = {
-    width: `${settings.width}mm`,
-    height: `${settings.height}mm`,
+    width: `${previewMetrics.actualWidth}mm`,
+    height: `${previewMetrics.actualHeight}mm`,
     fontSize: `${settings.fontSize}px`,
   };
 
   // Calculate logo size based on label dimensions (approximately 15% of label height)
-  const logoSize = Math.max(12, Math.min(settings.height * 0.15, settings.width * 0.25));
+  const logoSize = Math.max(12, Math.min(previewMetrics.actualHeight * 0.15, previewMetrics.actualWidth * 0.25));
 
   return (
     <div className="w-full flex justify-center">

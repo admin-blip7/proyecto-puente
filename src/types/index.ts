@@ -314,13 +314,19 @@ export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
 export const labelTypes = ["product", "repair"] as const;
 export type LabelType = typeof labelTypes[number];
 
+export const labelOrientations = ["horizontal", "vertical"] as const;
+export type LabelOrientation = typeof labelOrientations[number];
+
 export const LabelSettingsSchema = z.object({
     width: z.coerce.number().positive(),
     height: z.coerce.number().positive(),
+    orientation: z.enum(["horizontal", "vertical"]).default("horizontal"),
     fontSize: z.coerce.number().positive(),
     barcodeHeight: z.coerce.number().positive(),
     includeLogo: z.boolean(),
-    logoUrl: z.string().url().or(z.literal("")).optional(),
+    logoUrl: z.string().refine((val) => val === "" || z.string().url().safeParse(val).success, {
+        message: "Must be a valid URL or empty string"
+    }).optional(),
     storeName: z.string().optional(),
     content: z.object({
         showProductName: z.boolean(),
@@ -329,11 +335,10 @@ export const LabelSettingsSchema = z.object({
         showStoreName: z.boolean(),
     }),
     visualLayout: z.string().nullable().optional(), // JSON string of VisualElement[]
+    labelType: z.enum(["product", "repair"]).optional(), // Add labelType field
 });
 
-export type LabelSettings = z.infer<typeof LabelSettingsSchema> & {
-    labelType: LabelType;
-};
+export type LabelSettings = z.infer<typeof LabelSettingsSchema>;
 
 export interface LabelPrintProductContext {
     id?: string;

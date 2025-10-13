@@ -58,10 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         log.error("Error fetching session", error);
+        
+        // Si hay error de refresh token, limpiar la sesión
+        if (error.message?.includes("Invalid Refresh Token") || error.message?.includes("Refresh Token Not Found")) {
+          await supabase.auth.signOut({ scope: "local" });
+        }
+        
         setUser(null);
         setUserProfile(null);
         setLoading(false);
-        if (pathname !== "/login") {
+        if (pathname !== "/login" && pathname !== "/reset-password") {
           router.push("/login");
         }
         return;
@@ -76,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (supabaseUser && pathname === "/login") {
         router.push("/");
       }
-      if (!supabaseUser && pathname !== "/login") {
+      if (!supabaseUser && pathname !== "/login" && pathname !== "/reset-password") {
         router.push("/login");
       }
     };
@@ -93,11 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserProfile(buildUserProfile(supabaseUser));
       setLoading(false);
 
+      // Si Supabase inicia una sesión de recuperación de contraseña, redirigimos a la página de restablecer
+      if (_event === "PASSWORD_RECOVERY") {
+        router.push("/reset-password");
+        return;
+      }
+
       if (supabaseUser) {
         if (pathname === "/login") {
           router.push("/");
         }
-      } else if (pathname !== "/login") {
+      } else if (pathname !== "/login" && pathname !== "/reset-password") {
         router.push("/login");
       }
     });

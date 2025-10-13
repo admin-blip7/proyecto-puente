@@ -111,7 +111,7 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `height:${(element.height ?? settings.height / 4).toFixed(2)}mm`,
     `font-size:${(element.fontSize ?? settings.fontSize).toFixed(0)}px`,
     `display:flex`,
-    `align-items:center`,
+    `align-items:flex-start`,
     `justify-content:${
       element.textAlign === 'left'
         ? 'flex-start'
@@ -124,6 +124,12 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `font-family:${fontFamily}`,
     `font-weight:700`,
     `text-transform:capitalize`,
+    `word-wrap:break-word`,
+    `overflow-wrap:break-word`,
+    `white-space:normal`,
+    `line-height:1.2`,
+    `flex-wrap:wrap`,
+    `align-content:flex-start`,
   ];
 
   if (element.fontWeight) parts.push(`font-weight:${element.fontWeight}`);
@@ -363,13 +369,19 @@ export const generateAndPrintLabels = async (
                     margin: 0;
                     padding: 0;
                     font-family: 'Inter', sans-serif;
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-content: flex-start;
                 }
                 .label-canvas {
                     position: relative;
                     width: ${settings.width}mm;
                     height: ${settings.height}mm;
                     box-sizing: border-box;
-                    page-break-after: always;
+                    margin: 0;
+                    padding: 0;
+                    display: inline-block;
+                    vertical-align: top;
                 }
                 .label-canvas:last-child {
                     page-break-after: auto;
@@ -398,7 +410,9 @@ export const generateAndPrintLabels = async (
                     width: 100%;
                     height: 100%;
                 }
-            </style>            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+            </style>
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 `);
   printWindow.document.write('</head><body>');
 
@@ -413,23 +427,72 @@ export const generateAndPrintLabels = async (
   printWindow.focus();
 
   setTimeout(() => {
-    context.barcodeJobs.forEach((job) => {
-      const target = printWindow.document.getElementById(job.id);
-      if (!target) return;
-      try {
-        JsBarcode(target, job.value, {
-          format: job.format === 'ean13' ? 'EAN13' : 'CODE128',
-          displayValue: job.showValue,
-          height: job.height,
-          width: job.width,
-          margin: 0,
-          font: job.fontFamily,
-          fontSize: 12,
-          textMargin: 4,
-        });
-      } catch (error) {
-        log.error(`Failed to generate barcode for ${job.value}`, error);
+    // Asegurar que JsBarcode esté disponible en la ventana de impresión
+    const ensureBarcodeLib = () => new Promise<void>((resolve) => {
+      if ((printWindow as any).JsBarcode) {
+        resolve();
+        return;
       }
+      const check = setInterval(() => {
+        if ((printWindow as any).JsBarcode) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 50);
+      setTimeout(() => {
+        clearInterval(check);
+        resolve();
+      }, 5000);
+    });
+
+    ensureBarcodeLib().then(() => {
+      context.barcodeJobs.forEach((job) => {
+        const target = printWindow.document.getElementById(job.id);
+        if (!target) {
+          log.error(`Barcode target element not found: ${job.id}`);
+          return;
+        }
+        try {
+          const JsBarcode = (printWindow as any).JsBarcode;
+          if (JsBarcode) {
+            // Limpiar el contenido previo del SVG
+            target.innerHTML = '';
+            
+            JsBarcode(target, job.value, {
+              format: job.format === 'ean13' ? 'EAN13' : 'CODE128',
+              displayValue: true, // Forzar siempre mostrar el valor
+              height: job.height,
+              width: job.width,
+              margin: 0,
+              font: job.fontFamily,
+              fontSize: Math.max(16, Math.round(job.height * 0.25)), // Aumentar tamaño mínimo
+              textMargin: Math.max(8, Math.round(job.height * 0.15)), // Aumentar margen mínimo
+              background: '#ffffff',
+              lineColor: '#000000',
+              textAlign: 'center',
+              textPosition: 'bottom',
+            });
+            log.info(`Barcode generated successfully for ${job.value} on element ${job.id}`);
+          } else {
+            log.error('JsBarcode not available in print window');
+            // Fallback: mostrar el valor como texto
+            target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
+          }
+        } catch (error) {
+          log.error(`Failed to generate barcode for ${job.value}`, error);
+          // Fallback: mostrar el valor como texto
+          target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
+        }
+      });
+    }).catch((error) => {
+      log.error('JsBarcode library failed to load', error);
+      // Fallback para todos los códigos de barras
+      context.barcodeJobs.forEach((job) => {
+        const target = printWindow.document.getElementById(job.id);
+        if (target) {
+          target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
+        }
+      });
     });
 
     const ensureQrLib = () => new Promise<void>((resolve) => {
@@ -463,10 +526,10 @@ export const generateAndPrintLabels = async (
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-      }, 100);
+      }, 500);
     }).catch(() => {
       printWindow.print();
       printWindow.close();
     });
-  }, 350);
+  }, 1000);
 };

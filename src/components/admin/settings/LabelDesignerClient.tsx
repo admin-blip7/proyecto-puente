@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LabelSettings, LabelSettingsSchema, LabelType, labelTypes } from "@/types";
+import { LabelSettings, LabelSettingsSchema, LabelType, labelTypes, LabelOrientation, labelOrientations } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +64,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
           { id: 'label_002', name: 'Etiqueta Reparación Rápida', type: 'repair' as LabelType },
           { id: 'label_003', name: 'Etiqueta Consignación', type: 'product' as LabelType },
           { id: 'label_004', name: 'Etiqueta Garantía', type: 'repair' as LabelType },
+          { id: 'label_005', name: 'Etiqueta Producto Profesional', type: 'product' as LabelType },
         ];
         setExistingLabels(mockExistingLabels);
       } catch (error) {
@@ -90,7 +91,16 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   }, [selectedLabelType, form]);
 
   const handleLayoutChange = useCallback((layout: VisualEditorData) => {
-      form.setValue("visualLayout", JSON.stringify(layout), { shouldDirty: true });
+    const newValue = JSON.stringify(layout);
+    const currentValue = form.getValues("visualLayout");
+    
+    // Only update if the value actually changed to prevent unnecessary re-renders
+    if (newValue !== currentValue) {
+      // Use a timeout to batch updates and prevent rapid successive calls
+      setTimeout(() => {
+        form.setValue("visualLayout", newValue, { shouldDirty: true });
+      }, 0);
+    }
   }, [form]);
 
   const handleLabelTypeChange = useCallback(async (newLabelType: LabelType) => {
@@ -106,8 +116,9 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       // If there's an error, create default settings for this type
       const defaultSettings = {
         labelType: newLabelType,
-        width: 58, 
-        height: 40, 
+        width: 51, 
+        height: 102, 
+        orientation: 'vertical' as const,
         fontSize: 9,
         barcodeHeight: 30,
         includeLogo: false,
@@ -134,8 +145,240 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       
       try {
         // Load the specific settings for this label
-        // In a real implementation, you would have specific settings per label
-        const settings = await getLabelSettings(selectedLabel.type);
+        let settings;
+        
+        if (labelId === 'label_005') {
+          // Plantilla profesional de producto como las imágenes mostradas
+          settings = {
+            labelType: 'product' as LabelType,
+            width: 51,
+            height: 102,
+            orientation: 'vertical' as const,
+            fontSize: 10,
+            barcodeHeight: 25,
+            includeLogo: true,
+            logoUrl: "",
+            storeName: "22 Electronic Group",
+            content: {
+              showProductName: true,
+              showSku: true,
+              showPrice: true,
+              showStoreName: true,
+            },
+            visualLayout: JSON.stringify({
+              elements: [
+                {
+                  id: 'header-bg',
+                  type: 'rectangle',
+                  x: 2,
+                  y: 2,
+                  width: 54,
+                  height: 18,
+                  backgroundColor: '#000000',
+                  zIndex: 1
+                },
+                {
+                  id: 'store-logo',
+                  type: 'text',
+                  x: 4,
+                  y: 4,
+                  width: 50,
+                  height: 14,
+                  content: '22 Electronic Group',
+                  fontSize: 12,
+                  fontFamily: 'Gilroy',
+                  color: '#FFFFFF',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  zIndex: 2
+                },
+                {
+                  id: 'product-name',
+                  type: 'text',
+                  x: 4,
+                  y: 25,
+                  width: 50,
+                  height: 12,
+                  content: '{Nombre del Producto}',
+                  fontSize: 14,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  zIndex: 1
+                },
+                {
+                  id: 'memory-label',
+                  type: 'text',
+                  x: 4,
+                  y: 40,
+                  width: 20,
+                  height: 8,
+                  content: 'MEMORIA:',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  fontWeight: 'bold',
+                  zIndex: 1
+                },
+                {
+                  id: 'memory-value',
+                  type: 'text',
+                  x: 35,
+                  y: 40,
+                  width: 19,
+                  height: 8,
+                  content: '128GB',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  textAlign: 'right',
+                  zIndex: 1
+                },
+                {
+                  id: 'battery-label',
+                  type: 'text',
+                  x: 4,
+                  y: 50,
+                  width: 20,
+                  height: 8,
+                  content: 'BATERÍA:',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  fontWeight: 'bold',
+                  zIndex: 1
+                },
+                {
+                  id: 'battery-value',
+                  type: 'text',
+                  x: 35,
+                  y: 50,
+                  width: 19,
+                  height: 8,
+                  content: '90%',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  textAlign: 'right',
+                  zIndex: 1
+                },
+                {
+                  id: 'aesthetic-label',
+                  type: 'text',
+                  x: 4,
+                  y: 60,
+                  width: 20,
+                  height: 8,
+                  content: 'ESTÉTICA:',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  fontWeight: 'bold',
+                  zIndex: 1
+                },
+                {
+                  id: 'aesthetic-value',
+                  type: 'text',
+                  x: 35,
+                  y: 60,
+                  width: 19,
+                  height: 8,
+                  content: '9/10',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  textAlign: 'right',
+                  zIndex: 1
+                },
+                {
+                  id: 'color-label',
+                  type: 'text',
+                  x: 4,
+                  y: 70,
+                  width: 20,
+                  height: 8,
+                  content: 'COLOR:',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  fontWeight: 'bold',
+                  zIndex: 1
+                },
+                {
+                  id: 'color-value',
+                  type: 'text',
+                  x: 35,
+                  y: 70,
+                  width: 19,
+                  height: 8,
+                  content: 'Negro',
+                  fontSize: 9,
+                  fontFamily: 'Gilroy',
+                  color: '#000000',
+                  textAlign: 'right',
+                  zIndex: 1
+                },
+                {
+                  id: 'price-bg',
+                  type: 'rectangle',
+                  x: 4,
+                  y: 82,
+                  width: 50,
+                  height: 12,
+                  backgroundColor: '#000000',
+                  borderRadius: 4,
+                  zIndex: 1
+                },
+                {
+                  id: 'price',
+                  type: 'text',
+                  x: 6,
+                  y: 84,
+                  width: 46,
+                  height: 8,
+                  content: '{Precio de Venta}',
+                  fontSize: 16,
+                  fontFamily: 'Gilroy',
+                  color: '#FFFFFF',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  zIndex: 2
+                },
+                {
+                  id: 'barcode',
+                  type: 'placeholder',
+                  placeholderKey: 'barcode',
+                  x: 4,
+                  y: 98,
+                  width: 50,
+                  height: 20,
+                  showValue: true,
+                  barcodeFormat: 'code128',
+                  zIndex: 1
+                },
+                {
+                  id: 'sku-text',
+                  type: 'text',
+                  x: 4,
+                  y: 120,
+                  width: 50,
+                  height: 6,
+                  content: '{SKU}',
+                  fontSize: 8,
+                  fontFamily: 'Courier New',
+                  color: '#000000',
+                  textAlign: 'center',
+                  zIndex: 1
+                }
+              ]
+            })
+          };
+        } else {
+          // Para otras etiquetas, usar la configuración por defecto
+          settings = await getLabelSettings(selectedLabel.type);
+        }
+        
         form.reset(settings);
       } catch (error) {
         console.error('Error loading specific label settings:', error);
@@ -340,6 +583,24 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
           )}
           
           <div className="flex items-center space-x-2">
+            <Label htmlFor="label-orientation">Orientación</Label>
+            <Select 
+              value={form.watch("orientation") || "horizontal"} 
+              onValueChange={(value: LabelOrientation) => {
+                form.setValue("orientation", value, { shouldDirty: true });
+              }}
+            >
+              <SelectTrigger id="label-orientation" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="horizontal">Horizontal</SelectItem>
+                <SelectItem value="vertical">Vertical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex items-center space-x-2">
             <Label htmlFor="visual-mode-label">Modo Visual</Label>
             <Switch id="visual-mode-label" onCheckedChange={(checked) => setMode(checked ? "visual" : "simple")} />
           </div>
@@ -377,6 +638,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
             onLayoutChange={handleLayoutChange}
             widthMm={watchedSettings.width}
             heightMm={watchedSettings.height}
+            orientation={watchedSettings.orientation || 'horizontal'}
         />
       )}
     </>
