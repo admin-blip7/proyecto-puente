@@ -19,6 +19,8 @@ export interface Product {
   comboProductIds?: string[];
   compatibilityTags?: string[];
   searchKeywords?: string[];
+  category?: string; // Categoría especial (ej: "Celular Seminuevo", "Mica")
+  attributes?: Record<string, any>; // Atributos específicos por categoría
 }
 
 

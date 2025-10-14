@@ -20,28 +20,7 @@ CREATE TABLE IF NOT EXISTS public.settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Verificar si la tabla products tiene las columnas necesarias
-DO $products_migration$
-BEGIN
-    -- Verificar si la tabla products existe primero
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') THEN
-        -- Verificar y agregar columnas faltantes a products
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'id') THEN
-            ALTER TABLE products ADD COLUMN id UUID DEFAULT gen_random_uuid();
-        END IF;
-        
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'created_at') THEN
-            ALTER TABLE products ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-        END IF;
-        
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'last_updated') THEN
-            ALTER TABLE products ADD COLUMN last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-        END IF;
-        
-        -- Corregir productos sin ID
-        UPDATE products SET id = gen_random_uuid() WHERE id IS NULL OR id = '';
-    END IF;
-END $products_migration$;
+-- 3. La tabla products ya fue creada con la estructura correcta en la migración anterior
 
 -- 4. Crear índices para mejorar el rendimiento (solo si la tabla products existe)
 DO $create_indexes$
@@ -133,8 +112,8 @@ INSERT INTO public.settings (id, data) VALUES
     }
 }') ON CONFLICT (id) DO NOTHING;
 
--- 8. Limpiar productos duplicados o inválidos
-DELETE FROM products WHERE id IS NULL OR id = '' OR name IS NULL OR name = '';
+-- 8. Limpiar productos duplicados o inválidos (solo si la tabla tiene datos)
+DELETE FROM products WHERE name IS NULL OR name = '';
 
 -- 9. Verificar y crear RLS (Row Level Security) policies
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;

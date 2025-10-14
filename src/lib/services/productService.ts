@@ -50,6 +50,8 @@ const mapProduct = (row: any, index: number): Product => ({
   comboProductIds: Array.isArray(row?.comboProductIds) ? row.comboProductIds : [],
   compatibilityTags: Array.isArray(row?.compatibilityTags) ? row.compatibilityTags : [],
   searchKeywords: Array.isArray(row?.searchKeywords) ? row.searchKeywords : [],
+  category: row?.category ?? undefined,
+  attributes: row?.attributes ?? {},
 });
 
 const fetchProductRow = async (productId: string) => {
@@ -126,6 +128,8 @@ export const addProduct = async (
     comboProductIds: productData.comboProductIds ?? [],
     compatibilityTags: productData.compatibilityTags ?? [],
     searchKeywords,
+    category: productData.category ?? null,
+    attributes: productData.attributes ?? {},
     createdAt,
   };
 
@@ -172,6 +176,8 @@ export const updateProduct = async (
       comboProductIds: productData.comboProductIds ?? existingRow.comboProductIds ?? [],
       compatibilityTags: productData.compatibilityTags ?? existingRow.compatibilityTags ?? [],
       searchKeywords,
+      category: productData.category ?? existingRow.category,
+      attributes: productData.attributes ?? existingRow.attributes ?? {},
     })
     .eq("firestore_id", existingRow.firestore_id ?? productId);
 

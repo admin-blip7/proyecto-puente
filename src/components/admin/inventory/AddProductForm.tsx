@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
+import CategoryAttributes, { productCategories } from "./CategoryAttributes";
 import CurrencyInput from "@/components/ui/currency-input";
 import { getLogger } from "@/lib/logger";
 const log = getLogger("AddProductForm");
@@ -25,7 +26,10 @@ interface AddProductFormProps {
   allProducts: Product[];
 }
 
-const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'compatibilityTags'> & { compatibilityTags: string[] } = {
+const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'compatibilityTags' | 'attributes'> & {
+  compatibilityTags: string[];
+  attributes: Record<string, any>;
+} = {
   name: '',
   sku: '',
   price: 0,
@@ -37,6 +41,8 @@ const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'co
   consignorId: undefined,
   comboProductIds: [],
   compatibilityTags: [],
+  category: '',
+  attributes: {},
 };
 
 export default function AddProductForm({ consignors, allProducts }: AddProductFormProps) {
@@ -63,6 +69,10 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
     }
      if (name === 'ownershipType' && value !== 'Consigna') {
       updatedFormData.consignorId = undefined;
+    }
+    // Si cambia la categoría, limpiar los atributos
+    if (name === 'category') {
+      updatedFormData.attributes = {};
     }
     setFormData(updatedFormData);
   };
@@ -139,7 +149,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
           <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
           <TabsTrigger value="pricing" className="text-xs sm:text-sm">Precios</TabsTrigger>
-          <TabsTrigger value="classification" className="text-xs sm:text-sm">Tipo</TabsTrigger>
+          <TabsTrigger value="classification" className="text-xs sm:text-sm">Categoría</TabsTrigger>
           <TabsTrigger value="relations" className="text-xs sm:text-sm">Combos</TabsTrigger>
         </TabsList>
 
@@ -203,9 +213,46 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
 
           <TabsContent value="classification">
             <Card>
-              <CardHeader><CardTitle>Clasificación del Producto</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Categoría y Clasificación</CardTitle>
+                <CardDescription>Define el tipo de producto y sus atributos especiales</CardDescription>
+              </CardHeader>
               <CardContent className="space-y-6 px-2 sm:px-6">
+                {/* Categoría Especial */}
                 <div>
+                  <Label className="text-sm sm:text-base">Categoría Especial</Label>
+                  <Select value={formData.category || ''} onValueChange={(value) => handleSelectChange('category', value)}>
+                    <SelectTrigger className="text-base">
+                      <SelectValue placeholder="Seleccionar categoría..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productCategories.map(cat => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.category && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Se mostrarán campos adicionales para esta categoría
+                    </p>
+                  )}
+                </div>
+
+                {/* Atributos por categoría */}
+                {formData.category && (
+                  <div className="border-t pt-6">
+                    <CategoryAttributes
+                      category={formData.category}
+                      attributes={formData.attributes}
+                      onChange={(attributes) => setFormData(prev => ({ ...prev, attributes }))}
+                    />
+                  </div>
+                )}
+
+                {/* Tipo de Producto (existente) */}
+                <div className="border-t pt-6">
                   <Label className="text-sm sm:text-base">Tipo de Producto</Label>
                   <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mt-2">
                     <div className="flex items-center space-x-2">
@@ -218,6 +265,8 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                     </div>
                   </RadioGroup>
                 </div>
+
+                {/* Tipo de Propiedad (existente) */}
                 <div>
                   <Label className="text-sm sm:text-base">Tipo de Propiedad</Label>
                   <Select name="ownershipType" value={formData.ownershipType} onValueChange={(value: any) => handleSelectChange('ownershipType', value)}>
@@ -225,6 +274,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                     <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+
                 {formData.ownershipType === 'Consigna' && (
                   <div>
                     <Label className="text-sm sm:text-base">Consignador</Label>

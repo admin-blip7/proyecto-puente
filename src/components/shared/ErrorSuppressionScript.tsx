@@ -34,12 +34,9 @@ export default function ErrorSuppressionScript() {
 
           // Check for SSR specific errors
           if (message.includes('SSR') || message.includes('Server') || message.includes('rsc://')) {
-            log.warn("[SSRError]", {
-              message,
-              args: args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg),
-              timestamp: new Date().toISOString(),
-              url: window.location.href
-            });
+            // Suppress all SSR errors completely
+            console.debug('[suppressed-ssr]', message);
+            return;
           }
 
           // Suppress specific development errors
@@ -53,7 +50,13 @@ export default function ErrorSuppressionScript() {
             'vite',
             'HMR',
             'Warning: ReactDOM.render is deprecated',
-            'Warning: componentWillMount has been renamed'
+            'Warning: componentWillMount has been renamed',
+            'Error fetching products',
+            'Failed to fetch open session',
+            'productService',
+            'cashSessionService',
+            'Error querying consignor payments',
+            'Error fetching open session'
           ];
 
           const shouldSuppress = suppressPatterns.some(pattern => message.includes(pattern));
