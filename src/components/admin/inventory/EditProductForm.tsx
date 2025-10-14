@@ -199,8 +199,14 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <div>
                   <Label>Tipo de Producto</Label>
                   <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex space-x-4 mt-2">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Venta" id="type-venta" /><Label htmlFor="type-venta" className="font-normal">Para Venta</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Refacción" id="type-refaccion" /><Label htmlFor="type-refaccion" className="font-normal">Refacción</Label></div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Venta" id="type-venta" />
+                      <Label htmlFor="type-venta" className="font-normal">Para Venta</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Refacción" id="type-refaccion" />
+                      <Label htmlFor="type-refaccion" className="font-normal">Refacción</Label>
+                    </div>
                   </RadioGroup>
                 </div>
                 <div>

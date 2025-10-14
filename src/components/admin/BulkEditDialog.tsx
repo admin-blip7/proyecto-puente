@@ -162,10 +162,22 @@ export default function BulkEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4">
-                            <div><RadioGroupItem value="fixed" id="price-fixed" /><Label htmlFor="price-fixed" className="ml-2">Establecer Valor Fijo</Label></div>
-                            <div><RadioGroupItem value="amount" id="price-amount" /><Label htmlFor="price-amount" className="ml-2">Ajustar por Monto (+/-)</Label></div>
-                            <div><RadioGroupItem value="percent" id="price-percent" /><Label htmlFor="price-percent" className="ml-2">Ajustar por %</Label></div>
-                            <div><RadioGroupItem value="none" id="price-none" /><Label htmlFor="price-none" className="ml-2">Sin Cambios</Label></div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="fixed" id="price-fixed" />
+                              <Label htmlFor="price-fixed">Establecer Valor Fijo</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="amount" id="price-amount" />
+                              <Label htmlFor="price-amount">Ajustar por Monto (+/-)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="percent" id="price-percent" />
+                              <Label htmlFor="price-percent">Ajustar por %</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="none" id="price-none" />
+                              <Label htmlFor="price-none">Sin Cambios</Label>
+                            </div>
                         </RadioGroup>
                       </FormItem>
                     )}
@@ -195,10 +207,22 @@ export default function BulkEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-4">
-                            <div><RadioGroupItem value="fixed" id="cost-fixed" /><Label htmlFor="cost-fixed" className="ml-2">Establecer Valor Fijo</Label></div>
-                            <div><RadioGroupItem value="amount" id="cost-amount" /><Label htmlFor="cost-amount" className="ml-2">Ajustar por Monto (+/-)</Label></div>
-                            <div><RadioGroupItem value="percent" id="cost-percent" /><Label htmlFor="cost-percent" className="ml-2">Ajustar por %</Label></div>
-                            <div><RadioGroupItem value="none" id="cost-none" /><Label htmlFor="cost-none" className="ml-2">Sin Cambios</Label></div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="fixed" id="cost-fixed" />
+                              <Label htmlFor="cost-fixed">Establecer Valor Fijo</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="amount" id="cost-amount" />
+                              <Label htmlFor="cost-amount">Ajustar por Monto (+/-)</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="percent" id="cost-percent" />
+                              <Label htmlFor="cost-percent">Ajustar por %</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="none" id="cost-none" />
+                              <Label htmlFor="cost-none">Sin Cambios</Label>
+                            </div>
                         </RadioGroup>
                       </FormItem>
                     )}

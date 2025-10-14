@@ -64,8 +64,8 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
             <CommandInput placeholder="Buscar producto..." value={comboSearch} onValueChange={setComboSearch}/>
             <CommandList>
               <CommandEmpty>No se encontraron productos.</CommandEmpty>
-              {filteredComboOptions.map(product => (
-                <CommandItem key={product.id} onSelect={() => handleToggleComboProduct(product.id)}>
+              {filteredComboOptions.map((product, index) => (
+                <CommandItem key={`${product.id}-${index}`} onSelect={() => handleToggleComboProduct(product.id)}>
                   {product.name}
                 </CommandItem>
               ))}
@@ -78,8 +78,8 @@ export default function ComboProductSelector({ form, allProducts }: ComboProduct
         <Label>Productos en el combo ({comboProducts.length})</Label>
         {comboProducts.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {comboProducts.map(p => (
-              <Badge key={p.id} variant="secondary" className="text-sm">
+            {comboProducts.map((p, index) => (
+              <Badge key={`${p.id}-${index}`} variant="secondary" className="text-sm">
                 {p.name}
                 <button type="button" onClick={() => handleToggleComboProduct(p.id)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20">
                   <X className="h-3 w-3"/>

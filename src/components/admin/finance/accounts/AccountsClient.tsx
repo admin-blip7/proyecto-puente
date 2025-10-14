@@ -38,7 +38,9 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
     setAddEditOpen(true);
   };
 
-  const handleOpenEditDialog = (account: Account) => {
+  const handleOpenEditDialog = (e: React.MouseEvent, account: Account) => {
+    e.preventDefault();
+    e.stopPropagation();
     setSelectedAccount(account);
     setAddEditOpen(true);
   };
@@ -110,9 +112,14 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenEditDialog(account)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Editar</span>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <div
+                                className="flex items-center w-full"
+                                onClick={(e) => handleOpenEditDialog(e, account)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Editar</span>
+                              </div>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

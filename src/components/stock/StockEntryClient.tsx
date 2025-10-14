@@ -23,6 +23,7 @@ import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getLogger } from "@/lib/logger";
+import { generateUniqueKey, reportInvalidIds } from "@/lib/utils/keys";
 
 const log = getLogger("StockEntryClient");
 
@@ -330,10 +331,12 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                         <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
                                                             {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
                                                         </div>
-                                                        {filteredProducts.slice(0, 50).map(product => (
-                                                            <CommandItem 
-                                                                key={product.id} 
-                                                                onSelect={() => handleSelectProduct(product)} 
+                                                        {filteredProducts.slice(0, 50).map((product, index) => {
+                                                            const uniqueKey = generateUniqueKey(product, index, 'search-product');
+                                                            return (
+                                                            <CommandItem
+                                                                key={uniqueKey}
+                                                                onSelect={() => handleSelectProduct(product)}
                                                                 className="cursor-pointer flex items-center justify-between p-3 hover:bg-accent"
                                                             >
                                                                 <div className="flex flex-col">
@@ -346,7 +349,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                                     Stock: {product.stock || 0}
                                                                 </div>
                                                             </CommandItem>
-                                                        ))}
+                                                            );
+                                                        })}
                                                         {filteredProducts.length > 50 && (
                                                             <div className="p-2 text-xs text-center text-muted-foreground border-t">
                                                                 Mostrando los primeros 50 resultados
@@ -403,8 +407,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                     La lista de ingreso está vacía.
                                 </div>
                             ) : (
-                                entryList.map(item => (
-                                    <div key={item.id} className="border rounded-lg p-4 space-y-4 bg-card hover:bg-accent/5 transition-colors">
+                                entryList.map((item, index) => {
+                                    const uniqueKey = generateUniqueKey(item, index, 'stock-entry');
+                                    return (
+                                    <div key={uniqueKey} className="border rounded-lg p-4 space-y-4 bg-card hover:bg-accent/5 transition-colors">
                                         {/* Primera fila: Información básica del producto */}
                                         <div className="grid grid-cols-12 gap-4 items-center">
                                             <div className="col-span-2">
@@ -447,7 +453,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                         <SelectValue/>
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                                        {ownershipTypes.map((type, index) => {
+                                                            const uniqueKey = generateUniqueKey({ type }, index, 'ownership-type');
+                                                            return <SelectItem key={uniqueKey} value={type}>{type}</SelectItem>;
+                                                        })}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -502,7 +511,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                                 <SelectValue placeholder="Seleccionar consignador..."/>
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                                {consignors.map((c, index) => {
+                                                                    const uniqueKey = generateUniqueKey(c, index, 'consignor');
+                                                                    return <SelectItem key={uniqueKey} value={c.id}>{c.name}</SelectItem>;
+                                                                })}
                                                             </SelectContent>
                                                         </Select>
                                                     </>
@@ -525,7 +537,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                             </div>
                                         </div>
                                     </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                         {/* Mobile Enhanced Card View */}
@@ -535,8 +548,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                     La lista de ingreso está vacía.
                                 </div>
                         ) : (
-                            entryList.map(item => (
-                                <Card key={item.id} className="relative">
+                            entryList.map((item, index) => {
+                                const uniqueKey = generateUniqueKey(item, index, 'stock-entry-mobile');
+                                return (
+                                <Card key={uniqueKey} className="relative">
                                     <CardContent className="p-4 space-y-4">
                                         <div className="absolute top-2 right-2">
                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveItem(item.id)}>
@@ -589,7 +604,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                 <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
                                                     <SelectTrigger><SelectValue placeholder="Tipo Propiedad" /></SelectTrigger>
                                                     <SelectContent>
-                                                        {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                                        {ownershipTypes.map((type, index) => {
+                                                            const uniqueKey = generateUniqueKey({ type }, index, 'ownership-type-mobile');
+                                                            return <SelectItem key={uniqueKey} value={type}>{type}</SelectItem>;
+                                                        })}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -599,7 +617,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                     <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
                                                         <SelectTrigger><SelectValue placeholder="Seleccionar consignador..."/></SelectTrigger>
                                                         <SelectContent>
-                                                            {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                            {consignors.map((c, index) => {
+                                                                const uniqueKey = generateUniqueKey(c, index, 'consignor-mobile');
+                                                                return <SelectItem key={uniqueKey} value={c.id}>{c.name}</SelectItem>;
+                                                            })}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
@@ -650,7 +671,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))
+                                    );
+                                })
                         )}
                         </div>
                     </CardContent>

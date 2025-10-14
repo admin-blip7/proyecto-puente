@@ -98,7 +98,7 @@ export const addExpense = async (
     paidFromAccountId: expenseData.paidFromAccountId,
     paymentDate,
     receiptUrl: receiptUrl ?? null,
-    sessionId: activeSession ? activeSession.firestore_id ?? activeSession.id : expenseData.sessionId ?? null,
+    sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (expenseData.sessionId || null),
   };
 
   const { data: insertedExpense, error: insertError } = await supabase
@@ -108,26 +108,83 @@ export const addExpense = async (
     .single();
 
   if (insertError) {
-    log.error("Error inserting expense", insertError);
-    throw new Error("No se pudo registrar el gasto.");
+    log.error("Error inserting expense", { 
+      insertError, 
+      errorDetails: {
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint
+      },
+      expensePayload: {
+        ...expensePayload,
+        // Don't log sensitive data but log the structure
+        hasValidAccountId: !!expensePayload.paidFromAccountId,
+        accountId: expensePayload.paidFromAccountId
+      }
+    });
+    throw new Error(`No se pudo registrar el gasto: ${insertError.message}`);
   }
 
-  const { data: accountRow, error: accountError } = await supabase
+  // First, try to find the account using both possible ID fields
+  let accountRow = null;
+  let accountError = null;
+
+  // Try firestore_id first
+  const { data: byFirestoreId, error: errorFirestore } = await supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id,currentBalance")
+    .select("firestore_id,current_balance")
     .eq("firestore_id", expenseData.paidFromAccountId)
     .maybeSingle();
-
-  if (accountError || !accountRow) {
-    log.error("Error fetching account", accountError);
-    throw new Error("No se encontró la cuenta seleccionada.");
+  
+  if (!errorFirestore && byFirestoreId) {
+    accountRow = byFirestoreId;
+  } else {
+    // If not found by firestore_id, try with id field
+    const { data: byId, error: errorId } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("firestore_id,current_balance")
+      .eq("id", expenseData.paidFromAccountId)
+      .maybeSingle();
+    
+    if (byId) {
+      accountRow = byId;
+      accountError = null;
+    } else {
+      accountError = errorId || errorFirestore;
+    }
   }
 
-  const newBalance = Number(accountRow.currentBalance ?? 0) - expenseData.amount;
-  const { error: accountUpdateError } = await supabase
+  if (accountError || !accountRow) {
+    log.error("Error fetching account", { 
+      accountError, 
+      accountId: expenseData.paidFromAccountId,
+      errorDetails: accountError,
+      searchAttempts: {
+        firestore_id: expenseData.paidFromAccountId,
+        id: expenseData.paidFromAccountId
+      }
+    });
+    throw new Error(`No se encontró la cuenta seleccionada. ID: ${expenseData.paidFromAccountId}`);
+  }
+
+  const newBalance = Number(accountRow.current_balance ?? 0) - expenseData.amount;
+  // Update account balance with more specific ID matching
+  let accountUpdateError = null;
+  // First try updating with firestore_id
+  const { error: errorByFirestoreId } = await supabase
     .from(ACCOUNTS_TABLE)
-    .update({ currentBalance: newBalance })
-    .eq("firestore_id", accountRow.firestore_id ?? expenseData.paidFromAccountId);
+    .update({ current_balance: newBalance })
+    .eq("firestore_id", accountRow.firestore_id);
+  
+  if (errorByFirestoreId) {
+    // If that fails, try with id field
+    const { error: errorById } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .update({ current_balance: newBalance })
+      .eq("id", expenseData.paidFromAccountId);
+    accountUpdateError = errorById;
+  }
 
   if (accountUpdateError) {
     log.warn("Failed to update account balance", accountUpdateError);
@@ -138,17 +195,36 @@ export const addExpense = async (
     const expectedCashInDrawer =
       Number(activeSession.startingFloat ?? 0) + Number(activeSession.totalCashSales ?? 0) - newTotalPayouts;
 
-    const { error: sessionUpdateError } = await supabase
+    // Update the session with more specific ID matching
+    let sessionUpdateError = null;
+    // First try updating with firestore_id
+    const { error: sessionErrorByFirestoreId } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .update({
         totalCashPayouts: newTotalPayouts,
         expectedCashInDrawer,
       })
-      .eq("firestore_id", activeSession.firestore_id ?? activeSession.id);
+      .eq("firestore_id", activeSession.firestore_id || activeSession.id);
+    
+    if (sessionErrorByFirestoreId) {
+      // If that fails, try with id field
+      const { error: sessionErrorById } = await supabase
+        .from(CASH_SESSIONS_TABLE)
+        .update({
+          totalCashPayouts: newTotalPayouts,
+          expectedCashInDrawer,
+        })
+        .eq("id", activeSession.firestore_id || activeSession.id);
+      sessionUpdateError = sessionErrorById;
+    }
 
     if (sessionUpdateError) {
       log.warn("Failed to update cash session with expense", sessionUpdateError);
     }
+  }
+
+  if (accountUpdateError) {
+    log.warn("Failed to update account balance", accountUpdateError);
   }
 
   return mapExpense(insertedExpense);

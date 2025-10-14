@@ -81,13 +81,30 @@ const nextConfig: NextConfig = {
     if (dev && !isServer) {
       // Optimizar HMR y source maps para desarrollo
       config.devtool = 'eval-cheap-module-source-map';
-      
+
       // Configuración para mejor HMR
       config.watchOptions = {
         ...config.watchOptions,
-        poll: 1000,
-        aggregateTimeout: 300,
+        poll: 500, // Reducir polling para más rápido refresh
+        aggregateTimeout: 150, // Reducir timeout para respuestas más rápidas
+        ignored: ['**/node_modules/**', '**/.git/**', '**/.next/**'], // Ignorar carpetas innecesarias
       };
+
+      // Optimizar caché de módulos
+      config.module.rules = config.module.rules.map((rule: any) => {
+        if (rule.oneOf) {
+          rule.oneOf = rule.oneOf.map((r: any) => {
+            if (r.use && r.use.loader && r.use.loader.includes('next-swc-loader')) {
+              r.use.options = {
+                ...r.use.options,
+                // Optimizar compilación SWC para desarrollo
+              };
+            }
+            return r;
+          });
+        }
+        return rule;
+      });
     }
 
     // Optimizar source maps para producción

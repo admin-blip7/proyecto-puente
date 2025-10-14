@@ -28,10 +28,15 @@ const generateSearchKeywords = (name: string): string[] => {
   return Array.from(keywords);
 };
 
-const normalizeId = (row: any) => row?.id ?? row?.firestore_id;
+const normalizeId = (row: any, index: number) => {
+  const id = row?.id ?? row?.firestore_id;
+  // Si no hay ID o está duplicado, crear un ID compuesto único
+  if (!id) return `temp-${index}-${Date.now()}`;
+  return `${id}`;
+};
 
-const mapProduct = (row: any): Product => ({
-  id: normalizeId(row),
+const mapProduct = (row: any, index: number): Product => ({
+  id: normalizeId(row, index),
   name: row?.name ?? "",
   sku: row?.sku ?? "",
   price: Number(row?.price ?? 0),
@@ -75,7 +80,13 @@ export const getProducts = async (): Promise<Product[]> => {
       throw error;
     }
 
-    return (data ?? []).map(mapProduct);
+    const products = (data ?? []).map((row, index) => mapProduct(row, index));
+    const uniqueProducts = products.filter(
+      (product, index, self) =>
+        index === self.findIndex((p) => p.id === product.id)
+    );
+
+    return uniqueProducts;
   } catch (error) {
     log.error("Error fetching products:", error);
     return [];
@@ -85,7 +96,7 @@ export const getProducts = async (): Promise<Product[]> => {
 export const getProductById = async (productId: string): Promise<Product | null> => {
   try {
     const row = await fetchProductRow(productId);
-    return row ? mapProduct(row) : null;
+    return row ? mapProduct(row, 0) : null;
   } catch (error) {
     log.error("Error fetching product by ID:", error);
     return null;
@@ -129,7 +140,7 @@ export const addProduct = async (
     throw new Error("Failed to add product.");
   }
 
-  return mapProduct(data);
+  return mapProduct(data, 0);
 };
 
 export const updateProduct = async (
@@ -174,7 +185,7 @@ export const updateProduct = async (
     throw new Error("Product not found after update.");
   }
 
-  return mapProduct(updatedRow);
+  return mapProduct(updatedRow, 0);
 };
 
 export const processStockEntry = async (

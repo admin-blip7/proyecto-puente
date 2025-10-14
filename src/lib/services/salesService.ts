@@ -71,8 +71,8 @@ export const addSaleAndUpdateStock = async (
     cartItems.map(async (item) => {
       const { data, error } = await supabase
         .from(PRODUCTS_TABLE)
-        .select("firestore_id, stock, cost, ownershipType, consignorId, name")
-        .eq("firestore_id", item.id)
+        .select("id, firestore_id, stock, cost, ownershipType, consignorId, name")
+        .eq("id", item.id)
         .maybeSingle();
 
       if (error) {
@@ -97,7 +97,7 @@ export const addSaleAndUpdateStock = async (
     const { error: updateError } = await supabase
       .from(PRODUCTS_TABLE)
       .update({ stock: newStock })
-      .eq("firestore_id", row.firestore_id ?? cartItem.id);
+      .eq("id", row.id);
 
     if (updateError) {
       log.error("Error updating product stock", updateError);
@@ -105,7 +105,7 @@ export const addSaleAndUpdateStock = async (
     }
 
     const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
-      productId: row.firestore_id ?? cartItem.id,
+      productId: row.firestore_id ?? row.id,
       productName: row.name ?? cartItem.name,
       change: -cartItem.quantity,
       reason: "Venta",

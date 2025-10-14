@@ -60,15 +60,54 @@ export default function ShoppingCart({
   const handleExpenseAdded = async (description: string, amount: number, category: string) => {
     if (!userProfile) return;
     try {
-        await addExpense({ description, amount, category, paidFromAccountId: 'cash_drawer' }, undefined, userProfile.uid);
-        toast({
-            title: "Gasto Registrado",
-            description: "El gasto ha sido registrado exitosamente desde la caja."
+      // Try to find a cash account to use as the source for the expense
+      const { getAccounts, addAccount } = await import("@/lib/services/accountService");
+      const accounts = await getAccounts();
+      
+      // Look for a cash drawer account (one that contains "caja" or "cash" in the name)
+      let cashAccount = accounts.find(acc => 
+        acc.name.toLowerCase().includes('caja') || 
+        acc.name.toLowerCase().includes('cash') ||
+        acc.name.toLowerCase().includes('drawer')
+      );
+      
+      // If no cash account found, use the first available account as fallback
+      if (!cashAccount && accounts.length > 0) {
+        cashAccount = accounts[0];
+      }
+      
+      // If no accounts exist, create a default cash account
+      if (!cashAccount) {
+        cashAccount = await addAccount({
+          name: 'Caja Principal',
+          type: 'Caja',
+          currentBalance: 0
         });
-        setExpenseOpen(false);
+        toast({
+          title: "Cuenta Creada",
+          description: "Se creó una cuenta de caja principal para registrar el gasto."
+        });
+      }
+      
+      await addExpense({ 
+        description, 
+        amount, 
+        category, 
+        paidFromAccountId: cashAccount.id 
+      }, undefined, userProfile.uid);
+      
+      toast({
+          title: "Gasto Registrado",
+          description: `El gasto ha sido registrado exitosamente desde ${cashAccount.name}.`
+      });
+      setExpenseOpen(false);
     } catch(error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo registrar el gasto."})
+        toast({ 
+          variant: 'destructive', 
+          title: "Error", 
+          description: "No se pudo registrar el gasto. Intente recargar la página." 
+        });
     }
   }
   

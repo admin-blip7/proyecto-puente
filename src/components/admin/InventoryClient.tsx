@@ -122,38 +122,77 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
           <CardTitle>Lista de Productos</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-250px)] w-full">
-            <div className="relative w-full overflow-auto">
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead className="w-12">
-                        <Checkbox 
-                            checked={numSelected > 0 && numSelected === products.length ? true : (numSelected > 0 ? "indeterminate" : false)}
-                            onCheckedChange={(checked: any) => handleSelectAll(checked)}
+          {/* Mobile Card View */}
+          <div className="md:hidden">
+            <ScrollArea className="h-[calc(100vh-250px)] w-full">
+              <div className="space-y-3">
+                {products.map((product, index) => (
+                  <div key={`${product.id}-${index}`} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={selectedProductIds.includes(product.id)}
+                          onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                          className="mt-1"
                         />
-                    </TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Propiedad</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.name}</p>
+                          <p className="text-sm text-muted-foreground">{product.sku}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditPage(product.id)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <Badge variant={getOwnershipTypeVariant(product.ownershipType)} className="text-xs">
+                        {product.ownershipType}
+                      </Badge>
+                      <span className="font-semibold">{formatCurrency(product.price)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Stock: {product.stock}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <ScrollArea className="h-[calc(100vh-250px)] w-full">
+              <div className="relative w-full overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={numSelected > 0 && numSelected === products.length ? true : (numSelected > 0 ? "indeterminate" : false)}
+                          onCheckedChange={(checked: any) => handleSelectAll(checked)}
+                        />
+                      </TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Propiedad</TableHead>
+                      <TableHead className="text-right">Precio</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {products.map((product) => (
-                    <TableRow key={product.id} data-state={selectedProductIds.includes(product.id) ? "selected" : ""}>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product, index) => (
+                      <TableRow key={`${product.id}-${index}`} data-state={selectedProductIds.includes(product.id) ? "selected" : ""}>
                         <TableCell className="w-12">
-                            <Checkbox 
-                                checked={selectedProductIds.includes(product.id)}
-                                onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
-                            />
+                          <Checkbox
+                            checked={selectedProductIds.includes(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                          />
                         </TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>
-                            <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
+                          <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
                         <TableCell className="text-right">{product.stock}</TableCell>
@@ -163,12 +202,13 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                             <span className="sr-only">Editar</span>
                           </Button>
                         </TableCell>
-                    </TableRow>
+                      </TableRow>
                     ))}
-                </TableBody>
+                  </TableBody>
                 </Table>
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </div>
         </CardContent>
       </Card>
       

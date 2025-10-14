@@ -25,7 +25,12 @@ interface ConsignorClientProps {
 }
 
 export default function ConsignorClient({ initialConsignors }: ConsignorClientProps) {
-  const [consignors, setConsignors] = useState<Consignor[]>(initialConsignors);
+  // Remove duplicate consignors by ID to avoid React key conflicts
+  const uniqueConsignors = initialConsignors.filter((consignor, index, self) => 
+    index === self.findIndex(c => c.id === consignor.id)
+  );
+  
+  const [consignors, setConsignors] = useState<Consignor[]>(uniqueConsignors);
   const [selectedConsignor, setSelectedConsignor] = useState<Consignor | null>(null);
   const [isAddEditDialogOpen, setAddEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -52,11 +57,19 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   };
 
   const handleConsignorAdded = (newConsignor: Consignor) => {
-    setConsignors(prev => [newConsignor, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
+    setConsignors(prev => {
+      // Filter out any existing consignor with the same ID, then add the new one
+      const filtered = prev.filter(c => c.id !== newConsignor.id);
+      return [newConsignor, ...filtered].sort((a,b) => a.name.localeCompare(b.name));
+    });
   };
   
   const handleConsignorUpdated = (updatedConsignor: Consignor) => {
-      setConsignors(prev => prev.map(c => c.id === updatedConsignor.id ? updatedConsignor : c));
+      setConsignors(prev => {
+        // Remove any existing consignor with the same ID, then update with the new one
+        const filtered = prev.filter(c => c.id !== updatedConsignor.id);
+        return [updatedConsignor, ...filtered];
+      });
   };
   
   const handleConsignorDeleted = (consignorId: string) => {
@@ -101,43 +114,47 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {consignors.map((consignor) => (
-                        <TableRow key={consignor.id}>
-                            <TableCell className="font-medium">{consignor.name}</TableCell>
-                            <TableCell>{consignor.contactInfo}</TableCell>
-                            <TableCell className="text-right font-semibold">
-                                <div className="flex items-center justify-end">
-                                    <DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
-                                    {consignor.balanceDue.toFixed(2)}
-                                </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Abrir menú</span>
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleOpenPaymentDialog(consignor)}>
-                                            <DollarSign className="mr-2 h-4 w-4" />
-                                            <span>Registrar Pago</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleOpenEditDialog(consignor)}>
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            <span>Editar</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleOpenDeleteDialog(consignor)} className="text-destructive">
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            <span>Eliminar</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
-                    ))}
+                    {consignors.map((consignor, index) => {
+                        // Generate a unique key that accounts for potential duplicate IDs
+                        const uniqueKey = consignor.id || `${index}-${consignor.name}`;
+                        return (
+                            <TableRow key={uniqueKey}>
+                                <TableCell className="font-medium">{consignor.name}</TableCell>
+                                <TableCell>{consignor.contactInfo}</TableCell>
+                                <TableCell className="text-right font-semibold">
+                                    <div className="flex items-center justify-end">
+                                        <DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
+                                        {consignor.balanceDue.toFixed(2)}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                <span className="sr-only">Abrir menú</span>
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleOpenPaymentDialog(consignor)}>
+                                                <DollarSign className="mr-2 h-4 w-4" />
+                                                <span>Registrar Pago</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleOpenEditDialog(consignor)}>
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Editar</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleOpenDeleteDialog(consignor)} className="text-destructive">
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                <span>Eliminar</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
                 </TableBody>
                 </Table>
             </div>

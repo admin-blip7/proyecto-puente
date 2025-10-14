@@ -13,7 +13,7 @@ const mapAccount = (row: any): Account => ({
   id: row?.firestore_id ?? row?.id ?? "",
   name: row?.name ?? "",
   type: row?.type ?? "Banco",
-  currentBalance: Number(row?.currentBalance ?? 0),
+  currentBalance: Number(row?.current_balance ?? 0),
 });
 
 export const getAccounts = async (): Promise<Account[]> => {
@@ -43,7 +43,7 @@ export const addAccount = async (accountData: Omit<Account, "id">): Promise<Acco
       firestore_id: firestoreId,
       name: accountData.name,
       type: accountData.type,
-      currentBalance: accountData.currentBalance ?? 0,
+      current_balance: accountData.currentBalance ?? 0,
     };
 
     const { data, error } = await supabase

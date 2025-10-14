@@ -119,41 +119,42 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
   return (
     <form onSubmit={handleSaveProduct} className="h-full flex flex-col">
       <header className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <div className="flex justify-between items-center mb-4 pt-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pt-4">
           <Button asChild variant="outline" size="sm">
             <Link href="/admin">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
+              <span className="hidden sm:inline">Volver</span>
+              <span className="sm:hidden">Atrás</span>
             </Link>
           </Button>
-          <h1 className="text-xl font-bold tracking-tight text-center">Agregar Nuevo Producto</h1>
-          <Button type="submit" disabled={isLoading}>
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-center flex-1">Agregar Nuevo Producto</h1>
+          <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isLoading ? 'Guardando...' : 'Guardar Producto'}
+            {isLoading ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
       </header>
 
       <Tabs defaultValue="general" className="w-full flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="general">Información General</TabsTrigger>
-          <TabsTrigger value="pricing">Precios y Stock</TabsTrigger>
-          <TabsTrigger value="classification">Clasificación</TabsTrigger>
-          <TabsTrigger value="relations">Combos y Etiquetas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+          <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
+          <TabsTrigger value="pricing" className="text-xs sm:text-sm">Precios</TabsTrigger>
+          <TabsTrigger value="classification" className="text-xs sm:text-sm">Tipo</TabsTrigger>
+          <TabsTrigger value="relations" className="text-xs sm:text-sm">Combos</TabsTrigger>
         </TabsList>
 
         <div className="py-6 flex-1 overflow-y-auto">
           <TabsContent value="general">
             <Card>
               <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-2 sm:px-6">
                 <div>
-                  <Label htmlFor="name">Nombre del Producto</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required/>
+                  <Label htmlFor="name" className="text-sm sm:text-base">Nombre del Producto</Label>
+                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="text-base"/>
                 </div>
                 <div>
-                  <Label htmlFor="sku">SKU (Código de Barras)</Label>
-                  <Input id="sku" name="sku" value={formData.sku} onChange={handleChange} required />
+                  <Label htmlFor="sku" className="text-sm sm:text-base">SKU (Código de Barras)</Label>
+                  <Input id="sku" name="sku" value={formData.sku} onChange={handleChange} required className="text-base" />
                 </div>
               </CardContent>
             </Card>
@@ -162,38 +163,38 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
           <TabsContent value="pricing">
             <Card>
               <CardHeader><CardTitle>Precios y Stock</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="space-y-4 px-2 sm:px-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="cost">Costo de Compra</Label>
-                    <CurrencyInput 
-                       id="cost" 
-                       name="cost" 
-                       value={formData.cost} 
+                    <Label htmlFor="cost" className="text-sm sm:text-base">Costo de Compra</Label>
+                    <CurrencyInput
+                       id="cost"
+                       name="cost"
+                       value={formData.cost}
                        onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
                        showCurrencyLabel={false}
                      />
                   </div>
                   <div>
-                    <Label htmlFor="price">Precio de Venta</Label>
-                    <CurrencyInput 
-                       id="price" 
-                       name="price" 
-                       value={formData.price} 
+                    <Label htmlFor="price" className="text-sm sm:text-base">Precio de Venta</Label>
+                    <CurrencyInput
+                       id="price"
+                       name="price"
+                       value={formData.price}
                        onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
                        disabled={formData.ownershipType === 'Familiar'}
                        showCurrencyLabel={false}
                      />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="stock">Stock Inicial</Label>
-                    <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleChange} />
+                    <Label htmlFor="stock" className="text-sm sm:text-base">Stock Inicial</Label>
+                    <Input id="stock" name="stock" type="number" value={formData.stock} onChange={handleChange} className="text-base" />
                   </div>
                   <div>
-                    <Label htmlFor="reorderPoint">Punto de Reorden</Label>
-                    <Input id="reorderPoint" name="reorderPoint" type="number" value={formData.reorderPoint || 0} onChange={handleChange} />
+                    <Label htmlFor="reorderPoint" className="text-sm sm:text-base">Punto de Reorden</Label>
+                    <Input id="reorderPoint" name="reorderPoint" type="number" value={formData.reorderPoint || 0} onChange={handleChange} className="text-base" />
                   </div>
                 </div>
               </CardContent>
@@ -203,26 +204,32 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
           <TabsContent value="classification">
             <Card>
               <CardHeader><CardTitle>Clasificación del Producto</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-6 px-2 sm:px-6">
                 <div>
-                  <Label>Tipo de Producto</Label>
-                  <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex space-x-4 mt-2">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Venta" id="type-venta" /><Label htmlFor="type-venta" className="font-normal">Para Venta</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="Refacción" id="type-refaccion" /><Label htmlFor="type-refaccion" className="font-normal">Refacción</Label></div>
+                  <Label className="text-sm sm:text-base">Tipo de Producto</Label>
+                  <RadioGroup name="type" value={formData.type} onValueChange={(value) => handleSelectChange('type', value)} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mt-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Venta" id="type-venta" />
+                      <Label htmlFor="type-venta" className="font-normal text-sm sm:text-base">Para Venta</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Refacción" id="type-refaccion" />
+                      <Label htmlFor="type-refaccion" className="font-normal text-sm sm:text-base">Refacción</Label>
+                    </div>
                   </RadioGroup>
                 </div>
                 <div>
-                  <Label>Tipo de Propiedad</Label>
+                  <Label className="text-sm sm:text-base">Tipo de Propiedad</Label>
                   <Select name="ownershipType" value={formData.ownershipType} onValueChange={(value: any) => handleSelectChange('ownershipType', value)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>{ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 {formData.ownershipType === 'Consigna' && (
                   <div>
-                    <Label>Consignador</Label>
+                    <Label className="text-sm sm:text-base">Consignador</Label>
                     <Select name="consignorId" value={formData.consignorId || ''} onValueChange={(value) => handleSelectChange('consignorId', value)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccione un consignador..." /></SelectTrigger>
+                      <SelectTrigger className="text-base"><SelectValue placeholder="Seleccione un consignador..." /></SelectTrigger>
                       <SelectContent>{consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>

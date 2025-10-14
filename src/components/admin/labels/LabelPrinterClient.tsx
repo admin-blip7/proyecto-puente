@@ -11,6 +11,7 @@ import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui
 import { Printer, Search, Trash2, PlusCircle } from "lucide-react";
 import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { generateUniqueKey, reportInvalidIds } from "@/lib/utils/keys";
 
 interface LabelPrinterClientProps {
     allProducts: Product[];
@@ -27,7 +28,20 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     const consignorMap = useMemo(() => new Map(consignors.map((c) => [c.id, c.name])), [consignors]);
     const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
 
-    const getProductKey = (product: LabelPrintItem['product']) => product.id ?? product.sku;
+    const getProductKey = (product: LabelPrintItem['product'], index: number = 0) => {
+      return generateUniqueKey(product, index, 'label-product');
+    };
+    
+    // Para funciones que necesitan buscar por productId, usamos un mapa de keys
+    const productKeyMap = useMemo(() => {
+      const map = new Map<string, string>();
+      printList.forEach((item, index) => {
+        const key = getProductKey(item.product, index);
+        const productId = item.product.id ?? item.product.sku;
+        map.set(productId, key);
+      });
+      return map;
+    }, [printList]);
 
     const resolveSupplierName = (product: Product): string | undefined => {
         type SupplierCandidate = {
@@ -82,15 +96,21 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                 quantity: 1,
             };
 
-            const candidateKey = getProductKey(candidate.product);
+            const candidateProductId = candidate.product.id ?? candidate.product.sku;
+            const candidateKey = getProductKey(candidate.product, prev.length);
 
-            const existingItem = prev.find((item) => getProductKey(item.product) === candidateKey);
+            const existingItem = prev.find((item) => {
+                const productId = item.product.id ?? item.product.sku;
+                return productId === candidateProductId;
+            });
+            
             if (existingItem) {
-                return prev.map((item) =>
-                    getProductKey(item.product) === candidateKey
+                return prev.map((item) => {
+                    const productId = item.product.id ?? item.product.sku;
+                    return productId === candidateProductId
                         ? { ...item, quantity: item.quantity + 1 }
-                        : item
-                );
+                        : item;
+                });
             }
             return [...prev, candidate];
         });
@@ -98,13 +118,17 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     };
     
     const handleUpdateQuantity = (productId: string, quantity: number) => {
-        setPrintList((prev) => prev.map((item) =>
-            getProductKey(item.product) === productId ? { ...item, quantity: Math.max(0, quantity) } : item
-        ));
+        setPrintList((prev) => prev.map((item) => {
+            const currentProductId = item.product.id ?? item.product.sku;
+            return currentProductId === productId ? { ...item, quantity: Math.max(0, quantity) } : item;
+        }));
     };
 
     const handleRemoveItem = (productId: string) => {
-        setPrintList((prev) => prev.filter((item) => getProductKey(item.product) !== productId));
+        setPrintList((prev) => prev.filter((item) => {
+            const currentProductId = item.product.id ?? item.product.sku;
+            return currentProductId !== productId;
+        }));
     };
 
     const handleGenerate = async () => {
@@ -200,26 +224,29 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                printList.map(item => (
-                                    <TableRow key={getProductKey(item.product)}>
-                                        <TableCell className="font-medium">{item.product.name}</TableCell>
-                                        <TableCell>{item.product.sku}</TableCell>
-                                        <TableCell>
-                                            <Input
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(e) => handleUpdateQuantity(getProductKey(item.product), parseInt(e.target.value) || 0)}
-                                                min="0"
-                                                className="h-8"
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(getProductKey(item.product))}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                printList.map((item, index) => {
+                                    const itemKey = getProductKey(item.product, index);
+                                    return (
+                                        <TableRow key={itemKey}>
+                                            <TableCell className="font-medium">{item.product.name}</TableCell>
+                                            <TableCell>{item.product.sku}</TableCell>
+                                            <TableCell>
+                                                <Input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleUpdateQuantity(itemKey, parseInt(e.target.value) || 0)}
+                                                    min="0"
+                                                    className="h-8"
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(itemKey)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>

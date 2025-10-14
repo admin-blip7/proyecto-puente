@@ -76,7 +76,13 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     }, [generateUniqueSku]);
     
     useEffect(() => {
-        getConsignors().then(setConsignors);
+        getConsignors().then((loadedConsignors) => {
+            // Remove duplicate consignors to prevent React key conflicts
+            const uniqueConsignors = loadedConsignors.filter((consignor, index, self) => 
+                index === self.findIndex(c => c.id === consignor.id)
+            );
+            setConsignors(uniqueConsignors);
+        });
         
         if (typeof window !== 'undefined') {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -499,7 +505,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                                 <SelectValue placeholder="Seleccionar consignador..."/>
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                                {consignors.map((c, index) => <SelectItem key={`${c.id}-${index}`} value={c.id}>{c.name}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                     </>
@@ -596,7 +602,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                     <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
                                                         <SelectTrigger><SelectValue placeholder="Seleccionar consignador..."/></SelectTrigger>
                                                         <SelectContent>
-                                                            {consignors.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                            {consignors.map((c, index) => <SelectItem key={`${c.id}-${index}`} value={c.id}>{c.name}</SelectItem>)}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>

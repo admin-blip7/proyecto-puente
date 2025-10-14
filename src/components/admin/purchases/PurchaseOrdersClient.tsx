@@ -108,8 +108,13 @@ export default function PurchaseOrdersClient() {
         updatedAt: order.updatedAt ?? order.updated_at,
         id: order.id ?? order.firestore_id,
       })) as PurchaseOrder[];
+      
+      // Remove duplicate orders to prevent React key conflicts
+      const uniqueOrders = ordersData.filter((order, index, self) => 
+        index === self.findIndex(o => o.id === order.id)
+      );
 
-      setOrders(ordersData);
+      setOrders(uniqueOrders);
     } catch (error) {
       log.error('Error loading purchase orders:', error);
       toast({
@@ -355,7 +360,7 @@ export default function PurchaseOrdersClient() {
             </CardContent>
           </Card>
         ) : (
-          filteredOrders.map((order) => {
+          filteredOrders.map((order, index) => {
             const StatusIcon = statusConfig[order.status].icon;
             const totalQty = order.items?.reduce((sum, item) => sum + ((item.quantity ?? item.qty ?? 0) as number), 0) ?? 0;
             const sumCost = order.items?.reduce((sum, item) => {
@@ -365,7 +370,7 @@ export default function PurchaseOrdersClient() {
             }, 0) ?? 0;
             const avgUnitCost = totalQty > 0 ? (sumCost / totalQty) : 0;
             return (
-              <Card key={order.id} className="hover:shadow-md transition-shadow">
+              <Card key={`${order.id}-${index}`} className="hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                     <div className="flex-1 space-y-2">

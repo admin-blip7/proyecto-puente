@@ -36,7 +36,7 @@ const mapCreditAccount = (row: any): CreditAccount => ({
   accountId: row?.accountId ?? "",
   clientId: row?.clientId ?? "",
   creditLimit: Number(row?.creditLimit ?? 0),
-  currentBalance: Number(row?.currentBalance ?? 0),
+  currentBalance: Number(row?.current_balance ?? 0),
   status: row?.status ?? "Al Corriente",
   paymentDueDate: toDate(row?.paymentDueDate),
   interestRate: Number(row?.interestRate ?? 0),
@@ -138,7 +138,7 @@ export const addClient = async (
     accountId,
     clientId: firestoreId,
     creditLimit,
-    currentBalance: 0,
+    current_balance: 0,
     status: "Al Corriente",
     paymentDueDate: paymentDueDate.toISOString(),
     interestRate: interestRate ?? 0,
@@ -240,7 +240,7 @@ export const createCreditSale = async (params: CreateCreditSaleParams): Promise<
   }
 
   const creditAccount = mapCreditAccount(creditAccountRow);
-  if (creditAccount.currentBalance + totalAmount > creditAccount.creditLimit) {
+  if (creditAccount.current_balance + totalAmount > creditAccount.creditLimit) {
     throw new Error("Límite de crédito insuficiente");
   }
 
@@ -286,10 +286,10 @@ export const createCreditSale = async (params: CreateCreditSaleParams): Promise<
     }
   }
 
-  const newBalance = creditAccount.currentBalance + totalAmount;
+  const newBalance = creditAccount.current_balance + totalAmount;
   const { error: accountUpdateError } = await supabase
     .from(CREDIT_ACCOUNTS_TABLE)
-    .update({ currentBalance: newBalance })
+    .update({ current_balance: newBalance })
     .eq("firestore_id", creditAccount.id);
 
   if (accountUpdateError) {
@@ -430,7 +430,7 @@ export const createFinancedSale = async (params: CreateFinancedSaleParams): Prom
     accountId,
     clientId: client.id,
     creditLimit: product.price,
-    currentBalance: amountToFinance,
+    current_balance: amountToFinance,
     status: "Al Corriente",
     paymentDueDate: nowIso(),
     interestRate: terms.annualInterestRate,

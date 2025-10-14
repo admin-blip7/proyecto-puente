@@ -243,16 +243,16 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
 
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                  <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Super Dashboard</h1>
-                    <p className="text-muted-foreground">Una vista 360° de la salud y el potencial de tu negocio.</p>
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Super Dashboard</h1>
+                    <p className="text-muted-foreground text-sm sm:text-base">Una vista 360° de la salud y el potencial de tu negocio.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                     <DatePickerWithRange date={dateRange} onDateChange={setDateRange} />
                      <Select onValueChange={handleDatePresetChange} defaultValue="this_month">
-                        <SelectTrigger className="w-[120px]">
+                        <SelectTrigger className="w-full sm:w-[120px]">
                             <SelectValue placeholder="Periodo" />
                         </SelectTrigger>
                         <SelectContent>
@@ -267,7 +267,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
             </div>
 
             {/* KPI Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
                 <StatCard title="Ganancia Neta" value={formatCurrency(netProfit)} icon={TrendingUp} description="Ganancia después de todos los costos." isPrimary />
                 <StatCard title="Ingresos Totales" value={formatCurrency(totalRevenue)} icon={DollarSign} />
                 <StatCard title="Costos Totales" value={formatCurrency(totalCost)} icon={TrendingDown} />
@@ -275,7 +275,7 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
             </div>
 
             {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
                 {/* Internal KPIs Column */}
                 <div className="lg:col-span-2 space-y-6">
                      <Card>
@@ -349,8 +349,8 @@ const FinanceDashboard: FC<FinanceDashboardProps> = ({
                                 <div>
                                     <p className="text-muted-foreground font-medium">Productos de Baja Rotación</p>
                                      <ul className="text-sm list-disc pl-5 mt-1">
-                                        {lowRotationProducts.map(p => (
-                                            <li key={p.id}>{p.name} <span className="text-muted-foreground">({p.sold} vendidos)</span></li>
+                                        {lowRotationProducts.map((p, index) => (
+                                            <li key={`${p.id}-${index}`}>{p.name} <span className="text-muted-foreground">({p.sold} vendidos)</span></li>
                                         ))}
                                     </ul>
                                 </div>

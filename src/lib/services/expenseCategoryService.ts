@@ -28,7 +28,13 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
       throw error;
     }
 
-    return (data ?? []).map(mapCategory);
+    const categories = (data ?? []).map(mapCategory);
+    const uniqueCategories = categories.filter(
+      (category, index, self) =>
+        index === self.findIndex((c) => c.id === category.id)
+    );
+
+    return uniqueCategories;
   } catch (error) {
     log.error("Error fetching expense categories", error);
     throw error;

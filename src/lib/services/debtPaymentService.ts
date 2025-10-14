@@ -42,12 +42,12 @@ export const addDebtPayment = async (
     await Promise.all([
       supabase
         .from(DEBTS_TABLE)
-        .select("firestore_id,currentBalance")
+        .select("firestore_id,current_balance")
         .or(orIdFilter(debtId))
         .maybeSingle(),
       supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id,currentBalance")
+        .select("firestore_id,current_balance")
         .or(orIdFilter(paidFromAccountId))
         .maybeSingle(),
     ]);
@@ -60,7 +60,7 @@ export const addDebtPayment = async (
     throw new Error("La cuenta de origen no existe.");
   }
 
-  const availableBalance = Number(accountRow.currentBalance ?? 0);
+  const availableBalance = Number(accountRow.current_balance ?? 0);
   if (availableBalance < amountPaid) {
     throw new Error("Saldo insuficiente en la cuenta de origen.");
   }
@@ -89,17 +89,17 @@ export const addDebtPayment = async (
     throw insertError;
   }
 
-  const newDebtBalance = Number(debtRow.currentBalance ?? 0) - amountPaid;
+  const newDebtBalance = Number(debtRow.current_balance ?? 0) - amountPaid;
   const newAccountBalance = availableBalance - amountPaid;
 
   const [{ error: debtUpdateError }, { error: accountUpdateError }] = await Promise.all([
     supabase
       .from(DEBTS_TABLE)
-      .update({ currentBalance: newDebtBalance })
+      .update({ current_balance: newDebtBalance })
       .eq("firestore_id", debtRow.firestore_id ?? debtId),
     supabase
       .from(ACCOUNTS_TABLE)
-      .update({ currentBalance: newAccountBalance })
+      .update({ current_balance: newAccountBalance })
       .eq("firestore_id", accountRow.firestore_id ?? paidFromAccountId),
   ]);
 

@@ -132,7 +132,7 @@ export const closeCashSession = async (
   try {
     const { data: accounts, error: accountsError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("firestore_id,name,currentBalance")
+      .select("firestore_id,name,current_balance")
       .in("name", ["Caja Chica", "Banco Principal"]);
 
     if (!accountsError && accounts) {
@@ -146,11 +146,11 @@ export const closeCashSession = async (
             delta = session.totalCardSales;
           }
           if (delta > 0) {
-            const newBalance = Number(account.currentBalance ?? 0) + delta;
+            const newBalance = Number(account.current_balance ?? 0) + delta;
             const { error: updateError } = await supabase
               .from(ACCOUNTS_TABLE)
-              .update({ currentBalance: newBalance })
-              .eq("firestore_id", account.firestore_id ?? account.id);
+              .update({ current_balance: newBalance })
+              .eq("firestore_id", account.firestore_id);
             if (updateError) {
               throw updateError;
             }

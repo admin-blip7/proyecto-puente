@@ -1,5 +1,5 @@
-# Firebase Studio
+# Proyecto Puente - Sistema POS
 
-This is a NextJS starter in Firebase Studio.
+Este es un sistema POS (Point of Sale) completo desarrollado con Next.js y Supabase como backend.
 
 To get started, take a look at src/app/page.tsx.

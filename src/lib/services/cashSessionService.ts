@@ -5,6 +5,7 @@ import { CashSession } from "@/types";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+import { formatCurrency } from "@/lib/utils";
 
 const log = getLogger("cashSessionService");
 
@@ -40,7 +41,12 @@ export const getAllClosedSessions = async (): Promise<CashSession[]> => {
       .order("closedAt", { ascending: false, nullsFirst: false });
 
     if (error) throw error;
-    return (data ?? []).map(mapSession);
+    const sessions = (data ?? []).map(mapSession);
+    const uniqueSessions = sessions.filter(
+      (session, index, self) =>
+        index === self.findIndex((s) => s.id === session.id)
+    );
+    return uniqueSessions;
   } catch (error) {
     log.error("Error fetching closed cash sessions", error);
     return [];
@@ -130,9 +136,28 @@ export const closeCashSession = async (
   }
 
   try {
+    // Ensure Caja Chica exists before updating
+    const { data: cajaChica } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("firestore_id,current_balance")
+      .eq("name", "Caja Chica")
+      .maybeSingle();
+
+    if (!cajaChica) {
+      // Create Caja Chica account if it doesn't exist
+      const { addAccount } = await import("./accountService");
+      await addAccount({
+        name: "Caja Chica",
+        type: "Efectivo",
+        currentBalance: 0
+      });
+      log.info("Created Caja Chica account automatically");
+    }
+
+    // Update accounts
     const { data: accounts, error: accountsError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("firestore_id,name,currentBalance")
+      .select("firestore_id,name,current_balance")
       .in("name", ["Caja Chica", "Banco Principal"]);
 
     if (!accountsError && accounts) {
@@ -146,20 +171,21 @@ export const closeCashSession = async (
             delta = session.totalCardSales;
           }
           if (delta > 0) {
-            const newBalance = Number(account.currentBalance ?? 0) + delta;
+            const newBalance = Number(account.current_balance ?? 0) + delta;
             const { error: updateError } = await supabase
               .from(ACCOUNTS_TABLE)
-              .update({ currentBalance: newBalance })
-              .eq("firestore_id", account.firestore_id ?? account.id);
+              .update({ current_balance: newBalance })
+              .eq("firestore_id", account.firestore_id);
             if (updateError) {
               throw updateError;
             }
+            log.info(`Updated ${account.name} balance by +${formatCurrency(delta)}`);
           }
         })
       );
     }
   } catch (accountsErr) {
-    log.warn("Skipping account balance updates", accountsErr);
+    log.error("Error updating account balances", accountsErr);
   }
 
   return {

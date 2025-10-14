@@ -11,14 +11,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const formatCurrency = (value: number) => {
+  // Manejar valores negativos convirtiéndolos a positivos y agregando prefijo
+  const isNegative = value < 0;
+  const absoluteValue = Math.abs(value);
+  
   // Normalizar primero para manejar problemas de precisión de punto flotante
-  const normalizedValue = normalizeMXNAmount(value);
+  const normalizedValue = normalizeMXNAmount(absoluteValue);
   const validation = validateMXNAmount(normalizedValue);
+  
   if (!validation.isValid) {
     log.warn(`Intento de formatear monto inválido: ${value} (normalizado: ${normalizedValue}). Error: ${validation.error}`);
     return "$0.00 MXN";
   }
-  return formatMXNAmount(normalizedValue);
+  
+  const formattedAmount = formatMXNAmount(normalizedValue);
+  return isNegative ? `-${formattedAmount}` : formattedAmount;
 };
 
 export const getWarrantyStatusVariant = (status: Warranty["status"]) => {

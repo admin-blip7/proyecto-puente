@@ -60,16 +60,28 @@ const defaultTicketSettings: TicketSettings = {
 const stripMeta = (row: any) => {
   if (!row) return null;
   const {
-    firestore_id,
     id,
     created_at,
     createdAt,
     updatedAt,
     lastUpdated,
+    last_updated,
+    data,
     ...rest
   } = row;
-  if (lastUpdated) {
-    rest.lastUpdated = lastUpdated;
+  
+  // Si los datos vienen en formato JSON en la columna 'data'
+  if (data && typeof data === 'object') {
+    return {
+      ...data,
+      id: id,
+      lastUpdated: last_updated || lastUpdated
+    };
+  }
+  
+  // Si los datos vienen directamente en el row (formato antiguo)
+  if (lastUpdated || last_updated) {
+    rest.lastUpdated = lastUpdated || last_updated;
   }
   // Handle null visualLayout values by setting them to undefined
   if (rest.visualLayout === null) {
@@ -80,17 +92,35 @@ const stripMeta = (row: any) => {
 
 const fetchSettingsDoc = async (docId: string) => {
   const supabase = getSupabaseServerClient();
+  
+  // DEBUG: Log para verificar la estructura de la tabla settings
+  log.info("DEBUG: Intentando acceder a la tabla settings", { docId });
+  
   const { data, error } = await supabase
     .from(SETTINGS_TABLE)
     .select("*")
-    .eq("firestore_id", docId)
+    .eq("id", docId)
     .limit(1)
     .maybeSingle();
 
   if (error) {
+    log.error("DEBUG: Error al acceder a settings", { error: error.message, docId });
     throw error;
   }
 
+  log.info("DEBUG: Datos de settings recuperados", { hasData: !!data, docId });
+  
+  // Adaptar la estructura de datos para compatibilidad
+  if (data && data.data) {
+    // Si los datos están en formato JSON en la columna 'data'
+    const adaptedRow = {
+      ...data.data,
+      id: data.id,
+      lastUpdated: data.last_updated
+    };
+    return { row: adaptedRow, supabase };
+  }
+  
   return data ? { row: data, supabase } : { row: null, supabase };
 };
 
@@ -98,10 +128,12 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
   try {
     const { row, supabase } = await fetchSettingsDoc(docId);
     const timestamp = nowIso();
+    
+    // Adaptar la estructura de datos para la tabla settings
     const data = {
-      firestore_id: docId,
-      ...payload,
-      lastUpdated: timestamp,
+      id: docId,
+      data: payload, // Almacenar el payload como JSON en la columna data
+      last_updated: timestamp, // Usar snake_case para consistencia con la BD
     };
 
     log.info("Upserting settings document", { docId, hasExistingRow: !!row });
@@ -110,7 +142,7 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
       const { error } = await supabase
         .from(SETTINGS_TABLE)
         .update(data)
-        .eq("firestore_id", docId);
+        .eq("id", docId);
       if (error) {
         log.error("Database update error", { error, docId });
         throw new Error(`Database error: ${error.message}`);
@@ -125,9 +157,9 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
     
     log.info("Settings document upserted successfully", { docId });
   } catch (error) {
-    log.error("Error in upsertSettingsDoc", { 
+    log.error("Error in upsertSettingsDoc", {
       error: error instanceof Error ? error.message : String(error),
-      docId 
+      docId
     });
     throw error;
   }

@@ -202,6 +202,7 @@ export async function POST(request: Request) {
     /*
     // Test basic connection first
     await testBasicConnection();
+    */
     
     const supabase = getSupabaseServerClient();
     console.log("Supabase client created successfully");
