@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Buscador de Compatibilidad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Test del Buscador de Compatibilidad</h1>
+
+        <!-- Test de búsqueda de micas -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">1. Buscar Micas Compatibles</h2>
+            <div class="flex gap-4 mb-4">
+                <input type="number" id="alto" placeholder="Alto (mm)" class="border rounded px-3 py-2" value="150">
+                <input type="number" id="ancho" placeholder="Ancho (mm)" class="border rounded px-3 py-2" value="75">
+                <button onclick="buscarMicas()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Buscar
+                </button>
+            </div>
+            <div id="resultado-micas" class="text-sm text-gray-600"></div>
+        </div>
+
+        <!-- Test de registro de compatibilidad -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">2. Registrar Compatibilidad</h2>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <input type="text" id="modelo" placeholder="Modelo (ej: iPhone 13)" class="border rounded px-3 py-2" value="iPhone 13">
+                <input type="text" id="mica-id" placeholder="ID Mica" class="border rounded px-3 py-2">
+                <input type="number" id="alto-reg" placeholder="Alto (mm)" class="border rounded px-3 py-2" value="150">
+                <input type="number" id="ancho-reg" placeholder="Ancho (mm)" class="border rounded px-3 py-2" value="75">
+            </div>
+            <button onclick="registrarCompatibilidad()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                Registrar Compatibilidad
+            </button>
+            <div id="resultado-registro" class="text-sm text-gray-600 mt-2"></div>
+        </div>
+
+        <!-- Test de historial -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">3. Ver Historial</h2>
+            <button onclick="verHistorial()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mb-4">
+                Cargar Historial
+            </button>
+            <div id="resultado-historial" class="text-sm"></div>
+        </div>
+
+        <!-- Test de modelos -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">4. Ver Modelos Únicos</h2>
+            <button onclick="verModelos()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-4">
+                Cargar Modelos
+            </button>
+            <div id="resultado-modelos" class="text-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function buscarMicas() {
+            const alto = document.getElementById('alto').value;
+            const ancho = document.getElementById('ancho').value;
+            const resultado = document.getElementById('resultado-micas');
+
+            if (!alto || !ancho) {
+                resultado.innerHTML = '<span class="text-red-600">Por favor ingresa alto y ancho</span>';
+                return;
+            }
+
+            resultado.innerHTML = '<span class="text-blue-600">Buscando...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/micas/search?alto=${alto}&ancho=${ancho}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const micas = await response.json();
+
+                if (micas.length === 0) {
+                    resultado.innerHTML = '<span class="text-orange-600">No se encontraron micas compatibles</span>';
+                } else {
+                    resultado.innerHTML = `
+                        <div class="mt-2">
+                            <p class="font-semibold text-green-600">Se encontraron ${micas.length} micas:</p>
+                            ${micas.map(mica => `
+                                <div class="border rounded p-2 mt-1">
+                                    <p><strong>${mica.name}</strong> - SKU: ${mica.sku}</p>
+                                    <p class="text-xs">Stock: ${mica.stock} | Precio: $${mica.price}</p>
+                                    ${mica.attributes?.alto ? `<p class="text-xs text-blue-600">Medidas: ${mica.attributes.alto}×${mica.attributes.ancho}mm</p>` : ''}
+                                    <p class="text-xs text-gray-500">ID: ${mica.id}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultado.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
+            }
+        }
+
+        async function registrarCompatibilidad() {
+            const modelo = document.getElementById('modelo').value;
+            const micaId = document.getElementById('mica-id').value;
+            const alto = document.getElementById('alto-reg').value;
+            const ancho = document.getElementById('ancho-reg').value;
+            const resultado = document.getElementById('resultado-registro');
+
+            if (!modelo || !micaId || !alto || !ancho) {
+                resultado.innerHTML = '<span class="text-red-600">Por favor completa todos los campos</span>';
+                return;
+            }
+
+            resultado.innerHTML = '<span class="text-blue-600">Registrando...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/compatibilidad/registrar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        modelo,
+                        alto: parseFloat(alto),
+                        ancho: parseFloat(ancho),
+                        micaId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                resultado.innerHTML = `<span class="text-green-600">✓ ${data.message}</span>`;
+            } catch (error) {
+                console.error('Error:', error);
+                resultado.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
+            }
+        }
+
+        async function verHistorial() {
+            const resultado = document.getElementById('resultado-historial');
+            resultado.innerHTML = '<span class="text-blue-600">Cargando historial...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/compatibilidad/historial?limit=10`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const historial = await response.json();
+
+                if (historial.length === 0) {
+                    resultado.innerHTML = '<span class="text-orange-600">No hay compatibilidades registradas</span>';
+                } else {
+                    resultado.innerHTML = `
+                        <div class="mt-2">
+                            <p class="font-semibold text-green-600">Historial:</p>
+                            ${historial.map(item => `
+                                <div class="border rounded p-2 mt-1">
+                                    <p><strong>${item.modelo_celular}</strong> - ${item.alto}×${item.ancho}mm</p>
+                                    <p class="text-xs">Usado: ${item.contador} vez${item.contador !== 1 ? 'es' : ''}</p>
+                                    ${item.product ? `<p class="text-xs">Mica: ${item.product.name}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultado.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
+            }
+        }
+
+        async function verModelos() {
+            const resultado = document.getElementById('resultado-modelos');
+            resultado.innerHTML = '<span class="text-blue-600">Cargando modelos...</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/compatibilidad/modelos`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const modelos = await response.json();
+
+                if (modelos.length === 0) {
+                    resultado.innerHTML = '<span class="text-orange-600">No hay modelos registrados</span>';
+                } else {
+                    resultado.innerHTML = `
+                        <div class="mt-2">
+                            <p class="font-semibold text-green-600">Modelos únicos (${modelos.length}):</p>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                ${modelos.map(modelo => `
+                                    <span class="bg-gray-200 rounded px-2 py-1 text-sm">${modelo}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultado.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
+            }
+        }
+
+        // Cargar datos automáticamente al cargar la página
+        window.onload = () => {
+            verHistorial();
+            verModelos();
+        };
+    </script>
+</body>
+</html>

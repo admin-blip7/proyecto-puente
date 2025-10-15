@@ -140,7 +140,7 @@ export interface CartItem extends Product {
 }
 
 export interface StockEntryItem {
-  id: string; 
+  id: string;
   productId?: string;
   sku: string;
   name: string;
@@ -150,6 +150,8 @@ export interface StockEntryItem {
   isNew: boolean;
   ownershipType: OwnershipType;
   consignorId?: string;
+  category?: string;
+  attributes?: Record<string, any>;
 }
 
 export interface RepairPart {

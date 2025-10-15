@@ -24,6 +24,8 @@ import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandG
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getLogger } from "@/lib/logger";
 import { generateUniqueKey, reportInvalidIds } from "@/lib/utils/keys";
+import { productCategories } from "@/components/admin/inventory/CategoryAttributes";
+import CategoryAttributes from "@/components/admin/inventory/CategoryAttributes";
 
 const log = getLogger("StockEntryClient");
 
@@ -74,6 +76,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             price: 0,
             cost: 0,
             ownershipType: 'Propio',
+            category: '',
+            attributes: {},
             isNew: true
         }]);
     }, [generateUniqueSku]);
@@ -157,6 +161,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                 cost: product.cost,
                 ownershipType: product.ownershipType,
                 consignorId: product.consignorId,
+                category: product.category || '',
+                attributes: product.attributes || {},
                 isNew: false
             }];
         });
@@ -172,7 +178,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                     updatedValue = parseFloat(value as string) || 0;
                 }
                 const updatedItem = { ...item, [field]: updatedValue };
-                
+
                 if (field === 'ownershipType' && value !== 'Consigna') {
                     updatedItem.consignorId = undefined;
                 }
@@ -183,6 +189,15 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                     updatedItem.price = updatedValue as number;
                 }
                 return updatedItem;
+            }
+            return item;
+        }));
+    }, []);
+
+    const handleUpdateAttributes = useCallback((id: string, attributes: Record<string, any>) => {
+        setEntryList(prev => prev.map(item => {
+            if (item.id === id) {
+                return { ...item, attributes };
             }
             return item;
         }));
@@ -415,38 +430,53 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                         <div className="grid grid-cols-12 gap-4 items-center">
                                             <div className="col-span-2">
                                                 <Label className="text-xs font-medium text-muted-foreground mb-1 block">SKU</Label>
-                                                <Input 
-                                                    value={item.sku} 
-                                                    readOnly={!item.isNew} 
-                                                    onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} 
-                                                    className={cn(!item.isNew && "bg-muted/50 text-xs", "h-9")} 
+                                                <Input
+                                                    value={item.sku}
+                                                    readOnly={!item.isNew}
+                                                    onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)}
+                                                    className={cn(!item.isNew && "bg-muted/50 text-xs", "h-9")}
                                                 />
                                             </div>
-                                            <div className="col-span-4">
+                                            <div className="col-span-3">
                                                 <Label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre del Producto</Label>
-                                                <Input 
-                                                    value={item.name} 
-                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} 
+                                                <Input
+                                                    value={item.name}
+                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
                                                     className="h-9"
                                                     placeholder="Ingrese el nombre del producto"
                                                 />
                                             </div>
                                             <div className="col-span-2">
+                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Categoría</Label>
+                                                <Select value={item.category || ''} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue placeholder="Seleccionar..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="">Sin categoría</SelectItem>
+                                                        {productCategories.map((cat, index) => {
+                                                            const uniqueKey = generateUniqueKey(cat, index, 'category');
+                                                            return <SelectItem key={uniqueKey} value={cat.value}>{cat.label}</SelectItem>;
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="col-span-2">
                                                 <Label className="text-xs font-medium text-muted-foreground mb-1 block">Cantidad</Label>
-                                                <Input 
-                                                    type="number" 
-                                                    value={item.quantity} 
-                                                    onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} 
+                                                <Input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
                                                     onFocus={(e) => {
                                                         if (e.target.value === '0') {
                                                             e.target.select();
                                                         }
                                                     }}
-                                                    className="text-right h-9" 
+                                                    className="text-right h-9"
                                                     min="1"
                                                 />
                                             </div>
-                                            <div className="col-span-3">
+                                            <div className="col-span-2">
                                                 <Label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Propiedad</Label>
                                                 <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
                                                     <SelectTrigger className="h-9">
@@ -536,6 +566,17 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Tercera fila: Atributos específicos de la categoría */}
+                                        {item.category && (
+                                            <div className="border-t pt-4">
+                                                <CategoryAttributes
+                                                    category={item.category}
+                                                    attributes={item.attributes || {}}
+                                                    onChange={(attributes) => handleUpdateAttributes(item.id, attributes)}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                     );
                                 })
@@ -563,34 +604,49 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                         <div className="space-y-3">
                                             <div className="space-y-1">
                                                 <Label className="text-xs font-medium text-muted-foreground">Nombre del Producto</Label>
-                                                <Input 
-                                                    value={item.name} 
-                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} 
+                                                <Input
+                                                    value={item.name}
+                                                    onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
                                                     placeholder="Ingrese el nombre del producto"
                                                 />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-medium text-muted-foreground">Categoría</Label>
+                                                <Select value={item.category || ''} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccionar..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="">Sin categoría</SelectItem>
+                                                        {productCategories.map((cat, index) => {
+                                                            const uniqueKey = generateUniqueKey(cat, index, 'category-mobile');
+                                                            return <SelectItem key={uniqueKey} value={cat.value}>{cat.label}</SelectItem>;
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <Label className="text-xs font-medium text-muted-foreground">SKU</Label>
-                                                    <Input 
-                                                        value={item.sku} 
-                                                        readOnly={!item.isNew} 
-                                                        onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)} 
-                                                        className={cn(!item.isNew && "bg-muted/50 text-xs")} 
+                                                    <Input
+                                                        value={item.sku}
+                                                        readOnly={!item.isNew}
+                                                        onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)}
+                                                        className={cn(!item.isNew && "bg-muted/50 text-xs")}
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label className="text-xs font-medium text-muted-foreground">Cantidad</Label>
-                                                    <Input 
-                                                        type="number" 
-                                                        value={item.quantity} 
-                                                        onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)} 
+                                                    <Input
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
                                                         onFocus={(e) => {
                                                             if (e.target.value === '0') {
                                                                 e.target.select();
                                                             }
                                                         }}
-                                                        className="text-right" 
+                                                        className="text-right"
                                                         min="1"
                                                     />
                                                 </div>
@@ -669,6 +725,17 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                 </span>
                                             </div>
                                         </div>
+
+                                        {/* Atributos específicos para móvil */}
+                                        {item.category && (
+                                            <div className="border-t pt-4 mt-4">
+                                                <CategoryAttributes
+                                                    category={item.category}
+                                                    attributes={item.attributes || {}}
+                                                    onChange={(attributes) => handleUpdateAttributes(item.id, attributes)}
+                                                />
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                                     );

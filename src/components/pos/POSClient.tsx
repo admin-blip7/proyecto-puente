@@ -8,7 +8,7 @@ import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock } from "lucide-react";
+import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 
@@ -22,6 +22,7 @@ import { Skeleton } from "../ui/skeleton";
 import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
 import { getClientsWithCredit } from "@/lib/services/creditService";
 import { formatCurrency } from "@/lib/utils";
+import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 
 
 interface POSClientProps {
@@ -38,6 +39,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [isOpeningDrawer, setOpeningDrawer] = useState(false);
   const [isClosingDrawer, setClosingDrawer] = useState(false);
   const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
+  const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -206,8 +208,16 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     <div className="grid h-full grid-cols-1 lg:grid-cols-12">
       <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6 overflow-hidden">
         <Header searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
-        <div className="mt-6">
+        <div className="mt-6 flex items-center justify-between">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
+          <Button
+            onClick={() => setShowBuscadorCompatibilidad(true)}
+            variant="outline"
+            className="hidden md:flex items-center gap-2"
+          >
+            <Search className="w-4 h-4" />
+            Buscar Micas
+          </Button>
         </div>
         <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
           <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))'}}>
@@ -234,15 +244,25 @@ export default function POSClient({ initialProducts }: POSClientProps) {
          </div>
        </div>
 
-       {/* Mobile Cart Sheet */}
-      <div className="lg:hidden fixed bottom-4 right-4 z-50">
+       {/* Mobile Buttons */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-50 flex gap-2">
+        {/* Buscador de Micas flotante */}
+        <Button
+          onClick={() => setShowBuscadorCompatibilidad(true)}
+          size="icon"
+          className="w-14 h-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700"
+        >
+          <Package className="h-6 w-6" />
+        </Button>
+
+        {/* Mobile Cart Sheet */}
         <Sheet>
           <SheetTrigger asChild>
             <Button size="icon" className="w-16 h-16 rounded-full shadow-2xl">
               <ShoppingCartIcon className="h-7 w-7" />
               {totalCartItems > 0 && (
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className="absolute top-0 right-0 -translate-x-1 translate-y-1 rounded-full px-2"
                 >
                   {totalCartItems}
@@ -282,6 +302,13 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             // Here you could refresh products or clients if needed
         }}
       />
+
+      {/* Buscador de Compatibilidad */}
+      {showBuscadorCompatibilidad && (
+        <BuscadorCompatibilidad
+          onClose={() => setShowBuscadorCompatibilidad(false)}
+        />
+      )}
     </>
   );
 }

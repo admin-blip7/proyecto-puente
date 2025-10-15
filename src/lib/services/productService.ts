@@ -42,14 +42,14 @@ const mapProduct = (row: any, index: number): Product => ({
   price: Number(row?.price ?? 0),
   cost: Number(row?.cost ?? 0),
   stock: Number(row?.stock ?? 0),
-  createdAt: toDate(row?.createdAt),
+  createdAt: toDate(row?.created_at ?? row?.createdAt),
   type: row?.type ?? "Venta",
-  ownershipType: row?.ownershipType ?? "Propio",
-  consignorId: row?.consignorId ?? undefined,
-  reorderPoint: row?.reorderPoint !== null ? Number(row?.reorderPoint) : undefined,
-  comboProductIds: Array.isArray(row?.comboProductIds) ? row.comboProductIds : [],
-  compatibilityTags: Array.isArray(row?.compatibilityTags) ? row.compatibilityTags : [],
-  searchKeywords: Array.isArray(row?.searchKeywords) ? row.searchKeywords : [],
+  ownershipType: row?.ownership_type ?? "Propio",
+  consignorId: row?.consignor_id ?? undefined,
+  reorderPoint: row?.reorder_point !== null ? Number(row?.reorder_point) : undefined,
+  comboProductIds: Array.isArray(row?.combo_product_ids) ? row.combo_product_ids : [],
+  compatibilityTags: Array.isArray(row?.compatibility_tags) ? row.compatibility_tags : [],
+  searchKeywords: Array.isArray(row?.search_keywords) ? row.search_keywords : [],
   category: row?.category ?? undefined,
   attributes: row?.attributes ?? {},
 });
@@ -122,15 +122,15 @@ export const addProduct = async (
     cost: Number(productData.cost ?? 0),
     stock: Number(productData.stock ?? 0),
     type: productData.type ?? "Venta",
-    ownershipType: productData.ownershipType ?? "Propio",
-    consignorId: productData.consignorId ?? null,
-    reorderPoint: productData.reorderPoint ?? 0,
-    comboProductIds: productData.comboProductIds ?? [],
-    compatibilityTags: productData.compatibilityTags ?? [],
+    ownership_type: productData.ownershipType ?? "Propio",
+    consignor_id: productData.consignorId ?? null,
+    reorder_point: productData.reorderPoint ?? 0,
+    combo_product_ids: productData.comboProductIds ?? [],
+    compatibility_tags: productData.compatibilityTags ?? [],
     searchKeywords,
     category: productData.category ?? null,
     attributes: productData.attributes ?? {},
-    createdAt,
+    created_at: createdAt,
   };
 
   const { data, error } = await supabase
@@ -170,11 +170,11 @@ export const updateProduct = async (
       cost: productData.cost ?? existingRow.cost ?? 0,
       stock: productData.stock ?? existingRow.stock ?? 0,
       type: productData.type ?? existingRow.type ?? "Venta",
-      ownershipType: productData.ownershipType ?? existingRow.ownershipType ?? "Propio",
-      consignorId: productData.consignorId ?? existingRow.consignorId ?? null,
-      reorderPoint: productData.reorderPoint ?? existingRow.reorderPoint ?? 0,
-      comboProductIds: productData.comboProductIds ?? existingRow.comboProductIds ?? [],
-      compatibilityTags: productData.compatibilityTags ?? existingRow.compatibilityTags ?? [],
+      ownership_type: productData.ownershipType ?? existingRow.ownership_type ?? "Propio",
+      consignor_id: productData.consignorId ?? existingRow.consignor_id ?? null,
+      reorder_point: productData.reorderPoint ?? existingRow.reorder_point ?? 0,
+      combo_product_ids: productData.comboProductIds ?? existingRow.combo_product_ids ?? [],
+      compatibility_tags: productData.compatibilityTags ?? existingRow.compatibility_tags ?? [],
       searchKeywords,
       category: productData.category ?? existingRow.category,
       attributes: productData.attributes ?? existingRow.attributes ?? {},
@@ -220,6 +220,8 @@ export const processStockEntry = async (
           reorderPoint: 0,
           comboProductIds: [],
           compatibilityTags: [],
+          category: item.category,
+          attributes: item.attributes,
         } as Omit<Product, "id" | "createdAt" | "searchKeywords">);
 
         productId = newProduct.id;
@@ -238,8 +240,10 @@ export const processStockEntry = async (
             stock: currentStock + item.quantity,
             cost: item.cost,
             price: item.price,
-            ownershipType: item.ownershipType,
-            consignorId: item.consignorId ?? null,
+            ownership_type: item.ownershipType,
+            consignor_id: item.consignorId ?? null,
+            category: item.category ?? null,
+            attributes: item.attributes ?? {},
           })
           .eq("firestore_id", row.firestore_id ?? productId);
 
@@ -249,12 +253,12 @@ export const processStockEntry = async (
       }
 
       const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
-        productId,
-        productName: item.name,
+        product_id: productId,
+        product_name: item.name,
         change: item.quantity,
         reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
-        updatedBy: userId,
-        createdAt: nowIso(),
+        updated_by: userId,
+        created_at: nowIso(),
         metadata: { cost: item.cost },
       });
 
@@ -296,7 +300,7 @@ export const bulkUpdateProducts = async (
 
   const { data, error } = await supabase
     .from(PRODUCTS_TABLE)
-    .select("firestore_id, price, cost, compatibilityTags")
+    .select("firestore_id, price, cost, compatibility_tags")
     .in("firestore_id", productIds);
 
   if (error) {
@@ -326,8 +330,8 @@ export const bulkUpdateProducts = async (
     }
 
     if (updateData.tagsToAdd?.length || updateData.tagsToRemove?.length) {
-      const currentTags = Array.isArray(row.compatibilityTags)
-        ? [...row.compatibilityTags]
+      const currentTags = Array.isArray(row.compatibility_tags)
+        ? [...row.compatibility_tags]
         : [];
 
       if (updateData.tagsToAdd?.length) {
@@ -343,7 +347,7 @@ export const bulkUpdateProducts = async (
         }
       }
 
-      updates.compatibilityTags = currentTags;
+      updates.compatibility_tags = currentTags;
     }
 
     if (Object.keys(updates).length > 0) {
