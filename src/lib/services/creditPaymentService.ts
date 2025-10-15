@@ -31,12 +31,12 @@ export const addClientPayment = async (
     await Promise.all([
       supabase
         .from(CREDIT_ACCOUNTS_TABLE)
-        .select("firestore_id,current_balance")
+        .select("firestore_id,currentBalance")
         .or(orIdFilter(accountId))
         .maybeSingle(),
       supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id,current_balance")
+        .select("firestore_id,currentBalance")
         .or(orIdFilter(depositAccountId))
         .maybeSingle(),
     ]);
@@ -66,8 +66,8 @@ export const addClientPayment = async (
     throw insertError;
   }
 
-  const creditBalance = Number(creditAccount.current_balance ?? 0) - amountPaid;
-  const depositBalance = Number(depositAccount.current_balance ?? 0) + amountPaid;
+  const creditBalance = Number(creditAccount.currentBalance ?? 0) - amountPaid;
+  const depositBalance = Number(depositAccount.currentBalance ?? 0) + amountPaid;
 
   const [{ error: creditUpdateError }, { error: depositUpdateError }] = await Promise.all([
     supabase

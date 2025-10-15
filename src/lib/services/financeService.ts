@@ -133,7 +133,7 @@ export const addExpense = async (
   // Try firestore_id first
   const { data: byFirestoreId, error: errorFirestore } = await supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id,current_balance")
+    .select("firestore_id,currentBalance")
     .eq("firestore_id", expenseData.paidFromAccountId)
     .maybeSingle();
   
@@ -143,7 +143,7 @@ export const addExpense = async (
     // If not found by firestore_id, try with id field
     const { data: byId, error: errorId } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("firestore_id,current_balance")
+      .select("firestore_id,currentBalance")
       .eq("id", expenseData.paidFromAccountId)
       .maybeSingle();
     
@@ -168,7 +168,7 @@ export const addExpense = async (
     throw new Error(`No se encontró la cuenta seleccionada. ID: ${expenseData.paidFromAccountId}`);
   }
 
-  const newBalance = Number(accountRow.current_balance ?? 0) - expenseData.amount;
+  const newBalance = Number(accountRow.currentBalance ?? 0) - expenseData.amount;
   // Update account balance with more specific ID matching
   let accountUpdateError = null;
   // First try updating with firestore_id
