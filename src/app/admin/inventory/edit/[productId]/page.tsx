@@ -11,13 +11,13 @@ import Link from "next/link";
 import { notFound } from 'next/navigation';
 
 type Props = {
-  params: {
+  params: Promise<{
     productId: string;
-  };
+  }>;
 };
 
 export default async function EditProductPage({ params }: Props) {
-  const { productId } = params;
+  const { productId } = await params;
   
   // Fetch all necessary data in parallel
   const [product, consignors, allProducts] = await Promise.all([

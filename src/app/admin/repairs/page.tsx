@@ -2,7 +2,7 @@ import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import RepairClient from "@/components/admin/repairs/RepairClient";
+import RepairDashboard from "@/components/admin/repairs/RepairDashboard";
 import { getRepairOrders } from "@/lib/services/repairService";
 import { getProducts } from "@/lib/services/productService";
 import { getTicketSettings, getLabelSettings } from "@/lib/services/settingsService";
@@ -34,9 +34,9 @@ export default async function RepairsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
-               <RepairClient 
-                initialOrders={initialOrders} 
-                allSpareParts={spareParts.filter(p => p.type === 'Refacción')} 
+               <RepairDashboard
+                initialOrders={initialOrders}
+                allSpareParts={spareParts.filter(p => p.type === 'Refacción')}
                 ticketSettings={ticketSettings}
                 labelSettings={labelSettings}
                />

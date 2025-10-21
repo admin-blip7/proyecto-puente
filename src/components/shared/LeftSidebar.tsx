@@ -16,9 +16,7 @@ import {
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
   import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Image from 'next/image';
-  
-
-const mainNavItems = [
+  const mainNavItems = [
     { href: '/', icon: Home, label: 'Punto de Venta' },
     { href: '/admin', icon: Package, label: 'Inventario'},
     { href: '/admin/stock-entry', icon: PackagePlus, label: 'Ingresar Stock'},
@@ -47,7 +45,6 @@ const settingsNavItems = [
     { href: '/admin/settings', icon: Settings, label: 'Diseño de Tickets y Etiquetas' },
     { href: '/admin/labels', icon: Printer, label: 'Imprimir Etiquetas' },
 ];
-
 
 const getInitials = (name: string) => {
     if (!name) return "";

@@ -4,6 +4,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, X, Smartphone, Package, History, ChevronRight } from 'lucide-react';
 import { Product } from '@/types';
 
+interface ProductWithCompatibility extends Product {
+  compatibility?: {
+    level: 'Compatible' | 'Posiblemente compatible' | 'No compatible';
+    micaAltoCm: number;
+    micaAnchoCm: number;
+    requestedAltoCm: number;
+    requestedAnchoCm: number;
+  };
+}
+
 interface Compatibilidad {
   id: string;
   modelo_celular: string;
@@ -17,13 +27,14 @@ interface Compatibilidad {
 
 interface BuscadorCompatibilidadProps {
   onClose?: () => void;
+  onAddToCart?: (product: Product, quantity?: number) => void;
 }
 
-export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilidadProps) {
+export default function BuscadorCompatibilidad({ onClose, onAddToCart }: BuscadorCompatibilidadProps) {
   const [modelo, setModelo] = useState('');
   const [alto, setAlto] = useState('');
   const [ancho, setAncho] = useState('');
-  const [resultados, setResultados] = useState<Product[]>([]);
+  const [resultados, setResultados] = useState<ProductWithCompatibility[]>([]);
   const [historial, setHistorial] = useState<Compatibilidad[]>([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
@@ -78,14 +89,15 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
     }
   }, []);
 
-  // Registrar compatibilidad
-  const registrarCompatibilidad = async (mica: Product) => {
+  // Registrar compatibilidad y agregar al carrito
+  const registrarCompatibilidad = async (mica: ProductWithCompatibility) => {
     if (!modelo.trim()) {
       alert('Por favor ingresa el modelo del celular para registrar la compatibilidad');
       return;
     }
 
     try {
+      // Primero registrar la compatibilidad
       const response = await fetch('/api/compatibilidad/registrar', {
         method: 'POST',
         headers: {
@@ -96,11 +108,18 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
           alto: parseFloat(alto),
           ancho: parseFloat(ancho),
           micaId: mica.id,
+          compatibilityLevel: mica.compatibility?.level || 'No compatible',
         }),
       });
 
       if (response.ok) {
-        alert('Compatibilidad registrada exitosamente');
+        // Si se registró exitosamente, agregar al carrito
+        if (onAddToCart) {
+          onAddToCart(mica, 1);
+          alert(`Compatibilidad registrada y mica "${mica.name}" agregada al carrito`);
+        } else {
+          alert('Compatibilidad registrada exitosamente');
+        }
         cargarHistorial(); // Actualizar historial
       } else {
         alert('Error al registrar compatibilidad');
@@ -128,6 +147,34 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
       cargarHistorial();
     }
   }, [mostrarHistorial, cargarHistorial]);
+
+  // Función para obtener el color de la etiqueta de compatibilidad
+  const getCompatibilityBadgeColor = (level: string) => {
+    switch (level) {
+      case 'Compatible':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Posiblemente compatible':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'No compatible':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Función para obtener el ícono de compatibilidad
+  const getCompatibilityIcon = (level: string) => {
+    switch (level) {
+      case 'Compatible':
+        return '✓';
+      case 'Posiblemente compatible':
+        return '?';
+      case 'No compatible':
+        return '✗';
+      default:
+        return '';
+    }
+  };
 
   // Filtrar modelos sugeridos
   const modelosFiltrados = modelosSugeridos.filter((m) =>
@@ -190,25 +237,27 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-medium mb-1 opacity-90">
-                Alto (mm)
+                Alto (cm)
               </label>
               <input
                 type="number"
+                step="0.1"
                 value={alto}
                 onChange={(e) => setAlto(e.target.value)}
-                placeholder="150"
+                placeholder="15.0"
                 className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:bg-white/30"
               />
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 opacity-90">
-                Ancho (mm)
+                Ancho (cm)
               </label>
               <input
                 type="number"
+                step="0.1"
                 value={ancho}
                 onChange={(e) => setAncho(e.target.value)}
-                placeholder="75"
+                placeholder="7.5"
                 className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:bg-white/30"
               />
             </div>
@@ -260,12 +309,12 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
                 <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">
                   {alto && ancho
-                    ? 'No hay micas compatibles con esas medidas'
+                    ? 'Mostrando todas las micas disponibles con su nivel de compatibilidad'
                     : 'Ingresa las medidas para buscar micas compatibles'}
                 </p>
                 {alto && ancho && (
                   <p className="text-xs mt-1">
-                    Tolerancia máxima: 1mm (siempre igual o más grande)
+                    Tolerancia: 0 a -2mm (la mica nunca puede ser más grande que el dispositivo)
                   </p>
                 )}
               </div>
@@ -277,7 +326,18 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{mica.name}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-gray-900">{mica.name}</h3>
+                        {mica.compatibility && (
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-full border ${getCompatibilityBadgeColor(
+                              mica.compatibility.level
+                            )}`}
+                          >
+                            {getCompatibilityIcon(mica.compatibility.level)} {mica.compatibility.level}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-500">SKU: {mica.sku}</p>
                       <div className="mt-1 flex items-center gap-4 text-xs text-gray-600">
                         <span>Stock: {mica.stock}</span>
@@ -285,7 +345,12 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
                       </div>
                       {mica.attributes?.alto && mica.attributes?.ancho && (
                         <div className="mt-1 text-xs text-blue-600">
-                          Medidas: {mica.attributes.alto}×{mica.attributes.ancho}mm
+                          Medidas: {(parseFloat(mica.attributes.alto) > 50 ? parseFloat(mica.attributes.alto) / 10 : parseFloat(mica.attributes.alto)).toFixed(1)}×{(parseFloat(mica.attributes.ancho) > 50 ? parseFloat(mica.attributes.ancho) / 10 : parseFloat(mica.attributes.ancho)).toFixed(1)}cm
+                        </div>
+                      )}
+                      {mica.compatibility && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Diferencia: {Math.abs(mica.compatibility.micaAltoCm - mica.compatibility.requestedAltoCm).toFixed(1)}×{Math.abs(mica.compatibility.micaAnchoCm - mica.compatibility.requestedAnchoCm).toFixed(1)}cm
                         </div>
                       )}
                     </div>
@@ -293,7 +358,7 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
                       onClick={() => registrarCompatibilidad(mica)}
                       className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
                     >
-                      Registrar <ChevronRight className="w-3 h-3" />
+                      Registrar y Agregar <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -320,7 +385,7 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
                         {item.modelo_celular}
                       </h4>
                       <p className="text-sm text-gray-500">
-                        Medidas: {item.alto}×{item.ancho}mm
+                        Medidas: {item.alto}×{item.ancho}cm
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         Usado {item.contador} vez{item.contador !== 1 ? 'es' : ''}
@@ -345,7 +410,9 @@ export default function BuscadorCompatibilidad({ onClose }: BuscadorCompatibilid
       {/* Footer info */}
       <div className="p-3 bg-gray-50 border-t">
         <p className="text-xs text-gray-500 text-center">
-          Las micas deben ser iguales o más grandes, nunca más pequeñas
+          Sistema de tolerancia: <span className="text-green-600 font-medium">Compatible</span> (0 a -2mm), 
+          <span className="text-yellow-600 font-medium"> Posiblemente compatible</span> (hasta 5mm), 
+          <span className="text-red-600 font-medium"> No compatible</span> (más de 5mm)
         </p>
       </div>
     </div>

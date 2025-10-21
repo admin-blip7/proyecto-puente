@@ -68,7 +68,7 @@ const getNextOrderId = async (): Promise<string> => {
 };
 
 export const addRepairOrder = async (
-  orderData: Omit<RepairOrder, "id" | "orderId" | "createdAt" | "status" | "partsUsed" | "laborCost" | "totalCost" | "totalPrice" | "profit">
+  orderData: Omit<RepairOrder, "id" | "orderId" | "createdAt" | "status">
 ): Promise<RepairOrder> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -87,11 +87,11 @@ export const addRepairOrder = async (
       deviceSerialIMEI: orderData.deviceSerialIMEI,
       reportedIssue: orderData.reportedIssue,
       technicianNotes: orderData.technicianNotes ?? null,
-      partsUsed: [],
-      laborCost: 0,
-      totalCost: 0,
-      totalPrice: 0,
-      profit: 0,
+      partsUsed: orderData.partsUsed ?? [],
+      laborCost: orderData.laborCost ?? 0,
+      totalCost: orderData.totalCost ?? 0,
+      totalPrice: orderData.totalPrice ?? 0,
+      profit: orderData.profit ?? 0,
       createdAt,
       completedAt: null,
     };

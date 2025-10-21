@@ -14,8 +14,8 @@
         <div class="bg-white rounded-lg shadow p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">1. Buscar Micas Compatibles</h2>
             <div class="flex gap-4 mb-4">
-                <input type="number" id="alto" placeholder="Alto (mm)" class="border rounded px-3 py-2" value="150">
-                <input type="number" id="ancho" placeholder="Ancho (mm)" class="border rounded px-3 py-2" value="75">
+                <input type="number" id="alto" placeholder="Alto (cm)" class="border rounded px-3 py-2" value="15.0" step="0.1">
+                <input type="number" id="ancho" placeholder="Ancho (cm)" class="border rounded px-3 py-2" value="7.5" step="0.1">
                 <button onclick="buscarMicas()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                     Buscar
                 </button>
@@ -87,14 +87,33 @@
                     resultado.innerHTML = `
                         <div class="mt-2">
                             <p class="font-semibold text-green-600">Se encontraron ${micas.length} micas:</p>
-                            ${micas.map(mica => `
-                                <div class="border rounded p-2 mt-1">
-                                    <p><strong>${mica.name}</strong> - SKU: ${mica.sku}</p>
-                                    <p class="text-xs">Stock: ${mica.stock} | Precio: $${mica.price}</p>
-                                    ${mica.attributes?.alto ? `<p class="text-xs text-blue-600">Medidas: ${mica.attributes.alto}×${mica.attributes.ancho}mm</p>` : ''}
-                                    <p class="text-xs text-gray-500">ID: ${mica.id}</p>
-                                </div>
-                            `).join('')}
+                            ${micas.map(mica => {
+                                const compatibilityLevel = mica.compatibility?.level || 'Sin información';
+                                const compatibilityClass = getCompatibilityClass(compatibilityLevel);
+                                const compatibilityIcon = getCompatibilityIcon(compatibilityLevel);
+                                
+                                return `
+                                    <div class="border rounded p-2 mt-1">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <p><strong>${mica.name}</strong> - SKU: ${mica.sku}</p>
+                                                <p class="text-xs">Stock: ${mica.stock} | Precio: $${mica.price}</p>
+                                                ${mica.attributes?.alto ? `<p class="text-xs text-blue-600">Medidas: ${(parseFloat(mica.attributes.alto) > 50 ? parseFloat(mica.attributes.alto) / 10 : parseFloat(mica.attributes.alto)).toFixed(1)}×${(parseFloat(mica.attributes.ancho) > 50 ? parseFloat(mica.attributes.ancho) / 10 : parseFloat(mica.attributes.ancho)).toFixed(1)}cm</p>` : ''}
+                                                <p class="text-xs text-gray-500">ID: ${mica.id}</p>
+                                            </div>
+                                            <span class="compatibility-badge ${compatibilityClass} text-xs px-2 py-1 rounded">
+                                                ${compatibilityIcon} ${compatibilityLevel}
+                                            </span>
+                                        </div>
+                                        ${mica.compatibility ? `
+                                            <p class="text-xs text-gray-600 mt-1">
+                                                <strong>Diferencia:</strong> 
+                                                ${Math.abs(mica.compatibility.micaAltoCm - mica.compatibility.requestedAltoCm).toFixed(1)}×${Math.abs(mica.compatibility.micaAnchoCm - mica.compatibility.requestedAnchoCm).toFixed(1)}cm
+                                            </p>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
                     `;
                 }
@@ -211,6 +230,25 @@
                 resultado.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
             }
         }
+
+        // Funciones auxiliares para compatibilidad
+         function getCompatibilityClass(level) {
+             switch(level) {
+                 case 'Compatible': return 'bg-green-100 text-green-800';
+                 case 'Posiblemente compatible': return 'bg-yellow-100 text-yellow-800';
+                 case 'No compatible': return 'bg-red-100 text-red-800';
+                 default: return 'bg-gray-100 text-gray-800';
+             }
+         }
+         
+         function getCompatibilityIcon(level) {
+             switch(level) {
+                 case 'Compatible': return '✓';
+                 case 'Posiblemente compatible': return '?';
+                 case 'No compatible': return '✗';
+                 default: return '?';
+             }
+         }
 
         // Cargar datos automáticamente al cargar la página
         window.onload = () => {

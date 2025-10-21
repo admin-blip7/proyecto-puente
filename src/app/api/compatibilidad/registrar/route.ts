@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabaseServerClient';
 
 export async function POST(request: NextRequest) {
   try {
-    const { modelo, alto, ancho, micaId } = await request.json();
+    const { modelo, alto, ancho, micaId, compatibilityLevel } = await request.json();
 
     if (!modelo || !alto || !ancho || !micaId) {
       return NextResponse.json(
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         .update({
           contador: existente.contador + 1,
           actualizado_at: new Date().toISOString(),
+          // Remover temporalmente nivel_compatibilidad hasta que se aplique la migración
+          // nivel_compatibilidad: compatibilityLevel || existente.nivel_compatibilidad || 'No compatible',
         })
         .eq('id', existente.id);
 
@@ -67,6 +69,8 @@ export async function POST(request: NextRequest) {
           tienda_id: 'default', // Podría ser dinámico si hay múltiples tiendas
           vendedor_id: null, // Podría obtenerse del usuario autenticado
           contador: 1,
+          // Remover temporalmente nivel_compatibilidad hasta que se aplique la migración
+          // nivel_compatibilidad: compatibilityLevel || 'No compatible',
         })
         .select()
         .single();

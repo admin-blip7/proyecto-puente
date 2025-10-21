@@ -8,8 +8,8 @@ type SupplierDetailPageParams = {
   supplierId: string;
 };
 
-export default async function SupplierDetailPage({ params }: { params: SupplierDetailPageParams }) {
-  const { supplierId } = params;
+export default async function SupplierDetailPage({ params }: { params: Promise<SupplierDetailPageParams> }) {
+  const { supplierId } = await params;
 
   try {
     const supplier = await getSupplierById(supplierId);

@@ -307,6 +307,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       {showBuscadorCompatibilidad && (
         <BuscadorCompatibilidad
           onClose={() => setShowBuscadorCompatibilidad(false)}
+          onAddToCart={addToCart}
         />
       )}
     </>
