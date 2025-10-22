@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       const supabaseUser = newSession?.user ?? null;
       setUser(supabaseUser);
       setUserProfile(buildUserProfile(supabaseUser));
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      listener?.subscription?.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [router, pathname]);
 

@@ -100,7 +100,7 @@ export default function CompatibilityChecker() {
       };
 
       // Check if dimensions are available
-       if (!protector.screenWidth || !protector.screenHeight) {
+       if (!protector.attributes?.screenWidth || !protector.attributes?.screenHeight) {
          toast({
            title: "Error",
            description: "Este protector no tiene dimensiones registradas",
@@ -109,21 +109,21 @@ export default function CompatibilityChecker() {
          return;
        }
 
-       const widthOk = protector.screenWidth <= phoneData.width;
-       const heightOk = protector.screenHeight <= phoneData.height;
+       const widthOk = protector.attributes?.screenWidth <= phoneData.width;
+       const heightOk = protector.attributes?.screenHeight <= phoneData.height;
        let cornerOk = true;
        let notchOk = true;
 
        // Check corner radius if both have it
-       if (protector.cornerRadius && phoneData.cornerRadius) {
-         cornerOk = protector.cornerRadius <= phoneData.cornerRadius;
+       if (protector.attributes?.cornerRadius && phoneData.cornerRadius) {
+         cornerOk = protector.attributes.cornerRadius <= phoneData.cornerRadius;
        }
 
        // Check notch compatibility
-       if (protector.notchType && phoneData.notchType) {
-         notchOk = protector.notchType === phoneData.notchType ||
-                   protector.notchType === "none" ||
-                   (protector.notchType === "notch" && phoneData.notchType === "dynamic-island");
+       if (protector.attributes?.notchType && phoneData.notchType) {
+         notchOk = protector.attributes.notchType === phoneData.notchType ||
+                   protector.attributes.notchType === "none" ||
+                   (protector.attributes.notchType === "notch" && phoneData.notchType === "dynamic-island");
        }
 
        const isCompatible = widthOk && heightOk && cornerOk && notchOk;
@@ -142,13 +142,13 @@ export default function CompatibilityChecker() {
            heightOk,
            cornerOk,
            notchOk,
-           protectorWidth: protector.screenWidth,
-           protectorHeight: protector.screenHeight,
+           protectorWidth: protector.attributes?.screenWidth,
+           protectorHeight: protector.attributes?.screenHeight,
            phoneWidth: phoneData.width,
            phoneHeight: phoneData.height,
-           protectorCorner: protector.cornerRadius,
+           protectorCorner: protector.attributes?.cornerRadius,
            phoneCorner: phoneData.cornerRadius,
-           protectorNotch: protector.notchType,
+           protectorNotch: protector.attributes?.notchType,
            phoneNotch: phoneData.notchType,
          },
        };
@@ -229,8 +229,8 @@ export default function CompatibilityChecker() {
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm">
                   <strong>Dimensiones:</strong>{" "}
-                  {selectedProtectorProduct.screenWidth && selectedProtectorProduct.screenHeight
-                    ? `${selectedProtectorProduct.screenWidth} x ${selectedProtectorProduct.screenHeight} cm`
+                  {selectedProtectorProduct.attributes?.screenWidth && selectedProtectorProduct.attributes?.screenHeight
+                    ? `${selectedProtectorProduct.attributes.screenWidth} x ${selectedProtectorProduct.attributes.screenHeight} cm`
                     : "⚠ Este protector no tiene dimensiones registradas"
                   }
                 </p>

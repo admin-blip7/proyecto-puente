@@ -83,3 +83,7 @@ public/worker-*.js.map
 .cache/
 .temp/
 .swc/
+.vercel
+
+# Local Netlify folder
+.netlify

@@ -23,6 +23,7 @@ import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
 import { getClientsWithCredit } from "@/lib/services/creditService";
 import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
+import { getProducts } from "@/lib/services/productService";
 
 
 interface POSClientProps {
@@ -44,6 +45,20 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
+  // Function to refresh products from the database
+  const refreshProducts = useCallback(async () => {
+    try {
+      const updatedProducts = await getProducts();
+      setProducts(updatedProducts);
+    } catch (error) {
+      console.error('Error refreshing products:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los productos",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (userProfile) {
@@ -240,6 +255,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               onAddToCart={addToCart}
               onCloseSession={() => setClosingDrawer(true)}
               onFinanceSale={() => setFinancePlanOpen(true)}
+              onSuccessfulSale={refreshProducts}
             />
          </div>
        </div>
@@ -282,6 +298,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 onAddToCart={addToCart}
                 onCloseSession={() => setClosingDrawer(true)}
                 onFinanceSale={() => setFinancePlanOpen(true)}
+                onSuccessfulSale={refreshProducts}
              />
           </SheetContent>
         </Sheet>
@@ -298,9 +315,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         onOpenChange={setFinancePlanOpen}
         allProducts={products}
         allClients={allClients}
-        onSaleCreated={() => {
-            // Here you could refresh products or clients if needed
-        }}
+        onSaleCreated={refreshProducts}
       />
 
       {/* Buscador de Compatibilidad */}

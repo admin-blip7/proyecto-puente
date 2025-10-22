@@ -187,6 +187,25 @@ export interface RepairOrder {
     completedAt?: Date;
 }
 
+export interface ProductVariant {
+    id: string;
+    productId: string;
+    sku: string;
+    serialNumber?: string;
+    imei?: string;
+    price?: number;
+    cost?: number;
+    status: 'available' | 'sold' | 'reserved' | 'damaged';
+    batteryHealth?: number;
+    storage?: number;
+    aestheticCondition?: string;
+    color?: string;
+    replacedParts?: string[];
+    notes?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 export const paymentMethods = ["Transferencia Bancaria", "Efectivo", "Depósito"] as const;
 export type PaymentMethod = typeof paymentMethods[number];
 

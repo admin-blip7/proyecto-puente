@@ -21,7 +21,7 @@ if (!BATCH_SIZE || typeof BATCH_SIZE !== 'number' || BATCH_SIZE < 1) {
     process.exit(1);
 }
 
-let pgCreds;
+let pgCreds: any;
 try {
     pgCreds = JSON.parse(fs.readFileSync('./supabase-service.json', 'utf8'));
     if (typeof pgCreds.user === 'string' &&
@@ -65,7 +65,7 @@ function quit() {
 async function loadUsers(filename: string): Promise<any> {
     return new Promise((resolve, reject) => {
         const Batch = require('stream-json/utils/Batch');
-        let insertRows = [];
+        let insertRows: string[] = [];
 
         const StreamArray = require('stream-json/streamers/StreamArray');
         const {chain} = require('stream-chain');
@@ -80,8 +80,8 @@ async function loadUsers(filename: string): Promise<any> {
         // count all odd values from a huge array
         
         let oddCounter = 0;
-        pipeline.on('data', async data => {
-          data.forEach(item => {
+        pipeline.on('data', async (data: any) => {
+          data.forEach((item: any) => {
             // console.log('user', user);
             const index = item.key;
             const user = item.value;
@@ -103,10 +103,10 @@ async function loadUsers(filename: string): Promise<any> {
 
 async function loadUsers_old(filename: string): Promise<any> {
     return new Promise((resolve, reject) => {
-        let insertRows = [];
+        let insertRows: string[] = [];
         const jsonStream = StreamArray.withParser();
         //internal Node readable stream option, pipe to stream-json to convert it for us
-        fs.createReadStream(filename).pipe(jsonStream.input);
+        (fs.createReadStream(filename) as any).pipe(jsonStream.input);
     
         fs.writeFileSync(`./queue.tmp`, '', 'utf-8');       
 

@@ -3,9 +3,9 @@ import { Client } from 'pg';
 import * as StreamArray from 'stream-json/streamers/StreamArray';
 
 const args = process.argv.slice(2);
-let filename;
-let tableName;
-let fields;
+let filename: string;
+let tableName: string;
+let fields: any;
 let client: Client;
 
 if (args.length < 1) {

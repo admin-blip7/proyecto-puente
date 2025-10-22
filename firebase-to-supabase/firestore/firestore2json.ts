@@ -2,15 +2,15 @@ import { getFirestoreInstance, cleanUp, writeRecord } from './utils';
 import * as fs from 'fs';
 const args = process.argv.slice(2);
 
-let processDocument;
+let processDocument: any;
 if (fs.existsSync(`./${args[0]}.js`)) {
     // read file to string
     processDocument = require(`./${args[0]}.js`);
 }
 
-let db;
+let db: any;
 
-const recordCounters = {};
+const recordCounters: any = {};
 let limit = 0;
 
 if (args.length < 1) {
@@ -44,7 +44,7 @@ async function getAll(collectionName: string, offset: number, batchSize: number,
 }
 
 async function getBatch(collectionName: string, offset: number, batchSize: number, limit: number): Promise<{data: any[], error: any}> {
-    const data = [];
+    const data: any[] = [];
     let error = null;
     if (recordCounters[collectionName] >= limit) {
         return {data, error};
@@ -59,8 +59,8 @@ async function getBatch(collectionName: string, offset: number, batchSize: numbe
     .limit(batchSize)
     .offset(offset)
     .get()
-    .then(snapshot => {
-      snapshot.forEach(fsdoc => {
+    .then((snapshot: any) => {
+      snapshot.forEach((fsdoc: any) => {
         let doc = fsdoc.data();
         if (!doc.firestore_id) doc.firestore_id = fsdoc.id;
         else if (!doc.firestoreid) doc.firestoreid = fsdoc.id;   
@@ -74,7 +74,7 @@ async function getBatch(collectionName: string, offset: number, batchSize: numbe
         data.push(doc);
       });
     })
-    .catch(err => {
+    .catch((err: any) => {
         error = err;
     });
     return {data, error};        

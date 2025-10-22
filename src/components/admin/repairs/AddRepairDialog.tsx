@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { RepairOrder } from "@/types";
+import { RepairOrder, RepairPart } from "@/types";
 import { Loader2, Wrench, Plus, Save, X, CloudUpload, CheckCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -25,14 +25,14 @@ interface AddRepairDialogProps {
 }
 
 const commonProblems = [
-  { id: "screen", label: "Pantalla Rota" },
-  { id: "battery", label: "Problemas de Batería" },
-  { id: "water", label: "Daño por Agua" },
-  { id: "camera", label: "Cámara Dañada" },
-  { id: "charging", label: "Puerto de Carga" },
-  { id: "speaker", label: "Altavoz/Micrófono" },
-  { id: "button", label: "Botones Dañados" },
-  { id: "software", label: "Problemas de Software" }
+  { id: "screen", label: "Pantalla Rota", price: 0 },
+  { id: "battery", label: "Problemas de Batería", price: 0 },
+  { id: "water", label: "Daño por Agua", price: 0 },
+  { id: "camera", label: "Cámara Dañada", price: 0 },
+  { id: "charging", label: "Puerto de Carga", price: 0 },
+  { id: "speaker", label: "Altavoz/Micrófono", price: 0 },
+  { id: "button", label: "Botones Dañados", price: 0 },
+  { id: "software", label: "Problemas de Software", price: 0 }
 ];
 
 const formSchema = z.object({
@@ -225,7 +225,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
       }));
 
       // Combine problems and parts for the ticket
-      const servicesForTicket = [
+      const servicesForTicket: RepairPart[] = [
         ...selectedProblems.map(p => ({
           productId: p.id,
           name: p.label,
@@ -233,7 +233,13 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
           cost: 0, // Problems are labor, no cost
           quantity: 1
         })),
-        ...selectedParts
+        ...selectedParts.map(part => ({
+          productId: part.id,
+          name: part.name,
+          price: part.price,
+          cost: part.cost,
+          quantity: part.quantity
+        }))
       ];
 
       // Create FormData for server action

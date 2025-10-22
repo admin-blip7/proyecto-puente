@@ -382,8 +382,8 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOrders.map((order) => {
               const isStatusNew = order.status === "Recibido";
-              const isStatusInProgress = order.status === "En progreso";
-              const isStatusReady = order.status === "Listo para entrega" || order.status === "Completado";
+              const isStatusInProgress = order.status === "En Diagnóstico" || order.status === "Esperando Refacción" || order.status === "En Reparación";
+              const isStatusReady = order.status === "Listo para Entrega" || order.status === "Completado";
               const isStatusCancelled = order.status === "Cancelado";
 
               return (

@@ -9,8 +9,8 @@ const formSchema = z.object({
   customerPhone: z.string().min(1, "El teléfono es requerido."),
   deviceBrand: z.string().min(1, "La marca es requerida."),
   deviceModel: z.string().min(1, "El modelo es requerido."),
-  deviceSerialIMEI: z.string().optional(),
-  reportedIssue: z.string().optional(),
+  deviceSerialIMEI: z.string().min(1, "El IMEI o Serie es requerido."),
+  reportedIssue: z.string().min(1, "La descripción del problema es requerida."),
   technicianNotes: z.string().optional(),
   partsUsed: z.array(z.object({
     productId: z.string(),
@@ -49,7 +49,10 @@ export async function createRepairOrder(formData: FormData) {
     const validatedData = formSchema.parse(rawData);
 
     // Create the repair order
-    const newOrder = await addRepairOrder(validatedData);
+    const newOrder = await addRepairOrder({
+      ...validatedData,
+      partsUsed: validatedData.partsUsed || []
+    });
 
     // Return success response with order data
     return {

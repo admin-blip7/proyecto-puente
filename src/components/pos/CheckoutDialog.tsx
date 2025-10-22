@@ -137,7 +137,25 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
              customerPhone: customerPhone || undefined,
            });
          } else {
-          newSale = await addSaleAndUpdateStock(saleDataForDb, cartItems);
+          // Usar API route para procesar la venta
+          const response = await fetch('/api/sales', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              saleData: saleDataForDb,
+              cartItems: cartItems
+            })
+          });
+
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.details || result.error || 'Error al procesar la venta');
+          }
+
+          newSale = result.sale;
         }
 
         setLastSale(newSale);

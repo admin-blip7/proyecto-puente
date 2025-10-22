@@ -77,10 +77,10 @@ export default function RepairDetailsDialog({
   const [editingSteps, setEditingSteps] = useState(false);
   const [services, setServices] = useState(order?.partsUsed || []);
   const [partsNeeded, setPartsNeeded] = useState(order?.partsUsed || []);
-  const [repairSteps, setRepairSteps] = useState(order?.repairSteps || [
+  const [repairSteps, setRepairSteps] = useState([
     { id: 1, text: "Diagnóstico inicial completo.", completed: true },
     { id: 2, text: "Reparar dispositivo.", completed: order?.status !== "Recibido" },
-    { id: 3, text: "Pruebas finales y calibración.", completed: order?.status === "Listo para entrega" || order?.status === "Completado" }
+    { id: 3, text: "Pruebas finales y calibración.", completed: order?.status === "Listo para Entrega" || order?.status === "Completado" }
   ]);
   const [newService, setNewService] = useState("");
   const [newPart, setNewPart] = useState("");

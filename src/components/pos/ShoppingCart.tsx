@@ -27,6 +27,7 @@ interface ShoppingCartProps {
   onAddToCart: (product: Product, quantity?: number) => void;
   onCloseSession: () => void;
   onFinanceSale: () => void;
+  onSuccessfulSale?: () => void | Promise<void>;
 }
 
 export default function ShoppingCart({ 
@@ -39,6 +40,7 @@ export default function ShoppingCart({
   onAddToCart,
   onCloseSession,
   onFinanceSale,
+  onSuccessfulSale,
 }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
@@ -55,6 +57,10 @@ export default function ShoppingCart({
   const handleSuccessfulSale = () => {
     onClearCart();
     setCheckoutOpen(false);
+    // Call the product refresh callback if provided
+    if (onSuccessfulSale) {
+      onSuccessfulSale();
+    }
   };
 
   const handleExpenseAdded = async (description: string, amount: number, category: string) => {
@@ -80,7 +86,7 @@ export default function ShoppingCart({
       if (!cashAccount) {
         cashAccount = await addAccount({
           name: 'Caja Principal',
-          type: 'Caja',
+          type: 'Efectivo',
           currentBalance: 0
         });
         toast({

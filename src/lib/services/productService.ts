@@ -1,7 +1,7 @@
 
 'use server';
 
-import { Product, StockEntryItem, BulkUpdateData } from "@/types";
+import { Product, StockEntryItem, BulkUpdateData, ProductVariant } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
@@ -11,6 +11,7 @@ const log = getLogger("productService");
 
 const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
+const PRODUCT_VARIANTS_TABLE = "product_variants";
 
 const generateSearchKeywords = (name: string): string[] => {
   if (!name) return [];
@@ -296,6 +297,7 @@ export const bulkUpdateProducts = async (
   updateData: BulkUpdateData
 ): Promise<void> => {
   if (!productIds.length) return;
+
   const supabase = getSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -361,5 +363,168 @@ export const bulkUpdateProducts = async (
         throw updateError;
       }
     }
+  }
+};
+
+// ProductVariant functions
+export const getProductVariants = async (productId: string): Promise<ProductVariant[]> => {
+  const supabase = getSupabaseServerClient();
+  
+  const { data, error } = await supabase
+    .from(PRODUCT_VARIANTS_TABLE)
+    .select("*")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    log.error("Error fetching product variants", error);
+    throw new Error("Failed to fetch product variants.");
+  }
+
+  return data.map(row => ({
+    id: row.id,
+    productId: row.product_id,
+    sku: row.sku,
+    serialNumber: row.serial_number,
+    imei: row.imei,
+    price: row.price,
+    cost: row.cost,
+    status: row.status,
+    batteryHealth: row.battery_health,
+    storage: row.storage,
+    aestheticCondition: row.aesthetic_condition,
+    color: row.color,
+    replacedParts: row.replaced_parts || [],
+    notes: row.notes,
+    createdAt: toDate(row.created_at),
+    updatedAt: toDate(row.updated_at),
+  }));
+};
+
+export const addProductVariant = async (
+  productId: string,
+  variantData: Omit<ProductVariant, "id" | "productId" | "createdAt" | "updatedAt">
+): Promise<ProductVariant> => {
+  const supabase = getSupabaseServerClient();
+  const now = nowIso();
+  const newId = uuidv4();
+
+  const payload = {
+    id: newId,
+    product_id: productId,
+    sku: variantData.sku,
+    serial_number: variantData.serialNumber,
+    imei: variantData.imei,
+    price: variantData.price,
+    cost: variantData.cost,
+    status: variantData.status,
+    battery_health: variantData.batteryHealth,
+    storage: variantData.storage,
+    aesthetic_condition: variantData.aestheticCondition,
+    color: variantData.color,
+    replaced_parts: variantData.replacedParts || [],
+    notes: variantData.notes,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { data, error } = await supabase
+    .from(PRODUCT_VARIANTS_TABLE)
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) {
+    log.error("Error adding product variant", error);
+    throw new Error("Failed to add product variant.");
+  }
+
+  return {
+    id: data.id,
+    productId: data.product_id,
+    sku: data.sku,
+    serialNumber: data.serial_number,
+    imei: data.imei,
+    price: data.price,
+    cost: data.cost,
+    status: data.status,
+    batteryHealth: data.battery_health,
+    storage: data.storage,
+    aestheticCondition: data.aesthetic_condition,
+    color: data.color,
+    replacedParts: data.replaced_parts || [],
+    notes: data.notes,
+    createdAt: toDate(data.created_at),
+    updatedAt: toDate(data.updated_at),
+  };
+};
+
+export const updateProductVariant = async (
+  variantId: string,
+  variantData: Partial<Omit<ProductVariant, "id" | "productId" | "createdAt" | "updatedAt">>
+): Promise<ProductVariant> => {
+  const supabase = getSupabaseServerClient();
+  const now = nowIso();
+
+  const updates: any = {
+    updated_at: now,
+  };
+
+  if (variantData.sku !== undefined) updates.sku = variantData.sku;
+  if (variantData.serialNumber !== undefined) updates.serial_number = variantData.serialNumber;
+  if (variantData.imei !== undefined) updates.imei = variantData.imei;
+  if (variantData.price !== undefined) updates.price = variantData.price;
+  if (variantData.cost !== undefined) updates.cost = variantData.cost;
+  if (variantData.status !== undefined) updates.status = variantData.status;
+  if (variantData.batteryHealth !== undefined) updates.battery_health = variantData.batteryHealth;
+  if (variantData.storage !== undefined) updates.storage = variantData.storage;
+  if (variantData.aestheticCondition !== undefined) updates.aesthetic_condition = variantData.aestheticCondition;
+  if (variantData.color !== undefined) updates.color = variantData.color;
+  if (variantData.replacedParts !== undefined) updates.replaced_parts = variantData.replacedParts;
+  if (variantData.notes !== undefined) updates.notes = variantData.notes;
+
+  const { data, error } = await supabase
+    .from(PRODUCT_VARIANTS_TABLE)
+    .update(updates)
+    .eq("id", variantId)
+    .select("*")
+    .single();
+
+  if (error) {
+    log.error("Error updating product variant", error);
+    throw new Error("Failed to update product variant.");
+  }
+
+  return {
+    id: data.id,
+    productId: data.product_id,
+    sku: data.sku,
+    serialNumber: data.serial_number,
+    imei: data.imei,
+    price: data.price,
+    cost: data.cost,
+    status: data.status,
+    batteryHealth: data.battery_health,
+    storage: data.storage,
+    aestheticCondition: data.aesthetic_condition,
+    color: data.color,
+    replacedParts: data.replaced_parts || [],
+    notes: data.notes,
+    createdAt: toDate(data.created_at),
+    updatedAt: toDate(data.updated_at),
+  };
+};
+
+export const deleteProductVariant = async (variantId: string): Promise<void> => {
+  const supabase = getSupabaseServerClient();
+  
+  const { error } = await supabase
+    .from(PRODUCT_VARIANTS_TABLE)
+    .delete()
+    .eq("id", variantId);
+
+  if (error) {
+    log.error("Error deleting product variant", error);
+    throw new Error("Failed to delete product variant.");
   }
 };

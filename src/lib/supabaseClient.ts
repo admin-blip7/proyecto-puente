@@ -14,6 +14,12 @@ export const supabase = supabaseUrl && supabaseAnonKey
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        detectSessionInUrl: false,
       },
+      global: {
+        headers: {
+          'X-Client-Info': 'storefront-swift/1.0.0'
+        }
+      }
     })
   : undefined;
