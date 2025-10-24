@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
@@ -24,6 +24,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn, formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useRouter } from "next/navigation";
 
 
 interface SalesHistoryClientProps {
@@ -35,6 +36,7 @@ interface SalesHistoryClientProps {
 
 export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
   const [sales, setSales] = useState<Sale[]>(() => initialSales);
+  const router = useRouter();
   
   // Sync sales state with initialSales prop if it changes
   React.useEffect(() => {
@@ -147,7 +149,14 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   }, [sales]);
 
   const sortedSales = useMemo(() => {
-    if (!sortField) return deduplicatedSales;
+    if (!sortField) {
+      // Default sort: by createdAt descending (newest first)
+      return [...deduplicatedSales].sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return bTime - aTime; // Descending order (newest first)
+      });
+    }
 
     return [...deduplicatedSales].sort((a, b) => {
       let aValue: any = a[sortField];
@@ -204,6 +213,17 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       }
       
       console.log('Total sales loaded:', sales.length);
+      
+      // Debug: Check for the specific sale SALE-731410C0
+      const targetSale = sales.find(s => s.saleId === 'SALE-731410C0');
+      if (targetSale) {
+        console.log('Found SALE-731410C0:', targetSale);
+        console.log('Sale createdAt:', targetSale.createdAt);
+        console.log('Sale createdAt type:', typeof targetSale.createdAt);
+      } else {
+        console.warn('SALE-731410C0 not found in sales list');
+        console.log('Available saleIds:', sales.map(s => s.saleId).slice(0, 10));
+      }
     }
   }, [sales]);
 
@@ -258,9 +278,19 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/admin/sales/consignor-reports')}
+            className="flex items-center gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Reportes de Consignatarios
+          </Button>
+          <div className="flex items-center space-x-2">
             <Switch id="exclude-familiar" checked={excludeFamiliar} onCheckedChange={setExcludeFamiliar} />
             <Label htmlFor="exclude-familiar">Excluir ventas &quot;Familiar&quot;</Label>
+          </div>
         </div>
       </div>
 

@@ -11,7 +11,7 @@ const Dialog = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root>
 >((props, ref) => (
-  <DialogPrimitive.Root modal={false} {...props} />
+  <DialogPrimitive.Root {...props} />
 ))
 Dialog.displayName = "Dialog"
 const DialogTrigger = DialogPrimitive.Trigger
@@ -43,7 +43,6 @@ const DialogContent = React.forwardRef<
       ref={ref}
       // Desactivar el bloqueo automático de scroll de Radix
       onOpenAutoFocus={(e) => e.preventDefault()}
-      onPointerDownOutside={(e) => e.preventDefault()}
       // Proporcionar aria-describedby por defecto para evitar warnings de accesibilidad
       aria-describedby={props['aria-describedby'] || undefined}
       className={cn(

@@ -61,19 +61,23 @@ export async function POST(request: Request) {
   }
 }
 
-// Método GET para obtener ventas (opcional)
+// Método GET para obtener ventas
 export async function GET() {
   try {
-    // Aquí podrías implementar getSales si es necesario
+    const { getSales } = await import("@/lib/services/salesService");
+    const sales = await getSales();
+
     return NextResponse.json({
       success: true,
-      message: "Sales API is working",
+      data: sales,
+      count: sales.length,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
+    log.error("Error getting sales:", error);
     return NextResponse.json({
       success: false,
-      error: "Error en el API de ventas",
+      error: "Error al obtener las ventas",
       details: error.message,
       timestamp: new Date().toISOString()
     }, { status: 500 });

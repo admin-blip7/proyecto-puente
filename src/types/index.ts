@@ -26,6 +26,7 @@ export interface Product {
 
 export interface Consignor {
     id: string;
+    firestore_id?: string;
     name: string;
     contactInfo: string;
     balanceDue: number;
@@ -82,6 +83,7 @@ export interface SaleItem {
   quantity: number;
   priceAtSale: number;
   serials?: string[];
+  consignorId?: string;
 }
 
 export interface Sale {

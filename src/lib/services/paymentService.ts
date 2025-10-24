@@ -300,7 +300,19 @@ const uploadProofOfPayment = async (
   consignorId: string,
   paymentId: string
 ): Promise<string> => {
-  const filePath = `${STORAGE_PAYMENT_PROOFS_PATH}/${consignorId}/${paymentId}-${file.name}`;
+  // Sanitize the filename to remove special characters that cause StorageApiError
+  const sanitizeFilename = (filename: string): string => {
+    // Replace special characters with underscores and remove accents
+    return filename
+      .normalize('NFD') // Normalize to decompose accents
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // Replace special characters with underscores
+      .replace(/_+/g, '_') // Replace multiple underscores with single
+      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+  };
+
+  const sanitizedFilename = sanitizeFilename(file.name);
+  const filePath = `${STORAGE_PAYMENT_PROOFS_PATH}/${consignorId}/${paymentId}-${sanitizedFilename}`;
   return uploadFile(file, filePath);
 };
 
@@ -345,5 +357,68 @@ export const addConsignorPayment = async (
   } catch (error) {
     log.error("Error processing consignor payment", error instanceof Error ? error.message : String(error));
     throw error;
+  }
+};
+
+// Nueva función para obtener todos los pagos de consignadores
+export const getAllConsignorPayments = async (): Promise<ConsignorPayment[]> => {
+  const startTime = Date.now();
+  const requestId = `all-payments-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    log.info(`[getAllConsignorPayments] Starting request`, {
+      requestId,
+      timestamp: new Date().toISOString()
+    });
+
+    const supabase = getSupabaseServerClient();
+
+    // Verificar conexión y acceso a la tabla
+    const { data: testData, error: testError } = await supabase
+      .from(CONSIGNOR_PAYMENTS_TABLE)
+      .select("id")
+      .limit(1);
+
+    if (testError) {
+      log.error("[getAllConsignorPayments] Error accessing consignor_payments table", {
+        requestId,
+        error: testError
+      });
+      return [];
+    }
+
+    // Obtener todos los pagos ordenados por fecha
+    const { data, error } = await supabase
+      .from(CONSIGNOR_PAYMENTS_TABLE)
+      .select("*")
+      .order("paymentDate", { ascending: false });
+
+    if (error) {
+      log.error("[getAllConsignorPayments] Error fetching payments", {
+        requestId,
+        error
+      });
+      return [];
+    }
+
+    const processingTime = Date.now() - startTime;
+    const paymentCount = data?.length || 0;
+    
+    log.info(`[getAllConsignorPayments] Successfully completed`, {
+      requestId,
+      paymentCount,
+      processingTime: `${processingTime}ms`
+    });
+
+    return (data ?? []).map(mapPayment);
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    log.error("[getAllConsignorPayments] Unexpected error", {
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      processingTime: `${processingTime}ms`
+    });
+    return [];
   }
 };

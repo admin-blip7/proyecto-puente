@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Consignor } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -16,9 +16,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddEditConsignorDialog from "./AddEditConsignorDialog";
 import DeleteConsignorDialog from "./DeleteConsignorDialog";
-import RegisterPaymentDialog from "./RegisterPaymentDialog";
-import { DollarSign, MoreHorizontal } from "lucide-react";
+import RegisterPaymentDialog from "./RegisterPaymentDialogFixed";
+import { DollarSign, MoreHorizontal, BarChart3 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { useRouter } from "next/navigation";
+import { getConsignors } from "@/lib/services/consignorService";
 
 interface ConsignorClientProps {
   initialConsignors: Consignor[];
@@ -35,6 +37,8 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   const [isAddEditDialogOpen, setAddEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const router = useRouter();
 
   const handleOpenAddDialog = () => {
     setSelectedConsignor(null);
@@ -52,6 +56,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   };
   
   const handleOpenPaymentDialog = (consignor: Consignor) => {
+    console.log("Opening payment dialog for:", consignor.name);
     setSelectedConsignor(consignor);
     setPaymentDialogOpen(true);
   };
@@ -77,87 +82,150 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   };
   
   const handlePaymentRegistered = (consignorId: string, amountPaid: number) => {
-      setConsignors(prev => prev.map(c => 
-        c.id === consignorId 
-            ? { ...c, balanceDue: c.balanceDue - amountPaid } 
+      // Update local state immediately for UI feedback
+      setConsignors(prev => prev.map(c =>
+        (c.id === consignorId || c.firestore_id === consignorId)
+            ? { ...c, balanceDue: c.balanceDue - amountPaid }
             : c
       ));
+      
+      // Delayed and conditional data refresh to prevent render conflicts
+      setTimeout(() => {
+        // Only refresh if the dialog is closed to avoid interference
+        if (!isPaymentDialogOpen) {
+          handleRefreshData();
+        }
+      }, 1500);
   };
 
+  const handlePaymentDialogOpenChange = (open: boolean) => {
+    setPaymentDialogOpen(open);
+    if (!open) {
+      setSelectedConsignor(null);
+    }
+  };
+
+  const handleViewSalesReport = (consignor: Consignor) => {
+    router.push(`/admin/consignors/${consignor.id}/sales-report`);
+  };
+  
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const refreshedConsignors = await getConsignors();
+      // Remove duplicates by ID
+      const uniqueRefreshed = refreshedConsignors.filter((consignor, index, self) => 
+        index === self.findIndex(c => c.id === consignor.id)
+      );
+      setConsignors(uniqueRefreshed);
+    } catch (error) {
+      console.error('Error refreshing consignors:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Gestión de Consignadores</h1>
-        <Button onClick={handleOpenAddDialog}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Agregar Consignador
-        </Button>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Consignadores</h1>
+          <p className="text-muted-foreground">
+            Gestiona los consignadores y sus balances
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshData}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+          <Button onClick={handleOpenAddDialog}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Agregar Consignador
+          </Button>
+        </div>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Lista de Consignadores</CardTitle>
-           <CardDescription>
-            Agrega, edita, elimina o registra pagos a tus consignadores.
+          <CardDescription>
+            {consignors.length} consignador{consignors.length !== 1 ? 'es' : ''} registrado{consignors.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-250px)] w-full">
-            <div className="relative w-full overflow-auto">
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Información de Contacto</TableHead>
-                        <TableHead className="text-right">Saldo Pendiente</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {consignors.map((consignor, index) => {
-                        // Generate a unique key that accounts for potential duplicate IDs
-                        const uniqueKey = consignor.id || `${index}-${consignor.name}`;
-                        return (
-                            <TableRow key={uniqueKey}>
-                                <TableCell className="font-medium">{consignor.name}</TableCell>
-                                <TableCell>{consignor.contactInfo}</TableCell>
-                                <TableCell className="text-right font-semibold">
-                                    <div className="flex items-center justify-end">
-                                        <DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
-                                        {consignor.balanceDue.toFixed(2)}
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <span className="sr-only">Abrir menú</span>
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handleOpenPaymentDialog(consignor)}>
-                                                <DollarSign className="mr-2 h-4 w-4" />
-                                                <span>Registrar Pago</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleOpenEditDialog(consignor)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                <span>Editar</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleOpenDeleteDialog(consignor)} className="text-destructive">
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                <span>Eliminar</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })}
-                </TableBody>
-                </Table>
-            </div>
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Información de Contacto</TableHead>
+                  <TableHead className="text-right">Balance Pendiente</TableHead>
+                  <TableHead className="w-[100px]">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {consignors.map((consignor) => (
+                  <TableRow key={consignor.id}>
+                    <TableCell className="font-medium">{consignor.name}</TableCell>
+                    <TableCell>{consignor.contactInfo || 'No especificado'}</TableCell>
+                    <TableCell className="text-right">
+                      <span className={`font-medium ${consignor.balanceDue > 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                        ${consignor.balanceDue?.toFixed(2) || '0.00'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEditDialog(consignor)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewSalesReport(consignor)}>
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            Ver Reportes
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenPaymentDialog(consignor)}
+                            disabled={consignor.balanceDue <= 0}
+                          >
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            Registrar Pago
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenDeleteDialog(consignor)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {consignors.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No hay consignadores registrados
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </ScrollArea>
         </CardContent>
       </Card>
@@ -169,22 +237,18 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
         onConsignorAdded={handleConsignorAdded}
         onConsignorUpdated={handleConsignorUpdated}
       />
-      {selectedConsignor && (
-        <>
-            <DeleteConsignorDialog
-                isOpen={isDeleteDialogOpen}
-                onOpenChange={setDeleteDialogOpen}
-                consignor={selectedConsignor}
-                onConsignorDeleted={handleConsignorDeleted}
-            />
-            <RegisterPaymentDialog 
-                isOpen={isPaymentDialogOpen}
-                onOpenChange={setPaymentDialogOpen}
-                consignor={selectedConsignor}
-                onPaymentRegistered={handlePaymentRegistered}
-            />
-        </>
-      )}
+      <DeleteConsignorDialog
+          isOpen={isDeleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          consignor={selectedConsignor}
+          onConsignorDeleted={handleConsignorDeleted}
+      />
+      <RegisterPaymentDialog
+          isOpen={isPaymentDialogOpen}
+          onOpenChange={handlePaymentDialogOpenChange}
+          consignor={selectedConsignor}
+          onPaymentRegistered={handlePaymentRegistered}
+      />
     </>
   );
 }

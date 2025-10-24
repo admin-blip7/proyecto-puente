@@ -13,6 +13,51 @@ const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 const PRODUCT_VARIANTS_TABLE = "product_variants";
 
+// Helper function to resolve consignor Firestore ID to PostgreSQL UUID
+const resolveConsignorId = async (consignorId: string | undefined): Promise<string | null> => {
+  if (!consignorId || consignorId.trim() === '') {
+    log.warn(`Empty consignor ID provided`);
+    return null;
+  }
+  
+  const supabase = getSupabaseServerClient();
+  
+  // First try to find by direct ID match
+  const { data, error } = await supabase
+    .from("consignors")
+    .select("id, name")
+    .eq("id", consignorId)
+    .maybeSingle();
+    
+  if (error) {
+    log.error(`Error querying consignor by ID: ${consignorId}`, error);
+  }
+  
+  if (data) {
+    log.info(`Found consignor by ID: ${consignorId} -> ${data.name} (${data.id})`);
+    return data.id;
+  }
+  
+  // If not found by ID, try by firestore_id
+  const { data: firestoreData, error: firestoreError } = await supabase
+    .from("consignors")
+    .select("id, name")
+    .eq("firestore_id", consignorId)
+    .maybeSingle();
+    
+  if (firestoreError) {
+    log.error(`Error querying consignor by firestore_id: ${consignorId}`, firestoreError);
+  }
+  
+  if (firestoreData) {
+    log.info(`Found consignor by firestore_id: ${consignorId} -> ${firestoreData.name} (${firestoreData.id})`);
+    return firestoreData.id;
+  }
+  
+  log.warn(`Consignor not found for ID: ${consignorId}`);
+  return null;
+};
+
 const generateSearchKeywords = (name: string): string[] => {
   if (!name) return [];
   const lowerCaseName = name.toLowerCase();
@@ -71,6 +116,22 @@ const fetchProductRow = async (productId: string) => {
   return data ?? null;
 };
 
+const fetchProductBySku = async (sku: string) => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select("*")
+    .eq("sku", sku)
+    .maybeSingle();
+
+  if (error) {
+    log.error("Error fetching product by SKU", error);
+    throw error;
+  }
+
+  return data ?? null;
+};
+
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -114,6 +175,9 @@ export const addProduct = async (
   const createdAt = nowIso();
   const newId = uuidv4();
 
+  // Resolve consignor ID to proper PostgreSQL UUID
+  const resolvedConsignorId = await resolveConsignorId(productData.consignorId);
+
   const payload = {
     id: newId,
     firestore_id: newId,
@@ -124,11 +188,11 @@ export const addProduct = async (
     stock: Number(productData.stock ?? 0),
     type: productData.type ?? "Venta",
     ownership_type: productData.ownershipType ?? "Propio",
-    consignor_id: productData.consignorId ?? null,
+    consignor_id: resolvedConsignorId,
     reorder_point: productData.reorderPoint ?? 0,
     combo_product_ids: productData.comboProductIds ?? [],
     compatibility_tags: productData.compatibilityTags ?? [],
-    searchKeywords,
+    search_keywords: searchKeywords, // Corregido: search_keywords en lugar de searchKeywords
     category: productData.category ?? null,
     attributes: productData.attributes ?? {},
     created_at: createdAt,
@@ -176,7 +240,7 @@ export const updateProduct = async (
       reorder_point: productData.reorderPoint ?? existingRow.reorder_point ?? 0,
       combo_product_ids: productData.comboProductIds ?? existingRow.combo_product_ids ?? [],
       compatibility_tags: productData.compatibilityTags ?? existingRow.compatibility_tags ?? [],
-      searchKeywords,
+      search_keywords: searchKeywords, // Corregido: search_keywords en lugar de searchKeywords
       category: productData.category ?? existingRow.category,
       attributes: productData.attributes ?? existingRow.attributes ?? {},
     })
@@ -201,80 +265,195 @@ export const processStockEntry = async (
 ): Promise<StockEntryItem[]> => {
   const supabase = getSupabaseServerClient();
   const processedItems: StockEntryItem[] = [];
+  
+  // Validación inicial de los datos de entrada
+  if (!entryItems || entryItems.length === 0) {
+    throw new Error("No hay productos para procesar.");
+  }
+  
+  if (!userId || userId.trim() === '') {
+    throw new Error("ID de usuario no válido.");
+  }
 
   try {
+    log.info(`Starting stock entry process for ${entryItems.length} items`, {
+      userId,
+      itemCount: entryItems.length
+    });
+    
     for (const item of entryItems) {
+      // Validaciones de cada item antes de procesar
+      if (!item.name || item.name.trim() === '') {
+        throw new Error(`El producto con SKU "${item.sku || 'N/A'}" no tiene un nombre válido.`);
+      }
+      
+      if (!item.sku || item.sku.trim() === '') {
+        throw new Error(`El producto "${item.name}" no tiene un SKU válido.`);
+      }
+      
+      if (!item.quantity || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
+        throw new Error(`El producto "${item.name}" debe tener una cantidad válida (entero mayor a 0).`);
+      }
+      
+      if (item.cost < 0) {
+        throw new Error(`El producto "${item.name}" no puede tener un costo negativo.`);
+      }
+      
+      if (item.price < 0) {
+        throw new Error(`El producto "${item.name}" no puede tener un precio negativo.`);
+      }
+      
+      if (item.ownershipType === 'Consigna' && (!item.consignorId || item.consignorId.trim() === '')) {
+        throw new Error(`El producto en consigna "${item.name}" debe tener un consignador seleccionado.`);
+      }
+      
       let productId = item.productId;
       let isNewProduct = false;
+      let row = null;
 
-      if (!productId) {
-        const newProduct = await addProduct({
-          id: "", // ignored
-          name: item.name,
-          sku: item.sku,
-          price: item.price,
-          cost: item.cost,
-          stock: item.quantity,
-          type: "Venta",
-          ownershipType: item.ownershipType,
-          consignorId: item.consignorId,
-          reorderPoint: 0,
-          comboProductIds: [],
-          compatibilityTags: [],
-          category: item.category,
-          attributes: item.attributes,
-        } as Omit<Product, "id" | "createdAt" | "searchKeywords">);
-
-        productId = newProduct.id;
-        item.productId = productId;
-        isNewProduct = true;
-      } else {
-        const row = await fetchProductRow(productId);
+      // Si tenemos productId, buscar el producto
+      if (productId) {
+        row = await fetchProductRow(productId);
         if (!row) {
-          throw new Error(`Producto ${productId} no encontrado.`);
+          throw new Error(`Producto con ID ${productId} no encontrado en la base de datos.`);
+        }
+        log.info(`Found existing product by ID: ${productId}`);
+      } else {
+        // Si no hay productId, buscar por SKU primero
+        if (item.sku) {
+          row = await fetchProductBySku(item.sku);
+          if (row) {
+            // Producto encontrado por SKU, actualizarlo
+            productId = row.firestore_id || row.id;
+            item.productId = productId;
+            isNewProduct = false;
+            log.info(`Found existing product by SKU: ${item.sku}, ID: ${productId}`);
+          }
         }
 
-        const currentStock = Number(row.stock ?? 0);
-        const { error: updateError } = await supabase
-          .from(PRODUCTS_TABLE)
-          .update({
-            stock: currentStock + item.quantity,
-            cost: item.cost,
-            price: item.price,
-            ownership_type: item.ownershipType,
-            consignor_id: item.consignorId ?? null,
-            category: item.category ?? null,
-            attributes: item.attributes ?? {},
-          })
-          .eq("firestore_id", row.firestore_id ?? productId);
+        // Si no se encontró por SKU o no hay SKU, crear nuevo producto
+        if (!row) {
+          try {
+            log.info(`Creating new product: ${item.name}, SKU: ${item.sku}`);
+            const newProduct = await addProduct({
+              id: "", // ignored
+              name: item.name,
+              sku: item.sku,
+              price: item.price,
+              cost: item.cost,
+              stock: item.quantity,
+              type: "Venta",
+              ownershipType: item.ownershipType,
+              consignorId: item.consignorId,
+              reorderPoint: 0,
+              comboProductIds: [],
+              compatibilityTags: [],
+              category: item.category,
+              attributes: item.attributes,
+            } as Omit<Product, "id" | "createdAt" | "searchKeywords">);
 
-        if (updateError) {
-          throw updateError;
+            productId = newProduct.id;
+            item.productId = productId;
+            isNewProduct = true;
+            row = { firestore_id: productId, id: productId }; // Asignar para el log
+            log.info(`Successfully created new product: ${productId}`);
+          } catch (addError: any) {
+            // Si falla por SKU duplicado, buscarlo nuevamente
+            if (item.sku && addError?.message?.includes('duplicate key') && addError?.message?.includes('sku')) {
+              log.info(`SKU ${item.sku} ya existe, buscando producto existente...`);
+              row = await fetchProductBySku(item.sku);
+              if (row) {
+                productId = row.firestore_id || row.id;
+                item.productId = productId;
+                isNewProduct = false;
+                log.info(`Producto encontrado por SKU duplicado: ${productId}`);
+              } else {
+                throw new Error(`No se pudo encontrar producto con SKU ${item.sku} después de error de duplicado`);
+              }
+            } else {
+              log.error("Error creating new product:", addError);
+              throw new Error(`Error al crear producto "${item.name}": ${addError.message}`);
+            }
+          }
         }
       }
 
-      const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
+      // Actualizar stock si no es nuevo producto
+      if (!isNewProduct && row) {
+        const currentStock = Number(row.stock ?? 0);
+        
+        // Resolve consignor ID to proper PostgreSQL UUID for updates
+        const resolvedConsignorId = await resolveConsignorId(item.consignorId);
+        
+        const updateData = {
+          stock: currentStock + item.quantity,
+          cost: item.cost,
+          price: item.price,
+          ownership_type: item.ownershipType,
+          consignor_id: resolvedConsignorId,
+          category: item.category ?? null,
+          attributes: item.attributes ?? {},
+        };
+        
+        log.info(`Updating existing product ${productId}`, {
+          currentStock,
+          newStock: currentStock + item.quantity,
+          quantityAdded: item.quantity
+        });
+        
+        const { error: updateError } = await supabase
+          .from(PRODUCTS_TABLE)
+          .update(updateData)
+          .eq("id", row.id); // Usar el id real del registro
+
+        if (updateError) {
+          log.error("Error updating existing product:", updateError);
+          throw new Error(`Error al actualizar producto "${item.name}": ${updateError.message}`);
+        }
+      }
+
+      // Registrar en el log de inventario
+      const logData = {
         product_id: productId,
         product_name: item.name,
         change: item.quantity,
         reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
         updated_by: userId,
         created_at: nowIso(),
-        metadata: { cost: item.cost },
-      });
+        metadata: {
+          cost: item.cost,
+          ownershipType: item.ownershipType,
+          isNewProduct
+        },
+      };
+      
+      const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert(logData);
 
       if (logError) {
         log.error("Error saving inventory log", logError);
-        throw logError;
+        // No lanzar error aquí, ya que el producto ya se procesó correctamente
+        // pero sí registrar el problema
       }
 
       processedItems.push(item);
     }
 
+    log.info(`Successfully processed ${processedItems.length} stock entry items`);
     return processedItems;
   } catch (error) {
-    log.error("Error processing stock entry", error);
-    throw new Error("Could not save to the database.");
+    log.error("Error processing stock entry", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId,
+      itemCount: entryItems.length
+    });
+    
+    // Propagar el error con un mensaje más descriptivo
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error("Error desconocido al procesar el ingreso de mercancía.");
+    }
   }
 };
 

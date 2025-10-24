@@ -20,7 +20,7 @@ import { Loader2 } from "lucide-react";
 interface DeleteConsignorDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  consignor: Consignor;
+  consignor: Consignor | null;
   onConsignorDeleted: (consignorId: string) => void;
 }
 
@@ -34,6 +34,8 @@ export default function DeleteConsignorDialog({
   const { toast } = useToast();
 
   const handleDelete = async () => {
+    if (!consignor) return;
+    
     setLoading(true);
     try {
       await deleteConsignor(consignor.id);
@@ -56,13 +58,13 @@ export default function DeleteConsignorDialog({
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+    <AlertDialog open={isOpen && !!consignor} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
           <AlertDialogDescription>
             Esta acción no se puede deshacer. Esto eliminará permanentemente al consignador{" "}
-            <span className="font-semibold">{consignor.name}</span>.
+            <span className="font-semibold">{consignor?.name}</span>.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

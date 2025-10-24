@@ -208,56 +208,181 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     };
     
     const validateEntryList = () => {
+        const errors: string[] = [];
+        
         for (const item of entryList) {
-            if (!item.sku || !item.name || item.quantity <= 0) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `Revisa el producto "${item.name || 'Nuevo Producto'}" y asegúrate que tenga SKU, nombre y cantidad.` });
-                return false;
+            const itemIdentifier = item.name || `SKU: ${item.sku}` || 'Producto sin identificar';
+            
+            // Validaciones básicas
+            if (!item.sku || item.sku.trim() === '') {
+                errors.push(`El producto "${itemIdentifier}" debe tener un SKU válido.`);
             }
-            if (item.ownershipType === 'Consigna' && !item.consignorId) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `El producto en consigna "${item.name}" debe tener un consignador seleccionado.` });
-                return false;
+            
+            if (!item.name || item.name.trim() === '') {
+                errors.push(`El producto con SKU "${item.sku}" debe tener un nombre válido.`);
             }
+            
+            if (!item.quantity || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
+                errors.push(`El producto "${itemIdentifier}" debe tener una cantidad válida (número entero mayor a 0).`);
+            }
+            
+            // Validaciones financieras
+            if (item.cost < 0) {
+                errors.push(`El producto "${itemIdentifier}" no puede tener un costo negativo.`);
+            }
+            
+            if (item.price < 0) {
+                errors.push(`El producto "${itemIdentifier}" no puede tener un precio negativo.`);
+            }
+            
             if (item.ownershipType === 'Familiar' && item.price !== item.cost) {
-                toast({ variant: "destructive", title: "Error de Validación", description: `Para el producto familiar "${item.name}", el precio y el costo deben ser iguales.` });
-                return false;
+                errors.push(`Para el producto familiar "${itemIdentifier}", el precio y el costo deben ser iguales.`);
+            }
+            
+            // Validaciones específicas del tipo de propiedad
+            if (item.ownershipType === 'Consigna') {
+                if (!item.consignorId || item.consignorId.trim() === '') {
+                    errors.push(`El producto en consigna "${itemIdentifier}" debe tener un consignador seleccionado.`);
+                }
+                
+                // Validación adicional: verificar que el consignador exista en la lista
+                const consignorExists = consignors.some(c => c.id === item.consignorId);
+                if (!consignorExists) {
+                    errors.push(`El consignador seleccionado para "${itemIdentifier}" no existe. Por favor, seleccione un consignador válido.`);
+                }
+            }
+            
+            // Validaciones de categorías y atributos
+            if (item.category && item.category.trim() === '') {
+                errors.push(`El producto "${itemIdentifier}" tiene una categoría vacía. Seleccione una categoría válida o deje el campo vacío.`);
             }
         }
+        
+        if (errors.length > 0) {
+            // Mostrar todos los errores encontrados
+            const errorMessage = errors.length > 3
+                ? `${errors.slice(0, 3).join('\n')}\n... y ${errors.length - 3} errores más.`
+                : errors.join('\n');
+                
+            toast({
+                variant: "destructive",
+                title: `Se encontraron ${errors.length} error(es) de validación:`,
+                description: errorMessage
+            });
+            
+            // Log para depuración
+            log.error("Validation errors:", errors);
+            return false;
+        }
+        
         return true;
     }
 
     const handleProcessEntry = async () => {
         if (!userProfile) {
-            toast({ variant: "destructive", title: "Error", description: "Debes iniciar sesión para procesar." });
+            toast({ variant: "destructive", title: "Error de Autenticación", description: "Debes iniciar sesión para procesar el ingreso." });
+            log.error("User not authenticated when trying to process stock entry");
             return;
         }
+        
         if (!validateEntryList()) {
+            log.error("Validation failed for stock entry", { entryList });
             return;
         }
         
         setIsLoading(true);
+        
         try {
-            console.log("Step 1: Sending the following data to the backend...", entryList);
-            const processedItems = await processStockEntry(entryList, userProfile.uid);
-            toast({ title: "Éxito", description: `${entryList.length} registros de inventario procesados.` });
+            // Log para auditoría
+            log.info(`Starting stock entry process for ${entryList.length} items`, {
+                userId: userProfile.uid,
+                items: entryList.map(item => ({
+                    name: item.name,
+                    sku: item.sku,
+                    quantity: item.quantity,
+                    ownershipType: item.ownershipType,
+                    isNew: item.isNew
+                }))
+            });
             
-            const labelsToPrint = processedItems.map(p => ({
-                product: {
-                    id: p.productId,
-                    name: p.name,
-                    sku: p.sku,
-                    price: p.price,
-                    cost: p.cost,
-                    ownershipType: p.ownershipType,
-                },
-                quantity: p.quantity,
-            }));
+            const processedItems = await processStockEntry(entryList, userProfile.uid);
+            
+            // Log de éxito
+            log.info(`Successfully processed ${processedItems.length} stock entry items`, {
+                userId: userProfile.uid,
+                processedItems: processedItems.map(item => ({
+                    productId: item.productId,
+                    name: item.name,
+                    quantity: item.quantity
+                }))
+            });
+            
+            toast({
+                title: "Ingreso Exitoso",
+                description: `Se procesaron ${processedItems.length} productos correctamente.`
+            });
+            
+            // Generar etiquetas
+            try {
+                const labelsToPrint = processedItems.map(p => ({
+                    product: {
+                        id: p.productId,
+                        name: p.name,
+                        sku: p.sku,
+                        price: p.price,
+                        cost: p.cost,
+                        ownershipType: p.ownershipType,
+                    },
+                    quantity: p.quantity,
+                }));
 
-            await generateAndPrintLabels(labelsToPrint, labelSettings);
+                await generateAndPrintLabels(labelsToPrint, labelSettings);
+                log.info(`Generated and printed ${labelsToPrint.length} labels`);
+            } catch (labelError) {
+                log.error("Error generating labels:", labelError);
+                toast({
+                    variant: "destructive",
+                    title: "Error en Etiquetas",
+                    description: "Los productos se ingresaron correctamente, pero hubo un error al generar las etiquetas."
+                });
+            }
 
+            // Limpiar la lista después de un procesamiento exitoso
             setEntryList([]);
+            
         } catch (error) {
-            console.error(error);
-            toast({ variant: "destructive", title: "Error", description: "No se pudo procesar el ingreso de mercancía." });
+            // Log detallado del error
+            log.error("Error processing stock entry", {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                userId: userProfile.uid,
+                entryCount: entryList.length,
+                items: entryList.map(item => ({
+                    name: item.name,
+                    sku: item.sku,
+                    isNew: item.isNew
+                }))
+            });
+            
+            // Mensaje de error más específico
+            let errorMessage = "No se pudo procesar el ingreso de mercancía.";
+            if (error instanceof Error) {
+                if (error.message.includes('duplicate key')) {
+                    errorMessage = "Error: Uno o más SKU ya existen en la base de datos. Verifique los productos e intente nuevamente.";
+                } else if (error.message.includes('foreign key')) {
+                    errorMessage = "Error: El consignador seleccionado no es válido. Verifique los datos e intente nuevamente.";
+                } else if (error.message.includes('check constraint')) {
+                    errorMessage = "Error: Los datos del producto no cumplen con las validaciones requeridas. Revise los campos e intente nuevamente.";
+                } else {
+                    errorMessage = `Error: ${error.message}`;
+                }
+            }
+            
+            toast({
+                variant: "destructive",
+                title: "Error en el Procesamiento",
+                description: errorMessage
+            });
         } finally {
             setIsLoading(false);
         }
@@ -448,12 +573,12 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                             </div>
                                             <div className="col-span-2">
                                                 <Label className="text-xs font-medium text-muted-foreground mb-1 block">Categoría</Label>
-                                                <Select value={item.category || ''} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
+                                                <Select value={item.category || 'none'} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
                                                     <SelectTrigger className="h-9">
                                                         <SelectValue placeholder="Seleccionar..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">Sin categoría</SelectItem>
+                                                        <SelectItem value="none">Sin categoría</SelectItem>
                                                         {productCategories.map((cat, index) => {
                                                             const uniqueKey = generateUniqueKey(cat, index, 'category');
                                                             return <SelectItem key={uniqueKey} value={cat.value}>{cat.label}</SelectItem>;
@@ -612,12 +737,12 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs font-medium text-muted-foreground">Categoría</Label>
-                                                <Select value={item.category || ''} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
+                                                <Select value={item.category || 'none'} onValueChange={(value) => handleUpdateItem(item.id, 'category', value)}>
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Seleccionar..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">Sin categoría</SelectItem>
+                                                        <SelectItem value="none">Sin categoría</SelectItem>
                                                         {productCategories.map((cat, index) => {
                                                             const uniqueKey = generateUniqueKey(cat, index, 'category-mobile');
                                                             return <SelectItem key={uniqueKey} value={cat.value}>{cat.label}</SelectItem>;

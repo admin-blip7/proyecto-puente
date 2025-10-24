@@ -39,7 +39,7 @@ export default function ErrorSuppressionScript() {
             return;
           }
 
-          // Suppress specific development errors
+          // Suppress ONLY specific development errors (NOT system errors)
           const suppressPatterns = [
             'ERR_ABORTED',
             'net::ERR_',
@@ -50,25 +50,28 @@ export default function ErrorSuppressionScript() {
             'vite',
             'HMR',
             'Warning: ReactDOM.render is deprecated',
-            'Warning: componentWillMount has been renamed',
-            'Error fetching products',
-            'Failed to fetch open session',
-            'productService',
-            'cashSessionService',
-            'Error querying consignor payments',
-            'Error fetching open session'
+            'Warning: componentWillMount has been renamed'
           ];
 
           const shouldSuppress = suppressPatterns.some(pattern => message.includes(pattern));
 
-          // Don't suppress critical errors
+          // Don't suppress critical system errors or accessibility warnings
           const criticalPatterns = [
             'permission',
             'PERMISSION_DENIED',
             'unhandled',
             'paymentService',
             'consignor payments',
-            'Error querying consignor payments'
+            'productService',
+            'cashSessionService',
+            'Error querying consignor payments',
+            'Error fetching products',
+            'Failed to fetch open session',
+            'Error fetching open session',
+            'DialogContent requires a DialogTitle',
+            'DialogTitle',
+            'component to be accessible for screen reader users',
+            'VisuallyHidden component'
           ];
           const isCritical = criticalPatterns.some(pattern =>
             message.toLowerCase().includes(pattern)
@@ -81,6 +84,15 @@ export default function ErrorSuppressionScript() {
 
           // Log other errors normally
           originalError.apply(console, args);
+
+          // Extra logging for DialogTitle issues to help debug
+          if (message.includes('DialogContent') && message.includes('DialogTitle')) {
+            log.error('[DialogTitleError]', {
+              message,
+              stack: new Error().stack,
+              timestamp: new Date().toISOString()
+            });
+          }
         } catch (e) {
           // Fallback to original console.error if anything fails
           originalError.apply(console, args);

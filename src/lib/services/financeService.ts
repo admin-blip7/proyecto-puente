@@ -49,7 +49,18 @@ export const getExpenses = async (): Promise<Expense[]> => {
 };
 
 const uploadReceipt = async (file: File, expenseId: string): Promise<string> => {
-  const filePath = `${STORAGE_RECEIPTS_PATH}/${expenseId}-${file.name}`;
+  // Sanitize the filename to remove special characters that cause StorageApiError
+  const sanitizeFilename = (filename: string): string => {
+    return filename
+      .normalize('NFD') // Normalize to decompose accents
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // Replace special characters with underscores
+      .replace(/_+/g, '_') // Replace multiple underscores with single
+      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+  };
+
+  const sanitizedFilename = sanitizeFilename(file.name);
+  const filePath = `${STORAGE_RECEIPTS_PATH}/${expenseId}-${sanitizedFilename}`;
   return uploadFile(file, filePath);
 };
 

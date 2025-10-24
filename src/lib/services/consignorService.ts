@@ -10,7 +10,8 @@ const log = getLogger("consignorService");
 const CONSIGNORS_TABLE = "consignors";
 
 const mapConsignor = (row: any): Consignor => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "", // Use the UUID id from Supabase
+  firestore_id: row?.firestore_id,
   name: row?.name ?? "",
   contactInfo: row?.contactInfo ?? "",
   balanceDue: Number(row?.balanceDue ?? 0),
@@ -30,7 +31,17 @@ export const getConsignors = async (): Promise<Consignor[]> => {
       throw error;
     }
 
-    return (data ?? []).map(mapConsignor);
+    const mappedConsignors = (data ?? []).map(mapConsignor);
+    
+    // Remove duplicates by name and contactInfo to prevent duplicates in UI
+    const uniqueConsignors = mappedConsignors.filter((consignor, index, self) => 
+      index === self.findIndex(c => 
+        c.name === consignor.name && c.contactInfo === consignor.contactInfo
+      )
+    );
+
+    log.info(`Fetched ${data?.length || 0} consignors, filtered to ${uniqueConsignors.length} unique`);
+    return uniqueConsignors;
   } catch (error) {
     log.error("Error fetching consignors", error);
     return [];
