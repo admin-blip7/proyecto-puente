@@ -1105,29 +1105,156 @@ export const createCRMClientFromSale = async (saleInfo: {
         log.info(`Creating CRM client from sale info: ${saleInfo.name}`);
 
         // Check if client already exists by phone or email
+        let existingClient: CRMClient | null = null;
         if (saleInfo.phone) {
             const { data: existingByPhone } = await supabase
                 .from(CRM_CLIENTS_TABLE)
-                .select("firestore_id")
+                .select("id, firestore_id")
                 .eq("phone", saleInfo.phone)
                 .single();
 
             if (existingByPhone) {
                 log.info(`Client already exists with phone ${saleInfo.phone}`);
-                return await getCRMClientById(existingByPhone.firestore_id);
+                existingClient = await getCRMClientById(existingByPhone.firestore_id);
+                
+                // Create interaction for existing client if amount or warranty type
+                const intType = saleInfo.interactionType || 'sale';
+                const shouldCreateInteraction = (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) || intType === 'warranty';
+                
+                if (shouldCreateInteraction && existingClient && existingByPhone.id) {
+                    try {
+                        const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        const now = nowIso();
+                        const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
+                        
+                        log.info(`Creating ${intType} interaction for existing client: client_id=${existingByPhone.id}, amount=${saleInfo.saleAmount}`);
+                        const { error: interactionError } = await supabase
+                            .from(CRM_INTERACTIONS_TABLE)
+                            .insert({
+                                firestore_id: interactionFirestoreId,
+                                client_id: existingByPhone.id,
+                                interaction_type: intType,
+                                interaction_date: now,
+                                amount: saleInfo.saleAmount,
+                                description: `${intType}: ${saleInfo.saleId || 'POS'}`,
+                                related_table: relatedTable,
+                                status: 'completed'
+                            });
+
+                        if (interactionError) {
+                            log.warn(`Failed to create ${intType} interaction for existing client:`, interactionError);
+                        } else {
+                            log.info(`Created ${intType} interaction for existing client`);
+                            
+                            // Update total_purchases if there's an amount
+                            if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
+                                const { error: updateError } = await supabase
+                                    .from(CRM_CLIENTS_TABLE)
+                                    .update({
+                                        total_purchases: saleInfo.saleAmount + (existingClient.totalPurchases || 0),
+                                        last_contact_date: now
+                                    })
+                                    .eq('id', existingByPhone.id);
+                                
+                                if (updateError) {
+                                    log.warn(`Failed to update total_purchases for existing client:`, updateError);
+                                }
+                            } else {
+                                // Still update last_contact_date
+                                const { error: updateError } = await supabase
+                                    .from(CRM_CLIENTS_TABLE)
+                                    .update({
+                                        last_contact_date: now
+                                    })
+                                    .eq('id', existingByPhone.id);
+                                
+                                if (updateError) {
+                                    log.warn(`Failed to update last_contact_date for existing client:`, updateError);
+                                }
+                            }
+                        }
+                    } catch (interactionError) {
+                        log.warn(`Error creating interaction for existing client`, interactionError);
+                    }
+                }
+                
+                return existingClient;
             }
         }
 
         if (saleInfo.email) {
             const { data: existingByEmail } = await supabase
                 .from(CRM_CLIENTS_TABLE)
-                .select("firestore_id")
+                .select("id, firestore_id")
                 .eq("email", saleInfo.email)
                 .single();
 
-            if (existingByEmail) {
+            if (existingByEmail && !existingClient) {
                 log.info(`Client already exists with email ${saleInfo.email}`);
-                return await getCRMClientById(existingByEmail.firestore_id);
+                existingClient = await getCRMClientById(existingByEmail.firestore_id);
+                
+                // Create interaction for existing client if amount or warranty type
+                const intType = saleInfo.interactionType || 'sale';
+                const shouldCreateInteraction = (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) || intType === 'warranty';
+                
+                if (shouldCreateInteraction && existingClient && existingByEmail.id) {
+                    try {
+                        const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        const now = nowIso();
+                        const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
+                        
+                        log.info(`Creating ${intType} interaction for existing client: client_id=${existingByEmail.id}, amount=${saleInfo.saleAmount}`);
+                        const { error: interactionError } = await supabase
+                            .from(CRM_INTERACTIONS_TABLE)
+                            .insert({
+                                firestore_id: interactionFirestoreId,
+                                client_id: existingByEmail.id,
+                                interaction_type: intType,
+                                interaction_date: now,
+                                amount: saleInfo.saleAmount,
+                                description: `${intType}: ${saleInfo.saleId || 'POS'}`,
+                                related_table: relatedTable,
+                                status: 'completed'
+                            });
+
+                        if (interactionError) {
+                            log.warn(`Failed to create ${intType} interaction for existing client:`, interactionError);
+                        } else {
+                            log.info(`Created ${intType} interaction for existing client`);
+                            
+                            // Update total_purchases if there's an amount
+                            if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
+                                const { error: updateError } = await supabase
+                                    .from(CRM_CLIENTS_TABLE)
+                                    .update({
+                                        total_purchases: saleInfo.saleAmount + (existingClient.totalPurchases || 0),
+                                        last_contact_date: now
+                                    })
+                                    .eq('id', existingByEmail.id);
+                                
+                                if (updateError) {
+                                    log.warn(`Failed to update total_purchases for existing client:`, updateError);
+                                }
+                            } else {
+                                // Still update last_contact_date
+                                const { error: updateError } = await supabase
+                                    .from(CRM_CLIENTS_TABLE)
+                                    .update({
+                                        last_contact_date: now
+                                    })
+                                    .eq('id', existingByEmail.id);
+                                
+                                if (updateError) {
+                                    log.warn(`Failed to update last_contact_date for existing client:`, updateError);
+                                }
+                            }
+                        }
+                    } catch (interactionError) {
+                        log.warn(`Error creating interaction for existing client`, interactionError);
+                    }
+                }
+                
+                return existingClient;
             }
         }
 
