@@ -140,6 +140,7 @@ export const addSaleAndUpdateStock = async (
       cashierName: sale.cashierName,
       customerName: sale.customerName,
       customerPhone: sale.customerPhone,
+      crm_client_id: crmClientId || null,
       createdAt: sale.createdAt,
     };
 
@@ -292,6 +293,20 @@ export const addSaleAndUpdateStock = async (
       try {
         log.info(`Updating CRM client ${crmClientId} with sale info`);
         
+        // First fetch the client by firestore_id to get the database ID
+        const { data: clientData, error: fetchError } = await supabase
+          .from('crm_clients')
+          .select('id, firestore_id')
+          .eq('firestore_id', crmClientId)
+          .single();
+
+        if (fetchError || !clientData) {
+          log.warn(`Client not found: ${crmClientId}`, fetchError);
+          return sale;
+        }
+
+        const dbClientId = clientData.id;
+        
         // Update client total_purchases and last_contact_date
         const { data: updatedClient, error: updateError } = await supabase
           .from('crm_clients')
@@ -299,7 +314,7 @@ export const addSaleAndUpdateStock = async (
             total_purchases: saleData.totalAmount,
             last_contact_date: now
           })
-          .eq('id', parseInt(crmClientId) || crmClientId)
+          .eq('id', dbClientId)
           .select()
           .single();
 
@@ -317,7 +332,7 @@ export const addSaleAndUpdateStock = async (
               .from('crm_interactions')
               .insert({
                 firestore_id: `interaction-sale-${sale.id}`,
-                client_id: parseInt(crmClientId),
+                client_id: dbClientId,
                 interaction_type: 'sale',
                 interaction_date: now,
                 amount: saleData.totalAmount,
