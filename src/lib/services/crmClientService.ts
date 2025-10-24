@@ -1107,14 +1107,99 @@ export const createCRMClientFromSale = async (saleInfo: {
         // Check if client already exists by phone or email
         let existingClient: CRMClient | null = null;
         if (saleInfo.phone) {
-            log.info(`Searching for existing client with phone: "${saleInfo.phone}"`);
+            // Normalize phone: remove all non-digit characters for comparison
+            const normalizedPhone = saleInfo.phone.replace(/\D/g, "");
+            log.info(`Searching for existing client with phone: "${saleInfo.phone}" (normalized: "${normalizedPhone}")`);
+            
             const { data: existingByPhone, error: phoneError } = await supabase
                 .from(CRM_CLIENTS_TABLE)
-                .select("id, firestore_id")
+                .select("id, firestore_id, phone")
                 .eq("phone", saleInfo.phone)
                 .single();
 
-            if (phoneError) {
+            if (phoneError && phoneError.code === 'PGRST116') {
+                // No rows found, try search by getting all clients and matching normalized phones
+                log.info(`Exact match not found, trying to fetch all clients and match normalized phone...`);
+                const { data: allClients } = await supabase
+                    .from(CRM_CLIENTS_TABLE)
+                    .select("id, firestore_id, phone");
+                
+                // Find matching client by normalized phone
+                const fuzzyMatches = allClients?.filter(client => {
+                    const normalizedClientPhone = client.phone.replace(/\D/g, "");
+                    return normalizedClientPhone === normalizedPhone;
+                }) || [];
+                
+                if (fuzzyMatches && fuzzyMatches.length > 0) {
+                    log.info(`Found ${fuzzyMatches.length} fuzzy matches for normalized phone`);
+                    const bestMatch = fuzzyMatches[0];
+                    log.info(`Using best match: ${bestMatch.phone} (ID: ${bestMatch.id})`);
+                    existingClient = await getCRMClientById(bestMatch.firestore_id);
+                    
+                    // Now create interaction for this fuzzy-matched client
+                    const intType = saleInfo.interactionType || 'sale';
+                    const shouldCreateInteraction = (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) || intType === 'warranty';
+                    
+                    log.info(`Fuzzy Interaction check - type: ${intType}, amount: ${saleInfo.saleAmount}, shouldCreate: ${shouldCreateInteraction}`);
+                    
+                    if (shouldCreateInteraction && existingClient && bestMatch.id) {
+                        try {
+                            const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                            const now = nowIso();
+                            const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
+                            
+                            log.info(`➕ Creating ${intType} interaction (fuzzy match) for client: client_id=${bestMatch.id}, amount=${saleInfo.saleAmount}, table=${relatedTable}`);
+                            const { error: interactionError } = await supabase
+                                .from(CRM_INTERACTIONS_TABLE)
+                                .insert({
+                                    firestore_id: interactionFirestoreId,
+                                    client_id: bestMatch.id,
+                                    interaction_type: intType,
+                                    interaction_date: now,
+                                    amount: saleInfo.saleAmount,
+                                    description: `${intType}: ${saleInfo.saleId || 'POS'}`,
+                                    related_table: relatedTable,
+                                    status: 'completed'
+                                });
+
+                            if (interactionError) {
+                                log.error(`❌ Failed to create ${intType} interaction (fuzzy match):`, interactionError);
+                            } else {
+                                log.info(`✅ Successfully created ${intType} interaction (fuzzy match) - firestore_id: ${interactionFirestoreId}`);
+                                
+                                if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
+                                    const { error: updateError } = await supabase
+                                        .from(CRM_CLIENTS_TABLE)
+                                        .update({
+                                            total_purchases: saleInfo.saleAmount + (existingClient.totalPurchases || 0),
+                                            last_contact_date: now
+                                        })
+                                        .eq('id', bestMatch.id);
+                                    
+                                    if (updateError) {
+                                        log.warn(`Failed to update total_purchases (fuzzy match):`, updateError);
+                                    }
+                                } else {
+                                    const { error: updateError } = await supabase
+                                        .from(CRM_CLIENTS_TABLE)
+                                        .update({
+                                            last_contact_date: now
+                                        })
+                                        .eq('id', bestMatch.id);
+                                    
+                                    if (updateError) {
+                                        log.warn(`Failed to update last_contact_date (fuzzy match):`, updateError);
+                                    }
+                                }
+                            }
+                        } catch (interactionError) {
+                            log.warn(`Error creating interaction (fuzzy match)`, interactionError);
+                        }
+                    }
+                    
+                    return existingClient;
+                }
+            } else if (phoneError) {
                 log.warn(`No client found by phone (${saleInfo.phone}): ${phoneError.message}`);
             }
 
