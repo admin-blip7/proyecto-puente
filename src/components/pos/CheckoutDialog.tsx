@@ -179,6 +179,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
       cashierName: userProfile.name,
       customerName: customerName || null,
       customerPhone: customerPhone || null,
+      customerEmail: null,
       crmClientId: selectedCRMClient || null,
     }
 

@@ -1083,3 +1083,90 @@ export const createCRMInteraction = async (
         throw error;
     }
 };
+
+// Create CRM Client from Sale information
+export const createCRMClientFromSale = async (saleInfo: {
+    name: string;
+    phone: string;
+    email?: string;
+}): Promise<CRMClient | null> => {
+    const supabase = await getSupabaseClientWithAuth();
+    if (!supabase) {
+        throw new Error("Supabase client not initialized");
+    }
+
+    try {
+        log.info(`Creating CRM client from sale info: ${saleInfo.name}`);
+
+        // Check if client already exists by phone or email
+        if (saleInfo.phone) {
+            const { data: existingByPhone } = await supabase
+                .from(CRM_CLIENTS_TABLE)
+                .select("firestore_id")
+                .eq("phone", saleInfo.phone)
+                .single();
+
+            if (existingByPhone) {
+                log.info(`Client already exists with phone ${saleInfo.phone}`);
+                return await getCRMClientById(existingByPhone.firestore_id);
+            }
+        }
+
+        if (saleInfo.email) {
+            const { data: existingByEmail } = await supabase
+                .from(CRM_CLIENTS_TABLE)
+                .select("firestore_id")
+                .eq("email", saleInfo.email)
+                .single();
+
+            if (existingByEmail) {
+                log.info(`Client already exists with email ${saleInfo.email}`);
+                return await getCRMClientById(existingByEmail.firestore_id);
+            }
+        }
+
+        // Parse name into first and last name
+        const nameParts = saleInfo.name.trim().split(" ");
+        const firstName = nameParts[0] || "Cliente";
+        const lastName = nameParts.slice(1).join(" ") || "Venta POS";
+
+        // Generate client code
+        const clientCode = await generateClientCode();
+
+        // Create new client
+        const firestoreId = `sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const now = nowIso();
+
+        const { data: newClient, error: createError } = await supabase
+            .from(CRM_CLIENTS_TABLE)
+            .insert({
+                firestore_id: firestoreId,
+                client_code: clientCode,
+                identification_type: "cedula",
+                identification_number: `temp-${Date.now()}`,
+                first_name: firstName,
+                last_name: lastName,
+                email: saleInfo.email || null,
+                phone: saleInfo.phone,
+                client_type: "particular",
+                client_status: "active",
+                registration_date: now,
+                created_at: now,
+                updated_at: now,
+            })
+            .select()
+            .single();
+
+        if (createError) {
+            log.error("Error creating client from sale", createError);
+            throw createError;
+        }
+
+        log.info(`Created new CRM client from sale: ${newClient.firestore_id}`);
+        return mapCRMClient(newClient);
+
+    } catch (error) {
+        log.error("Error in createCRMClientFromSale", error);
+        return null;
+    }
+};

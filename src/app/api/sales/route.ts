@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
 import { CartItem, Sale, SaleItem } from "@/types";
 import { getLogger } from "@/lib/logger";
-import { NextResponse } from "next/server";
 
 const log = getLogger("salesAPI");
 
@@ -39,8 +38,31 @@ export async function POST(request: Request) {
       crmClientId: crmClientId
     });
 
+    // If no CRM client selected but customer info provided, create one
+    let finalCrmClientId = crmClientId;
+    if (!crmClientId && saleData.customerName && saleData.customerPhone) {
+      try {
+        log.info(`Creating new CRM client for: ${saleData.customerName}`);
+        const { createCRMClientFromSale } = await import("@/lib/services/crmClientService");
+        
+        const newClient = await createCRMClientFromSale({
+          name: saleData.customerName,
+          phone: saleData.customerPhone,
+          email: saleData.customerEmail
+        });
+        
+        if (newClient && newClient.id) {
+          finalCrmClientId = newClient.id.toString();
+          log.info(`Created new CRM client with ID: ${finalCrmClientId}`);
+        }
+      } catch (crmError) {
+        log.warn("Could not create CRM client from sale info", crmError);
+        // Don't let this error break the sale process
+      }
+    }
+
     // Procesar la venta
-    const result = await addSaleAndUpdateStock(saleData, cartItems, crmClientId);
+    const result = await addSaleAndUpdateStock(saleData, cartItems, finalCrmClientId);
 
     log.info(`Sale processed successfully: ${result.saleId}`);
 
