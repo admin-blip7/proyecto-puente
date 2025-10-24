@@ -1087,13 +1087,14 @@ export const createCRMInteraction = async (
     }
 };
 
-// Create CRM Client from Sale information
+// Create CRM Client from Sale or Repair information
 export const createCRMClientFromSale = async (saleInfo: {
     name: string;
     phone: string;
     email?: string;
     saleAmount?: number;
     saleId?: string;
+    interactionType?: 'sale' | 'repair';
 }): Promise<CRMClient | null> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -1170,33 +1171,36 @@ export const createCRMClientFromSale = async (saleInfo: {
         log.info(`Created new CRM client from sale: ${newClient.firestore_id}`);
         const mappedClient = mapCRMClient(newClient);
 
-        // If sale information is provided, create the initial sale interaction
-        log.info(`Creating initial interaction - saleAmount: ${saleInfo.saleAmount}, saleId: ${saleInfo.saleId}`);
+        // If amount information is provided, create the initial interaction
+        const intType = saleInfo.interactionType || 'sale';
+        log.info(`Creating initial interaction - type: ${intType}, amount: ${saleInfo.saleAmount}, id: ${saleInfo.saleId}`);
+        
         if (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) {
             try {
-                const interactionFirestoreId = `interaction-sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, firestore_id=${interactionFirestoreId}`);
+                const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, type=${intType}, firestore_id=${interactionFirestoreId}`);
                 
+                const relatedTable = intType === 'repair' ? 'repair_orders' : 'sales';
                 const { data: interactionData, error: interactionError } = await supabase
                     .from(CRM_INTERACTIONS_TABLE)
                     .insert({
                         firestore_id: interactionFirestoreId,
                         client_id: newClient.id, // Use the numeric BIGINT ID
-                        interaction_type: 'sale',
+                        interaction_type: intType,
                         interaction_date: now,
                         amount: saleInfo.saleAmount,
-                        description: `Initial sale: ${saleInfo.saleId || 'POS'}`,
-                        related_table: 'sales',
+                        description: `Initial ${intType}: ${saleInfo.saleId || 'POS'}`,
+                        related_table: relatedTable,
                         status: 'completed'
                     })
                     .select();
 
                 if (interactionError) {
-                    log.warn(`Failed to create initial sale interaction for client ${newClient.firestore_id}:`, interactionError);
+                    log.warn(`Failed to create initial ${intType} interaction for client ${newClient.firestore_id}:`, interactionError);
                 } else {
-                    log.info(`Created initial sale interaction for new client ${newClient.firestore_id}:`, interactionData);
+                    log.info(`Created initial ${intType} interaction for new client ${newClient.firestore_id}:`, interactionData);
                     
-                    // Update total_purchases to reflect the initial sale
+                    // Update total_purchases to reflect the initial transaction
                     const { error: updateTotalError } = await supabase
                         .from(CRM_CLIENTS_TABLE)
                         .update({
@@ -1213,10 +1217,10 @@ export const createCRMClientFromSale = async (saleInfo: {
                     }
                 }
             } catch (interactionError) {
-                log.warn("Error creating initial sale interaction", interactionError);
+                log.warn(`Error creating initial ${intType} interaction`, interactionError);
             }
         } else {
-            log.warn(`Skipping interaction creation - saleAmount: ${saleInfo.saleAmount}`);
+            log.warn(`Skipping interaction creation - amount: ${saleInfo.saleAmount}`);
         }
 
         return mappedClient;

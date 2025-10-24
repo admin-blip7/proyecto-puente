@@ -106,7 +106,32 @@ export const addRepairOrder = async (
       throw error ?? new Error("Failed to add repair order");
     }
 
-    return mapRepairOrder(data);
+    const repairOrder = mapRepairOrder(data);
+
+    // Auto-create or link CRM client for repairs
+    if (orderData.customerName && orderData.customerPhone) {
+      try {
+        log.info(`Creating/linking CRM client for repair: ${orderData.customerName}`);
+        const { createCRMClientFromSale } = await import("./crmClientService");
+        
+        const crmClient = await createCRMClientFromSale({
+          name: orderData.customerName,
+          phone: orderData.customerPhone,
+          saleAmount: orderData.totalPrice,
+          saleId: orderId,
+          interactionType: 'repair'
+        });
+
+        if (crmClient && crmClient.id) {
+          log.info(`Linked repair order ${orderId} to CRM client: ${crmClient.id}`);
+        }
+      } catch (crmError) {
+        log.warn(`Could not create/link CRM client for repair ${orderId}:`, crmError);
+        // Don't break repair creation if CRM fails
+      }
+    }
+
+    return repairOrder;
   } catch (error) {
     log.error("Error adding repair order", error);
     throw new Error("Failed to add repair order.");
