@@ -179,6 +179,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
       cashierName: userProfile.name,
       customerName: customerName || null,
       customerPhone: customerPhone || null,
+      crmClientId: selectedCRMClient || null,
     }
 
     try {
@@ -205,7 +206,8 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             },
             body: JSON.stringify({
               saleData: saleDataForDb,
-              cartItems: cartItems
+              cartItems: cartItems,
+              crmClientId: selectedCRMClient || null
             })
           });
 

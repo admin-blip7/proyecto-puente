@@ -62,7 +62,8 @@ export const getSales = async (): Promise<Sale[]> => {
 
 export const addSaleAndUpdateStock = async (
   saleData: Omit<Sale, "id" | "saleId" | "createdAt">,
-  cartItems: CartItem[]
+  cartItems: CartItem[],
+  crmClientId?: string | null
 ): Promise<Sale> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -286,15 +287,72 @@ export const addSaleAndUpdateStock = async (
 
     log.info(`Sale ${saleId} processed successfully`);
 
-    // Register sale in CRM if customer information is available
-    try {
-      await registerSaleInCRM(saleId, saleData.totalAmount, {
-        name: saleData.customerName,
-        phone: saleData.customerPhone
-      });
-    } catch (crmError) {
-      // Don't let CRM errors break the sale process
-      log.warn("Failed to register sale in CRM", crmError);
+    // Update CRM client if one was selected during checkout
+    if (crmClientId) {
+      try {
+        log.info(`Updating CRM client ${crmClientId} with sale info`);
+        
+        // Update client total_purchases and last_contact_date
+        const { data: updatedClient, error: updateError } = await supabase
+          .from('crm_clients')
+          .update({
+            total_purchases: saleData.totalAmount,
+            last_contact_date: now
+          })
+          .eq('id', parseInt(crmClientId) || crmClientId)
+          .select()
+          .single();
+
+        if (updateError) {
+          log.warn(`Failed to update CRM client ${crmClientId}:`, updateError);
+        } else {
+          log.info(`Updated CRM client ${crmClientId}:`, {
+            totalPurchases: updatedClient?.total_purchases,
+            lastContactDate: updatedClient?.last_contact_date
+          });
+
+          // Create CRM interaction for the sale
+          try {
+            const { data: interaction, error: interactionError } = await supabase
+              .from('crm_interactions')
+              .insert({
+                firestore_id: `interaction-sale-${sale.id}`,
+                client_id: parseInt(crmClientId),
+                interaction_type: 'sale',
+                interaction_date: now,
+                amount: saleData.totalAmount,
+                description: `Sale: ${saleId}`,
+                related_id: sale.id,
+                related_table: 'sales',
+                status: 'completed'
+              })
+              .select()
+              .single();
+
+            if (interactionError) {
+              log.warn(`Failed to create CRM interaction:`, interactionError);
+            } else {
+              log.info(`Created CRM interaction for sale ${saleId}`);
+            }
+          } catch (interactionError) {
+            log.warn("Error creating CRM interaction", interactionError);
+          }
+        }
+      } catch (crmError) {
+        // Don't let CRM errors break the sale process
+        log.warn("Failed to update CRM client", crmError);
+      }
+    } else {
+      // Register sale in CRM if customer information is available but no client selected
+      try {
+        await registerSaleInCRM(saleId, saleData.totalAmount, {
+          name: saleData.customerName,
+          phone: saleData.customerPhone
+        });
+      } catch (crmError) {
+        // Don't let CRM errors break the sale process
+        log.warn("Failed to register sale in CRM", crmError);
+      }
     }
 
     return sale;

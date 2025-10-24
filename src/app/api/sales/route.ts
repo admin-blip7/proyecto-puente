@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
 import { CartItem, Sale, SaleItem } from "@/types";
 import { getLogger } from "@/lib/logger";
+import { NextResponse } from "next/server";
 
 const log = getLogger("salesAPI");
 
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     log.info("Sales API endpoint called");
     
     const body = await request.json();
-    const { saleData, cartItems } = body;
+    const { saleData, cartItems, crmClientId } = body;
 
     // Validar datos requeridos
     if (!saleData || !cartItems || !Array.isArray(cartItems)) {
@@ -34,11 +35,12 @@ export async function POST(request: Request) {
     log.info(`Sale data:`, { 
       totalAmount: saleData.totalAmount, 
       paymentMethod: saleData.paymentMethod,
-      cashierId: saleData.cashierId 
+      cashierId: saleData.cashierId,
+      crmClientId: crmClientId
     });
 
     // Procesar la venta
-    const result = await addSaleAndUpdateStock(saleData, cartItems);
+    const result = await addSaleAndUpdateStock(saleData, cartItems, crmClientId);
 
     log.info(`Sale processed successfully: ${result.saleId}`);
 
