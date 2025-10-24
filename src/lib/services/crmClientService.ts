@@ -1169,10 +1169,13 @@ export const createCRMClientFromSale = async (saleInfo: {
         const mappedClient = mapCRMClient(newClient);
 
         // If sale information is provided, create the initial sale interaction
+        log.info(`Creating initial interaction - saleAmount: ${saleInfo.saleAmount}, saleId: ${saleInfo.saleId}`);
         if (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) {
             try {
                 const interactionFirestoreId = `interaction-sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const { error: interactionError } = await supabase
+                log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, firestore_id=${interactionFirestoreId}`);
+                
+                const { data: interactionData, error: interactionError } = await supabase
                     .from(CRM_INTERACTIONS_TABLE)
                     .insert({
                         firestore_id: interactionFirestoreId,
@@ -1183,17 +1186,20 @@ export const createCRMClientFromSale = async (saleInfo: {
                         description: `Initial sale: ${saleInfo.saleId || 'POS'}`,
                         related_table: 'sales',
                         status: 'completed'
-                    });
+                    })
+                    .select();
 
                 if (interactionError) {
                     log.warn(`Failed to create initial sale interaction for client ${newClient.firestore_id}:`, interactionError);
                 } else {
-                    log.info(`Created initial sale interaction for new client ${newClient.firestore_id}`);
+                    log.info(`Created initial sale interaction for new client ${newClient.firestore_id}:`, interactionData);
                     // Note: total_purchases will be updated by addSaleAndUpdateStock() to avoid duplication
                 }
             } catch (interactionError) {
                 log.warn("Error creating initial sale interaction", interactionError);
             }
+        } else {
+            log.warn(`Skipping interaction creation - saleAmount: ${saleInfo.saleAmount}`);
         }
 
         return mappedClient;

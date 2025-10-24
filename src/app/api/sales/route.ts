@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     if (!crmClientId && saleData.customerName && saleData.customerPhone) {
       try {
         log.info(`Creating new CRM client for: ${saleData.customerName}`);
+        log.info(`Sale details for new client - amount: ${saleData.totalAmount}, payment: ${saleData.paymentMethod}`);
         const { createCRMClientFromSale } = await import("@/lib/services/crmClientService");
         
         const newClient = await createCRMClientFromSale({
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
         
         if (newClient && newClient.id) {
           finalCrmClientId = newClient.id.toString();
-          log.info(`Created new CRM client with ID: ${finalCrmClientId}`);
+          log.info(`Created new CRM client with ID: ${finalCrmClientId}, totalPurchases: ${newClient.totalPurchases}`);
         }
       } catch (crmError) {
         log.warn("Could not create CRM client from sale info", crmError);

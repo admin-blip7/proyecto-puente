@@ -308,7 +308,10 @@ export const addSaleAndUpdateStock = async (
         const dbClientId = clientData.id;
         
         // Update client total_purchases (sum, not replace) and last_contact_date
-        const newTotalPurchases = (clientData.total_purchases || 0) + saleData.totalAmount;
+        const currentTotal = clientData.total_purchases || 0;
+        const newTotalPurchases = currentTotal + saleData.totalAmount;
+        log.info(`Updating client ${crmClientId} total_purchases: ${currentTotal} + ${saleData.totalAmount} = ${newTotalPurchases}`);
+        
         const { data: updatedClient, error: updateError } = await supabase
           .from('crm_clients')
           .update({
@@ -323,7 +326,9 @@ export const addSaleAndUpdateStock = async (
           log.warn(`Failed to update CRM client ${crmClientId}:`, updateError);
         } else {
           log.info(`Updated CRM client ${crmClientId}:`, {
-            totalPurchases: updatedClient?.total_purchases,
+            currentTotal: currentTotal,
+            saleAmount: saleData.totalAmount,
+            newTotal: updatedClient?.total_purchases,
             lastContactDate: updatedClient?.last_contact_date
           });
 
