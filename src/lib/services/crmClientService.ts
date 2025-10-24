@@ -1094,7 +1094,7 @@ export const createCRMClientFromSale = async (saleInfo: {
     email?: string;
     saleAmount?: number;
     saleId?: string;
-    interactionType?: 'sale' | 'repair';
+    interactionType?: 'sale' | 'repair' | 'warranty';
 }): Promise<CRMClient | null> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -1183,7 +1183,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                 const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, type=${intType}, firestore_id=${interactionFirestoreId}`);
                 
-                const relatedTable = intType === 'repair' ? 'repair_orders' : 'sales';
+                const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
                 const { data: interactionData, error: interactionError } = await supabase
                     .from(CRM_INTERACTIONS_TABLE)
                     .insert({
