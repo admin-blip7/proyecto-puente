@@ -4,6 +4,7 @@ import { CartItem, Sale, SaleItem } from "@/types";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("salesAPI");
+// Sales API endpoint for processing POS transactions
 
 export async function POST(request: Request) {
   try {

@@ -479,12 +479,14 @@ export const deleteCRMClient = async (id: string): Promise<void> => {
     }
 
     try {
+        // Try to delete by firestore_id first (it's unique)
         const { error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .delete()
-            .or(`firestore_id.eq.${id},id.eq.${id}`);
+            .eq('firestore_id', id);
 
         if (error) throw error;
+        log.info(`Deleted CRM client with ID: ${id}`);
     } catch (error) {
         log.error("Error deleting CRM client", error);
         throw error;
