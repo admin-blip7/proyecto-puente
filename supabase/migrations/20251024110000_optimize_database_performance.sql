@@ -18,7 +18,5 @@ CREATE INDEX IF NOT EXISTS idx_crm_documents_uploaded_by ON crm_documents(upload
 DROP INDEX IF EXISTS idx_product_variants_productid;
 
 -- STEP 4: Verify RLS is disabled on CRM tables
-SELECT table_name, rowsecurity 
-FROM information_schema.tables 
-WHERE table_name IN ('crm_clients', 'crm_interactions', 'crm_tags', 'crm_tasks', 'crm_documents')
-ORDER BY table_name;
+-- Query depends on PostgreSQL version - this is for reference only
+-- Check in Supabase Dashboard: Authentication → Policies

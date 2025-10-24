@@ -134,68 +134,93 @@ ALTER TABLE crm_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crm_documents ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for crm_clients
-CREATE POLICY IF NOT EXISTS "Users can view crm_clients" ON crm_clients
+DROP POLICY IF EXISTS "Users can view crm_clients" ON crm_clients;
+DROP POLICY IF EXISTS "Users can insert crm_clients" ON crm_clients;
+DROP POLICY IF EXISTS "Users can update crm_clients" ON crm_clients;
+DROP POLICY IF EXISTS "Users can delete crm_clients" ON crm_clients;
+
+CREATE POLICY "Users can view crm_clients" ON crm_clients
     FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can insert crm_clients" ON crm_clients
+CREATE POLICY "Users can insert crm_clients" ON crm_clients
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can update crm_clients" ON crm_clients
+CREATE POLICY "Users can update crm_clients" ON crm_clients
     FOR UPDATE USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can delete crm_clients" ON crm_clients
+CREATE POLICY "Users can delete crm_clients" ON crm_clients
     FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create RLS policies for crm_interactions
-CREATE POLICY IF NOT EXISTS "Users can view crm_interactions" ON crm_interactions
+DROP POLICY IF EXISTS "Users can view crm_interactions" ON crm_interactions;
+DROP POLICY IF EXISTS "Users can insert crm_interactions" ON crm_interactions;
+DROP POLICY IF EXISTS "Users can update crm_interactions" ON crm_interactions;
+DROP POLICY IF EXISTS "Users can delete crm_interactions" ON crm_interactions;
+
+CREATE POLICY "Users can view crm_interactions" ON crm_interactions
     FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can insert crm_interactions" ON crm_interactions
+CREATE POLICY "Users can insert crm_interactions" ON crm_interactions
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can update crm_interactions" ON crm_interactions
+CREATE POLICY "Users can update crm_interactions" ON crm_interactions
     FOR UPDATE USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can delete crm_interactions" ON crm_interactions
+CREATE POLICY "Users can delete crm_interactions" ON crm_interactions
     FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create RLS policies for crm_tags
-CREATE POLICY IF NOT EXISTS "Users can view crm_tags" ON crm_tags
+DROP POLICY IF EXISTS "Users can view crm_tags" ON crm_tags;
+DROP POLICY IF EXISTS "Users can insert crm_tags" ON crm_tags;
+DROP POLICY IF EXISTS "Users can update crm_tags" ON crm_tags;
+DROP POLICY IF EXISTS "Users can delete crm_tags" ON crm_tags;
+
+CREATE POLICY "Users can view crm_tags" ON crm_tags
     FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can insert crm_tags" ON crm_tags
+CREATE POLICY "Users can insert crm_tags" ON crm_tags
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can update crm_tags" ON crm_tags
+CREATE POLICY "Users can update crm_tags" ON crm_tags
     FOR UPDATE USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can delete crm_tags" ON crm_tags
+CREATE POLICY "Users can delete crm_tags" ON crm_tags
     FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create RLS policies for crm_tasks
-CREATE POLICY IF NOT EXISTS "Users can view crm_tasks" ON crm_tasks
+DROP POLICY IF EXISTS "Users can view crm_tasks" ON crm_tasks;
+DROP POLICY IF EXISTS "Users can insert crm_tasks" ON crm_tasks;
+DROP POLICY IF EXISTS "Users can update crm_tasks" ON crm_tasks;
+DROP POLICY IF EXISTS "Users can delete crm_tasks" ON crm_tasks;
+
+CREATE POLICY "Users can view crm_tasks" ON crm_tasks
     FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can insert crm_tasks" ON crm_tasks
+CREATE POLICY "Users can insert crm_tasks" ON crm_tasks
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can update crm_tasks" ON crm_tasks
+CREATE POLICY "Users can update crm_tasks" ON crm_tasks
     FOR UPDATE USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can delete crm_tasks" ON crm_tasks
+CREATE POLICY "Users can delete crm_tasks" ON crm_tasks
     FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create RLS policies for crm_documents
-CREATE POLICY IF NOT EXISTS "Users can view crm_documents" ON crm_documents
+DROP POLICY IF EXISTS "Users can view crm_documents" ON crm_documents;
+DROP POLICY IF EXISTS "Users can insert crm_documents" ON crm_documents;
+DROP POLICY IF EXISTS "Users can update crm_documents" ON crm_documents;
+DROP POLICY IF EXISTS "Users can delete crm_documents" ON crm_documents;
+
+CREATE POLICY "Users can view crm_documents" ON crm_documents
     FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can insert crm_documents" ON crm_documents
+CREATE POLICY "Users can insert crm_documents" ON crm_documents
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can update crm_documents" ON crm_documents
+CREATE POLICY "Users can update crm_documents" ON crm_documents
     FOR UPDATE USING (auth.role() = 'authenticated');
 
-CREATE POLICY IF NOT EXISTS "Users can delete crm_documents" ON crm_documents
+CREATE POLICY "Users can delete crm_documents" ON crm_documents
     FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create triggers for updated_at
