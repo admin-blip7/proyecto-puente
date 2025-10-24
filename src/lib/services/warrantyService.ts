@@ -14,17 +14,17 @@ const WARRANTY_BUCKET = "warranties";
 
 const mapWarranty = (row: any): Warranty => ({
   id: row?.firestore_id ?? row?.id ?? "",
-  saleId: row?.saleId ?? "",
-  productId: row?.productId ?? "",
-  productName: row?.productName ?? "",
-  customerName: row?.customerName ?? undefined,
-  customerPhone: row?.customerPhone ?? undefined,
+  saleId: row?.sale_id ?? row?.saleId ?? "",
+  productId: row?.product_id ?? row?.productId ?? "",
+  productName: row?.product_name ?? row?.productName ?? "",
+  customerName: row?.customer_name ?? row?.customerName ?? undefined,
+  customerPhone: row?.customer_phone ?? row?.customerPhone ?? undefined,
   reason: row?.reason ?? "",
   status: row?.status ?? "Pendiente",
-  reportedAt: toDate(row?.reportedAt),
-  resolutionDetails: row?.resolutionDetails ?? undefined,
-  resolvedAt: row?.resolvedAt ? toDate(row.resolvedAt) : undefined,
-  imageUrls: Array.isArray(row?.imageUrls) ? row.imageUrls : [],
+  reportedAt: toDate(row?.reported_at ?? row?.reportedAt),
+  resolutionDetails: row?.resolution_details ?? row?.resolutionDetails ?? undefined,
+  resolvedAt: row?.resolved_at ?? row?.resolvedAt ? toDate(row?.resolved_at ?? row?.resolvedAt) : undefined,
+  imageUrls: Array.isArray(row?.image_urls ?? row?.imageUrls) ? (row?.image_urls ?? row?.imageUrls) : [],
 });
 
 const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
@@ -66,17 +66,17 @@ export const addWarranty = async (
 
     const payload = {
       firestore_id: firestoreId,
-      saleId: warrantyData.saleId,
-      productId: warrantyData.productId,
-      productName: warrantyData.productName,
-      customerName: warrantyData.customerName ?? null,
-      customerPhone: warrantyData.customerPhone ?? null,
+      sale_id: warrantyData.saleId,
+      product_id: warrantyData.productId,
+      product_name: warrantyData.productName,
+      customer_name: warrantyData.customerName ?? null,
+      customer_phone: warrantyData.customerPhone ?? null,
       reason: warrantyData.reason,
       status: "Pendiente" as const,
-      reportedAt,
-      resolutionDetails: warrantyData.resolutionDetails ?? null,
-      resolvedAt: null,
-      imageUrls,
+      reported_at: reportedAt,
+      resolution_details: warrantyData.resolutionDetails ?? null,
+      resolved_at: null,
+      image_urls: imageUrls,
     };
 
     const { data, error } = await supabase
@@ -132,16 +132,21 @@ export const updateWarranty = async (
     if (!supabase) {
       throw new Error("Supabase client not initialized");
     }
-    const updates: Record<string, any> = { ...dataToUpdate };
+    // Convert camelCase to snake_case for database
+    const updates: Record<string, any> = {};
+    for (const [key, value] of Object.entries(dataToUpdate)) {
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      updates[snakeKey] = value;
+    }
 
     if (dataToUpdate.status === "Resuelta" || dataToUpdate.status === "Rechazada") {
-      updates.resolvedAt = nowIso();
+      updates.resolved_at = nowIso();
     }
 
     const { error } = await supabase
       .from(WARRANTIES_TABLE)
       .update(updates)
-      .or(orIdFilter(warrantyId));
+      .eq('firestore_id', warrantyId);
 
     if (error) {
       throw error;
