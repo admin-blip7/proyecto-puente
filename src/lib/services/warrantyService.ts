@@ -9,7 +9,7 @@ import { getLogger } from "@/lib/logger";
 
 const log = getLogger("warrantyService");
 
-const WARRANTIES_TABLE = "warranties";
+const WARRANTIES_TABLE = "warranties_new";
 const WARRANTY_BUCKET = "warranties";
 
 const mapWarranty = (row: any): Warranty => ({
