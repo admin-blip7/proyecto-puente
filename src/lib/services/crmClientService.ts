@@ -1193,7 +1193,22 @@ export const createCRMClientFromSale = async (saleInfo: {
                     log.warn(`Failed to create initial sale interaction for client ${newClient.firestore_id}:`, interactionError);
                 } else {
                     log.info(`Created initial sale interaction for new client ${newClient.firestore_id}:`, interactionData);
-                    // Note: total_purchases will be updated by addSaleAndUpdateStock() to avoid duplication
+                    
+                    // Update total_purchases to reflect the initial sale
+                    const { error: updateTotalError } = await supabase
+                        .from(CRM_CLIENTS_TABLE)
+                        .update({
+                            total_purchases: saleInfo.saleAmount,
+                            last_contact_date: now
+                        })
+                        .eq('id', newClient.id);
+                    
+                    if (updateTotalError) {
+                        log.warn(`Failed to update total_purchases for new client:`, updateTotalError);
+                    } else {
+                        log.info(`Updated total_purchases for new client to: ${saleInfo.saleAmount}`);
+                        mappedClient.totalPurchases = saleInfo.saleAmount;
+                    }
                 }
             } catch (interactionError) {
                 log.warn("Error creating initial sale interaction", interactionError);

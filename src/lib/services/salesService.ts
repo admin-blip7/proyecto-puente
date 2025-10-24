@@ -288,8 +288,8 @@ export const addSaleAndUpdateStock = async (
 
     log.info(`Sale ${saleId} processed successfully`);
 
-    // Update CRM client if one was selected during checkout
-    if (crmClientId) {
+    // Update CRM client if one was selected during checkout (and skip if auto-created, already done)
+    if (crmClientId && !skipCrmInteraction) {
       try {
         log.info(`Updating CRM client ${crmClientId} with sale info`);
         
