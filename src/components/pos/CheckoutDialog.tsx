@@ -7,14 +7,18 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CartItem, Sale, SaleItem, UserProfile, ClientProfile } from "@/types";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { CartItem, Sale, SaleItem, UserProfile, ClientProfile, CRMClient } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, User, Search } from "lucide-react";
 import { formatCurrency } from '@/lib/utils';
 import SaleSummaryDialog from "./SaleSummaryDialog";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
 import { getClientsWithCredit, createCreditSale } from "@/lib/services/creditService";
+import { getCRMClients } from "@/lib/services/crmClientService";
 import { ScrollArea } from "../ui/scroll-area";
 import { getLogger } from "@/lib/logger";
 
@@ -40,6 +44,11 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clients, setClients] = useState<any[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
+  const [crmClients, setCrmClients] = useState<CRMClient[]>([]);
+  const [loadingCRMClients, setLoadingCRMClients] = useState(false);
+  const [selectedCRMClient, setSelectedCRMClient] = useState<string>("");
+  const [crmClientSearch, setCrmClientSearch] = useState<string>("");
+  const [showCRMClientDropdown, setShowCRMClientDropdown] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -60,11 +69,38 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     }
   }, [toast]);
 
+  const loadCRMClients = useCallback(async () => {
+    setLoadingCRMClients(true);
+    try {
+      const clientsData = await getCRMClients({
+        search: crmClientSearch || undefined,
+        clientStatus: 'active' as any,
+        limit: 50
+      });
+      setCrmClients(clientsData);
+    } catch (error) {
+      log.error('Error loading CRM clients:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes del CRM",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCRMClients(false);
+    }
+  }, [toast, crmClientSearch]);
+
   useEffect(() => {
     if (paymentMethod === 'Crédito') {
       loadClients();
     }
   }, [paymentMethod, loadClients]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadCRMClients();
+    }
+  }, [isOpen, loadCRMClients]);
 
   const change = useMemo(() => {
     if (paymentMethod === 'Efectivo' && amountPaid > 0) {
@@ -79,6 +115,30 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         newSerials[index] = value;
         return { ...prev, [productId]: newSerials };
     });
+  };
+
+  const handleCRMClientSelect = (clientId: string) => {
+    const client = crmClients.find(c => c.id === clientId);
+    if (client) {
+      setSelectedCRMClient(clientId);
+      setCustomerName(`${client.firstName} ${client.lastName}`);
+      setCustomerPhone(client.phone || '');
+      setShowCRMClientDropdown(false);
+      setCrmClientSearch('');
+    }
+  };
+
+  const handleCRMClientSearch = (value: string) => {
+    setCrmClientSearch(value);
+    if (value.length >= 2 || value.length === 0) {
+      loadCRMClients();
+    }
+  };
+
+  const clearCRMClientSelection = () => {
+    setSelectedCRMClient('');
+    setCustomerName('');
+    setCustomerPhone('');
   };
 
   const handleProcessSale = async () => {
@@ -173,6 +233,9 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         setAmountPaid(0);
         setSerials({});
         setSelectedClient("");
+        setSelectedCRMClient("");
+        setCrmClientSearch("");
+        setShowCRMClientDropdown(false);
 
     } catch (error) {
         log.error("Sale processing error:", error);
@@ -199,13 +262,160 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-4 py-4 pr-6">
                 <div className="space-y-2">
-                    <Label htmlFor="customer-name">Nombre del Cliente (Opcional)</Label>
-                    <Input id="customer-name" placeholder="Ej: Juan Pérez" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                    <Label htmlFor="crm-client-select">Cliente del CRM</Label>
+                    <Popover open={showCRMClientDropdown} onOpenChange={setShowCRMClientDropdown}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between text-left h-auto p-3"
+                            >
+                                <div className="flex flex-col items-start">
+                                    {selectedCRMClient ? (
+                                        <>
+                                            <div className="flex items-center gap-2">
+                                                <User className="h-4 w-4" />
+                                                <span className="font-medium">
+                                                    {crmClients.find(c => c.id === selectedCRMClient)?.firstName} {crmClients.find(c => c.id === selectedCRMClient)?.lastName}
+                                                </span>
+                                            </div>
+                                            {crmClients.find(c => c.id === selectedCRMClient)?.phone && (
+                                                <span className="text-sm text-muted-foreground">
+                                                    {crmClients.find(c => c.id === selectedCRMClient)?.phone}
+                                                </span>
+                                            )}
+                                            {crmClients.find(c => c.id === selectedCRMClient)?.companyName && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                    {crmClients.find(c => c.id === selectedCRMClient)?.companyName}
+                                                </Badge>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <User className="h-4 w-4" />
+                                            <span>Seleccionar cliente existente o buscar...</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                                <CommandInput
+                                    placeholder="Buscar cliente por nombre, teléfono o cédula..."
+                                    value={crmClientSearch}
+                                    onValueChange={handleCRMClientSearch}
+                                    className="border-0 focus:ring-0"
+                                />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        {loadingCRMClients ? (
+                                            <div className="flex items-center justify-center py-4">
+                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                <span>Buscando clientes...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-4">
+                                                <p className="text-sm text-muted-foreground">No se encontraron clientes</p>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Puedes crear un nuevo cliente desde el módulo de CRM
+                                                </p>
+                                            </div>
+                                        )}
+                                    </CommandEmpty>
+                                    <CommandGroup heading="Clientes Activos">
+                                        {crmClients.map((client) => (
+                                            <CommandItem
+                                                key={client.id}
+                                                value={`${client.firstName} ${client.lastName} ${client.phone} ${client.identificationNumber}`}
+                                                onSelect={() => handleCRMClientSelect(client.id)}
+                                                className="p-3 cursor-pointer hover:bg-accent"
+                                            >
+                                                <div className="flex items-center gap-3 w-full">
+                                                    <User className="h-4 w-4 text-muted-foreground" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium truncate">
+                                                                {client.firstName} {client.lastName}
+                                                            </span>
+                                                            {client.companyName && (
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {client.companyName}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {client.phone && (
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    {client.phone}
+                                                                </span>
+                                                            )}
+                                                            {client.phone && client.identificationNumber && (
+                                                                <span className="text-muted-foreground">•</span>
+                                                            )}
+                                                            {client.identificationNumber && (
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    {client.identificationType}: {client.identificationNumber}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {client.totalPurchases > 0 && (
+                                                            <div className="text-xs text-muted-foreground mt-1">
+                                                                Compras totales: {formatCurrency(client.totalPurchases)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+
+                    {selectedCRMClient && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearCRMClientSelection}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <User className="h-3 w-3 mr-1" />
+                                Limpiar selección
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="text-xs text-muted-foreground mt-2">
+                        Si el cliente no existe en el CRM, puedes ingresarlo manualmente abajo o crearlo desde el módulo de CRM.
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="customer-phone">Teléfono del Cliente (Opcional)</Label>
-                    <Input id="customer-phone" placeholder="Ej: 555-123-4567" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-                </div>
+
+                {!selectedCRMClient && (
+                    <>
+                        <div className="space-y-2">
+                            <Label htmlFor="customer-name">Nombre del Cliente (Opcional)</Label>
+                            <Input
+                                id="customer-name"
+                                placeholder="Ej: Juan Pérez"
+                                value={customerName}
+                                onChange={(e) => setCustomerName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="customer-phone">Teléfono del Cliente (Opcional)</Label>
+                            <Input
+                                id="customer-phone"
+                                placeholder="Ej: 555-123-4567"
+                                value={customerPhone}
+                                onChange={(e) => setCustomerPhone(e.target.value)}
+                            />
+                        </div>
+                    </>
+                )}
                 
                 <div>
                     <Label>Números de Serie/IMEI (Opcional)</Label>

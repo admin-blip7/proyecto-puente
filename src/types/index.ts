@@ -486,3 +486,109 @@ export interface ClientPayment {
 export interface ClientProfile extends Client {
     creditAccount?: CreditAccount;
 }
+
+// CRM Types
+export type IdentificationType = 'cedula' | 'ruc' | 'pasaporte';
+export type ClientType = 'particular' | 'empresa' | 'recurrente';
+export type CRMClientStatus = 'active' | 'inactive' | 'pending' | 'blacklisted';
+export type InteractionType = 'sale' | 'repair' | 'credit_payment' | 'warranty' | 'contact' | 'consignment' | 'follow_up';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type DocumentType = 'identification' | 'contract' | 'warranty' | 'invoice' | 'other';
+
+export interface CRMClient {
+    id: string;
+    firestore_id?: string;
+    clientCode: string;
+    identificationType: IdentificationType;
+    identificationNumber: string;
+    firstName: string;
+    lastName: string;
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    secondaryPhone?: string;
+    address?: string;
+    city?: string;
+    province?: string;
+    clientType: ClientType;
+    clientStatus: CRMClientStatus;
+    registrationDate: Date;
+    lastContactDate?: Date;
+    totalPurchases: number;
+    outstandingBalance: number;
+    creditLimit: number;
+    tags: string[];
+    notes?: string;
+    createdBy?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CRMInteraction {
+    id: string;
+    firestore_id?: string;
+    clientId: string;
+    interactionType: InteractionType;
+    relatedId?: string;
+    relatedTable?: string;
+    interactionDate: Date;
+    description?: string;
+    amount?: number;
+    status?: string;
+    employeeId?: string;
+    metadata?: Record<string, any>;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CRMTag {
+    id: string;
+    firestore_id?: string;
+    name: string;
+    color: string;
+    description?: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CRMTask {
+    id: string;
+    firestore_id?: string;
+    clientId: string;
+    title: string;
+    description?: string;
+    dueDate?: Date;
+    status: TaskStatus;
+    priority: TaskPriority;
+    assignedTo?: string;
+    completedAt?: Date;
+    completionNotes?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CRMDocument {
+    id: string;
+    firestore_id?: string;
+    clientId: string;
+    documentType: DocumentType;
+    documentName: string;
+    fileUrl: string;
+    fileSize?: number;
+    mimeType?: string;
+    uploadDate: Date;
+    uploadedBy?: string;
+    createdAt: Date;
+}
+
+export interface CRMClientStats {
+    totalClients: number;
+    activeClients: number;
+    newClientsThisMonth: number;
+    totalPurchases: number;
+    averagePurchaseValue: number;
+    topClients: CRMClient[];
+    recentInteractions: CRMInteraction[];
+}

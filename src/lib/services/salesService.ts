@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+import { registerSaleInCRM } from "@/lib/utils/crmUtils";
 
 const log = getLogger("salesService");
 
@@ -284,6 +285,18 @@ export const addSaleAndUpdateStock = async (
     }
 
     log.info(`Sale ${saleId} processed successfully`);
+
+    // Register sale in CRM if customer information is available
+    try {
+      await registerSaleInCRM(saleId, saleData.totalAmount, {
+        name: saleData.customerName,
+        phone: saleData.customerPhone
+      });
+    } catch (crmError) {
+      // Don't let CRM errors break the sale process
+      log.warn("Failed to register sale in CRM", crmError);
+    }
+
     return sale;
 
   } catch (error) {

@@ -7,6 +7,8 @@
   },
   "scripts": {
     "dev": "next dev --turbopack -p 9003 --hostname localhost",
+    "dev:stable": "next dev --turbopack -p 9003 --hostname localhost --no-turbopack-cache",
+    "dev:clean": "node scripts/clear-cache.js && next dev --turbopack -p 9003 --hostname localhost",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "npm run clean && next build",
@@ -14,7 +16,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next",
-    "supabase:storage": "node scripts/configure-supabase-storage.mjs"
+    "clean:cache": "node scripts/clear-cache.js",
+    "supabase:storage": "node scripts/configure-supabase-storage.mjs",
+    "supabase:crm-migrate": "node scripts/apply-crm-migrations-client.js",
+    "supabase:crm-only": "node scripts/apply-crm-only.js",
+    "supabase:crm-sql": "node scripts/apply-crm-sql.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",

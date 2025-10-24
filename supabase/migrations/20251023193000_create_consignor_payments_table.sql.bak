@@ -1,4 +1,4 @@
--- Create consignor payments table
+-- Create consignor_payments table
 CREATE TABLE IF NOT EXISTS consignor_payments (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     firestore_id TEXT UNIQUE NOT NULL,
@@ -17,15 +17,6 @@ CREATE TABLE IF NOT EXISTS consignor_payments (
 CREATE INDEX idx_consignor_payments_consignorid ON consignor_payments(consignorid);
 CREATE INDEX idx_consignor_payments_payment_date ON consignor_payments(paymentDate DESC);
 CREATE INDEX idx_consignor_payments_firestore_id ON consignor_payments(firestore_id);
-
--- Create the function first
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language plpgsql;
 
 -- Add RLS policies
 ALTER TABLE consignor_payments ENABLE ROW LEVEL SECURITY;
