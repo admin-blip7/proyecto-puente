@@ -293,10 +293,10 @@ export const addSaleAndUpdateStock = async (
       try {
         log.info(`Updating CRM client ${crmClientId} with sale info`);
         
-        // First fetch the client by firestore_id to get the database ID
+        // First fetch the client by firestore_id to get the database ID and current purchases
         const { data: clientData, error: fetchError } = await supabase
           .from('crm_clients')
-          .select('id, firestore_id')
+          .select('id, firestore_id, total_purchases')
           .eq('firestore_id', crmClientId)
           .single();
 
@@ -307,11 +307,12 @@ export const addSaleAndUpdateStock = async (
 
         const dbClientId = clientData.id;
         
-        // Update client total_purchases and last_contact_date
+        // Update client total_purchases (sum, not replace) and last_contact_date
+        const newTotalPurchases = (clientData.total_purchases || 0) + saleData.totalAmount;
         const { data: updatedClient, error: updateError } = await supabase
           .from('crm_clients')
           .update({
-            total_purchases: saleData.totalAmount,
+            total_purchases: newTotalPurchases,
             last_contact_date: now
           })
           .eq('id', dbClientId)
