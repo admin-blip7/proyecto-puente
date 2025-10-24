@@ -147,10 +147,22 @@ export const updateWarranty = async (
 };
 
 const uploadWarrantyImages = async (images: File[]): Promise<string[]> => {
-  const uploads = images.map(async (image) => {
-    const objectPath = `${uuidv4()}-${image.name}`;
-    return uploadFile(image, `${WARRANTY_BUCKET}/${objectPath}`);
-  });
+  if (!images || images.length === 0) {
+    log.info("No warranty images to upload");
+    return [];
+  }
 
-  return Promise.all(uploads);
+  try {
+    const uploads = images.map(async (image) => {
+      const objectPath = `${uuidv4()}-${image.name}`;
+      return uploadFile(image, `${WARRANTY_BUCKET}/${objectPath}`);
+    });
+
+    const results = await Promise.all(uploads);
+    log.info(`Uploaded ${results.length} warranty images successfully`);
+    return results;
+  } catch (error) {
+    log.warn("Error uploading warranty images", error);
+    return [];
+  }
 };
