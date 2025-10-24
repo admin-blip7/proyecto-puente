@@ -35,12 +35,14 @@ export const getWarranties = async (): Promise<Warranty[]> => {
     const { data, error } = await supabase
       .from(WARRANTIES_TABLE)
       .select("*")
-      .order("reportedAt", { ascending: false });
+      .order("reported_at", { ascending: false });
 
     if (error) {
+      log.error("Error fetching warranties from Supabase:", error);
       throw error;
     }
 
+    log.info(`Fetched ${(data ?? []).length} warranties`);
     return (data ?? []).map(mapWarranty);
   } catch (error) {
     log.error("Error fetching warranties", error);
