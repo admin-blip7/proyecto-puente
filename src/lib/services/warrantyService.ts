@@ -98,24 +98,28 @@ export const addWarranty = async (
     // Auto-create or link CRM client for warranties
     if (warrantyData.customerName && warrantyData.customerPhone) {
       try {
-        log.info(`Creating/linking CRM client for warranty: ${warrantyData.customerName}`);
+        log.info(`Creating/linking CRM client for warranty: ${warrantyData.customerName}, phone: ${warrantyData.customerPhone}`);
         const { createCRMClientFromSale } = await import("./crmClientService");
         
         const crmClient = await createCRMClientFromSale({
           name: warrantyData.customerName,
           phone: warrantyData.customerPhone,
-          saleAmount: 0, // Warranty doesn't have a cost initially, but creates interaction
+          saleAmount: 0,
           saleId: firestoreId,
           interactionType: 'warranty'
         });
 
         if (crmClient && crmClient.id) {
-          log.info(`Linked warranty ${firestoreId} to CRM client: ${crmClient.id}`);
+          log.info(`✅ Successfully linked warranty ${firestoreId} to CRM client: ${crmClient.id} (${crmClient.firstName} ${crmClient.lastName})`);
+        } else {
+          log.warn(`⚠️ CRM client returned but no ID: ${JSON.stringify(crmClient)}`);
         }
       } catch (crmError) {
-        log.warn(`Could not create/link CRM client for warranty ${firestoreId}:`, crmError);
+        log.error(`❌ Could not create/link CRM client for warranty ${firestoreId}:`, crmError);
         // Don't break warranty creation if CRM fails
       }
+    } else {
+      log.warn(`⚠️ Skipping CRM linking - missing name or phone: name=${warrantyData.customerName}, phone=${warrantyData.customerPhone}`);
     }
 
     return warranty;

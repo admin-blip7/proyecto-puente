@@ -1107,19 +1107,26 @@ export const createCRMClientFromSale = async (saleInfo: {
         // Check if client already exists by phone or email
         let existingClient: CRMClient | null = null;
         if (saleInfo.phone) {
-            const { data: existingByPhone } = await supabase
+            log.info(`Searching for existing client with phone: "${saleInfo.phone}"`);
+            const { data: existingByPhone, error: phoneError } = await supabase
                 .from(CRM_CLIENTS_TABLE)
                 .select("id, firestore_id")
                 .eq("phone", saleInfo.phone)
                 .single();
 
+            if (phoneError) {
+                log.warn(`No client found by phone (${saleInfo.phone}): ${phoneError.message}`);
+            }
+
             if (existingByPhone) {
-                log.info(`Client already exists with phone ${saleInfo.phone}`);
+                log.info(`✅ Client already exists with phone ${saleInfo.phone} - ID: ${existingByPhone.id}`);
                 existingClient = await getCRMClientById(existingByPhone.firestore_id);
                 
                 // Create interaction for existing client if amount or warranty type
                 const intType = saleInfo.interactionType || 'sale';
                 const shouldCreateInteraction = (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) || intType === 'warranty';
+                
+                log.info(`Interaction check - type: ${intType}, amount: ${saleInfo.saleAmount}, shouldCreate: ${shouldCreateInteraction}`);
                 
                 if (shouldCreateInteraction && existingClient && existingByPhone.id) {
                     try {
@@ -1127,7 +1134,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                         const now = nowIso();
                         const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
                         
-                        log.info(`Creating ${intType} interaction for existing client: client_id=${existingByPhone.id}, amount=${saleInfo.saleAmount}`);
+                        log.info(`➕ Creating ${intType} interaction for existing client: client_id=${existingByPhone.id}, amount=${saleInfo.saleAmount}, table=${relatedTable}`);
                         const { error: interactionError } = await supabase
                             .from(CRM_INTERACTIONS_TABLE)
                             .insert({
@@ -1142,9 +1149,9 @@ export const createCRMClientFromSale = async (saleInfo: {
                             });
 
                         if (interactionError) {
-                            log.warn(`Failed to create ${intType} interaction for existing client:`, interactionError);
+                            log.error(`❌ Failed to create ${intType} interaction for existing client:`, interactionError);
                         } else {
-                            log.info(`Created ${intType} interaction for existing client`);
+                            log.info(`✅ Successfully created ${intType} interaction for existing client - firestore_id: ${interactionFirestoreId}`);
                             
                             // Update total_purchases if there's an amount
                             if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
@@ -1218,9 +1225,9 @@ export const createCRMClientFromSale = async (saleInfo: {
                             });
 
                         if (interactionError) {
-                            log.warn(`Failed to create ${intType} interaction for existing client:`, interactionError);
+                            log.error(`❌ Failed to create ${intType} interaction for existing client:`, interactionError);
                         } else {
-                            log.info(`Created ${intType} interaction for existing client`);
+                            log.info(`✅ Successfully created ${intType} interaction for existing client - firestore_id: ${interactionFirestoreId}`);
                             
                             // Update total_purchases if there's an amount
                             if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {

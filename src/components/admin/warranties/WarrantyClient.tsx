@@ -16,8 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Edit } from "lucide-react";
+import { Edit, Plus } from "lucide-react";
 import EditWarrantyDialog from "./EditWarrantyDialog";
+import CreateWarrantyDialog from "./CreateWarrantyDialog";
 import { getWarrantyStatusVariant } from "@/lib/utils";
 
 
