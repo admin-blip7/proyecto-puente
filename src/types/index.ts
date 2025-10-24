@@ -499,6 +499,7 @@ export type DocumentType = 'identification' | 'contract' | 'warranty' | 'invoice
 export interface CRMClient {
     id: string;
     firestore_id?: string;
+    _dbId?: number;
     clientCode: string;
     identificationType: IdentificationType;
     identificationNumber: string;

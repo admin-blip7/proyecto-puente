@@ -31,6 +31,7 @@ const CRM_DOCUMENTS_TABLE = "crm_documents";
 const mapCRMClient = (row: any): CRMClient => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
+    _dbId: row?.id ? (typeof row.id === 'number' ? row.id : parseInt(row.id)) : undefined,
     clientCode: row?.client_code ?? row?.clientcode ?? row?.clientCode ?? "",
     identificationType: (row?.identification_type ?? row?.identificationtype ?? row?.identificationType ?? "cedula") as IdentificationType,
     identificationNumber: row?.identification_number ?? row?.identificationnumber ?? row?.identificationNumber ?? "",
@@ -505,7 +506,7 @@ export const getCRMDocuments = async (clientId: string): Promise<CRMDocument[]> 
         const { data, error } = await supabase
             .from(CRM_DOCUMENTS_TABLE)
             .select("*")
-            .eq("client_id", parseInt(client.id))
+            .eq("client_id", client._dbId || parseInt(client.id))
             .order("upload_date", { ascending: false });
 
         if (error) throw error;
@@ -579,7 +580,7 @@ export const getCRMInteractions = async (
         const { data, error } = await supabase
             .from(CRM_INTERACTIONS_TABLE)
             .select("*")
-            .eq("client_id", parseInt(client.id))
+            .eq("client_id", client._dbId || parseInt(client.id))
             .order("interaction_date", { ascending: false })
             .limit(limit);
 
@@ -626,7 +627,7 @@ export const createCRMTask = async (
 
         const payload = {
             firestore_id: firestoreId,
-            client_id: parseInt(client.id),
+            client_id: client._dbId || parseInt(client.id),
             title: taskData.title,
             description: taskData.description || null,
             due_date: taskData.dueDate ? taskData.dueDate.toISOString() : null,
@@ -748,7 +749,7 @@ export const getCRMTasks = async (
         if (filters?.clientId) {
             const client = await getCRMClientById(filters.clientId);
             if (client) {
-                query = query.eq("client_id", parseInt(client.id));
+                query = query.eq("client_id", client._dbId || parseInt(client.id));
             } else {
                 return [];
             }
@@ -1035,7 +1036,7 @@ export const createCRMInteraction = async (
 
         const payload = {
             firestore_id: firestoreId,
-            client_id: parseInt(client.id),
+            client_id: client._dbId || parseInt(client.id),
             interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
             related_table: interactionData.relatedTable || null,
