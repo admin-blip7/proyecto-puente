@@ -56,7 +56,10 @@ export const addWarranty = async (
     const supabase = getSupabaseServerClient();
     const firestoreId = uuidv4();
     const reportedAt = nowIso();
+    
+    log.info(`Adding warranty for customer: ${warrantyData.customerName}`);
     const imageUrls = await uploadWarrantyImages(images);
+    log.info(`Uploaded ${imageUrls.length} warranty images`);
 
     const payload = {
       firestore_id: firestoreId,
@@ -80,10 +83,37 @@ export const addWarranty = async (
       .single();
 
     if (error || !data) {
+      log.error("Warranty insert error:", error);
       throw error ?? new Error("Failed to add warranty");
     }
 
-    return mapWarranty(data);
+    const warranty = mapWarranty(data);
+    log.info(`Warranty created: ${firestoreId}`);
+
+    // Auto-create or link CRM client for warranties
+    if (warrantyData.customerName && warrantyData.customerPhone) {
+      try {
+        log.info(`Creating/linking CRM client for warranty: ${warrantyData.customerName}`);
+        const { createCRMClientFromSale } = await import("./crmClientService");
+        
+        const crmClient = await createCRMClientFromSale({
+          name: warrantyData.customerName,
+          phone: warrantyData.customerPhone,
+          saleAmount: 0, // Warranty doesn't have a cost initially, but creates interaction
+          saleId: firestoreId,
+          interactionType: 'warranty'
+        });
+
+        if (crmClient && crmClient.id) {
+          log.info(`Linked warranty ${firestoreId} to CRM client: ${crmClient.id}`);
+        }
+      } catch (crmError) {
+        log.warn(`Could not create/link CRM client for warranty ${firestoreId}:`, crmError);
+        // Don't break warranty creation if CRM fails
+      }
+    }
+
+    return warranty;
   } catch (error) {
     log.error("Error adding warranty", error);
     throw new Error("Failed to add warranty.");

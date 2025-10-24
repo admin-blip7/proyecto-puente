@@ -1175,7 +1175,10 @@ export const createCRMClientFromSale = async (saleInfo: {
         const intType = saleInfo.interactionType || 'sale';
         log.info(`Creating initial interaction - type: ${intType}, amount: ${saleInfo.saleAmount}, id: ${saleInfo.saleId}`);
         
-        if (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) {
+        // Create interaction if amount > 0 OR if it's a warranty (warranty can be $0 initially)
+        const shouldCreateInteraction = (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) || intType === 'warranty';
+        
+        if (shouldCreateInteraction) {
             try {
                 const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, type=${intType}, firestore_id=${interactionFirestoreId}`);
@@ -1200,27 +1203,41 @@ export const createCRMClientFromSale = async (saleInfo: {
                 } else {
                     log.info(`Created initial ${intType} interaction for new client ${newClient.firestore_id}:`, interactionData);
                     
-                    // Update total_purchases to reflect the initial transaction
-                    const { error: updateTotalError } = await supabase
-                        .from(CRM_CLIENTS_TABLE)
-                        .update({
-                            total_purchases: saleInfo.saleAmount,
-                            last_contact_date: now
-                        })
-                        .eq('id', newClient.id);
-                    
-                    if (updateTotalError) {
-                        log.warn(`Failed to update total_purchases for new client:`, updateTotalError);
+                    // Update total_purchases if there's an amount (warranties might be $0 initially)
+                    if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
+                        const { error: updateTotalError } = await supabase
+                            .from(CRM_CLIENTS_TABLE)
+                            .update({
+                                total_purchases: saleInfo.saleAmount,
+                                last_contact_date: now
+                            })
+                            .eq('id', newClient.id);
+                        
+                        if (updateTotalError) {
+                            log.warn(`Failed to update total_purchases for new client:`, updateTotalError);
+                        } else {
+                            log.info(`Updated total_purchases for new client to: ${saleInfo.saleAmount}`);
+                            mappedClient.totalPurchases = saleInfo.saleAmount;
+                        }
                     } else {
-                        log.info(`Updated total_purchases for new client to: ${saleInfo.saleAmount}`);
-                        mappedClient.totalPurchases = saleInfo.saleAmount;
+                        // Still update last_contact_date even if no amount
+                        const { error: updateContactError } = await supabase
+                            .from(CRM_CLIENTS_TABLE)
+                            .update({
+                                last_contact_date: now
+                            })
+                            .eq('id', newClient.id);
+                        
+                        if (updateContactError) {
+                            log.warn(`Failed to update last_contact_date for new client:`, updateContactError);
+                        }
                     }
                 }
             } catch (interactionError) {
                 log.warn(`Error creating initial ${intType} interaction`, interactionError);
             }
         } else {
-            log.warn(`Skipping interaction creation - amount: ${saleInfo.saleAmount}`);
+            log.warn(`Skipping ${intType} interaction creation - amount: ${saleInfo.saleAmount}, shouldCreate: ${shouldCreateInteraction}`);
         }
 
         return mappedClient;
