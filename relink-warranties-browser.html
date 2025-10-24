@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reparar Garantías - Vínculo a CRM</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        h1 { color: #333; }
+        button { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #1d4ed8; }
+        .results { margin-top: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #2563eb; border-radius: 4px; }
+        .loading { color: #666; font-style: italic; }
+        .success { color: #16a34a; font-weight: bold; }
+        .failed { color: #dc2626; }
+        .linked { color: #2563eb; }
+        table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
+        th { background: #f3f4f6; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Reparar Garantías - Vínculo a CRM</h1>
+        <p>Este proceso buscará todas las garantías creadas y las vinculará automáticamente a sus clientes en el CRM usando búsqueda fuzzy de teléfono.</p>
+        
+        <button onclick="runRepair()">▶️ Ejecutar Reparación</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function runRepair() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔄 Ejecutando reparación... esto puede tomar unos segundos...</div>';
+            
+            try {
+                const response = await fetch('/api/crm/relink-warranties', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    resultsDiv.innerHTML = `<div class="results"><div class="failed">❌ Error: ${data.error}</div></div>`;
+                    return;
+                }
+                
+                let html = `<div class="results">
+                    <h2 class="success">✅ Reparación Completada</h2>
+                    <p><strong>${data.summary}</strong></p>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Garantía</th>
+                                <th>Estado</th>
+                                <th>Detalles</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                
+                data.results.details.forEach(detail => {
+                    const warrantyId = detail.warranty_id.slice(0, 8) + '...';
+                    let statusClass = 'linked';
+                    if (detail.status === 'error' || detail.status === 'failed') statusClass = 'failed';
+                    if (detail.status === 'already_linked') statusClass = 'linked';
+                    if (detail.status === 'skipped') statusClass = 'loading';
+                    
+                    html += `<tr>
+                        <td>${warrantyId}</td>
+                        <td><span class="${statusClass}">${detail.status.toUpperCase()}</span></td>
+                        <td>${detail.reason || 'OK'}</td>
+                    </tr>`;
+                });
+                
+                html += `</tbody>
+                    </table>
+                </div>`;
+                
+                resultsDiv.innerHTML = html;
+                
+                // Scroll to results
+                document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="results"><div class="failed">❌ Error: ${error.message}</div></div>`;
+            }
+        }
+    </script>
+</body>
+</html>
