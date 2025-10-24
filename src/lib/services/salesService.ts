@@ -141,7 +141,6 @@ export const addSaleAndUpdateStock = async (
       cashierName: sale.cashierName,
       customerName: sale.customerName,
       customerPhone: sale.customerPhone,
-      crm_client_id: crmClientId || null,
       createdAt: sale.createdAt,
     };
 
