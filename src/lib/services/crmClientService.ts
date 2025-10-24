@@ -230,28 +230,28 @@ export const getCRMClients = async (
         let query = supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .order("registrationdate", { ascending: false });
+            .order("registration_date", { ascending: false });
 
         // Apply filters
         if (filters?.search) {
             const searchTerm = `%${filters.search}%`;
             query = query.or(`
-                firstname.ilike.${searchTerm},
-                lastname.ilike.${searchTerm},
-                companyname.ilike.${searchTerm},
+                first_name.ilike.${searchTerm},
+                last_name.ilike.${searchTerm},
+                company_name.ilike.${searchTerm},
                 email.ilike.${searchTerm},
                 phone.ilike.${searchTerm},
-                identificationnumber.ilike.${searchTerm},
-                clientcode.ilike.${searchTerm}
+                identification_number.ilike.${searchTerm},
+                client_code.ilike.${searchTerm}
             `);
         }
 
         if (filters?.clientType) {
-            query = query.eq("clienttype", filters.clientType);
+            query = query.eq("client_type", filters.clientType);
         }
 
         if (filters?.clientStatus) {
-            query = query.eq("clientstatus", filters.clientStatus);
+            query = query.eq("client_status", filters.clientStatus);
         }
 
         if (filters?.tags && filters.tags.length > 0) {
@@ -295,7 +295,7 @@ export const getCRMClientById = async (id: string): Promise<CRMClient | null> =>
         const { data, error, status, statusText } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("firestore_id", id)
             .single();
 
         if (error) {
@@ -441,7 +441,7 @@ export const updateCRMClient = async (
         const { data, error, status, statusText } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .update(payload)
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("firestore_id", id)
             .select()
             .single();
 
@@ -506,7 +506,7 @@ export const getCRMDocuments = async (clientId: string): Promise<CRMDocument[]> 
             .from(CRM_DOCUMENTS_TABLE)
             .select("*")
             .eq("client_id", parseInt(client.id))
-            .order("uploaddate", { ascending: false });
+            .order("upload_date", { ascending: false });
 
         if (error) throw error;
 
@@ -580,7 +580,7 @@ export const getCRMInteractions = async (
             .from(CRM_INTERACTIONS_TABLE)
             .select("*")
             .eq("client_id", parseInt(client.id))
-            .order("interactiondate", { ascending: false })
+            .order("interaction_date", { ascending: false })
             .limit(limit);
 
         if (error) throw error;
@@ -588,18 +588,18 @@ export const getCRMInteractions = async (
         return (data || []).map((row: any) => ({
             id: row?.firestore_id ?? row?.id ?? "",
             firestore_id: row?.firestore_id ?? row?.id ?? "",
-            clientId: row?.clientid ?? row?.clientId ?? "",
-            interactionType: (row?.interactiontype ?? row?.interactionType ?? "contact") as InteractionType,
-            relatedId: row?.relatedid ?? row?.relatedId ?? undefined,
-            relatedTable: row?.relatedtable ?? row?.relatedTable ?? undefined,
-            interactionDate: toDate(row?.interactiondate ?? row?.interactionDate),
+            clientId: row?.client_id ?? row?.clientId ?? "",
+            interactionType: (row?.interaction_type ?? row?.interactionType ?? "contact") as InteractionType,
+            relatedId: row?.related_id ?? row?.relatedId ?? undefined,
+            relatedTable: row?.related_table ?? row?.relatedTable ?? undefined,
+            interactionDate: toDate(row?.interaction_date ?? row?.interactionDate),
             description: row?.description ?? undefined,
             amount: row?.amount ? Number(row.amount) : undefined,
             status: row?.status ?? undefined,
-            employeeId: row?.employeeid ?? row?.employeeId ?? undefined,
+            employeeId: row?.employee_id ?? row?.employeeId ?? undefined,
             metadata: row?.metadata ?? {},
-            createdAt: toDate(row?.createdat ?? row?.createdAt),
-            updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+            createdAt: toDate(row?.created_at ?? row?.createdAt),
+            updatedAt: toDate(row?.updated_at ?? row?.updatedAt),
         }));
     } catch (error) {
         log.error("Error getting CRM interactions", error);
@@ -698,7 +698,7 @@ export const updateCRMTask = async (
         const { data, error } = await supabase
             .from(CRM_TASKS_TABLE)
             .update(payload)
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("firestore_id", id)
             .select()
             .single();
 
@@ -743,7 +743,7 @@ export const getCRMTasks = async (
         let query = supabase
             .from(CRM_TASKS_TABLE)
             .select("*")
-            .order("createdat", { ascending: false });
+            .order("created_at", { ascending: false });
 
         if (filters?.clientId) {
             const client = await getCRMClientById(filters.clientId);
@@ -862,26 +862,26 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
         const { count: activeClients } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*", { count: "exact", head: true })
-            .eq("clientstatus", "active");
+            .eq("client_status", "active");
 
         // Get new clients this month
         const { count: newClientsThisMonth } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*", { count: "exact", head: true })
-            .gte("registrationdate", firstDayOfMonth.toISOString());
+            .gte("registration_date", firstDayOfMonth.toISOString());
 
         // Get total purchases
         const { data: purchasesData } = await supabase
             .from(CRM_CLIENTS_TABLE)
-            .select("totalpurchases");
+            .select("total_purchases");
 
-        const totalPurchases = purchasesData?.reduce((sum, client) => sum + Number(client.totalpurchases || 0), 0) || 0;
+        const totalPurchases = purchasesData?.reduce((sum, client) => sum + Number(client.total_purchases || 0), 0) || 0;
 
         // Get top clients
         const { data: topClientsData } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .order("totalpurchases", { ascending: false })
+            .order("total_purchases", { ascending: false })
             .limit(5);
 
         const topClients = (topClientsData || []).map(mapCRMClient);
@@ -890,17 +890,17 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
         const { data: recentInteractionsData } = await supabase
             .from(CRM_INTERACTIONS_TABLE)
             .select("*")
-            .order("interactiondate", { ascending: false })
+            .order("interaction_date", { ascending: false })
             .limit(10);
 
         const recentInteractions = (recentInteractionsData || []).map((row: any) => ({
             id: row?.firestore_id ?? row?.id ?? "",
             firestore_id: row?.firestore_id ?? row?.id ?? "",
-            clientId: row?.clientid ?? row?.clientId ?? "",
-            interactionType: (row?.interactiontype ?? row?.interactionType ?? "contact") as InteractionType,
-            relatedId: row?.relatedid ?? row?.relatedId ?? undefined,
-            relatedTable: row?.relatedtable ?? row?.relatedTable ?? undefined,
-            interactionDate: toDate(row?.interactiondate ?? row?.interactionDate),
+            clientId: row?.client_id ?? row?.clientId ?? "",
+            interactionType: (row?.interaction_type ?? row?.interactionType ?? "contact") as InteractionType,
+            relatedId: row?.related_id ?? row?.relatedId ?? undefined,
+            relatedTable: row?.related_table ?? row?.relatedTable ?? undefined,
+            interactionDate: toDate(row?.interaction_date ?? row?.interactionDate),
             description: row?.description ?? undefined,
             amount: row?.amount ? Number(row.amount) : undefined,
             status: row?.status ?? undefined,
@@ -1036,17 +1036,17 @@ export const createCRMInteraction = async (
         const payload = {
             firestore_id: firestoreId,
             client_id: parseInt(client.id),
-            interactiontype: interactionData.interactionType,
+            interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
             related_table: interactionData.relatedTable || null,
-            interactiondate: interactionData.interactionDate.toISOString(),
+            interaction_date: interactionData.interactionDate.toISOString(),
             description: interactionData.description || null,
             amount: interactionData.amount || null,
             status: interactionData.status || null,
             employee_id: interactionData.employeeId || null,
             metadata: interactionData.metadata || {},
-            createdat: now,
-            updatedat: now,
+            created_at: now,
+            updated_at: now,
         };
 
         const { data, error } = await supabase
