@@ -30,7 +30,7 @@ export const getSales = async (): Promise<Sale[]> => {
     const { data, error } = await supabase
       .from(SALES_TABLE)
       .select("*")
-      .order("created_at", { ascending: false }); // Usar created_at en lugar de createdAt
+      .order("createdAt", { ascending: false });
 
     if (error) {
       log.error("Database error fetching sales", error);

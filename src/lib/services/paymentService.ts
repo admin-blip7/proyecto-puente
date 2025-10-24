@@ -15,12 +15,12 @@ const STORAGE_PAYMENT_PROOFS_PATH = "payment_proofs";
 
 const mapPayment = (row: any): ConsignorPayment => ({
   id: row?.firestore_id ?? row?.id ?? "",
-  paymentId: row?.paymentId ?? "",
-  consignorId: row?.consignorid ?? "",
-  amountPaid: Number(row?.amountPaid ?? 0),
-  paymentDate: toDate(row?.paymentDate),
-  paymentMethod: row?.paymentMethod ?? "Efectivo",
-  proofOfPaymentUrl: row?.proofOfPaymentUrl ?? "",
+  paymentId: row?.paymentid ?? row?.paymentId ?? "",
+  consignorId: row?.consignorid ?? row?.consignor_id ?? "",
+  amountPaid: Number(row?.amountpaid ?? row?.amountPaid ?? 0),
+  paymentDate: toDate(row?.paymentdate ?? row?.paymentDate),
+  paymentMethod: row?.paymentmethod ?? row?.paymentMethod ?? "Efectivo",
+  proofOfPaymentUrl: row?.proofofpaymenturl ?? row?.proofOfPaymentUrl ?? "",
   notes: row?.notes ?? undefined,
 });
 
@@ -115,14 +115,50 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
       try {
         log.debug(`[getConsignorPayments] Attempting query with column: ${columnName}`, { requestId });
         
-        const result = await supabase
-          .from(CONSIGNOR_PAYMENTS_TABLE)
-          .select("*")
-          .eq(columnName, consignorId)
-          .order("paymentDate", { ascending: false });
+        // Intentar con diferentes nombres de columna para la ordenación también
+        const sortColumns = ["paymentdate", "payment_date", "paymentDate"];
+        let queryResult;
+        let sortColumnFound = false;
+        
+        for (const sortColumn of sortColumns) {
+          try {
+            queryResult = await supabase
+              .from(CONSIGNOR_PAYMENTS_TABLE)
+              .select("*")
+              .eq(columnName, consignorId)
+              .order(sortColumn, { ascending: false });
+            
+            if (!queryResult.error) {
+              sortColumnFound = true;
+              log.debug(`[getConsignorPayments] Successfully used sort column: ${sortColumn}`, {
+                requestId,
+                columnName
+              });
+              break;
+            }
+          } catch (sortError) {
+            log.debug(`[getConsignorPayments] Sort column ${sortColumn} not found`, {
+              requestId,
+              columnName,
+              error: sortError instanceof Error ? sortError.message : String(sortError)
+            });
+          }
+        }
+        
+        // Si ningún nombre de columna de ordenación funciona, intentar sin ordenación
+        if (!sortColumnFound) {
+          log.debug(`[getConsignorPayments] No valid sort column found, trying unsorted query`, {
+            requestId,
+            columnName
+          });
+          queryResult = await supabase
+            .from(CONSIGNOR_PAYMENTS_TABLE)
+            .select("*")
+            .eq(columnName, consignorId);
+        }
 
-        data = result.data;
-        error = result.error;
+        data = queryResult?.data ?? null;
+        error = queryResult?.error ?? null;
 
         if (!error) {
           log.info(`[getConsignorPayments] Successfully queried with column: ${columnName}`, {
@@ -339,12 +375,12 @@ export const addConsignorPayment = async (
 
     const payload = {
       firestore_id: firestoreId,
-      paymentId,
+      paymentid: paymentId,
       consignorid: consignorId,
-      amountPaid,
-      paymentDate,
-      paymentMethod: paymentData.paymentMethod,
-      proofOfPaymentUrl,
+      amountpaid: amountPaid,
+      paymentdate: paymentDate,
+      paymentmethod: paymentData.paymentMethod,
+      proofofpaymenturl: proofOfPaymentUrl,
       notes: paymentData.notes ?? null,
     };
 
@@ -391,7 +427,7 @@ export const getAllConsignorPayments = async (): Promise<ConsignorPayment[]> => 
     const { data, error } = await supabase
       .from(CONSIGNOR_PAYMENTS_TABLE)
       .select("*")
-      .order("paymentDate", { ascending: false });
+      .order("paymentdate", { ascending: false });
 
     if (error) {
       log.error("[getAllConsignorPayments] Error fetching payments", {

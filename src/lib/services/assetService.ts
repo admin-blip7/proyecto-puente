@@ -83,11 +83,46 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
 
       log.debug(`[getAssets] Table access verified`, { requestId });
 
-      // Realizar la consulta principal
-      const result = await supabase
-        .from(ASSETS_TABLE)
-        .select("*")
-        .order("purchaseDate", { ascending: false });
+      // Realizar la consulta principal con manejo flexible de nombres de columna
+      let result;
+      let error;
+      
+      // Intentar con diferentes nombres de columna para la ordenación
+      const sortColumns = ["purchaseDate", "purchase_date", "purchasedate"];
+      let sortColumnFound = false;
+      
+      for (const sortColumn of sortColumns) {
+        try {
+          result = await supabase
+            .from(ASSETS_TABLE)
+            .select("*")
+            .order(sortColumn, { ascending: false });
+          
+          if (!result.error) {
+            sortColumnFound = true;
+            log.debug(`[getAssets] Successfully used sort column: ${sortColumn}`, { requestId });
+            break;
+          }
+        } catch (sortError) {
+          log.debug(`[getAssets] Sort column ${sortColumn} not found`, {
+            requestId,
+            error: sortError instanceof Error ? sortError.message : String(sortError)
+          });
+        }
+      }
+      
+      // Si ningún nombre de columna funciona, hacer consulta sin ordenación
+      if (!sortColumnFound) {
+        log.warn(`[getAssets] No valid sort column found, using unsorted query`, { requestId });
+        result = await supabase
+          .from(ASSETS_TABLE)
+          .select("*");
+      }
+      
+      // Asegurar que result esté definido
+      if (!result) {
+        throw new Error("Failed to execute asset query");
+      }
 
       data = result.data;
       error = result.error;

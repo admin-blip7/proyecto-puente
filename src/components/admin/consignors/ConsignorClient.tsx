@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import AddEditConsignorDialog from "./AddEditConsignorDialog";
 import DeleteConsignorDialog from "./DeleteConsignorDialog";
 import RegisterPaymentDialog from "./RegisterPaymentDialogFixed";
-import { DollarSign, MoreHorizontal, BarChart3 } from "lucide-react";
+import { DollarSign, MoreHorizontal, BarChart3, Receipt } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { getConsignors } from "@/lib/services/consignorService";
@@ -143,6 +143,14 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Actualizar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/admin/consignors/payments')}
+          >
+            <Receipt className="h-4 w-4 mr-2" />
+            Ver Pagos
           </Button>
           <Button onClick={handleOpenAddDialog}>
             <PlusCircle className="h-4 w-4 mr-2" />

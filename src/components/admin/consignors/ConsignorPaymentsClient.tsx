@@ -31,8 +31,8 @@ export default function ConsignorPaymentsClient() {
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState<PaymentFilters>({
         searchTerm: "",
-        consignorId: "",
-        paymentMethod: "",
+        consignorId: "all",
+        paymentMethod: "all",
         dateRange: {
             start: "",
             end: ""
@@ -107,12 +107,12 @@ export default function ConsignorPaymentsClient() {
         }
 
         // Filter by consignor
-        if (filters.consignorId) {
+        if (filters.consignorId && filters.consignorId !== "all") {
             filtered = filtered.filter(payment => payment.consignorId === filters.consignorId);
         }
 
         // Filter by payment method
-        if (filters.paymentMethod) {
+        if (filters.paymentMethod && filters.paymentMethod !== "all") {
             filtered = filtered.filter(payment => payment.paymentMethod === filters.paymentMethod);
         }
 
@@ -245,7 +245,7 @@ export default function ConsignorPaymentsClient() {
                                 <SelectValue placeholder="Todos los consignadores" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Todos los consignadores</SelectItem>
+                                <SelectItem value="all">Todos los consignadores</SelectItem>
                                 {consignors.map(consignor => (
                                     <SelectItem key={consignor.id} value={consignor.id}>
                                         {consignor.name}
@@ -268,7 +268,7 @@ export default function ConsignorPaymentsClient() {
                                 <SelectValue placeholder="Todos los métodos" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Todos los métodos</SelectItem>
+                                <SelectItem value="all">Todos los métodos</SelectItem>
                                 <SelectItem value="Transferencia Bancaria">Transferencia</SelectItem>
                                 <SelectItem value="Efectivo">Efectivo</SelectItem>
                                 <SelectItem value="Depósito">Depósito</SelectItem>

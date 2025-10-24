@@ -84,11 +84,46 @@ export const getDebts = async (): Promise<Debt[]> => {
 
       log.debug(`[getDebts] Table access verified`, { requestId });
 
-      // Realizar la consulta principal
-      const result = await supabase
-        .from(DEBTS_TABLE)
-        .select("*")
-        .order("creditorName", { ascending: true });
+      // Realizar la consulta principal con manejo flexible de nombres de columna
+      let result;
+      let error;
+      
+      // Intentar con diferentes nombres de columna para la ordenación
+      const sortColumns = ["creditorName", "creditor_name", "creditorname"];
+      let sortColumnFound = false;
+      
+      for (const sortColumn of sortColumns) {
+        try {
+          result = await supabase
+            .from(DEBTS_TABLE)
+            .select("*")
+            .order(sortColumn, { ascending: true });
+          
+          if (!result.error) {
+            sortColumnFound = true;
+            log.debug(`[getDebts] Successfully used sort column: ${sortColumn}`, { requestId });
+            break;
+          }
+        } catch (sortError) {
+          log.debug(`[getDebts] Sort column ${sortColumn} not found`, {
+            requestId,
+            error: sortError instanceof Error ? sortError.message : String(sortError)
+          });
+        }
+      }
+      
+      // Si ningún nombre de columna funciona, hacer consulta sin ordenación
+      if (!sortColumnFound) {
+        log.warn(`[getDebts] No valid sort column found, using unsorted query`, { requestId });
+        result = await supabase
+          .from(DEBTS_TABLE)
+          .select("*");
+      }
+      
+      // Asegurar que result esté definido
+      if (!result) {
+        throw new Error("Failed to execute debt query");
+      }
 
       data = result.data;
       error = result.error;
