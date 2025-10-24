@@ -2,7 +2,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { Warranty } from "@/types";
-import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { getSupabaseClientWithAuth } from "@/lib/supabaseClientWithAuth";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { uploadFile } from "./documentService";
 import { getLogger } from "@/lib/logger";
@@ -31,7 +31,7 @@ const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
 
 export const getWarranties = async (): Promise<Warranty[]> => {
   try {
-    const supabase = getSupabaseServerClient();
+    const supabase = await getSupabaseClientWithAuth();
     const { data, error } = await supabase
       .from(WARRANTIES_TABLE)
       .select("*")
@@ -53,7 +53,10 @@ export const addWarranty = async (
   images: File[]
 ): Promise<Warranty> => {
   try {
-    const supabase = getSupabaseServerClient();
+    const supabase = await getSupabaseClientWithAuth();
+    if (!supabase) {
+      throw new Error("Supabase client not initialized");
+    }
     const firestoreId = uuidv4();
     const reportedAt = nowIso();
     
@@ -125,7 +128,10 @@ export const updateWarranty = async (
   dataToUpdate: Partial<Warranty>
 ): Promise<void> => {
   try {
-    const supabase = getSupabaseServerClient();
+    const supabase = await getSupabaseClientWithAuth();
+    if (!supabase) {
+      throw new Error("Supabase client not initialized");
+    }
     const updates: Record<string, any> = { ...dataToUpdate };
 
     if (dataToUpdate.status === "Resuelta" || dataToUpdate.status === "Rechazada") {
