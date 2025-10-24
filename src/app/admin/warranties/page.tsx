@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";

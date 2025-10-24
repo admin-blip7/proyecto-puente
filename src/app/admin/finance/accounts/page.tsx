@@ -5,6 +5,8 @@ import { Menu } from "lucide-react";
 import AccountsClient from "@/components/admin/finance/accounts/AccountsClient";
 import { getAccounts } from "@/lib/services/accountService";
 
+// Render at runtime instead of build time (requires Supabase credentials)
+export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
     const initialAccounts = await getAccounts();

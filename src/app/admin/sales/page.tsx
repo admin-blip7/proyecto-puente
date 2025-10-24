@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import SalesHistoryClient from "@/components/admin/sales/SalesHistoryClient";
 import { Sale, Product } from "@/types";
 import { isToday } from 'date-fns';
