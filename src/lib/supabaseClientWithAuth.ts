@@ -1,5 +1,3 @@
-"use client";
-
 import { type SupabaseClient, type User } from "@supabase/supabase-js";
 import { getLogger } from "@/lib/logger";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
