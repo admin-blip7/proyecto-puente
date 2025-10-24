@@ -48,7 +48,9 @@ export async function POST(request: Request) {
         const newClient = await createCRMClientFromSale({
           name: saleData.customerName,
           phone: saleData.customerPhone,
-          email: saleData.customerEmail
+          email: saleData.customerEmail,
+          saleAmount: saleData.totalAmount,
+          saleId: `SALE-${Math.random().toString(36).substr(2, 8).toUpperCase()}`
         });
         
         if (newClient && newClient.id) {
@@ -62,7 +64,9 @@ export async function POST(request: Request) {
     }
 
     // Procesar la venta
-    const result = await addSaleAndUpdateStock(saleData, cartItems, finalCrmClientId);
+    // If we auto-created a CRM client, skip creating another interaction (already created during client creation)
+    const skipCrmInteraction = !crmClientId && finalCrmClientId; // Created a new client automatically
+    const result = await addSaleAndUpdateStock(saleData, cartItems, finalCrmClientId, skipCrmInteraction);
 
     log.info(`Sale processed successfully: ${result.saleId}`);
 

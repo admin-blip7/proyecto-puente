@@ -96,6 +96,7 @@ export interface Sale {
   cashierName?: string;
   customerName: string | null;
   customerPhone: string | null;
+  customerEmail?: string | null;
   createdAt: Date;
   sessionId?: string;
 }

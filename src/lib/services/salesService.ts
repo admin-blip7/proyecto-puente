@@ -63,7 +63,8 @@ export const getSales = async (): Promise<Sale[]> => {
 export const addSaleAndUpdateStock = async (
   saleData: Omit<Sale, "id" | "saleId" | "createdAt">,
   cartItems: CartItem[],
-  crmClientId?: string | null
+  crmClientId?: string | null,
+  skipCrmInteraction?: boolean
 ): Promise<Sale> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -327,31 +328,33 @@ export const addSaleAndUpdateStock = async (
             lastContactDate: updatedClient?.last_contact_date
           });
 
-          // Create CRM interaction for the sale
-          try {
-            const { data: interaction, error: interactionError } = await supabase
-              .from('crm_interactions')
-              .insert({
-                firestore_id: `interaction-sale-${sale.id}`,
-                client_id: dbClientId,
-                interaction_type: 'sale',
-                interaction_date: now,
-                amount: saleData.totalAmount,
-                description: `Sale: ${saleId}`,
-                related_id: sale.id,
-                related_table: 'sales',
-                status: 'completed'
-              })
-              .select()
-              .single();
+          // Create CRM interaction for the sale (unless it was already created during client auto-creation)
+          if (!skipCrmInteraction) {
+            try {
+              const { data: interaction, error: interactionError } = await supabase
+                .from('crm_interactions')
+                .insert({
+                  firestore_id: `interaction-sale-${sale.id}`,
+                  client_id: dbClientId,
+                  interaction_type: 'sale',
+                  interaction_date: now,
+                  amount: saleData.totalAmount,
+                  description: `Sale: ${saleId}`,
+                  related_id: sale.id,
+                  related_table: 'sales',
+                  status: 'completed'
+                })
+                .select()
+                .single();
 
-            if (interactionError) {
-              log.warn(`Failed to create CRM interaction:`, interactionError);
-            } else {
-              log.info(`Created CRM interaction for sale ${saleId}`);
+              if (interactionError) {
+                log.warn(`Failed to create CRM interaction:`, interactionError);
+              } else {
+                log.info(`Created CRM interaction for sale ${saleId}`);
+              }
+            } catch (interactionError) {
+              log.warn("Error creating CRM interaction", interactionError);
             }
-          } catch (interactionError) {
-            log.warn("Error creating CRM interaction", interactionError);
           }
         }
       } catch (crmError) {

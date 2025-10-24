@@ -1090,6 +1090,8 @@ export const createCRMClientFromSale = async (saleInfo: {
     name: string;
     phone: string;
     email?: string;
+    saleAmount?: number;
+    saleId?: string;
 }): Promise<CRMClient | null> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -1164,7 +1166,37 @@ export const createCRMClientFromSale = async (saleInfo: {
         }
 
         log.info(`Created new CRM client from sale: ${newClient.firestore_id}`);
-        return mapCRMClient(newClient);
+        const mappedClient = mapCRMClient(newClient);
+
+        // If sale information is provided, create the initial sale interaction
+        if (saleInfo.saleAmount !== undefined && saleInfo.saleAmount > 0) {
+            try {
+                const interactionFirestoreId = `interaction-sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const { error: interactionError } = await supabase
+                    .from(CRM_INTERACTIONS_TABLE)
+                    .insert({
+                        firestore_id: interactionFirestoreId,
+                        client_id: newClient.id, // Use the numeric BIGINT ID
+                        interaction_type: 'sale',
+                        interaction_date: now,
+                        amount: saleInfo.saleAmount,
+                        description: `Initial sale: ${saleInfo.saleId || 'POS'}`,
+                        related_table: 'sales',
+                        status: 'completed'
+                    });
+
+                if (interactionError) {
+                    log.warn(`Failed to create initial sale interaction for client ${newClient.firestore_id}:`, interactionError);
+                } else {
+                    log.info(`Created initial sale interaction for new client ${newClient.firestore_id}`);
+                    // Note: total_purchases will be updated by addSaleAndUpdateStock() to avoid duplication
+                }
+            } catch (interactionError) {
+                log.warn("Error creating initial sale interaction", interactionError);
+            }
+        }
+
+        return mappedClient;
 
     } catch (error) {
         log.error("Error in createCRMClientFromSale", error);
