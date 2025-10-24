@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Users, TrendingUp, DollarSign, Activity, Phone, Mail, Calendar, UserPlus } from "lucide-react";
+import { Users, TrendingUp, DollarSign, Activity, Phone, Mail, Calendar, UserPlus, ArrowLeft } from "lucide-react";
 import CRMClientList from "@/components/admin/crm/CRMClientList";
 import CRMClientForm from "@/components/admin/crm/CRMClientForm";
 import { getCRMStats } from "@/lib/services/crmClientService";
@@ -68,11 +70,19 @@ export default function CRMPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">CRM - Gestión de Clientes</h1>
-                <p className="text-muted-foreground">
-                    Administra toda la información de tus clientes y su historial de servicios
-                </p>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">CRM - Gestión de Clientes</h1>
+                    <p className="text-muted-foreground">
+                        Administra toda la información de tus clientes y su historial de servicios
+                    </p>
+                </div>
+                <Link href="/admin">
+                    <Button variant="outline" size="sm">
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Volver
+                    </Button>
+                </Link>
             </div>
 
             {/* Statistics */}
