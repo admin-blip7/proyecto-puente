@@ -31,30 +31,30 @@ const CRM_DOCUMENTS_TABLE = "crm_documents";
 const mapCRMClient = (row: any): CRMClient => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
-    clientCode: row?.clientcode ?? row?.clientCode ?? "",
-    identificationType: (row?.identificationtype ?? row?.identificationType ?? "cedula") as IdentificationType,
-    identificationNumber: row?.identificationnumber ?? row?.identificationNumber ?? "",
-    firstName: row?.firstname ?? row?.firstName ?? "",
-    lastName: row?.lastname ?? row?.lastName ?? "",
-    companyName: row?.companyname ?? row?.companyName ?? undefined,
+    clientCode: row?.client_code ?? row?.clientcode ?? row?.clientCode ?? "",
+    identificationType: (row?.identification_type ?? row?.identificationtype ?? row?.identificationType ?? "cedula") as IdentificationType,
+    identificationNumber: row?.identification_number ?? row?.identificationnumber ?? row?.identificationNumber ?? "",
+    firstName: row?.first_name ?? row?.firstname ?? row?.firstName ?? "",
+    lastName: row?.last_name ?? row?.lastname ?? row?.lastName ?? "",
+    companyName: row?.company_name ?? row?.companyname ?? row?.companyName ?? undefined,
     email: row?.email ?? undefined,
     phone: row?.phone ?? undefined,
-    secondaryPhone: row?.secondaryphone ?? row?.secondaryPhone ?? undefined,
+    secondaryPhone: row?.secondary_phone ?? row?.secondaryphone ?? row?.secondaryPhone ?? undefined,
     address: row?.address ?? undefined,
     city: row?.city ?? undefined,
     province: row?.province ?? undefined,
-    clientType: (row?.clienttype ?? row?.clientType ?? "particular") as ClientType,
-    clientStatus: (row?.clientstatus ?? row?.clientStatus ?? "active") as CRMClientStatus,
-    registrationDate: toDate(row?.registrationdate ?? row?.registrationDate),
-    lastContactDate: row?.lastcontactdate || row?.lastContactDate ? toDate(row?.lastcontactdate ?? row?.lastContactDate) : undefined,
-    totalPurchases: Number(row?.totalpurchases ?? row?.totalPurchases ?? 0),
-    outstandingBalance: Number(row?.outstandingbalance ?? row?.outstandingBalance ?? 0),
-    creditLimit: Number(row?.creditlimit ?? row?.creditLimit ?? 0),
+    clientType: (row?.client_type ?? row?.clienttype ?? row?.clientType ?? "particular") as ClientType,
+    clientStatus: (row?.client_status ?? row?.clientstatus ?? row?.clientStatus ?? "active") as CRMClientStatus,
+    registrationDate: toDate(row?.registration_date ?? row?.registrationdate ?? row?.registrationDate),
+    lastContactDate: row?.last_contact_date || row?.lastcontactdate || row?.lastContactDate ? toDate(row?.last_contact_date ?? row?.lastcontactdate ?? row?.lastContactDate) : undefined,
+    totalPurchases: Number(row?.total_purchases ?? row?.totalpurchases ?? row?.totalPurchases ?? 0),
+    outstandingBalance: Number(row?.outstanding_balance ?? row?.outstandingbalance ?? row?.outstandingBalance ?? 0),
+    creditLimit: Number(row?.credit_limit ?? row?.creditlimit ?? row?.creditLimit ?? 0),
     tags: row?.tags ?? [],
     notes: row?.notes ?? undefined,
-    createdBy: row?.createdby ?? row?.createdBy ?? undefined,
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
-    updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+    createdBy: row?.created_by ?? row?.createdby ?? row?.createdBy ?? undefined,
+    createdAt: toDate(row?.created_at ?? row?.createdat ?? row?.createdAt),
+    updatedAt: toDate(row?.updated_at ?? row?.updatedat ?? row?.updatedAt),
 });
 
 // Generate client code
@@ -70,9 +70,9 @@ const generateClientCode = async (): Promise<string> => {
     try {
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
-            .select("clientcode")
-            .like("clientcode", `${prefix}%`)
-            .order("clientcode", { ascending: false })
+            .select("client_code")
+            .like("client_code", `${prefix}%`)
+            .order("client_code", { ascending: false })
             .limit(1);
 
         if (error) throw error;
@@ -81,7 +81,7 @@ const generateClientCode = async (): Promise<string> => {
             return `${prefix}-0001`;
         }
 
-        const lastCode = data[0].clientcode;
+        const lastCode = data[0].client_code;
         const lastNumber = parseInt(lastCode.split("-")[2] || "0");
         const nextNumber = lastNumber + 1;
 
@@ -113,7 +113,7 @@ export const createCRMClient = async (
             const { data: existingClientByIdentification, error: checkError } = await supabase
                 .from(CRM_CLIENTS_TABLE)
                 .select("id")
-                .eq("identificationnumber", clientData.identificationNumber)
+                .eq("identification_number", clientData.identificationNumber)
                 .single();
                 
             if (existingClientByIdentification && !checkError) {
@@ -148,35 +148,35 @@ export const createCRMClient = async (
 
         const payload = {
             firestore_id: firestoreId,
-            clientcode: clientCode,
-            identificationtype: clientData.identificationType,
-            identificationnumber: clientData.identificationNumber,
-            firstname: clientData.firstName,
-            lastname: clientData.lastName,
-            companyname: clientData.companyName || null,
+            client_code: clientCode,
+            identification_type: clientData.identificationType,
+            identification_number: clientData.identificationNumber,
+            first_name: clientData.firstName,
+            last_name: clientData.lastName,
+            company_name: clientData.companyName || null,
             email: clientData.email || null,
             phone: clientData.phone || null,
-            secondaryphone: clientData.secondaryPhone || null,
+            secondary_phone: clientData.secondaryPhone || null,
             address: clientData.address || null,
             city: clientData.city || null,
             province: clientData.province || null,
-            clienttype: clientData.clientType,
-            clientstatus: clientData.clientStatus,
-            registrationdate: clientData.registrationDate ? clientData.registrationDate.toISOString() : new Date().toISOString(),
-            lastcontactdate: clientData.lastContactDate ? clientData.lastContactDate.toISOString() : null,
-            totalpurchases: 0,
-            outstandingbalance: 0,
-            creditlimit: clientData.creditLimit || 0,
+            client_type: clientData.clientType,
+            client_status: clientData.clientStatus,
+            registration_date: clientData.registrationDate ? clientData.registrationDate.toISOString() : new Date().toISOString(),
+            last_contact_date: clientData.lastContactDate ? clientData.lastContactDate.toISOString() : null,
+            total_purchases: 0,
+            outstanding_balance: 0,
+            credit_limit: clientData.creditLimit || 0,
             tags: clientData.tags || [],
             notes: clientData.notes || null,
-            createdby: userId,
-            createdat: now,
-            updatedat: now,
+            created_by: userId,
+            created_at: now,
+            updated_at: now,
         };
 
         log.info("Attempting to insert client with payload:", JSON.stringify({
             ...payload,
-            createdby: "[HIDDEN]" // Ocultar ID de usuario en logs
+            created_by: "[HIDDEN]" // Ocultar ID de usuario en logs
         }, null, 2));
 
         const { data, error, status, statusText } = await supabase
@@ -341,8 +341,8 @@ export const getCRMClientByIdentification = async (
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .eq("identificationtype", identificationType)
-            .eq("identificationnumber", identificationNumber)
+            .eq("identification_type", identificationType)
+            .eq("identification_number", identificationNumber)
             .single();
 
         if (error) {
@@ -389,7 +389,7 @@ export const updateCRMClient = async (
                     const { data: existingClient, error } = await supabase
                         .from(CRM_CLIENTS_TABLE)
                         .select("id")
-                        .eq("identificationnumber", updates.identificationNumber)
+                        .eq("identification_number", updates.identificationNumber)
                         .single();
                         
                     if (existingClient && !error) {
@@ -413,26 +413,26 @@ export const updateCRMClient = async (
         }
 
         const payload: any = {
-            updatedat: nowIso(),
+            updated_at: nowIso(),
         };
 
-        if (updates.identificationType !== undefined) payload.identificationtype = updates.identificationType;
-        if (updates.identificationNumber !== undefined) payload.identificationnumber = updates.identificationNumber;
-        if (updates.firstName !== undefined) payload.firstname = updates.firstName;
-        if (updates.lastName !== undefined) payload.lastname = updates.lastName;
-        if (updates.companyName !== undefined) payload.companyname = updates.companyName || null;
+        if (updates.identificationType !== undefined) payload.identification_type = updates.identificationType;
+        if (updates.identificationNumber !== undefined) payload.identification_number = updates.identificationNumber;
+        if (updates.firstName !== undefined) payload.first_name = updates.firstName;
+        if (updates.lastName !== undefined) payload.last_name = updates.lastName;
+        if (updates.companyName !== undefined) payload.company_name = updates.companyName || null;
         if (updates.email !== undefined) payload.email = updates.email || null;
         if (updates.phone !== undefined) payload.phone = updates.phone || null;
-        if (updates.secondaryPhone !== undefined) payload.secondaryphone = updates.secondaryPhone || null;
+        if (updates.secondaryPhone !== undefined) payload.secondary_phone = updates.secondaryPhone || null;
         if (updates.address !== undefined) payload.address = updates.address || null;
         if (updates.city !== undefined) payload.city = updates.city || null;
         if (updates.province !== undefined) payload.province = updates.province || null;
-        if (updates.clientType !== undefined) payload.clienttype = updates.clientType;
-        if (updates.clientStatus !== undefined) payload.clientstatus = updates.clientStatus;
-        if (updates.lastContactDate !== undefined) payload.lastcontactdate = updates.lastContactDate ? updates.lastContactDate.toISOString() : null;
-        if (updates.totalPurchases !== undefined) payload.totalpurchases = updates.totalPurchases;
-        if (updates.outstandingBalance !== undefined) payload.outstandingbalance = updates.outstandingBalance;
-        if (updates.creditLimit !== undefined) payload.creditlimit = updates.creditLimit;
+        if (updates.clientType !== undefined) payload.client_type = updates.clientType;
+        if (updates.clientStatus !== undefined) payload.client_status = updates.clientStatus;
+        if (updates.lastContactDate !== undefined) payload.last_contact_date = updates.lastContactDate ? updates.lastContactDate.toISOString() : null;
+        if (updates.totalPurchases !== undefined) payload.total_purchases = updates.totalPurchases;
+        if (updates.outstandingBalance !== undefined) payload.outstanding_balance = updates.outstandingBalance;
+        if (updates.creditLimit !== undefined) payload.credit_limit = updates.creditLimit;
         if (updates.tags !== undefined) payload.tags = updates.tags;
         if (updates.notes !== undefined) payload.notes = updates.notes || null;
 
