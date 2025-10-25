@@ -1,6 +1,7 @@
 import { Product } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from '@/lib/utils';
@@ -19,10 +20,47 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
     return "text-foreground";
   }
 
+  // Check if product has attributes and get display-worthy ones
+  const getDisplayAttributes = () => {
+    if (!product.attributes) return [];
+    
+    const attrs: Array<{ label: string; value: string }> = [];
+    
+    // Filter out empty/null/undefined values
+    Object.entries(product.attributes).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        // Format the key for display (color -> Color, memoria -> Memoria, etc.)
+        const label = key.charAt(0).toUpperCase() + key.slice(1);
+        attrs.push({ label, value: String(value) });
+      }
+    });
+    
+    return attrs;
+  };
+
+  const displayAttributes = getDisplayAttributes();
+  const hasAttributes = displayAttributes.length > 0;
+
   return (
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
       <CardContent className="p-3 text-center flex flex-col flex-1 justify-center">
         <h3 className="text-sm font-semibold tracking-tight leading-tight flex-1 mb-2">{product.name}</h3>
+        
+        {/* Conditionally render attributes if they exist */}
+        {hasAttributes && (
+          <div className="flex flex-wrap gap-1 justify-center mb-2">
+            {displayAttributes.map((attr, index) => (
+              <Badge 
+                key={index} 
+                variant="secondary" 
+                className="text-[10px] px-1.5 py-0.5 font-normal"
+              >
+                {attr.label}: {attr.value}
+              </Badge>
+            ))}
+          </div>
+        )}
+        
         <div className={cn("flex items-center justify-center gap-1 mt-1 font-medium", getStockColor())}>
             <Package className="w-3 h-3" />
             <span className="text-xs">{product.stock} en Stock</span>
