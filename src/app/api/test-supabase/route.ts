@@ -23,8 +23,8 @@ export async function GET() {
 
     // Probar conexión simple
     const { data, error } = await supabase
-      .from 'profiles'
-      .select('count')
+      .from('profiles')
+      .select('*')
       .limit(1)
 
     if (error) {
