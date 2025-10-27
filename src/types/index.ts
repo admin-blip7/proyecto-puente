@@ -86,6 +86,8 @@ export interface SaleItem {
   consignorId?: string;
 }
 
+export type SaleStatus = 'completed' | 'cancelled';
+
 export interface Sale {
   id: string;
   saleId: string;
@@ -99,6 +101,10 @@ export interface Sale {
   customerEmail?: string | null;
   createdAt: Date;
   sessionId?: string;
+  status?: SaleStatus;
+  cancelledAt?: Date;
+  cancelledBy?: string;
+  cancelReason?: string;
 }
 
 export interface Warranty {

@@ -23,15 +23,28 @@ const mapSale = (row: any): Sale => ({
   customerName: row?.customerName ?? null,
   customerPhone: row?.customerPhone ?? null,
   createdAt: toDate(row?.created_at ?? row?.createdAt), // Usar created_at primero
+  status: row?.status ?? "completed",
+  cancelledAt: row?.cancelled_at ? toDate(row.cancelled_at) : undefined,
+  cancelledBy: row?.cancelled_by ?? undefined,
+  cancelReason: row?.cancel_reason ?? undefined,
 });
 
-export const getSales = async (): Promise<Sale[]> => {
+export const getSales = async (includeStatus?: 'all' | 'completed' | 'cancelled'): Promise<Sale[]> => {
   try {
     const supabase = getSupabaseServerClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from(SALES_TABLE)
-      .select("*")
-      .order("createdAt", { ascending: false });
+      .select("*");
+
+    // Filter by status unless 'all' is specified
+    if (includeStatus === 'cancelled') {
+      query = query.eq('status', 'cancelled');
+    } else if (includeStatus !== 'all') {
+      // Default: only return completed (non-cancelled) sales
+      query = query.or('status.is.null,status.eq.completed');
+    }
+
+    const { data, error } = await query.order("createdAt", { ascending: false });
 
     if (error) {
       log.error("Database error fetching sales", error);
@@ -142,6 +155,7 @@ export const addSaleAndUpdateStock = async (
       customerName: sale.customerName,
       customerPhone: sale.customerPhone,
       createdAt: sale.createdAt,
+      status: 'completed',
     };
 
     log.info(`Sale record to insert:`, {
@@ -382,6 +396,86 @@ export const addSaleAndUpdateStock = async (
 
   } catch (error) {
     log.error("Error in addSaleAndUpdateStock", error);
+    throw error;
+  }
+};
+
+export interface CancelSalesResult {
+  saleId: string;
+  success: boolean;
+  errorMessage?: string;
+}
+
+export interface CancelSalesResponse {
+  results: CancelSalesResult[];
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+}
+
+/**
+ * Cancel one or multiple sales, restore inventory, adjust consignor balances, and log the reversal
+ * @param saleIds - Array of sale IDs to cancel
+ * @param performedBy - User ID who is performing the cancellation
+ * @param performedByName - User name who is performing the cancellation
+ * @param cancelReason - Optional reason for cancellation
+ * @returns Object with per-sale results and summary statistics
+ */
+export const cancelSales = async (
+  saleIds: string[],
+  performedBy: string,
+  performedByName: string,
+  cancelReason?: string
+): Promise<CancelSalesResponse> => {
+  try {
+    const supabase = getSupabaseServerClient();
+
+    log.info(`Cancelling ${saleIds.length} sale(s)`, {
+      saleIds,
+      performedBy,
+      performedByName,
+      cancelReason
+    });
+
+    // Call the stored procedure
+    const { data, error } = await supabase.rpc('cancel_sales', {
+      p_sale_ids: saleIds,
+      p_user_id: performedBy,
+      p_user_name: performedByName,
+      p_cancel_reason: cancelReason || null
+    });
+
+    if (error) {
+      log.error("Error calling cancel_sales stored procedure", error);
+      throw new Error(`Failed to cancel sales: ${error.message}`);
+    }
+
+    // Process the results
+    const results: CancelSalesResult[] = (data || []).map((row: any) => ({
+      saleId: row.sale_id,
+      success: row.success,
+      errorMessage: row.error_message || undefined
+    }));
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    log.info(`Cancellation complete: ${successCount} succeeded, ${failureCount} failed`, {
+      results
+    });
+
+    // Invalidate caches or refresh data if needed
+    // For now, we rely on the calling code to refresh as needed
+
+    return {
+      results,
+      totalProcessed: results.length,
+      successCount,
+      failureCount
+    };
+
+  } catch (error) {
+    log.error("Error in cancelSales", error);
     throw error;
   }
 };
