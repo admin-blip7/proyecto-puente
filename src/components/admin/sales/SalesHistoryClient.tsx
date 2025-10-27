@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3 } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3, Trash2, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
@@ -25,6 +25,19 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useRouter } from "next/navigation";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { getCurrentUser } from "@/lib/supabaseClientWithAuth";
 
 
 interface SalesHistoryClientProps {
@@ -61,6 +74,12 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const [sortField, setSortField] = useState<keyof Sale | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
+  
+  // Selection state
+  const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelProgress, setCancelProgress] = useState(0);
 
   const handleOpenWarrantyDialog = (sale: Sale) => {
     setSelectedSale(sale);
@@ -196,6 +215,125 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     });
   }, [sortedSales, excludeFamiliar, getProduct]);
 
+  // Calculate select all checkbox state
+  const selectAllState = useMemo(() => {
+    const visibleSaleIds = filteredSales.map(sale => sale.saleId);
+    const selectedVisible = visibleSaleIds.filter(id => selectedSaleIds.has(id));
+    
+    if (selectedVisible.length === 0) {
+      return { checked: false, indeterminate: false };
+    } else if (selectedVisible.length === visibleSaleIds.length) {
+      return { checked: true, indeterminate: false };
+    } else {
+      return { checked: false, indeterminate: true };
+    }
+  }, [filteredSales, selectedSaleIds]);
+
+  // Selection handlers
+  const handleSelectSale = (saleId: string, checked: boolean) => {
+    setSelectedSaleIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(saleId);
+      } else {
+        newSet.delete(saleId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedSaleIds(new Set(filteredSales.map(sale => sale.saleId)));
+    } else {
+      setSelectedSaleIds(new Set());
+    }
+  };
+
+  const handleCancelSales = async () => {
+    if (selectedSaleIds.size === 0) return;
+
+    setIsCancelling(true);
+    setCancelProgress(0);
+
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener la información del usuario",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const response = await fetch('/api/sales/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          saleIds: Array.from(selectedSaleIds),
+          userId: user.id,
+          userName: user.email || 'Usuario desconocido'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cancelar las ventas');
+      }
+
+      // Update progress
+      setCancelProgress(100);
+
+      // Remove successful cancellations from the local state
+      const successfulIds = data.results
+        .filter((r: any) => r.success)
+        .map((r: any) => r.saleId);
+
+      setSales(prevSales => 
+        prevSales.filter(sale => !successfulIds.includes(sale.saleId))
+      );
+
+      // Clear selection
+      setSelectedSaleIds(new Set());
+
+      // Show feedback
+      if (data.summary.failed > 0) {
+        const failedSales = data.results
+          .filter((r: any) => !r.success)
+          .map((r: any) => r.saleId)
+          .join(', ');
+
+        toast({
+          title: "Cancelación parcial",
+          description: `${data.summary.successful} ventas canceladas. Fallaron: ${failedSales}`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Éxito",
+          description: `${data.summary.successful} ventas canceladas exitosamente`,
+        });
+      }
+
+      setIsCancelDialogOpen(false);
+
+    } catch (error: any) {
+      console.error('Error cancelling sales:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Error al cancelar las ventas",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCancelling(false);
+      setCancelProgress(0);
+    }
+  };
+
   // Debug: Log sales data to check for invalid keys and duplicates
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -294,6 +432,39 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         </div>
       </div>
 
+      {/* Bulk action toolbar */}
+      {selectedSaleIds.size > 0 && (
+        <Card className="mb-4 border-destructive">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-base px-3 py-1">
+                  {selectedSaleIds.size} {selectedSaleIds.size === 1 ? 'venta seleccionada' : 'ventas seleccionadas'}
+                </Badge>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setIsCancelDialogOpen(true)}
+                disabled={isCancelling}
+                className="gap-2"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cancelando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Cancelar ventas
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
        <div className="grid gap-4 md:grid-cols-2 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -327,6 +498,13 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 <Table>
                 <TableHeader>
                     <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={selectAllState.indeterminate ? "indeterminate" : selectAllState.checked}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Seleccionar todas las ventas"
+                      />
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead>
                       <SortableHeader field="saleId">ID Venta</SortableHeader>
@@ -358,6 +536,13 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                       return (
                       <Fragment key={uniqueKey}>
                           <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedSaleIds.has(sale.saleId)}
+                                    onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
+                                    aria-label={`Seleccionar venta ${sale.saleId}`}
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon">
                                       {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -398,7 +583,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                             </TableRow>
                             {openCollapsibles[collapsibleKey] && (
                               <TableRow>
-                                  <TableCell colSpan={8} className="p-0 border-0">
+                                  <TableCell colSpan={9} className="p-0 border-0">
                                       <div className="p-4 bg-muted/50">
                                         <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
                                         <Table>
@@ -445,6 +630,47 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Confirmation dialog for canceling sales */}
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar ventas seleccionadas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Está a punto de cancelar {selectedSaleIds.size} {selectedSaleIds.size === 1 ? 'venta' : 'ventas'}.
+              Esta acción restaurará el inventario de los productos vendidos y revertirá los balances de consignadores si aplica.
+              <br /><br />
+              <strong>Esta acción no se puede deshacer.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {isCancelling && cancelProgress > 0 && (
+            <div className="space-y-2">
+              <Progress value={cancelProgress} className="w-full" />
+              <p className="text-sm text-muted-foreground text-center">
+                Cancelando ventas...
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelSales}
+              disabled={isCancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelando...
+                </>
+              ) : (
+                'Confirmar Cancelación'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {selectedSale && (
         <CreateWarrantyDialog
             isOpen={isWarrantyDialogOpen}
