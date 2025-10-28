@@ -6,7 +6,7 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const getSupabaseServerClient = () => {
   if (!supabaseUrl || !serviceRoleKey) {
-    // En desarrollo, es normal usar el cliente anónimo si no hay SERVICE_ROLE_KEY
+    // En desarrollo o build, es normal usar el cliente anónimo si no hay SERVICE_ROLE_KEY
     if (process.env.NODE_ENV === 'development') {
       console.log("🔧 Development mode: Using anon key for Supabase (SERVICE_ROLE_KEY not available)");
     } else {

@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { getProducts } from '@/lib/services/productService';
 
+// Force dynamic rendering to avoid build-time data fetching issues
+export const dynamic = 'force-dynamic';
+
 export default async function POSPage() {
   const initialProducts = await getProducts();
   return (
