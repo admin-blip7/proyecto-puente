@@ -46,10 +46,11 @@ export default function DeleteProductsDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error deleting products:", error);
+      const errorMessage = error instanceof Error ? error.message : "No se pudieron eliminar los productos.";
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "No se pudieron eliminar los productos.",
+        title: "Error al Eliminar",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);

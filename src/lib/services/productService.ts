@@ -460,15 +460,75 @@ export const processStockEntry = async (
 export const deleteProducts = async (productIds: string[]): Promise<void> => {
   if (!productIds.length) return;
   const supabase = getSupabaseServerClient();
-  const { error } = await supabase
+  
+  // First, get the actual firestore_id and id for the products to be deleted
+  const { data: productsToDelete, error: fetchError } = await supabase
     .from(PRODUCTS_TABLE)
-    .delete()
-    .in("firestore_id", productIds);
+    .select('id, firestore_id, name')
+    .or(`id.in.(${productIds.join(',')}),firestore_id.in.(${productIds.join(',')})`);
 
-  if (error) {
-    log.error("Error deleting products", error);
-    throw new Error("Failed to delete products.");
+  if (fetchError) {
+    log.error("Error fetching products for deletion", fetchError);
+    throw new Error("Failed to fetch products for deletion.");
   }
+
+  if (!productsToDelete || productsToDelete.length === 0) {
+    log.warn("No products found to delete", { productIds });
+    throw new Error("No se encontraron productos para eliminar.");
+  }
+
+  // Extract both id and firestore_id for deletion
+  const idsToDelete = productsToDelete.map(p => p.id).filter(Boolean);
+  const firestoreIdsToDelete = productsToDelete.map(p => p.firestore_id).filter(Boolean);
+
+  let deletionError = null;
+  let deletedCount = 0;
+
+  // Try to delete by UUID id first
+  if (idsToDelete.length > 0) {
+    const { error, count } = await supabase
+      .from(PRODUCTS_TABLE)
+      .delete({ count: 'exact' })
+      .in('id', idsToDelete);
+
+    if (error) {
+      deletionError = error;
+      log.error("Error deleting products by id", error);
+    } else {
+      deletedCount += count || 0;
+    }
+  }
+
+  // Try to delete by firestore_id if there are any left
+  if (firestoreIdsToDelete.length > 0) {
+    const { error, count } = await supabase
+      .from(PRODUCTS_TABLE)
+      .delete({ count: 'exact' })
+      .in('firestore_id', firestoreIdsToDelete);
+
+    if (error) {
+      deletionError = error;
+      log.error("Error deleting products by firestore_id", error);
+    } else {
+      deletedCount += count || 0;
+    }
+  }
+
+  if (deletionError) {
+    throw new Error("Failed to delete products: " + deletionError.message);
+  }
+
+  // Check if we expected to delete more than we actually deleted
+  if (deletedCount < productIds.length) {
+    const remainingCount = productIds.length - deletedCount;
+    log.warn(`Some products (${remainingCount}) could not be deleted, possibly due to dependencies`);
+    throw new Error(`No se pudieron eliminar ${remainingCount} producto(s). Es posible que tengan dependencias como ventas o registros asociados.`);
+  }
+
+  log.info(`Successfully deleted ${deletedCount} products`, { 
+    requestedIds: productIds,
+    foundProducts: productsToDelete.map(p => ({ id: p.id, firestore_id: p.firestore_id, name: p.name }))
+  });
 };
 
 export const bulkUpdateProducts = async (
