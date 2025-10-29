@@ -385,6 +385,7 @@ export const generateAndPrintLabels = async (
                     padding: 0;
                     display: inline-block;
                     vertical-align: top;
+                    page-break-after: always;
                 }
                 .label-canvas:last-child {
                     page-break-after: auto;
