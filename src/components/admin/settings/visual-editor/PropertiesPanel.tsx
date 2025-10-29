@@ -178,6 +178,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const showBarcodeValue = selectedElement.showValue !== false;
   const qrPlaceholder = selectedElement.qrPlaceholderKey ?? 'sku';
 
+  const isSideways = selectedElement.rotation === 90 || selectedElement.rotation === 270;
+  const widthLabel = isSideways ? 'Alto (mm)' : 'Ancho (mm)';
+  const heightLabel = isSideways ? 'Ancho (mm)' : 'Alto (mm)';
+
   return (
     <div className="space-y-4 text-sm">
       <div className="space-y-1">
@@ -380,37 +384,37 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label htmlFor="width">Ancho (mm)</Label>
+          <Label htmlFor="width">{widthLabel}</Label>
           <Input
             id="width"
             type="number"
             step="0.5"
             min="5"
-            value={draftWidth}
-            onChange={handleDimensionChange('width')}
-            onBlur={commitDimension('width')}
+            value={isSideways ? draftHeight : draftWidth}
+            onChange={handleDimensionChange(isSideways ? 'height' : 'width')}
+            onBlur={commitDimension(isSideways ? 'height' : 'width')}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                commitDimension('width')();
+                commitDimension(isSideways ? 'height' : 'width')();
               }
             }}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="height">Alto (mm)</Label>
+          <Label htmlFor="height">{heightLabel}</Label>
           <Input
             id="height"
             type="number"
             step="0.5"
             min="5"
-            value={draftHeight}
-            onChange={handleDimensionChange('height')}
-            onBlur={commitDimension('height')}
+            value={isSideways ? draftWidth : draftHeight}
+            onChange={handleDimensionChange(isSideways ? 'width' : 'height')}
+            onBlur={commitDimension(isSideways ? 'width' : 'height')}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                commitDimension('height')();
+                commitDimension(isSideways ? 'width' : 'height')();
               }
             }}
           />
