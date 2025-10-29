@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient';
 import { nanoid } from 'nanoid';
-import { Loader2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown, RotateCw } from 'lucide-react';
 
 interface PropertiesPanelProps {
   selectedElement: VisualElement | null;
@@ -48,6 +48,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const [draftWidth, setDraftWidth] = useState('');
   const [draftHeight, setDraftHeight] = useState('');
   const [draftFontSize, setDraftFontSize] = useState('');
+  const [draftRotation, setDraftRotation] = useState('');
 
   const placeholderMeta = useMemo(() => {
     if (!selectedElement?.placeholderKey) return undefined;
@@ -59,29 +60,33 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       setDraftWidth('');
       setDraftHeight('');
       setDraftFontSize('');
+      setDraftRotation('');
       return;
     }
     setDraftWidth(selectedElement.width !== undefined ? String(selectedElement.width) : '');
     setDraftHeight(selectedElement.height !== undefined ? String(selectedElement.height) : '');
     setDraftFontSize(selectedElement.fontSize !== undefined ? String(selectedElement.fontSize) : '');
+    setDraftRotation(selectedElement.rotation !== undefined ? String(selectedElement.rotation) : '0');
   }, [selectedElement]);
 
-  const handleDimensionChange = (field: 'width' | 'height' | 'fontSize') =>
+  const handleDimensionChange = (field: 'width' | 'height' | 'fontSize' | 'rotation') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const value = event.target.value;
       if (field === 'width') setDraftWidth(value);
       if (field === 'height') setDraftHeight(value);
       if (field === 'fontSize') setDraftFontSize(value);
+      if (field === 'rotation') setDraftRotation(value);
     };
 
-  const commitDimension = (field: 'width' | 'height' | 'fontSize') => () => {
+  const commitDimension = (field: 'width' | 'height' | 'fontSize' | 'rotation') => () => {
     if (!selectedElement) return;
-    const raw = field === 'width' ? draftWidth : field === 'height' ? draftHeight : draftFontSize;
+    const raw = field === 'width' ? draftWidth : field === 'height' ? draftHeight : field === 'fontSize' ? draftFontSize : draftRotation;
     const parsed = parseFloat(raw);
     if (Number.isNaN(parsed)) {
       setDraftWidth(selectedElement.width !== undefined ? String(selectedElement.width) : '');
       setDraftHeight(selectedElement.height !== undefined ? String(selectedElement.height) : '');
       setDraftFontSize(selectedElement.fontSize !== undefined ? String(selectedElement.fontSize) : '');
+      setDraftRotation(selectedElement.rotation !== undefined ? String(selectedElement.rotation) : '0');
       return;
     }
     onUpdateElement(selectedElement.id, { [field]: parsed });
@@ -207,6 +212,83 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <ChevronDown className="h-3 w-3" />
             Al fondo
           </Button>
+        </div>
+      </div>
+
+      {/* Rotation Controls */}
+      <div className="space-y-2">
+        <Label htmlFor="rotation">
+          <div className="flex items-center gap-1.5">
+            <RotateCw className="h-3.5 w-3.5" />
+            Rotación
+          </div>
+        </Label>
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={draftRotation === '0' ? 'default' : 'outline'}
+            onClick={() => {
+              setDraftRotation('0');
+              onUpdateElement(selectedElement.id, { rotation: 0 });
+            }}
+          >
+            0°
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={draftRotation === '90' ? 'default' : 'outline'}
+            onClick={() => {
+              setDraftRotation('90');
+              onUpdateElement(selectedElement.id, { rotation: 90 });
+            }}
+          >
+            90°
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={draftRotation === '180' ? 'default' : 'outline'}
+            onClick={() => {
+              setDraftRotation('180');
+              onUpdateElement(selectedElement.id, { rotation: 180 });
+            }}
+          >
+            180°
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={draftRotation === '270' ? 'default' : 'outline'}
+            onClick={() => {
+              setDraftRotation('270');
+              onUpdateElement(selectedElement.id, { rotation: 270 });
+            }}
+          >
+            270°
+          </Button>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="rotation" className="text-xs text-muted-foreground">
+            Ángulo personalizado (grados)
+          </Label>
+          <Input
+            id="rotation"
+            type="number"
+            step="1"
+            min="0"
+            max="360"
+            value={draftRotation}
+            onChange={handleDimensionChange('rotation')}
+            onBlur={commitDimension('rotation')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitDimension('rotation')();
+              }
+            }}
+          />
         </div>
       </div>
 

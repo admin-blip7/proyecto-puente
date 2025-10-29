@@ -135,7 +135,10 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
   if (element.fontWeight) parts.push(`font-weight:${element.fontWeight}`);
   if (element.color) parts.push(`color:${element.color}`);
   if (element.backgroundColor) parts.push(`background-color:${element.backgroundColor}`);
-  if (element.rotation) parts.push(`transform:rotate(${element.rotation}deg)`);
+  if (element.rotation) {
+    parts.push(`transform:rotate(${element.rotation}deg)`);
+    parts.push(`transform-origin:center center`);
+  }
 
   return parts.join(';');
 };
