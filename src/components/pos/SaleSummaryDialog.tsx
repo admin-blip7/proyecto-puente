@@ -85,12 +85,17 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
     if (isAndroid) {
         const plainTextTicket = generatePlainTextTicket(sale, settings);
         try {
-            const encodedText = encodeURIComponent(plainTextTicket);
-            const rawBtUrl = `rawbt:${encodedText}`;
-            window.open(rawBtUrl, '_blank');
+            if (navigator.share) {
+                await navigator.share({
+                    title: `Recibo Venta ${sale.saleId}`,
+                    text: plainTextTicket,
+                });
+            } else {
+                alert("La API para compartir no está disponible en este navegador. Copia el texto manualmente.");
+            }
         } catch (error) {
-            console.error("Error al abrir RAW BT:", error);
-            alert("No se pudo abrir la aplicación de impresión RAW BT. Asegúrate de que esté instalada.");
+            console.error("Error al compartir:", error);
+            alert("No se pudo abrir el diálogo para compartir/imprimir.");
         }
     } else {
         // Standard HTML printing for other devices
