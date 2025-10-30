@@ -232,7 +232,8 @@ CREATE TABLE sales (
   customer_name text,
   customer_phone text,
   created_at timestamptz DEFAULT now(),
-  session_id text
+  session_id text,
+  status TEXT DEFAULT 'completed' CHECK (status IN ('completed', 'cancelled'))
 );
 ```
 

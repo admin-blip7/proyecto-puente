@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { getLogger } from "@/lib/logger";
 import { nowIso } from "@/lib/supabase/utils";
@@ -159,18 +160,24 @@ export async function POST(request: Request) {
           }
         }
 
-        // Delete the sale
-        const { error: deleteError } = await supabase
+        // Mark the sale as cancelled
+        const { error: updateError } = await supabase
           .from('sales')
-          .delete()
+          .update({
+            status: 'cancelled',
+            cancelled_at: now,
+            cancelled_by: userId,
+            cancel_reason: 'Cancelled by user',
+            updated_at: now,
+          })
           .eq('saleId', saleId);
 
-        if (deleteError) {
-          log.error(`Error deleting sale ${saleId}:`, deleteError);
+        if (updateError) {
+          log.error(`Error updating sale ${saleId}:`, updateError);
           results.push({
             saleId,
             success: false,
-            error: 'Error al eliminar la venta'
+            error: 'Error al actualizar la venta',
           });
           continue;
         }
