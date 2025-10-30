@@ -80,68 +80,49 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
   const handlePrint = async () => {
     if (!settings) return;
 
-    const isAndroid = /android/i.test(navigator.userAgent);
+    // Standard HTML printing for all devices
+    const printContent = printAreaRef.current?.innerHTML;
+    if (printContent) {
+        const printWindow = window.open('', '', 'height=800,width=400');
+        if (printWindow) {
+            printWindow.document.write('<html><head><title>Recibo de Venta</title>');
+            printWindow.document.write(`
+              <style>
+                body { font-family: 'Courier New', Courier, monospace; margin: 0; }
+                .ticket-preview { width: 80mm; background-color: white; color: black; padding: 12px; font-size: 14px; }
+                .text-center { text-align: center; }
+                .space-y-1 > * + * { margin-top: 0.25rem; }
+                .mb-4 { margin-bottom: 1rem; }
+                .font-bold { font-weight: 700; }
+                .text-lg { font-size: 1.125rem; }
+                hr { border-style: dashed; border-color: black; margin-top: 0.5rem; margin-bottom: 0.5rem; border-top-width: 1px; }
+                table { width: 100%; }
+                .pb-1 { padding-bottom: 0.25rem; }
+                .text-left { text-align: left; }
+                .text-right { text-align: right; }
+                .align-top { vertical-align: top; }
+                .space-y-1 > * + * { margin-top: 0.25rem; }
+                .pt-1 { padding-top: 0.25rem; }
+                .flex { display: flex; }
+                .justify-between { justify-content: space-between; }
+                .justify-center { justify-content: center; }
+                .mt-4 { margin-top: 1rem; }
+                .pt-2 { padding-top: 0.5rem; }
+                .text-xs { font-size: 0.75rem; }
+                .text-sm { font-size: 0.875rem; }
+                .text-base { font-size: 1rem; }
+              </style>
+            `);
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(printContent);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
 
-    if (isAndroid) {
-        const plainTextTicket = generatePlainTextTicket(sale, settings);
-        try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: `Recibo Venta ${sale.saleId}`,
-                    text: plainTextTicket,
-                });
-            } else {
-                alert("La API para compartir no está disponible en este navegador. Copia el texto manualmente.");
-            }
-        } catch (error) {
-            console.error("Error al compartir:", error);
-            alert("No se pudo abrir el diálogo para compartir/imprimir.");
-        }
-    } else {
-        // Standard HTML printing for other devices
-        const printContent = printAreaRef.current?.innerHTML;
-        if (printContent) {
-            const printWindow = window.open('', '', 'height=800,width=400');
-            if (printWindow) {
-                printWindow.document.write('<html><head><title>Recibo de Venta</title>');
-                printWindow.document.write(`
-                  <style>
-                    body { font-family: 'Courier New', Courier, monospace; margin: 0; }
-                    .ticket-preview { width: 80mm; background-color: white; color: black; padding: 12px; font-size: 14px; }
-                    .text-center { text-align: center; }
-                    .space-y-1 > * + * { margin-top: 0.25rem; }
-                    .mb-4 { margin-bottom: 1rem; }
-                    .font-bold { font-weight: 700; }
-                    .text-lg { font-size: 1.125rem; }
-                    hr { border-style: dashed; border-color: black; margin-top: 0.5rem; margin-bottom: 0.5rem; border-top-width: 1px; }
-                    table { width: 100%; }
-                    .pb-1 { padding-bottom: 0.25rem; }
-                    .text-left { text-align: left; }
-                    .text-right { text-align: right; }
-                    .align-top { vertical-align: top; }
-                    .space-y-1 > * + * { margin-top: 0.25rem; }
-                    .pt-1 { padding-top: 0.25rem; }
-                    .flex { display: flex; }
-                    .justify-between { justify-content: space-between; }
-                    .justify-center { justify-content: center; }
-                    .mt-4 { margin-top: 1rem; }
-                    .pt-2 { padding-top: 0.5rem; }
-                    .text-xs { font-size: 0.75rem; }
-                    .text-sm { font-size: 0.875rem; }
-                    .text-base { font-size: 1rem; }
-                  </style>
-                `);
-                printWindow.document.write('</head><body>');
-                printWindow.document.write(printContent);
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                
-                setTimeout(() => {
-                  printWindow.print();
-                  printWindow.close();
-                }, 250);
-            }
+            setTimeout(() => {
+              printWindow.print();
+              printWindow.close();
+            }, 250);
         }
     }
   };
