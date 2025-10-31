@@ -10,6 +10,8 @@ export type PlaceholderKey =
   | 'ownershipType'
   | 'consignorName'
   | 'supplierName'
+  | 'category'
+  | 'attribute'
   | 'printDate'
   | 'printDateTime'
   | 'storeName'
@@ -44,6 +46,8 @@ export const LABEL_PLACEHOLDERS: PlaceholderDefinition[] = [
   { key: 'ownershipType', label: 'Tipo de Propiedad', token: '{Tipo de Propiedad}', kind: 'text' },
   { key: 'consignorName', label: 'Nombre del Consignador', token: '{Nombre del Consignador}', kind: 'text' },
   { key: 'supplierName', label: 'Nombre del Proveedor', token: '{Nombre del Proveedor}', kind: 'text' },
+  { key: 'category', label: 'Categoría', token: '{Categoría}', kind: 'text' },
+  { key: 'attribute', label: 'Atributo Específico', token: '{attr:nombre_del_atributo}', kind: 'text', helperText: 'Reemplaza "nombre_del_atributo" con el nombre del atributo que deseas mostrar. Por ejemplo: {attr:memoria} o {attr:color}.' },
   
   // Repair placeholders
   { key: 'orderId', label: 'ID de Orden', token: '{ID de Orden}', kind: 'text' },

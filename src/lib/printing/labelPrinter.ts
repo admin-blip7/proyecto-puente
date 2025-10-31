@@ -71,6 +71,8 @@ const formatPlaceholderValue = (
       return item.product.consignorName ?? '';
     case 'supplierName':
       return item.product.supplierName ?? '';
+    case 'category':
+      return item.product.category ?? '';
     case 'printDate':
       return context.dateFormatter.format(context.now);
     case 'printDateTime':
@@ -93,12 +95,25 @@ const replaceTokensInContent = (
   context: RenderContext
 ) => {
   let result = content;
+
+  // Handle standard placeholders
   tokenToPlaceholder.forEach((key, token) => {
     if (result.includes(token)) {
       const replacement = formatPlaceholderValue(key, item, settings, context);
       result = result.split(token).join(replacement);
     }
   });
+
+  // Handle dynamic attributes like {attr:color}
+  result = result.replace(/{attr:(.*?)}/g, (match, attributeName) => {
+    const cleanAttributeName = attributeName.trim();
+    if (item.product.attributes && typeof item.product.attributes === 'object') {
+      const attributeValue = item.product.attributes[cleanAttributeName];
+      return attributeValue !== undefined ? String(attributeValue) : '';
+    }
+    return ''; // Return empty if attributes are not available
+  });
+
   return result;
 };
 

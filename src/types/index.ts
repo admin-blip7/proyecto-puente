@@ -382,6 +382,8 @@ export interface LabelPrintProductContext {
     ownershipType?: OwnershipType;
     consignorName?: string;
     supplierName?: string;
+    category?: string;
+    attributes?: Record<string, any>;
 }
 
 export interface LabelPrintItem {
