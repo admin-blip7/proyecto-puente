@@ -307,6 +307,11 @@ export interface CashSession {
 }
 
 export const TicketSettingsSchema = z.object({
+  paperWidth: z.coerce.number().default(80),
+  fontStyle: z.object({
+    bold: z.boolean().default(false),
+    italic: z.boolean().default(false),
+  }).default({}),
   header: z.object({
     showLogo: z.boolean(),
     logoUrl: z.string().url().or(z.literal("")).optional(),
