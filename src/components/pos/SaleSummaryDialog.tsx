@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, X, Loader2 } from "lucide-react";
+import { Printer, X, Loader2 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { Sale, TicketSettings } from "@/types";
 import { getTicketSettings } from "@/lib/services/settingsService";
@@ -49,7 +49,7 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
 
       const imgData = canvas.toDataURL('image/png');
 
-      const pdfWidth = 80;
+      const pdfWidth = 58;
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
       const pdf = new jsPDF({
@@ -59,7 +59,11 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
       });
 
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`recibo-${sale.saleId}.pdf`);
+
+      // Auto print
+      pdf.autoPrint();
+      const pdfBlob = pdf.output('bloburl');
+      window.open(pdfBlob.toString(), '_blank');
 
     } catch (error) {
         console.error("Error al generar el PDF:", error);
@@ -97,9 +101,9 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
             {isGeneratingPdf ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Download className="mr-2 h-4 w-4" />
+              <Printer className="mr-2 h-4 w-4" />
             )}
-            Descargar PDF
+            Imprimir Recibo
           </Button>
         </DialogFooter>
       </DialogContent>
