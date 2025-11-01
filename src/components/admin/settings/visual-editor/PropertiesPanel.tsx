@@ -390,13 +390,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             type="number"
             step="0.5"
             min="5"
-            value={isSideways ? draftHeight : draftWidth}
-            onChange={handleDimensionChange(isSideways ? 'height' : 'width')}
-            onBlur={commitDimension(isSideways ? 'height' : 'width')}
+            value={draftWidth}
+            onChange={handleDimensionChange('width')}
+            onBlur={commitDimension('width')}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                commitDimension(isSideways ? 'height' : 'width')();
+                commitDimension('width')();
               }
             }}
           />
@@ -408,13 +408,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             type="number"
             step="0.5"
             min="5"
-            value={isSideways ? draftWidth : draftHeight}
-            onChange={handleDimensionChange(isSideways ? 'width' : 'height')}
-            onBlur={commitDimension(isSideways ? 'width' : 'height')}
+            value={draftHeight}
+            onChange={handleDimensionChange('height')}
+            onBlur={commitDimension('height')}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                commitDimension(isSideways ? 'width' : 'height')();
+                commitDimension('height')();
               }
             }}
           />

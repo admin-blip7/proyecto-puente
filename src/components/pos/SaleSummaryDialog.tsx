@@ -18,51 +18,6 @@ interface SaleSummaryDialogProps {
   sale: Sale;
 }
 
-// Helper to generate plain text for Android printing
-const generatePlainTextTicket = (sale: Sale, settings: TicketSettings): string => {
-    let text = "";
-    const separator = "-".repeat(40) + "\n";
-
-    // Header
-    if (settings.header.show.storeName && settings.header.storeName) text += `${settings.header.storeName}\n`;
-    if (settings.header.show.address && settings.header.address) text += `${settings.header.address}\n`;
-    if (settings.header.show.phone && settings.header.phone) text += `Tel: ${settings.header.phone}\n`;
-    if (settings.header.show.rfc && settings.header.rfc) text += `RFC: ${settings.header.rfc}\n`;
-    text += separator;
-
-    // Sale Info
-    text += `Folio: ${sale.saleId}\n`;
-    text += `Fecha: ${format(sale.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}\n`;
-    text += `Cajero: ${sale.cashierName}\n`;
-    if (sale.customerName) text += `Cliente: ${sale.customerName}\n`;
-    text += separator;
-
-    // Items
-    text += "CANT  PRODUCTO             IMPORTE\n";
-    sale.items.forEach(item => {
-        const name = item.name.substring(0, 20).padEnd(20);
-        const price = formatCurrency(item.priceAtSale * item.quantity).padStart(10);
-        text += `${item.quantity.toString().padEnd(4)}  ${name} ${price}\n`;
-    });
-    text += separator;
-
-    // Totals
-    const subtotal = sale.items.reduce((sum, item) => sum + (item.priceAtSale * item.quantity), 0);
-    const tax = subtotal * 0.16; // Assuming 16% tax
-    
-    if (settings.footer.showSubtotal) text += `SUBTOTAL: ${formatCurrency(subtotal).padStart(29)}\n`;
-    if (settings.footer.showTaxes) text += `IVA: ${formatCurrency(tax).padStart(35)}\n`;
-    text += `TOTAL: ${formatCurrency(sale.totalAmount).padStart(33)}\n`;
-    text += separator;
-
-    // Footer
-    if (settings.footer.thankYouMessage) text += `${settings.footer.thankYouMessage}\n`;
-    if (settings.footer.additionalInfo) text += `${settings.footer.additionalInfo}\n`;
-
-    return text;
-};
-
-
 export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSummaryDialogProps) {
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<TicketSettings | null>(null);
