@@ -158,6 +158,8 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
         fontWeight: 700,
         textTransform: 'capitalize',
         whiteSpace: 'pre-wrap',
+        transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+        transformOrigin: 'center center',
       }}
     >
       {renderContent()}

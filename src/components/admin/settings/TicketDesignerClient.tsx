@@ -9,6 +9,7 @@ import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion } from "@/components/ui/accordion";
 import { saveTicketSettings } from "@/lib/services/settingsService";
+import TicketLayoutSettings from "./TicketLayoutSettings";
 import TicketHeaderSettings from "./TicketHeaderSettings";
 import TicketBodySettings from "./TicketBodySettings";
 import TicketFooterSettings from "./TicketFooterSettings";
@@ -69,7 +70,8 @@ export default function TicketDesignerClient({ initialSettings }: TicketDesigner
             <h3 className="font-semibold text-lg mb-2">Opciones de Personalización</h3>
             <Form {...form}>
               <form>
-                  <Accordion type="multiple" defaultValue={["header", "body", "footer"]} className="w-full">
+                  <Accordion type="multiple" defaultValue={["layout", "header", "body", "footer"]} className="w-full">
+                      <TicketLayoutSettings />
                       <TicketHeaderSettings />
                       <TicketBodySettings />
                       <TicketFooterSettings />

@@ -118,11 +118,11 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     const defaults = getDefaultConfig(element.type, placeholder);
 
     const width = clamp(element.width ?? defaults.width, MIN_DIMENSION_MM, currentWidth);
-    const height = clamp(element.height ?? defaults.height, MIN_DIMENSION_MM, currentHeight);
+    const height = element.height ?? defaults.height; // No clamp on height
       const maxX = Math.max(0, currentWidth - width);
-      const maxY = Math.max(0, currentHeight - height);
+      // No maxY constraint, allow overflow
       const x = roundTo(clamp(element.x ?? 0, 0, maxX), 2);
-      const y = roundTo(clamp(element.y ?? 0, 0, maxY), 2);
+      const y = roundTo(element.y ?? 0, 2); // No clamp on y
 
       return {
         ...element,

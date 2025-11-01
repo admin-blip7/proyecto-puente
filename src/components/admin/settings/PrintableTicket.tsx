@@ -44,11 +44,20 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
 
 
   const fontSizeClass = `text-${body.fontSize}`;
+  const isBold = settings.fontStyle?.bold;
+  const isItalic = settings.fontStyle?.italic;
+
+  const wrapperStyle = {
+    width: `${settings.paperWidth || 80}mm`,
+    fontFamily: "'Courier New', Courier, monospace",
+    fontWeight: isBold ? 'bold' : 'normal',
+    fontStyle: isItalic ? 'italic' : 'normal',
+  };
 
   return (
     <div
-      className={`ticket-preview w-[80mm] bg-white text-black font-mono shadow-lg p-3 ${fontSizeClass}`}
-      style={{ fontFamily: "'Courier New', Courier, monospace" }}
+      className={`ticket-preview bg-white text-black font-mono shadow-lg p-3 ${fontSizeClass}`}
+      style={wrapperStyle}
     >
       {/* Header */}
       <div className="text-center space-y-1 mb-4">
