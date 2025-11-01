@@ -3,14 +3,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, X, Loader2 } from "lucide-react";
+import { Download, X, Loader2 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { Sale, TicketSettings } from "@/types";
 import { getTicketSettings } from "@/lib/services/settingsService";
 import PrintableTicket from "../admin/settings/PrintableTicket";
-import { formatCurrency } from "@/lib/utils";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface SaleSummaryDialogProps {
   isOpen: boolean;
@@ -22,6 +21,7 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<TicketSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,53 +32,39 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
     }
   }, [isOpen]);
 
-  const handlePrint = async () => {
-    if (!settings) return;
+  const handleDownloadPdf = async () => {
+    const ticketElement = printAreaRef.current?.querySelector('.ticket-preview');
+    if (!ticketElement || !settings) {
+        console.error("No se encontró el elemento del ticket para generar el PDF.");
+        return;
+    }
 
-    // Standard HTML printing for all devices
-    const printContent = printAreaRef.current?.innerHTML;
-    if (printContent) {
-        const printWindow = window.open('', '', 'height=800,width=400');
-        if (printWindow) {
-            printWindow.document.write('<html><head><title>Recibo de Venta</title>');
-            printWindow.document.write(`
-              <style>
-                body { font-family: 'Courier New', Courier, monospace; margin: 0; }
-                .ticket-preview { width: 80mm; background-color: white; color: black; padding: 12px; font-size: 14px; }
-                .text-center { text-align: center; }
-                .space-y-1 > * + * { margin-top: 0.25rem; }
-                .mb-4 { margin-bottom: 1rem; }
-                .font-bold { font-weight: 700; }
-                .text-lg { font-size: 1.125rem; }
-                hr { border-style: dashed; border-color: black; margin-top: 0.5rem; margin-bottom: 0.5rem; border-top-width: 1px; }
-                table { width: 100%; }
-                .pb-1 { padding-bottom: 0.25rem; }
-                .text-left { text-align: left; }
-                .text-right { text-align: right; }
-                .align-top { vertical-align: top; }
-                .space-y-1 > * + * { margin-top: 0.25rem; }
-                .pt-1 { padding-top: 0.25rem; }
-                .flex { display: flex; }
-                .justify-between { justify-content: space-between; }
-                .justify-center { justify-content: center; }
-                .mt-4 { margin-top: 1rem; }
-                .pt-2 { padding-top: 0.5rem; }
-                .text-xs { font-size: 0.75rem; }
-                .text-sm { font-size: 0.875rem; }
-                .text-base { font-size: 1rem; }
-              </style>
-            `);
-            printWindow.document.write('</head><body>');
-            printWindow.document.write(printContent);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.focus();
+    setIsGeneratingPdf(true);
 
-            setTimeout(() => {
-              printWindow.print();
-              printWindow.close();
-            }, 250);
-        }
+    try {
+      const canvas = await html2canvas(ticketElement as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+
+      const pdfWidth = 80;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`recibo-${sale.saleId}.pdf`);
+
+    } catch (error) {
+        console.error("Error al generar el PDF:", error);
+    } finally {
+        setIsGeneratingPdf(false);
     }
   };
 
@@ -103,13 +89,17 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
             )}
         </ScrollArea>
         <DialogFooter className="sm:justify-between">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isGeneratingPdf}>
               <X className="mr-2 h-4 w-4" />
               Cerrar
             </Button>
-          <Button onClick={handlePrint} disabled={isLoading}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir Recibo
+          <Button onClick={handleDownloadPdf} disabled={isLoading || isGeneratingPdf}>
+            {isGeneratingPdf ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Descargar PDF
           </Button>
         </DialogFooter>
       </DialogContent>
