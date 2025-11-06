@@ -276,6 +276,29 @@ const generateAndInjectScripts = (container: HTMLElement) => {
   });
 };
 
+const waitForContentReady = async (container: HTMLElement) => {
+  const fontPromise = document.fonts.ready;
+
+  const imagePromises = Array.from(container.getElementsByTagName('img')).map(img => {
+    if (img.complete) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => {
+        log.error(`Image failed to load: ${img.src}`);
+        resolve(); // Resolve anyway to not block PDF generation
+      };
+    });
+  });
+
+  try {
+    await Promise.all([fontPromise, ...imagePromises]);
+  } catch (error) {
+    log.error('Error waiting for content to load:', error);
+  }
+};
+
 
 export const generateLabelPdf = async (
   items: LabelPrintItem[],
@@ -348,14 +371,13 @@ export const generateLabelPdf = async (
 
     generateAndInjectScripts(container);
 
-    // Allow images and scripts to render
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await waitForContentReady(container);
 
     const canvas = await html2canvas(canvasWrapper, {
       scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: 'white',
+      backgroundColor: null,
       width: canvasWrapper.offsetWidth,
       height: canvasWrapper.offsetHeight,
       logging: false,
@@ -394,7 +416,7 @@ const generateLabelsHtml = (
     }),
   };
 
-  const expandedItems = items.flatMap((item, index) => 
+  const expandedItems = items.flatMap((item, index) =>
     Array.from({ length: Math.max(1, item.quantity) }, (_, quantityIndex) => ({
       ...item,
       _uniqueIndex: index * 1000 + quantityIndex
