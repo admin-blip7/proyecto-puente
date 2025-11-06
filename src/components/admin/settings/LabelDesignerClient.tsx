@@ -17,9 +17,11 @@ import VisualEditor from "./visual-editor/VisualEditor";
 import LabelLayoutSettings from "./LabelLayoutSettings";
 import LabelContentSettings from "./LabelContentSettings";
 import LabelPreview from "./LabelPreview";
+import PrintPreview from "./PrintPreview";
 import { normalizeVisualEditorData, VisualEditorData } from "@/lib/printing/visualLayoutTypes";
 import { supabase } from "@/lib/supabaseClient";
 import { nanoid } from "nanoid";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const mimeToExtension = (mime: string) => {
   if (mime.includes('png')) return 'png';
@@ -611,36 +613,49 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         </Button>
       </div>
 
-      {mode === "simple" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
-            <h3 className="font-semibold text-lg mb-2">Opciones de Personalización</h3>
-            <Form {...form}>
-              <form>
-                  <Accordion type="multiple" defaultValue={['layout', 'content']} className="w-full">
-                      <LabelLayoutSettings />
-                      <LabelContentSettings />
-                  </Accordion>
-              </form>
-            </Form>
-          </div>
-          <div className="lg:col-span-2">
-             <h3 className="font-semibold text-lg mb-2">Vista Previa en Vivo</h3>
-             <div className="bg-muted p-4 rounded-lg flex justify-center">
-               <LabelPreview settings={watchedSettings} />
-             </div>
-          </div>
-        </div>
-      ) : (
-        <VisualEditor 
-            key={visualEditorKey}
-            initialLayout={parsedLayout}
-            onLayoutChange={handleLayoutChange}
-            widthMm={watchedSettings.width}
-            heightMm={watchedSettings.height}
-            orientation={watchedSettings.orientation || 'horizontal'}
-        />
-      )}
+      <Tabs defaultValue="design" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="design">Diseño</TabsTrigger>
+          <TabsTrigger value="preview">Previsualización PDF</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="design" className="space-y-4">
+          {mode === "simple" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1">
+                <h3 className="font-semibold text-lg mb-2">Opciones de Personalización</h3>
+                <Form {...form}>
+                  <form>
+                      <Accordion type="multiple" defaultValue={['layout', 'content']} className="w-full">
+                          <LabelLayoutSettings />
+                          <LabelContentSettings />
+                      </Accordion>
+                  </form>
+                </Form>
+              </div>
+              <div className="lg:col-span-2">
+                 <h3 className="font-semibold text-lg mb-2">Vista Previa en Vivo</h3>
+                 <div className="bg-muted p-4 rounded-lg flex justify-center">
+                   <LabelPreview settings={watchedSettings} />
+                 </div>
+              </div>
+            </div>
+          ) : (
+            <VisualEditor 
+                key={visualEditorKey}
+                initialLayout={parsedLayout}
+                onLayoutChange={handleLayoutChange}
+                widthMm={watchedSettings.width}
+                heightMm={watchedSettings.height}
+                orientation={watchedSettings.orientation || 'horizontal'}
+            />
+          )}
+        </TabsContent>
+        
+        <TabsContent value="preview">
+          <PrintPreview settings={watchedSettings} />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

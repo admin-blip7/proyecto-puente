@@ -1,12 +1,13 @@
 "use client";
 
-import JsBarcode from 'jsbarcode';
+import * as JsBarcode from 'jsbarcode';
 import { LABEL_PLACEHOLDERS, PlaceholderKey } from './labelPlaceholders';
-import type { LabelPrintItem, LabelSettings } from '@/types';
-import { formatMXNAmount } from '@/lib/validation/currencyValidation';
-import { getLogger } from '@/lib/logger';
-import { getLabelSettings } from '@/lib/services/settingsService';
+import type { LabelPrintItem, LabelSettings } from '../../types';
+import { formatMXNAmount } from '../../lib/validation/currencyValidation';
+import { getLogger } from '../../lib/logger';
+import { getLabelSettings } from '../../lib/services/settingsService';
 import { normalizeVisualEditorData, VisualEditorData, VisualElement } from './visualLayoutTypes';
+import { generateLabelPdf } from './labelPdfGenerator';
 
 const log = getLogger('labelPrinter');
 
@@ -266,289 +267,39 @@ export const generateAndPrintLabels = async (
     return;
   }
 
-  let visualLayoutData: VisualEditorData | null = null;
-  if (settings.visualLayout) {
-    try {
-      const parsed = JSON.parse(settings.visualLayout);
-      visualLayoutData = normalizeVisualEditorData(parsed);
-    } catch (error) {
-      log.warn('No se pudo interpretar el diseño visual guardado.', error);
-    }
-  }
-
-  const visualElements = visualLayoutData?.elements ?? [];
-
-  if (visualElements.length === 0) {
-    alert('No se encontró un diseño visual de etiquetas guardado. Guarda un diseño en el Diseñador antes de imprimir.');
-    return;
-  }
-
-  const printWindow = window.open('', 'PRINT', 'height=600,width=800');
-  if (!printWindow) {
-    alert('El navegador bloqueó la ventana de impresión. Por favor, habilita las ventanas emergentes.');
-    return;
-  }
-
-  type QRCodeWindow = typeof printWindow & {
-    QRCode?: {
-      toCanvas: (canvas: HTMLCanvasElement, value: string, options?: { width?: number; margin?: number; errorCorrectionLevel?: string }) => void;
-    };
-  };
-
-  const qrWindow = printWindow as QRCodeWindow;
-
-  const barcodeJobs: BarcodeJob[] = [];
-  const qrJobs: QRJob[] = [];
-  const now = new Date();
-  const context: RenderContext = {
-    now,
-    barcodeJobs,
-    qrJobs,
-    dateFormatter: new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    dateTimeFormatter: new Intl.DateTimeFormat('es-MX', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-  };
-
-  printWindow.document.write('<html><head><title>Imprimir Etiquetas</title>');
-  printWindow.document.write(`
-            <style>
-                /* Importar fuentes Gilroy */
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-Regular.ttf') format('truetype');
-                  font-weight: 400;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-Medium.ttf') format('truetype');
-                  font-weight: 500;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-SemiBold.ttf') format('truetype');
-                  font-weight: 600;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-Bold.ttf') format('truetype');
-                  font-weight: 700;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-ExtraBold.ttf') format('truetype');
-                  font-weight: 800;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy';
-                  src: url('/font/Gilroy-Black.ttf') format('truetype');
-                  font-weight: 900;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy Light';
-                  src: url('/font/Gilroy-Light.ttf') format('truetype');
-                  font-weight: 300;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy Thin';
-                  src: url('/font/Gilroy-Thin.ttf') format('truetype');
-                  font-weight: 100;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy UltraLight';
-                  src: url('/font/Gilroy-UltraLight.ttf') format('truetype');
-                  font-weight: 200;
-                  font-style: normal;
-                }
-                @font-face {
-                  font-family: 'Gilroy Heavy';
-                  src: url('/font/Gilroy-Heavy.ttf') format('truetype');
-                  font-weight: 950;
-                  font-style: normal;
-                }
-                
-                @page {
-                    size: ${settings.width}mm ${settings.height}mm;
-                    margin: 0;
-                }
-                body {
-                    margin: 0;
-                    padding: 0;
-                    font-family: 'Inter', sans-serif;
-                    display: flex;
-                    flex-wrap: wrap;
-                    align-content: flex-start;
-                }
-                .label-canvas {
-                    position: relative;
-                    width: ${settings.width}mm;
-                    height: ${settings.height}mm;
-                    box-sizing: border-box;
-                    margin: 0;
-                    padding: 0;
-                    display: inline-block;
-                    vertical-align: top;
-                    page-break-after: always;
-                }
-                .label-canvas:last-child {
-                    page-break-after: auto;
-                }
-                .label-element {
-                    position: absolute;
-                    box-sizing: border-box;
-                    overflow: hidden;
-                    font-family: inherit;
-                    font-weight: inherit;
-                    text-transform: inherit;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .qr-placeholder {
-                    width: 80%;
-                    aspect-ratio: 1 / 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px);
-                    border-radius: 6px;
-                }
-                .qr-canvas {
-                    width: 100%;
-                    height: 100%;
-                }
-            </style>
-            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-`);
-  printWindow.document.write('</head><body>');
-
-  const expandedItems = items.flatMap((item) => Array.from({ length: Math.max(1, item.quantity) }, () => item));
-
-  expandedItems.forEach((item) => {
-    printWindow.document.write(renderVisualLabel(item, visualElements, settings, context));
-  });
-
-  printWindow.document.write('</body></html>');
-  printWindow.document.close();
-  printWindow.focus();
-
-  setTimeout(() => {
-    // Asegurar que JsBarcode esté disponible en la ventana de impresión
-    const ensureBarcodeLib = () => new Promise<void>((resolve) => {
-      if ((printWindow as any).JsBarcode) {
-        resolve();
-        return;
-      }
-      const check = setInterval(() => {
-        if ((printWindow as any).JsBarcode) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 50);
-      setTimeout(() => {
-        clearInterval(check);
-        resolve();
-      }, 5000);
-    });
-
-    ensureBarcodeLib().then(() => {
-      context.barcodeJobs.forEach((job) => {
-        const target = printWindow.document.getElementById(job.id);
-        if (!target) {
-          log.error(`Barcode target element not found: ${job.id}`);
-          return;
-        }
-        try {
-          const JsBarcode = (printWindow as any).JsBarcode;
-          if (JsBarcode) {
-            // Limpiar el contenido previo del SVG
-            target.innerHTML = '';
-            
-            JsBarcode(target, job.value, {
-              format: job.format === 'ean13' ? 'EAN13' : 'CODE128',
-              displayValue: true, // Forzar siempre mostrar el valor
-              height: job.height,
-              width: job.width,
-              margin: 0,
-              font: job.fontFamily,
-              fontSize: Math.max(16, Math.round(job.height * 0.25)), // Aumentar tamaño mínimo
-              textMargin: Math.max(8, Math.round(job.height * 0.15)), // Aumentar margen mínimo
-              background: '#ffffff',
-              lineColor: '#000000',
-              textAlign: 'center',
-              textPosition: 'bottom',
-            });
-            log.info(`Barcode generated successfully for ${job.value} on element ${job.id}`);
-          } else {
-            log.error('JsBarcode not available in print window');
-            // Fallback: mostrar el valor como texto
-            target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
-          }
-        } catch (error) {
-          log.error(`Failed to generate barcode for ${job.value}`, error);
-          // Fallback: mostrar el valor como texto
-          target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
-        }
-      });
-    }).catch((error) => {
-      log.error('JsBarcode library failed to load', error);
-      // Fallback para todos los códigos de barras
-      context.barcodeJobs.forEach((job) => {
-        const target = printWindow.document.getElementById(job.id);
-        if (target) {
-          target.innerHTML = `<text style="font-family: monospace; font-size: 10px;">${job.value}</text>`;
-        }
-      });
-    });
-
-    const ensureQrLib = () => new Promise<void>((resolve) => {
-      if (qrWindow.QRCode) {
-        resolve();
-        return;
-      }
-      const check = setInterval(() => {
-        if (qrWindow.QRCode) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 20);
-      setTimeout(() => {
-        clearInterval(check);
-        resolve();
-      }, 3000);
-    });
-
-    ensureQrLib().then(() => {
-      context.qrJobs.forEach((job) => {
-        const canvas = printWindow.document.getElementById(job.id) as HTMLCanvasElement | null;
-        if (!canvas || !qrWindow.QRCode) return;
-        try {
-          qrWindow.QRCode.toCanvas(canvas, job.value, { width: job.size, margin: 0, errorCorrectionLevel: 'H' });
-        } catch (error) {
-          log.error(`Failed to generate QR for ${job.value}`, error);
-        }
-      });
-
-      setTimeout(() => {
+  try {
+    // Generate PDF and open in new window for printing
+    const pdfBlob = await generateLabelPdf(items, settings, { returnBlob: true }) as Blob;
+    
+    // Create object URL and open in new window for printing
+    const url = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(url, '_blank');
+    
+    if (printWindow) {
+      printWindow.onload = () => {
         printWindow.print();
-        printWindow.close();
-      }, 500);
-    }).catch(() => {
-      printWindow.print();
-      printWindow.close();
-    });
-  }, 1000);
+        // Clean up after printing
+        setTimeout(() => {
+          printWindow.close();
+          URL.revokeObjectURL(url);
+        }, 100);
+      };
+    } else {
+      // If popup is blocked, fallback to download
+      const filename = `etiquetas-${new Date().toISOString().split('T')[0]}.pdf`;
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      
+      alert('La ventana de impresión fue bloqueada. El PDF se ha descargado automáticamente.');
+    }
+  } catch (error) {
+    log.error('Error al generar PDF de etiquetas:', error);
+    alert(`Error al generar PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
 };

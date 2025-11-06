@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
-import { Printer, Search, Trash2, PlusCircle } from "lucide-react";
+import { Printer, Search, Trash2, PlusCircle, Eye } from "lucide-react";
 import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateUniqueKey, reportInvalidIds } from "@/lib/utils/keys";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import PrintPreview from "@/components/admin/settings/PrintPreview";
 
 interface LabelPrinterClientProps {
     allProducts: Product[];
@@ -150,8 +152,8 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Impresión de Etiquetas por Lote</h1>
-                    <p className="text-muted-foreground">Busca productos y agrégalos a la lista para imprimir múltiples etiquetas a la vez.</p>
+                    <h1 className="text-2xl font-bold tracking-tight">Generación de Etiquetas PDF</h1>
+                    <p className="text-muted-foreground">Busca productos y agrégalos a la lista para generar múltiples etiquetas en formato PDF.</p>
                 </div>
             </div>
 
@@ -203,7 +205,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
 
             <Card>
                 <CardHeader>
-                    <CardTitle>2. Lista de Impresión</CardTitle>
+                    <CardTitle>2. Lista de Etiquetas</CardTitle>
                     <CardDescription>Ajusta la cantidad de etiquetas para cada producto.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -252,10 +254,29 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                     </Table>
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={handleGenerate} disabled={printList.length === 0}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Generar e Imprimir Todo
-                    </Button>
+                    <div className="flex gap-2">
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" disabled={printList.length === 0}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Vista Previa PDF
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Previsualización de Impresión PDF</DialogTitle>
+                                    <DialogDescription>
+                                        Revisa cómo se verán las etiquetas antes de generar el PDF final.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <PrintPreview settings={settings} />
+                            </DialogContent>
+                        </Dialog>
+                        <Button onClick={handleGenerate} disabled={printList.length === 0}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Generar e Imprimir PDF
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
         </div>
