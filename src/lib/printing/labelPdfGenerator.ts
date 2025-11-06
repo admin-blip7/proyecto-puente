@@ -422,6 +422,200 @@ const generateLabelsHtml = (
   return html;
 };
 
+const createSingleLabelHtml = (
+  item: LabelPrintItem & { _uniqueIndex: number },
+  layout: VisualElement[],
+  settings: LabelSettings,
+  context: RenderContext,
+  index: number
+): string => {
+  let html = `
+    <html>
+      <head>
+        <title>Etiqueta</title>
+        <style>
+          /* Importar fuentes Gilroy */
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-SemiBold.ttf') format('truetype');
+            font-weight: 600;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-ExtraBold.ttf') format('truetype');
+            font-weight: 800;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy';
+            src: url('/font/Gilroy-Black.ttf') format('truetype');
+            font-weight: 900;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy Light';
+            src: url('/font/Gilroy-Light.ttf') format('truetype');
+            font-weight: 300;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy Thin';
+            src: url('/font/Gilroy-Thin.ttf') format('truetype');
+            font-weight: 100;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy UltraLight';
+            src: url('/font/Gilroy-UltraLight.ttf') format('truetype');
+            font-weight: 200;
+            font-style: normal;
+          }
+          @font-face {
+            font-family: 'Gilroy Heavy';
+            src: url('/font/Gilroy-Heavy.ttf') format('truetype');
+            font-weight: 950;
+            font-style: normal;
+          }
+          
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          html, body {
+            width: ${settings.width}mm;
+            height: ${settings.height}mm;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: white;
+          }
+          
+          .label-canvas {
+            position: relative;
+            width: ${settings.width}mm;
+            height: ${settings.height}mm;
+            background: white;
+            overflow: hidden;
+          }
+          
+          .label-element {
+            position: absolute;
+            box-sizing: border-box;
+            overflow: hidden;
+            font-family: inherit;
+            font-weight: inherit;
+            text-transform: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .qr-placeholder {
+            width: 80%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px);
+            border-radius: 6px;
+          }
+          
+          .qr-canvas {
+            width: 100%;
+            height: 100%;
+          }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+      </head>
+      <body>
+  `;
+
+  html += createLabelHtml(item, layout, settings, context, index);
+
+  html += `
+        <script>
+          // Generate barcodes
+          document.querySelectorAll('svg[data-barcode-value]').forEach(svg => {
+            const value = svg.getAttribute('data-barcode-value');
+            const height = parseInt(svg.getAttribute('data-barcode-height'));
+            const width = parseFloat(svg.getAttribute('data-barcode-width'));
+            const format = svg.getAttribute('data-barcode-format');
+            const font = svg.getAttribute('data-barcode-font');
+            
+            if (value && window.JsBarcode) {
+              try {
+                JsBarcode(svg, value, {
+                  format: format,
+                  displayValue: true,
+                  height: height,
+                  width: width,
+                  margin: 0,
+                  font: font,
+                  fontSize: Math.max(16, Math.round(height * 0.25)),
+                  textMargin: Math.max(8, Math.round(height * 0.15)),
+                  background: '#ffffff',
+                  lineColor: '#000000',
+                  textAlign: 'center',
+                  textPosition: 'bottom',
+                });
+              } catch (error) {
+                console.error('Error generating barcode:', error);
+                svg.innerHTML = '<text style="font-family: monospace; font-size: 10px;">' + value + '</text>';
+              }
+            }
+          });
+          
+          // Generate QR codes
+          document.querySelectorAll('canvas[data-qr-value]').forEach(canvas => {
+            const value = canvas.getAttribute('data-qr-value');
+            const size = parseInt(canvas.getAttribute('width'));
+            
+            if (value && window.QRCode) {
+              try {
+                window.QRCode.toCanvas(canvas, value, { 
+                  width: size, 
+                  margin: 0, 
+                  errorCorrectionLevel: 'H',
+                  color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                  }
+                });
+              } catch (error) {
+                console.error('Error generating QR code:', error);
+              }
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `;
+
+  return html;
+};
+
 export const generateLabelPdf = async (
   items: LabelPrintItem[],
   settings: LabelSettings,
@@ -449,46 +643,87 @@ export const generateLabelPdf = async (
     throw new Error('No se encontró un diseño visual de etiquetas guardado.');
   }
 
-  // Generate HTML content
-  const htmlContent = generateLabelsHtml(items, visualElements, settings);
+  // Expand items according to quantity
+  const now = new Date();
+  const context: RenderContext = {
+    now,
+    dateFormatter: new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    dateTimeFormatter: new Intl.DateTimeFormat('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  };
 
-  // Create a temporary container to render the HTML
+  const expandedItems = items.flatMap((item, index) => 
+    Array.from({ length: Math.max(1, item.quantity) }, (_, quantityIndex) => ({
+      ...item,
+      _uniqueIndex: index * 1000 + quantityIndex
+    }))
+  );
+
+  // Create PDF with exact label dimensions
+  const pdf = new jsPDF({
+    orientation: settings.width > settings.height ? 'landscape' : 'portrait',
+    unit: 'mm',
+    format: [settings.width, settings.height],
+  });
+
+  // Create a temporary container to render each label
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '-9999px';
-  container.style.width = '210mm'; // A4 width
+  container.style.width = `${settings.width}mm`;
+  container.style.height = `${settings.height}mm`;
   container.style.background = 'white';
   document.body.appendChild(container);
 
   try {
-    container.innerHTML = htmlContent;
+    // Load external scripts once
+    const scriptsHtml = `
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    `;
+    container.innerHTML = scriptsHtml;
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Wait for barcodes and QR codes to be generated
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Process each label individually
+    for (let i = 0; i < expandedItems.length; i++) {
+      const item = expandedItems[i];
+      
+      // Generate HTML for this single label
+      const labelHtml = createSingleLabelHtml(item, visualElements, settings, context, item._uniqueIndex);
+      container.innerHTML = labelHtml;
 
-    // Generate canvas from HTML
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      width: container.scrollWidth,
-      height: container.scrollHeight,
-    });
+      // Wait for barcodes and QR codes to be generated
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Create PDF
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
+      // Generate canvas from this label with exact dimensions
+      const canvas = await html2canvas(container, {
+        scale: 3, // Higher scale for better quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: mmToPx(settings.width),
+        height: mmToPx(settings.height),
+        windowWidth: mmToPx(settings.width),
+        windowHeight: mmToPx(settings.height),
+      });
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      // Convert to image
+      const imgData = canvas.toDataURL('image/png', 1.0);
 
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // Add new page for each label after the first
+      if (i > 0) {
+        pdf.addPage([settings.width, settings.height], settings.width > settings.height ? 'landscape' : 'portrait');
+      }
+
+      // Add image to PDF with exact dimensions
+      pdf.addImage(imgData, 'PNG', 0, 0, settings.width, settings.height, undefined, 'FAST');
+    }
 
     if (returnBlob) {
       return pdf.output('blob');
