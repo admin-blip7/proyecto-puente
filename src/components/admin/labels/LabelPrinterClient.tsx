@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Product, LabelSettings, Consignor, Supplier, LabelPrintItem } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,9 @@ interface LabelPrinterClientProps {
 
 export default function LabelPrinterClient({ allProducts, settings, consignors, suppliers }: LabelPrinterClientProps) {
     const [searchQuery, setSearchQuery] = useState("");
-    const [popoverOpen, setPopoverOpen] = useState(false);
     const [printList, setPrintList] = useState<LabelPrintItem[]>([]);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const consignorMap = useMemo(() => new Map(consignors.map((c) => [c.id, c.name])), [consignors]);
     const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
@@ -105,7 +106,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                 const productId = item.product.id ?? item.product.sku;
                 return productId === candidateProductId;
             });
-            
+
             if (existingItem) {
                 return prev.map((item) => {
                     const productId = item.product.id ?? item.product.sku;
@@ -116,9 +117,29 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
             }
             return [...prev, candidate];
         });
+
+        // Limpiar la búsqueda pero mantener el foco
         setSearchQuery("");
+        setIsSearchOpen(false);
+        
+        // Enfocar el input inmediatamente después de seleccionar
+        setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, 100);
     };
     
+    const handleSearchInputChange = (value: string) => {
+        setSearchQuery(value);
+        setIsSearchOpen(value.length > 0);
+    };
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') {
+            setIsSearchOpen(false);
+            searchInputRef.current?.blur();
+        }
+    };
+
     const handleUpdateQuantity = (productId: string, quantity: number) => {
         setPrintList((prev) => prev.map((item) => {
             const currentProductId = item.product.id ?? item.product.sku;
@@ -163,14 +184,17 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                 </CardHeader>
                 <CardContent>
                     <div>
-                        <Popover open={popoverOpen && searchQuery.length > 0} onOpenChange={setPopoverOpen}>
+                        <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
                             <PopoverTrigger asChild className="w-full">
                                 <div className="relative">
                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                      <Input
-                                        placeholder="Buscar producto por SKU o nombre para agregar a la lista..."
+                                        ref={searchInputRef}
+                                        placeholder="Buscar productos (puedes seleccionar varios)..."
                                         value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onChange={(e) => handleSearchInputChange(e.target.value)}
+                                        onKeyDown={handleSearchKeyDown}
+                                        onFocus={() => searchQuery && setIsSearchOpen(true)}
                                         className="w-full pl-10"
                                     />
                                 </div>
@@ -178,18 +202,62 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                             <PopoverContent className="p-1 w-[--radix-popover-trigger-width]" align="start">
                                 <Command>
                                   <CommandList>
+                                    {printList.length > 0 && (
+                                        <div className="p-2 border-b">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSearchQuery("");
+                                                    setIsSearchOpen(false);
+                                                    searchInputRef.current?.focus();
+                                                }}
+                                                className="w-full justify-between text-xs"
+                                            >
+                                                Cerrar búsqueda
+                                                <PlusCircle className="h-3 w-3 rotate-45" />
+                                            </Button>
+                                        </div>
+                                    )}
                                     {filteredProducts.length > 0 ? (
                                         filteredProducts.slice(0, 50).map(product => (
-                                            <button 
-                                                key={product.id} 
-                                                onClick={() => handleSelectProduct(product)} 
-                                                className="w-full text-left p-2 hover:bg-accent rounded-sm cursor-pointer flex items-center justify-between"
+                                            <button
+                                                key={product.id}
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    handleSelectProduct(product);
+                                                }}
+                                                className="w-full text-left p-3 hover:bg-accent rounded-sm cursor-pointer flex items-center justify-between gap-2"
                                             >
-                                                <div>
-                                                    <span>{product.name}</span>
-                                                    <span className="text-xs text-muted-foreground ml-2">{product.sku}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-medium truncate">{product.name}</span>
+                                                        <span className="text-xs text-muted-foreground">{product.sku}</span>
+                                                    </div>
+                                                    {product.category && (
+                                                        <div className="mt-1">
+                                                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                                                {product.category}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {product.attributes && Object.keys(product.attributes).length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {Object.entries(product.attributes)
+                                                                .filter(([_, value]) => value !== null && value !== undefined && value !== "")
+                                                                .slice(0, 3)
+                                                                .map(([key, value]) => (
+                                                                <span
+                                                                    key={key}
+                                                                    className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded"
+                                                                >
+                                                                    {key}: {String(value)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <PlusCircle className="h-4 w-4 text-muted-foreground" />
+                                                <PlusCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                             </button>
                                         ))
                                     ) : (
