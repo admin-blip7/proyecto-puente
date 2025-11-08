@@ -104,30 +104,6 @@ const stripMeta = (row: any) => {
 const fetchSettingsDoc = async (docId: string) => {
   const supabase = getSupabaseServerClient();
   
-  // DEBUG: Log para verificar la estructura de la tabla settings
-  log.info("DEBUG: Intentando acceder a la tabla settings", { docId });
-  
-  // ADDITIONAL DEBUG: Check if table exists first
-  try {
-    log.info("DEBUG: Verificando si la tabla settings existe...");
-    const { data: tableInfo, error: tableError } = await supabase
-      .rpc('get_table_info', { table_name: SETTINGS_TABLE });
-    
-    if (tableError) {
-      log.warn("DEBUG: No se pudo verificar información de la tabla (puede no existir)", {
-        tableError: tableError.message,
-        docId
-      });
-    } else {
-      log.info("DEBUG: Información de la tabla settings", { tableInfo });
-    }
-  } catch (e) {
-    log.warn("DEBUG: Error al verificar tabla settings (continuando...)", {
-      error: e instanceof Error ? e.message : String(e),
-      docId
-    });
-  }
-  
   const { data, error } = await supabase
     .from(SETTINGS_TABLE)
     .select("*")
@@ -136,23 +112,9 @@ const fetchSettingsDoc = async (docId: string) => {
     .maybeSingle();
 
   if (error) {
-    log.error("DEBUG: Error al acceder a settings", {
-      error: error.message,
-      errorCode: error.code,
-      details: error.details,
-      hint: error.hint,
-      docId
-    });
-    
-    // ADDITIONAL DEBUG: Check if it's a table not found error
-    if (error.code === 'PGRST116' || error.message?.includes('relation') && error.message?.includes('does not exist')) {
-      log.error("DEBUG: La tabla settings no existe en la base de datos", { docId });
-    }
-    
+    log.error("Error fetching settings", { error: error.message, docId });
     throw error;
   }
-
-  log.info("DEBUG: Datos de settings recuperados", { hasData: !!data, docId, dataStructure: data ? Object.keys(data) : null });
   
   // Adaptar la estructura de datos para compatibilidad
   if (data && data.data) {
@@ -180,8 +142,6 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
       last_updated: timestamp, // Usar snake_case para consistencia con la BD
     };
 
-    log.info("Upserting settings document", { docId, hasExistingRow: !!row });
-
     if (row) {
       const { error } = await supabase
         .from(SETTINGS_TABLE)
@@ -198,8 +158,6 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
         throw new Error(`Database error: ${error.message}`);
       }
     }
-    
-    log.info("Settings document upserted successfully", { docId });
   } catch (error) {
     log.error("Error in upsertSettingsDoc", {
       error: error instanceof Error ? error.message : String(error),

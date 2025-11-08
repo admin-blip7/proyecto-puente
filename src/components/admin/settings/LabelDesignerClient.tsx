@@ -47,13 +47,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Debug initial settings
-  console.log("DEBUG: LabelDesignerClient initialized with settings:", {
-    labelType: initialSettings.labelType,
-    hasVisualLayout: !!initialSettings.visualLayout,
-    visualLayoutLength: initialSettings.visualLayout?.length,
-    visualLayoutPreview: initialSettings.visualLayout?.substring(0, 100)
-  });
+
 
   const form = useForm<LabelSettings>({
     resolver: zodResolver(LabelSettingsSchema),
@@ -70,11 +64,8 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         const response = await fetch('/api/settings/labels/list');
         if (response.ok) {
           const data = await response.json();
-          console.log("DEBUG: Loaded existing labels from API:", data.labels);
           setExistingLabels(data.labels);
         } else {
-          console.warn('Failed to load existing labels from API');
-          // Fallback to empty array
           setExistingLabels([]);
         }
       } catch (error) {
@@ -155,269 +146,22 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       setSelectedLabelType(selectedLabel.type);
       
       try {
-        // Load the specific settings for this label from API
         const settings = await getLabelSettings(selectedLabel.type);
-        console.log("DEBUG: Loaded specific label settings:", {
-          labelId,
-          labelName: selectedLabel.name,
-          hasVisualLayout: !!settings.visualLayout,
-          visualLayoutSize: settings.visualLayout?.length
+        form.reset(settings);
+      } catch (error) {
+        console.error('Error loading specific label settings:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo cargar la configuración de la etiqueta."
         });
-        form.reset(settings);
-      } catch (error) {
-        console.error('Error loading specific label settings:', error);
-        // If there's an error, create default settings for this type
-        let settings;
-        
-        if (labelId === 'label_005') {
-          // Plantilla profesional de producto como las imágenes mostradas
-          settings = {
-            labelType: 'product' as LabelType,
-            width: 51,
-            height: 102,
-            orientation: 'vertical' as const,
-            fontSize: 10,
-            barcodeHeight: 25,
-            includeLogo: true,
-            logoUrl: "",
-            storeName: "22 Electronic Group",
-            content: {
-              showProductName: true,
-              showSku: true,
-              showPrice: true,
-              showStoreName: true,
-            },
-            visualLayout: JSON.stringify({
-              elements: [
-                {
-                  id: 'header-bg',
-                  type: 'rectangle',
-                  x: 2,
-                  y: 2,
-                  width: 54,
-                  height: 18,
-                  backgroundColor: '#000000',
-                  zIndex: 1
-                },
-                {
-                  id: 'store-logo',
-                  type: 'text',
-                  x: 4,
-                  y: 4,
-                  width: 50,
-                  height: 14,
-                  content: '22 Electronic Group',
-                  fontSize: 12,
-                  fontFamily: 'Gilroy',
-                  color: '#FFFFFF',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  zIndex: 2
-                },
-                {
-                  id: 'product-name',
-                  type: 'text',
-                  x: 4,
-                  y: 25,
-                  width: 50,
-                  height: 12,
-                  content: '{Nombre del Producto}',
-                  fontSize: 14,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  zIndex: 1
-                },
-                {
-                  id: 'memory-label',
-                  type: 'text',
-                  x: 4,
-                  y: 40,
-                  width: 20,
-                  height: 8,
-                  content: 'MEMORIA:',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  fontWeight: 'bold',
-                  zIndex: 1
-                },
-                {
-                  id: 'memory-value',
-                  type: 'text',
-                  x: 35,
-                  y: 40,
-                  width: 19,
-                  height: 8,
-                  content: '128GB',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  textAlign: 'right',
-                  zIndex: 1
-                },
-                {
-                  id: 'battery-label',
-                  type: 'text',
-                  x: 4,
-                  y: 50,
-                  width: 20,
-                  height: 8,
-                  content: 'BATERÍA:',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  fontWeight: 'bold',
-                  zIndex: 1
-                },
-                {
-                  id: 'battery-value',
-                  type: 'text',
-                  x: 35,
-                  y: 50,
-                  width: 19,
-                  height: 8,
-                  content: '90%',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  textAlign: 'right',
-                  zIndex: 1
-                },
-                {
-                  id: 'aesthetic-label',
-                  type: 'text',
-                  x: 4,
-                  y: 60,
-                  width: 20,
-                  height: 8,
-                  content: 'ESTÉTICA:',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  fontWeight: 'bold',
-                  zIndex: 1
-                },
-                {
-                  id: 'aesthetic-value',
-                  type: 'text',
-                  x: 35,
-                  y: 60,
-                  width: 19,
-                  height: 8,
-                  content: '9/10',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  textAlign: 'right',
-                  zIndex: 1
-                },
-                {
-                  id: 'color-label',
-                  type: 'text',
-                  x: 4,
-                  y: 70,
-                  width: 20,
-                  height: 8,
-                  content: 'COLOR:',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  fontWeight: 'bold',
-                  zIndex: 1
-                },
-                {
-                  id: 'color-value',
-                  type: 'text',
-                  x: 35,
-                  y: 70,
-                  width: 19,
-                  height: 8,
-                  content: 'Negro',
-                  fontSize: 9,
-                  fontFamily: 'Gilroy',
-                  color: '#000000',
-                  textAlign: 'right',
-                  zIndex: 1
-                },
-                {
-                  id: 'price-bg',
-                  type: 'rectangle',
-                  x: 4,
-                  y: 82,
-                  width: 50,
-                  height: 12,
-                  backgroundColor: '#000000',
-                  borderRadius: 4,
-                  zIndex: 1
-                },
-                {
-                  id: 'price',
-                  type: 'text',
-                  x: 6,
-                  y: 84,
-                  width: 46,
-                  height: 8,
-                  content: '{Precio de Venta}',
-                  fontSize: 16,
-                  fontFamily: 'Gilroy',
-                  color: '#FFFFFF',
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  zIndex: 2
-                },
-                {
-                  id: 'barcode',
-                  type: 'placeholder',
-                  placeholderKey: 'barcode',
-                  x: 4,
-                  y: 98,
-                  width: 50,
-                  height: 20,
-                  showValue: true,
-                  barcodeFormat: 'code128',
-                  zIndex: 1
-                },
-                {
-                  id: 'sku-text',
-                  type: 'text',
-                  x: 4,
-                  y: 120,
-                  width: 50,
-                  height: 6,
-                  content: '{SKU}',
-                  fontSize: 8,
-                  fontFamily: 'Courier New',
-                  color: '#000000',
-                  textAlign: 'center',
-                  zIndex: 1
-                }
-              ]
-            })
-          };
-        } else {
-          // Para otras etiquetas, usar la configuración por defecto
-          settings = await getLabelSettings(selectedLabel.type);
-        }
-        
-        form.reset(settings);
-      } catch (error) {
-        console.error('Error loading specific label settings:', error);
       }
     }
-  }, [existingLabels, form]);
+  }, [existingLabels, form, toast]);
 
   const watchedSettings = form.watch();
   
-  // Debug watched settings
-  useEffect(() => {
-    console.log("DEBUG: Watched settings updated:", {
-      hasVisualLayout: !!watchedSettings.visualLayout,
-      visualLayoutLength: watchedSettings.visualLayout?.length,
-      selectedLabelType
-    });
-  }, [watchedSettings.visualLayout, selectedLabelType]);
+
 
   const uploadDataUrlIfNeeded = useCallback(async (dataUrl?: string | null) => {
     if (!dataUrl) return undefined;
@@ -548,35 +292,18 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
     const sourceLayout = watchedSettings.visualLayout ?? initialSettings.visualLayout;
     
     if (!sourceLayout) {
-      console.log("DEBUG: No source layout found", {
-        watched: watchedSettings.visualLayout,
-        initial: initialSettings.visualLayout
-      });
       return undefined;
     }
     
     try {
-        // Handle both string JSON and already parsed objects
-        const parsed = typeof sourceLayout === 'string' 
-          ? JSON.parse(sourceLayout)
-          : sourceLayout;
-        
-        console.log("DEBUG: Successfully parsed layout", {
-          sourceType: typeof sourceLayout,
-          preview: typeof sourceLayout === 'string' 
-            ? sourceLayout.substring(0, 100) 
-            : Object.keys(sourceLayout)
-        });
-        
-        return normalizeVisualEditorData(parsed);
+      const parsed = typeof sourceLayout === 'string' 
+        ? JSON.parse(sourceLayout)
+        : sourceLayout;
+      
+      return normalizeVisualEditorData(parsed);
     } catch (error) {
-        console.error("Invalid visual layout JSON", error, {
-          sourceType: typeof sourceLayout,
-          preview: typeof sourceLayout === 'string' 
-            ? sourceLayout.substring(0, 200) 
-            : sourceLayout
-        });
-        return undefined;
+      console.error("Invalid visual layout JSON", error);
+      return undefined;
     }
   }, [watchedSettings.visualLayout, initialSettings.visualLayout]);
 
