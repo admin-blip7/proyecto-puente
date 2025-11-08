@@ -361,7 +361,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             moveElement={moveElement}
             onSelectElement={handleSelectElement}
             selectedElementId={editorState.selectedElementId}
-            backgroundImageUrl={initialLayout?.globalStyles?.backgroundImageUrl}
+            backgroundImageUrl={initialLayout?.globalStyles?.backgroundImageUrl || undefined}
             backgroundColor={globalStyles.backgroundColor}
           />
         </div>

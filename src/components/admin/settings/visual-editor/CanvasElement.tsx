@@ -5,7 +5,6 @@ import React, { useMemo, useRef } from 'react';
 import { useDrag } from 'react-dnd';
 import { LABEL_PLACEHOLDERS, VisualElement } from './types';
 import { QRCode } from 'react-qrcode-logo';
-import Image from 'next/image';
 
 interface CanvasElementProps {
   element: VisualElement;
@@ -95,7 +94,8 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
             alt="Logo"
             width={widthPx}
             height={heightPx}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
+            style={{ objectPosition: 'center' }}
           />
         );
       }
@@ -144,15 +144,15 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
         top: topPx,
         width: widthPx,
         height: heightPx,
-        border: isSelected ? '2px solid #2563eb' : '1px solid #64748b',
-        backgroundColor: 'rgba(248, 250, 252, 0.95)',
+        border: isSelected ? '2px solid #2563eb' : (element.type === 'image' ? '1px dashed rgba(100, 116, 139, 0.3)' : '1px solid #64748b'),
+        backgroundColor: element.type === 'image' ? 'transparent' : 'rgba(248, 250, 252, 0.95)',
         opacity: isDragging ? 0.6 : 1,
         cursor: 'move',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         textAlign: element.textAlign ?? 'center',
-        padding: 4,
+        padding: element.type === 'image' ? 0 : 4,
         borderRadius: 4,
         fontFamily: element.fontFamily ?? 'Inter',
         fontWeight: 700,
@@ -160,6 +160,7 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
         whiteSpace: 'pre-wrap',
         transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
         transformOrigin: 'center center',
+        overflow: 'hidden',
       }}
     >
       {renderContent()}

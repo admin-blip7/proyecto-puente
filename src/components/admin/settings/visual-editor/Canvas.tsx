@@ -22,6 +22,8 @@ interface CanvasProps {
   moveElement: (id: string, x: number, y: number) => void;
   onSelectElement: (id: string | null) => void;
   selectedElementId: string | null;
+  backgroundImageUrl?: string;
+  backgroundColor?: string;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -34,6 +36,8 @@ const Canvas: React.FC<CanvasProps> = ({
   moveElement,
   onSelectElement,
   selectedElementId,
+  backgroundImageUrl,
+  backgroundColor,
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const pxPerMm = useMemo(() => mmToPixels(1, scale), [scale]);
@@ -96,41 +100,71 @@ const Canvas: React.FC<CanvasProps> = ({
   drop(ref);
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-muted/40">
-      <div
-        ref={ref}
-        className="relative bg-white shadow-sm"
-        style={{
-          width: widthPx,
-          height: heightPx,
-          border: isOver ? '2px dashed #22c55e' : '1px solid #d4d4d8',
-          transition: 'border-color 0.2s ease',
-          ...gridPattern,
-        }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            onSelectElement(null);
-          }
-        }}
-      >
+    <div className="w-full h-full flex items-center justify-center" style={{ background: '#6b7280' }}>
+      {/* Contenedor con padding para simular el espacio alrededor de la etiqueta */}
+      <div className="relative" style={{ padding: '40px' }}>
+        {/* Indicadores de medidas */}
+        <div className="absolute -top-6 left-0 right-0 flex items-center justify-center">
+          <span className="text-xs font-semibold text-white bg-slate-700 px-3 py-1 rounded-md shadow-md">
+            {labelWidthMm} mm
+          </span>
+        </div>
+        <div className="absolute -left-6 top-0 bottom-0 flex items-center justify-center" style={{ writingMode: 'vertical-rl' }}>
+          <span className="text-xs font-semibold text-white bg-slate-700 px-3 py-1 rounded-md shadow-md">
+            {labelHeightMm} mm
+          </span>
+        </div>
+        
+        {/* Área de la etiqueta */}
         <div
+          ref={ref}
+          className="relative"
           style={{
-            width: '100%',
-            height: '100%',
+            width: widthPx,
+            height: heightPx,
+            border: isOver ? '3px solid #22c55e' : '2px solid #475569',
+            transition: 'border-color 0.2s ease',
+            overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            backgroundColor: backgroundColor || '#ffffff',
+            backgroundImage: backgroundImageUrl && backgroundImageUrl.trim() ? `url(${backgroundImageUrl})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            ...gridPattern,
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              onSelectElement(null);
+            }
           }}
         >
-          {elements
-            .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)) // Sort by zIndex
-            .map((element) => (
-            <CanvasElement
-              key={element.id}
-              element={element}
-              scale={scale}
-              pxPerMm={pxPerMm}
-              onSelect={onSelectElement}
-              isSelected={element.id === selectedElementId}
-            />
-          ))}
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+            }}
+          >
+            {elements
+              .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)) // Sort by zIndex
+              .map((element) => (
+              <CanvasElement
+                key={element.id}
+                element={element}
+                scale={scale}
+                pxPerMm={pxPerMm}
+                onSelect={onSelectElement}
+                isSelected={element.id === selectedElementId}
+              />
+            ))}
+          </div>
+        </div>
+        
+        {/* Leyenda de vista previa */}
+        <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center">
+          <span className="text-xs text-white/80">
+            Vista previa • Escala {Math.round(scale * 100)}%
+          </span>
         </div>
       </div>
     </div>
