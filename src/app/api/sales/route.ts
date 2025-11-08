@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
+import { getCurrentOpenSession } from "@/lib/services/cashSessionService";
 import { CartItem, Sale, SaleItem } from "@/types";
 import { getLogger } from "@/lib/logger";
 
@@ -65,10 +66,53 @@ export async function POST(request: Request) {
       }
     }
 
+    // Obtener la sesión de caja activa para asociar la venta
+    log.info(`Getting active cash session for cashier: ${saleData.cashierId}`);
+    const activeSession = await getCurrentOpenSession(saleData.cashierId);
+
+    if (!activeSession) {
+      log.warn(`No active cash session found for cashier: ${saleData.cashierId}`);
+      return NextResponse.json({
+        success: false,
+        error: "No hay una sesión de caja activa",
+        details: "Debe abrir un turno de caja antes de registrar ventas"
+      }, { status: 400 });
+    }
+
+    log.info(`Found active session: ${activeSession.sessionId}`);
+
     // Procesar la venta
     // If we auto-created a CRM client, skip creating another interaction (already created during client creation)
     const skipCrmInteraction = !crmClientId && finalCrmClientId; // Created a new client automatically
     const result = await addSaleAndUpdateStock(saleData, cartItems, finalCrmClientId, skipCrmInteraction);
+
+    // Asociar la venta con la sesión de caja activa
+    log.info(`Associating sale ${result.saleId} with session ${activeSession.sessionId}`);
+    const { getSupabaseServerClient } = await import("@/lib/supabaseServerClient");
+    const supabase = getSupabaseServerClient();
+
+    const { error: updateError } = await supabase
+      .from("sales")
+      .update({ sessionId: activeSession.sessionId })
+      .eq("id", result.id);
+
+    if (updateError) {
+      log.error("Error associating sale with session:", updateError);
+    } else {
+      log.info(`Sale ${result.saleId} associated with session ${activeSession.sessionId}`);
+
+      // Actualizar los totales de la sesión
+      log.info("Updating session totals...");
+      const { error: rpcError } = await supabase.rpc("update_cash_session_totals_by_session", {
+        session_id_param: activeSession.sessionId
+      });
+
+      if (rpcError) {
+        log.warn("Error updating session totals via RPC:", rpcError);
+      } else {
+        log.info(`Session ${activeSession.sessionId} totals updated successfully`);
+      }
+    }
 
     log.info(`Sale processed successfully: ${result.saleId}`);
 
@@ -76,6 +120,7 @@ export async function POST(request: Request) {
       success: true,
       message: "Venta procesada exitosamente",
       sale: result,
+      sessionId: activeSession.sessionId,
       timestamp: new Date().toISOString()
     });
 
