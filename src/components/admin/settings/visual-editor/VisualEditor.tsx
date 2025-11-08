@@ -316,10 +316,15 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
   }, []);
 
   const handleUpdateGlobalStyles = useCallback((newStyles: { backgroundImageUrl?: string; backgroundColor?: string }) => {
-    setGlobalStyles(prev => ({
-      ...prev,
-      ...newStyles,
-    }));
+    console.log('handleUpdateGlobalStyles called with:', newStyles);
+    setGlobalStyles(prev => {
+      const updated = {
+        ...prev,
+        ...newStyles,
+      };
+      console.log('globalStyles updated to:', updated);
+      return updated;
+    });
   }, []);
 
   const selectedElement = editorState.elements.find((el) => el.id === editorState.selectedElementId) ?? null;

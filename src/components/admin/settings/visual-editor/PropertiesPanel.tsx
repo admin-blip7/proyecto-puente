@@ -17,6 +17,8 @@ interface PropertiesPanelProps {
   onDeleteElement?: (id: string) => void;
   onBringToFront?: (id: string) => void;
   onSendToBack?: (id: string) => void;
+  onUpdateGlobalStyles?: (styles: { backgroundImageUrl?: string; backgroundColor?: string }) => void;
+  initialLayout?: { globalStyles?: { backgroundImageUrl?: string; backgroundColor?: string } };
 }
 
 const textElementTypes: VisualElement['type'][] = ['text', 'placeholder'];
@@ -37,11 +39,13 @@ const FONT_OPTIONS = [
   'Georgia',
 ];
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
-  selectedElement, 
-  onUpdateElement, 
-  onBringToFront, 
-  onSendToBack 
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
+  selectedElement,
+  onUpdateElement,
+  onBringToFront,
+  onSendToBack,
+  onUpdateGlobalStyles,
+  initialLayout
 }) => {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -170,7 +174,139 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }, [uploadingLogo, selectedElement]);
 
   if (!selectedElement) {
-    return <p className="text-sm text-muted-foreground">Selecciona un elemento para editar sus propiedades.</p>;
+    // Show global canvas properties when no element is selected
+    return (
+      <div className="space-y-4 text-sm">
+        <div className="space-y-2">
+          <h3 className="font-semibold">Propiedades del Lienzo</h3>
+          
+          {/* Background Image Upload */}
+          <div className="space-y-2">
+            <Label>Imagen de Fondo</Label>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={uploadingLogo}
+              onClick={async () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.onchange = async () => {
+                  const file = fileInput.files?.[0];
+                  if (!file) return;
+                  try {
+                    setUploadingLogo(true);
+                    if (!supabase) {
+                      throw new Error('Supabase client no disponible');
+                    }
+
+                    const extension = file.name.split('.').pop() || 'png';
+                    const filePath = `background-${nanoid()}.${extension}`;
+                    const arrayBuffer = await file.arrayBuffer();
+                    const { error: uploadError } = await supabase.storage
+                      .from('label-assets')
+                      .upload(filePath, arrayBuffer, {
+                        contentType: file.type || 'image/png',
+                        upsert: true,
+                      });
+
+                    if (uploadError) {
+                      throw uploadError;
+                    }
+
+                    const { data } = supabase.storage.from('label-assets').getPublicUrl(filePath);
+                    const downloadUrl = data.publicUrl;
+                    
+                    console.log('Background image uploaded:', {
+                      filePath,
+                      downloadUrl,
+                      exists: !!downloadUrl,
+                    });
+                    
+                    onUpdateGlobalStyles?.({
+                      backgroundImageUrl: downloadUrl,
+                    });
+                  } catch (error) {
+                    console.error('Error uploading background image', error);
+                  } finally {
+                    setUploadingLogo(false);
+                  }
+                };
+                fileInput.click();
+              }}
+            >
+              {uploadingLogo ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Subiendo...
+                </span>
+              ) : (
+                'Subir Imagen de Fondo'
+              )}
+            </Button>
+            
+            {initialLayout?.globalStyles?.backgroundImageUrl && (
+              <div className="space-y-2">
+                <div className="relative w-full h-24 border rounded-md overflow-hidden bg-gray-50">
+                  <img
+                    src={initialLayout.globalStyles.backgroundImageUrl}
+                    alt="Vista previa del fondo"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      console.error('Error loading background image:', initialLayout.globalStyles.backgroundImageUrl);
+                      e.currentTarget.style.background = 'repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 10px, #e0e0e0 10px, #e0e0e0 20px)';
+                    }}
+                    onLoad={() => {
+                      console.log('Background image loaded successfully:', initialLayout.globalStyles.backgroundImageUrl);
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground break-all">
+                  URL: {initialLayout.globalStyles.backgroundImageUrl}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onUpdateGlobalStyles?.({ backgroundImageUrl: '' })}
+                >
+                  Eliminar Imagen de Fondo
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Background Color */}
+          <div className="space-y-2">
+            <Label htmlFor="bg-color">Color de Fondo</Label>
+            <div className="flex gap-2 items-center">
+              <Input
+                id="bg-color"
+                type="color"
+                value={initialLayout?.globalStyles?.backgroundColor || '#ffffff'}
+                onChange={(e) => onUpdateGlobalStyles?.({ backgroundColor: e.target.value })}
+                className="w-12 h-8 p-0 border-0"
+              />
+              <Input
+                type="text"
+                value={initialLayout?.globalStyles?.backgroundColor || '#ffffff'}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                    onUpdateGlobalStyles?.({ backgroundColor: value });
+                  }
+                }}
+                placeholder="#ffffff"
+                className="flex-1"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <p className="text-xs text-muted-foreground">
+          Selecciona un elemento para editar sus propiedades individuales.
+        </p>
+      </div>
+    );
   }
 
   const isTextElement = textElementTypes.includes(selectedElement.type);

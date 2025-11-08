@@ -43,6 +43,13 @@ const Canvas: React.FC<CanvasProps> = ({
   const pxPerMm = useMemo(() => mmToPixels(1, scale), [scale]);
   const widthPx = useMemo(() => mmToPixels(labelWidthMm, scale), [labelWidthMm, scale]);
   const heightPx = useMemo(() => mmToPixels(labelHeightMm, scale), [labelHeightMm, scale]);
+
+  // Debug background image
+  React.useEffect(() => {
+    if (backgroundImageUrl?.trim()) {
+      console.log('Canvas rendering with backgroundImageUrl:', backgroundImageUrl);
+    }
+  }, [backgroundImageUrl]);
   
   // Generate grid pattern
   const gridPattern = useMemo(() => {
