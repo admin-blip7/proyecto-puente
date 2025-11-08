@@ -67,18 +67,19 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   useEffect(() => {
     const loadExistingLabels = async () => {
       try {
-        // For now, we'll simulate loading existing labels
-        // In a real implementation, you would fetch these from your database
-        const mockExistingLabels = [
-          { id: 'label_001', name: 'Etiqueta Producto Estándar', type: 'product' as LabelType },
-          { id: 'label_002', name: 'Etiqueta Reparación Rápida', type: 'repair' as LabelType },
-          { id: 'label_003', name: 'Etiqueta Consignación', type: 'product' as LabelType },
-          { id: 'label_004', name: 'Etiqueta Garantía', type: 'repair' as LabelType },
-          { id: 'label_005', name: 'Etiqueta Producto Profesional', type: 'product' as LabelType },
-        ];
-        setExistingLabels(mockExistingLabels);
+        const response = await fetch('/api/settings/labels/list');
+        if (response.ok) {
+          const data = await response.json();
+          console.log("DEBUG: Loaded existing labels from API:", data.labels);
+          setExistingLabels(data.labels);
+        } else {
+          console.warn('Failed to load existing labels from API');
+          // Fallback to empty array
+          setExistingLabels([]);
+        }
       } catch (error) {
         console.error('Error loading existing labels:', error);
+        setExistingLabels([]);
       }
     };
     
@@ -154,7 +155,18 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       setSelectedLabelType(selectedLabel.type);
       
       try {
-        // Load the specific settings for this label
+        // Load the specific settings for this label from API
+        const settings = await getLabelSettings(selectedLabel.type);
+        console.log("DEBUG: Loaded specific label settings:", {
+          labelId,
+          labelName: selectedLabel.name,
+          hasVisualLayout: !!settings.visualLayout,
+          visualLayoutSize: settings.visualLayout?.length
+        });
+        form.reset(settings);
+      } catch (error) {
+        console.error('Error loading specific label settings:', error);
+        // If there's an error, create default settings for this type
         let settings;
         
         if (labelId === 'label_005') {
