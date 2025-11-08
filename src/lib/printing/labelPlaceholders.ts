@@ -12,6 +12,11 @@ export type PlaceholderKey =
   | 'supplierName'
   | 'category'
   | 'attribute'
+  | 'battery'
+  | 'color'
+  | 'aesthetic'
+  | 'memory'
+  | 'allAttributes'
   | 'printDate'
   | 'printDateTime'
   | 'storeName'
@@ -48,7 +53,12 @@ export const LABEL_PLACEHOLDERS: PlaceholderDefinition[] = [
   { key: 'supplierName', label: 'Nombre del Proveedor', token: '{Nombre del Proveedor}', kind: 'text' },
   { key: 'category', label: 'Categoría', token: '{Categoría}', kind: 'text' },
   { key: 'attribute', label: 'Atributo Específico', token: '{attr:nombre_del_atributo}', kind: 'text', helperText: 'Reemplaza "nombre_del_atributo" con el nombre del atributo que deseas mostrar. Por ejemplo: {attr:memoria} o {attr:color}.' },
-  
+  { key: 'battery', label: 'Batería', token: '{Batería}', kind: 'text' },
+  { key: 'color', label: 'Color', token: '{Color}', kind: 'text' },
+  { key: 'aesthetic', label: 'Estética', token: '{Estética}', kind: 'text' },
+  { key: 'memory', label: 'Memoria', token: '{Memoria}', kind: 'text' },
+  { key: 'allAttributes', label: 'Todos los Atributos', token: '{Todos los Atributos}', kind: 'text', helperText: 'Muestra todos los atributos del producto (batería, color, estética, memoria, etc.) en un formato legible.' },
+
   // Repair placeholders
   { key: 'orderId', label: 'ID de Orden', token: '{ID de Orden}', kind: 'text' },
   { key: 'customerName', label: 'Nombre del Cliente', token: '{Nombre del Cliente}', kind: 'text' },

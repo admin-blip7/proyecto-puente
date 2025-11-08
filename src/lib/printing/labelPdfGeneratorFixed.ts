@@ -8,7 +8,7 @@ import { LABEL_PLACEHOLDERS, PlaceholderKey } from './labelPlaceholders';
 import { formatMXNAmount } from '../../lib/validation/currencyValidation';
 import { getLogger } from '../../lib/logger';
 
-const log = getLogger('labelPdfGenerator');
+const log = getLogger('labelPdfGeneratorFixed');
 
 const MM_TO_PX = 3.7795275591;
 
@@ -22,21 +22,6 @@ const escapeHtml = (value: string | number | null | undefined) => {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-};
-
-const isValidImageUrl = (url: string | null | undefined): boolean => {
-  if (!url || typeof url !== 'string') return false;
-
-  // Reject data URLs larger than 100KB to prevent performance issues
-  if (url.startsWith('data:image/')) {
-    const base64Size = url.length * 0.75; // Approximate decoded size
-    return base64Size <= 100 * 1024; // 100KB limit
-  }
-
-  // Allow http, https, and relative URLs
-  return url.startsWith('http://') ||
-         url.startsWith('https://') ||
-         (!url.startsWith('data:') && !url.startsWith('blob:'));
 };
 
 interface RenderContext {
@@ -139,8 +124,6 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `line-height:1.2`,
     `flex-wrap:wrap`,
     `align-content:flex-start`,
-    // Force text color to black unless explicitly specified
-    `color:${element.color ?? '#000000'}`,
   ];
 
   if (element.type === 'text') {
@@ -149,7 +132,7 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     parts.push(`height:${(element.height ?? settings.height / 4).toFixed(2)}mm`);
   }
 
-  // Only set background color if explicitly provided
+  if (element.color) parts.push(`color:${element.color}`);
   if (element.backgroundColor) parts.push(`background-color:${element.backgroundColor}`);
   if (element.rotation) {
     parts.push(`transform:rotate(${element.rotation}deg)`);
@@ -213,7 +196,7 @@ const createLabelHtml = (
 
     if (coercedType === 'image') {
       const src = (element.imageUrl as string | undefined) || (typeof element.content === 'string' ? element.content : '') || (settings.includeLogo ? settings.logoUrl : '');
-      if (src && isValidImageUrl(src)) {
+      if (src) {
         html += `<div class="label-element" style="${style}"><img src="${escapeHtml(src)}" style="max-width:100%;max-height:100%;object-fit:contain;" crossorigin="anonymous" /></div>`;
       }
       return;
@@ -261,104 +244,84 @@ const getDocumentStyles = (origin: string = '') => `
 `;
 
 const generateAndInjectScripts = async (container: HTMLElement) => {
+  log.info('Generating barcodes and QR codes...');
+  
   // Generate barcodes
   const barcodeElements = container.querySelectorAll('svg[data-barcode-value]');
+  log.info(`Found ${barcodeElements.length} barcode elements`);
+  
   for (const svg of barcodeElements) {
     const value = svg.getAttribute('data-barcode-value');
-    let height = parseInt(svg.getAttribute('data-barcode-height') || '30');
+    const height = parseInt(svg.getAttribute('data-barcode-height') || '30');
     const width = parseFloat(svg.getAttribute('data-barcode-width') || '1.4');
     const format = svg.getAttribute('data-barcode-format') || 'CODE128';
     const font = svg.getAttribute('data-barcode-font') || 'Inter';
 
     if (value) {
       try {
-        // Calculate adequate space for barcode numbers
-        // Text typically needs 20-25% of barcode height
-        const calculatedTextSize = Math.max(18, Math.round(height * 0.25));
-        const calculatedTextMargin = Math.max(12, Math.round(height * 0.30));
-
-        // Adjust height to ensure full visibility of numbers
-        // Total height = barcode bars + text area
-        const totalBarcodeHeight = height + calculatedTextMargin + (calculatedTextSize * 0.6);
-        height = Math.max(height, Math.round(totalBarcodeHeight));
-
-        // Set explicit dimensions on SVG to ensure proper rendering
-        const svgElement = svg as SVGElement;
-        const currentViewBox = svgElement.getAttribute('viewBox');
-        if (currentViewBox) {
-          const [, , vbWidth, vbHeight] = currentViewBox.split(' ').map(Number);
-          if (vbHeight < height) {
-            svgElement.setAttribute('viewBox', `0 0 ${vbWidth} ${height}`);
-            svgElement.setAttribute('height', height.toString());
-          }
-        }
-
-        // Use the imported JsBarcode directly with improved settings
-        (JsBarcode as any)(svgElement, value, {
+        log.info(`Generating barcode for value: ${value}`);
+        (JsBarcode as any)(svg as SVGElement, value, {
           format,
           displayValue: true,
           height,
           width,
           margin: 0,
           font,
-          fontSize: calculatedTextSize,
-          textMargin: calculatedTextMargin,
+          fontSize: Math.max(16, Math.round(height * 0.25)),
+          textMargin: Math.max(8, Math.round(height * 0.15)),
           background: '#ffffff',
           lineColor: '#000000',
           textAlign: 'center',
           textPosition: 'bottom',
         });
-
-        // Post-process: ensure the SVG has proper padding for text
-        try {
-          const bbox = (svgElement as any).getBBox();
-          const requiredHeight = bbox.y + bbox.height + calculatedTextMargin;
-          if (requiredHeight > height) {
-            svgElement.setAttribute('height', Math.ceil(requiredHeight).toString());
-          }
-        } catch (e) {
-          // Fallback if getBBox is not available
-          console.warn('Could not get bounding box for SVG, using calculated height');
-        }
+        log.info('Barcode generated successfully');
       } catch (error) {
-        console.error('Error generating barcode:', error);
-        svg.innerHTML = `<text style="font-family: monospace; font-size: 10px; fill: #000000;">${escapeHtml(value)}</text>`;
+        log.error('Error generating barcode:', error);
+        svg.innerHTML = `<text style="font-family: monospace; font-size: 10px;" x="0" y="10">${escapeHtml(value)}</text>`;
       }
     }
   }
 
   // Generate QR codes
   const qrElements = container.querySelectorAll('canvas[data-qr-value]');
+  log.info(`Found ${qrElements.length} QR elements`);
+  
   for (const canvas of qrElements) {
     const value = canvas.getAttribute('data-qr-value');
     const size = parseInt(canvas.getAttribute('width') || '50');
 
     if (value) {
       try {
-        // Use the imported QRCode directly
+        log.info(`Generating QR code for value: ${value}`);
         await QRCode.toCanvas(canvas as HTMLCanvasElement, value, {
           width: size,
           margin: 0,
           errorCorrectionLevel: 'H'
         });
+        log.info('QR code generated successfully');
       } catch (error) {
-        console.error('Error generating QR code:', error);
+        log.error('Error generating QR code:', error);
       }
     }
   }
 };
 
 const waitForContentReady = async (container: HTMLElement) => {
+  log.info('Waiting for content to be ready...');
+  
   const fontPromise = document.fonts.ready;
 
   const imagePromises = Array.from(container.getElementsByTagName('img')).map(img => {
     if (img.complete) {
       return Promise.resolve();
     }
-    return new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
+    return new Promise<void>((resolve) => {
+      img.onload = () => {
+        log.info(`Image loaded: ${img.src}`);
+        resolve();
+      };
       img.onerror = () => {
-        console.error(`Image failed to load: ${img.src}`);
+        log.error(`Image failed to load: ${img.src}`);
         resolve(); // Resolve anyway to not block PDF generation
       };
     });
@@ -366,13 +329,13 @@ const waitForContentReady = async (container: HTMLElement) => {
 
   try {
     await Promise.all([fontPromise, ...imagePromises]);
+    log.info('Content is ready');
   } catch (error) {
-    console.error('Error waiting for content to load:', error);
+    log.error('Error waiting for content to load:', error);
   }
 };
 
-
-export const generateLabelPdf = async (
+export const generateLabelPdfFixed = async (
   items: LabelPrintItem[],
   settings: LabelSettings,
   options?: {
@@ -383,12 +346,15 @@ export const generateLabelPdf = async (
   const filename = options?.filename || `etiquetas-${new Date().toISOString().split('T')[0]}.pdf`;
   const returnBlob = options?.returnBlob || false;
 
+  log.info(`Starting PDF generation for ${items.length} items`);
+
   let visualLayoutData: VisualEditorData | null = null;
   if (settings.visualLayout) {
     try {
       visualLayoutData = normalizeVisualEditorData(JSON.parse(settings.visualLayout));
+      log.info('Visual layout parsed successfully');
     } catch (error) {
-      console.warn('Could not parse saved visual layout.', error);
+      log.warn('Could not parse saved visual layout.', error);
     }
   }
   const visualElements = visualLayoutData?.elements ?? [];
@@ -410,6 +376,8 @@ export const generateLabelPdf = async (
     }))
   );
 
+  log.info(`Expanded to ${expandedItems.length} labels`);
+
   const pdf = new jsPDF({
     orientation: settings.width > settings.height ? 'landscape' : 'portrait',
     unit: 'mm',
@@ -419,6 +387,7 @@ export const generateLabelPdf = async (
 
   for (let i = 0; i < expandedItems.length; i++) {
     const item = expandedItems[i];
+    log.info(`Processing label ${i + 1}/${expandedItems.length}: ${item.product.name}`);
 
     const container = document.createElement('div');
     container.id = `label-container-${item._uniqueIndex}`;
@@ -445,6 +414,7 @@ export const generateLabelPdf = async (
 
     await waitForContentReady(container);
 
+    log.info('Capturing canvas with html2canvas...');
     const canvas = await html2canvas(canvasWrapper, {
       scale: 3,
       useCORS: true,
@@ -456,95 +426,20 @@ export const generateLabelPdf = async (
     });
 
     const imgData = canvas.toDataURL('image/png', 1.0);
+    log.info('Canvas captured successfully');
 
     pdf.addPage([settings.width, settings.height], settings.width > settings.height ? 'landscape' : 'portrait');
     pdf.addImage(imgData, 'PNG', 0, 0, settings.width, settings.height, undefined, 'FAST');
 
     document.body.removeChild(container);
+    log.info(`Label ${i + 1} processed successfully`);
   }
+
+  log.info('PDF generation completed');
 
   if (returnBlob) {
     return pdf.output('blob');
   } else {
     pdf.save(filename);
   }
-};
-
-const generateLabelsHtml = (
-  items: LabelPrintItem[],
-  visualElements: VisualElement[],
-  settings: LabelSettings
-): string => {
-  const now = new Date();
-  const context: RenderContext = {
-    now,
-    dateFormatter: new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    dateTimeFormatter: new Intl.DateTimeFormat('es-MX', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-  };
-
-  const expandedItems = items.flatMap((item, index) =>
-    Array.from({ length: Math.max(1, item.quantity) }, (_, quantityIndex) => ({
-      ...item,
-      _uniqueIndex: index * 1000 + quantityIndex
-    }))
-  );
-
-  let allLabelsHtml = '';
-  expandedItems.forEach((item) => {
-    allLabelsHtml += `
-      <div class="label-canvas" style="width: ${settings.width}mm; height: ${settings.height}mm; border: 1px solid #ddd; page-break-inside: avoid;">
-        ${createLabelHtml(item, visualElements, settings, context, item._uniqueIndex)}
-      </div>
-    `;
-  });
-
-  return `
-    <html>
-      <head>
-        <title>Etiquetas</title>
-        ${getDocumentStyles()}
-        <style>
-          .labels-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; padding: 20px; }
-          @media print { body { margin: 0; padding: 0; } .labels-container { gap: 0; } .label-canvas { border: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="labels-container">${allLabelsHtml}</div>
-      </body>
-    </html>
-  `;
-};
-
-export const previewLabelsPdf = async (
-  items: LabelPrintItem[],
-  settings: LabelSettings,
-  maxLabels: number = 6
-): Promise<string> => {
-  const limitedItems = items.slice(0, maxLabels).map(item => ({
-    ...item,
-    quantity: Math.min(item.quantity, 2)
-  }));
-
-  let visualLayoutData: VisualEditorData | null = null;
-  if (settings.visualLayout) {
-    try {
-      visualLayoutData = normalizeVisualEditorData(JSON.parse(settings.visualLayout));
-    } catch (error) {
-      console.warn('Could not parse saved visual layout.', error);
-    }
-  }
-
-  const visualElements = visualLayoutData?.elements ?? [];
-
-  if (visualElements.length === 0) {
-    throw new Error('No saved visual label layout was found.');
-  }
-
-  return generateLabelsHtml(limitedItems, visualElements, settings);
 };

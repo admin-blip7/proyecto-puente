@@ -25,6 +25,21 @@ const escapeHtml = (value: string | number | null | undefined) => {
     .replace(/'/g, '&#039;');
 };
 
+const isValidImageUrl = (url: string | null | undefined): boolean => {
+  if (!url || typeof url !== 'string') return false;
+
+  // Reject data URLs larger than 100KB to prevent performance issues
+  if (url.startsWith('data:image/')) {
+    const base64Size = url.length * 0.75; // Approximate decoded size
+    return base64Size <= 100 * 1024; // 100KB limit
+  }
+
+  // Allow http, https, and relative URLs
+  return url.startsWith('http://') ||
+         url.startsWith('https://') ||
+         (!url.startsWith('data:') && !url.startsWith('blob:'));
+};
+
 interface BarcodeJob {
   id: string;
   value: string;
@@ -146,10 +161,12 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `line-height:1.2`,
     `flex-wrap:wrap`,
     `align-content:flex-start`,
+    // Force text color to black unless explicitly specified
+    `color:${element.color ?? '#000000'}`,
   ];
 
   if (element.fontWeight) parts.push(`font-weight:${element.fontWeight}`);
-  if (element.color) parts.push(`color:${element.color}`);
+  // Only set background color if explicitly provided
   if (element.backgroundColor) parts.push(`background-color:${element.backgroundColor}`);
   if (element.rotation) {
     parts.push(`transform:rotate(${element.rotation}deg)`);
@@ -220,7 +237,7 @@ const renderVisualLabel = (
 
     if (coercedType === 'image') {
       const src = (element.imageUrl as string | undefined) || (typeof element.content === 'string' ? element.content : '') || (settings.includeLogo ? settings.logoUrl : '');
-      if (src) {
+      if (src && isValidImageUrl(src)) {
         html += `<div class="label-element" style="${style}"><img src="${escapeHtml(src)}" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`;
       }
       return;
@@ -251,7 +268,12 @@ const renderVisualLabel = (
 
 export const generateAndPrintLabels = async (
   items: LabelPrintItem[],
-  fallbackSettings?: LabelSettings
+  fallbackSettings?: LabelSettings,
+  options?: {
+    onProgress?: (current: number, total: number) => void;
+    onStatus?: (message: string) => void;
+    signal?: AbortSignal;
+  }
 ) => {
   let settings: LabelSettings | null = null;
 
@@ -269,7 +291,12 @@ export const generateAndPrintLabels = async (
 
   try {
     // Generate PDF and open in new window for printing
-    const pdfBlob = await generateLabelPdf(items, settings, { returnBlob: true }) as Blob;
+    const pdfBlob = await generateLabelPdf(items, settings, {
+      returnBlob: true,
+      onProgress: options?.onProgress,
+      onStatus: options?.onStatus,
+      signal: options?.signal
+    }) as Blob;
     
     // Create object URL and open in new window for printing
     const url = URL.createObjectURL(pdfBlob);

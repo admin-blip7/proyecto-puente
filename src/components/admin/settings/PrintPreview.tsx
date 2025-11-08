@@ -105,6 +105,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
               consignorName,
               supplierName,
               category: product.category,
+              attributes: product.attributes,
             },
             quantity: quantities[product.id] || 1,
           };
@@ -166,6 +167,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
             consignorName,
             supplierName,
             category: product.category,
+            attributes: product.attributes,
           },
           quantity: quantities[product.id] || 1,
         };
@@ -201,6 +203,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
             consignorName,
             supplierName,
             category: product.category,
+            attributes: product.attributes,
           },
           quantity: quantities[product.id] || 1,
         };

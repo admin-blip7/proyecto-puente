@@ -27,18 +27,20 @@ interface ShoppingCartProps {
   onAddToCart: (product: Product, quantity?: number) => void;
   onCloseSession: () => void;
   onFinanceSale: () => void;
+  onSaleSuccess?: () => void;
 }
 
-export default function ShoppingCart({ 
-  cartItems, 
-  onUpdateQuantity, 
-  onClearCart, 
-  isSheet = false, 
-  selectedCartItem, 
+export default function ShoppingCart({
+  cartItems,
+  onUpdateQuantity,
+  onClearCart,
+  isSheet = false,
+  selectedCartItem,
   onSelectItem,
   onAddToCart,
   onCloseSession,
   onFinanceSale,
+  onSaleSuccess,
 }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
@@ -55,6 +57,7 @@ export default function ShoppingCart({
   const handleSuccessfulSale = () => {
     onClearCart();
     setCheckoutOpen(false);
+    onSaleSuccess?.();
   };
 
   const handleExpenseAdded = async (description: string, amount: number, category: string) => {
@@ -66,6 +69,7 @@ export default function ShoppingCart({
             description: "El gasto ha sido registrado exitosamente desde la caja."
         });
         setExpenseOpen(false);
+        onSaleSuccess?.();
     } catch(error) {
         console.error(error);
         toast({ variant: 'destructive', title: "Error", description: "No se pudo registrar el gasto."})

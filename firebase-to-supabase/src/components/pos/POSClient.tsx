@@ -50,6 +50,12 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     }
   }, [userProfile]);
 
+  const handleSuccessfulSale = () => {
+    if (userProfile) {
+      getCurrentOpenSession(userProfile.uid).then(setActiveSession);
+    }
+  };
+
 
   const addToCart = (product: Product, quantity: number = 1) => {
     setCart((prevCart) => {
@@ -230,6 +236,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               onAddToCart={addToCart}
               onCloseSession={() => setClosingDrawer(true)}
               onFinanceSale={() => setFinancePlanOpen(true)}
+              onSaleSuccess={handleSuccessfulSale}
             />
          </div>
        </div>
@@ -262,6 +269,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 onAddToCart={addToCart}
                 onCloseSession={() => setClosingDrawer(true)}
                 onFinanceSale={() => setFinancePlanOpen(true)}
+                onSaleSuccess={handleSuccessfulSale}
              />
           </SheetContent>
         </Sheet>
