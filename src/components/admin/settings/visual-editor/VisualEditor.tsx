@@ -184,7 +184,10 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     }
     
     timeoutRef.current = setTimeout(() => {
-      const currentLayout = JSON.stringify(editorState.elements);
+      const currentLayout = JSON.stringify({
+        elements: editorState.elements,
+        globalStyles,
+      });
       
       // Only call onLayoutChange if the layout actually changed
       if (currentLayout !== lastLayoutRef.current) {
