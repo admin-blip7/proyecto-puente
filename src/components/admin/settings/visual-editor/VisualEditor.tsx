@@ -54,6 +54,14 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     backgroundImageUrl: initialLayout?.globalStyles?.backgroundImageUrl || '',
     backgroundColor: initialLayout?.globalStyles?.backgroundColor || '#ffffff',
   });
+
+  // Sync globalStyles when initialLayout changes
+  useEffect(() => {
+    setGlobalStyles({
+      backgroundImageUrl: initialLayout?.globalStyles?.backgroundImageUrl || '',
+      backgroundColor: initialLayout?.globalStyles?.backgroundColor || '#ffffff',
+    });
+  }, [initialLayout?.globalStyles?.backgroundImageUrl, initialLayout?.globalStyles?.backgroundColor]);
   
   // Calculate actual dimensions based on orientation
   const currentWidth = useMemo(() => {
@@ -361,7 +369,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             moveElement={moveElement}
             onSelectElement={handleSelectElement}
             selectedElementId={editorState.selectedElementId}
-            backgroundImageUrl={initialLayout?.globalStyles?.backgroundImageUrl || undefined}
+            backgroundImageUrl={globalStyles.backgroundImageUrl || undefined}
             backgroundColor={globalStyles.backgroundColor}
           />
         </div>
