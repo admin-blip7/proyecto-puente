@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
@@ -38,13 +38,22 @@ interface DropPayload {
 const MIN_DIMENSION_MM = 5;
 
 const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChange, widthMm, heightMm, orientation = 'horizontal' }) => {
-  const normalizedInitial = useMemo(() => normalizeVisualEditorData(initialLayout), [initialLayout]);
+  const normalizedInitial = useMemo(() => {
+    if (!initialLayout) {
+      return { elements: [], globalStyles: { backgroundColor: '#ffffff' } };
+    }
+    return normalizeVisualEditorData(initialLayout);
+  }, [initialLayout]);
 
   const [editorState, setEditorState] = useState<VisualEditorState>({
-    elements: normalizedInitial.elements,
+    elements: normalizedInitial.elements || [],
     selectedElementId: null,
   });
   const [showGrid, setShowGrid] = useState(true);
+  const [globalStyles, setGlobalStyles] = useState({
+    backgroundImageUrl: initialLayout?.globalStyles?.backgroundImageUrl || '',
+    backgroundColor: initialLayout?.globalStyles?.backgroundColor || '#ffffff',
+  });
   
   // Calculate actual dimensions based on orientation
   const currentWidth = useMemo(() => {
@@ -174,6 +183,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         lastLayoutRef.current = currentLayout;
         onLayoutChangeRef.current({
           elements: editorState.elements,
+          globalStyles,
         });
       }
     }, 300); // Increased debounce time to reduce frequency
@@ -183,7 +193,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [editorState.elements]);
+  }, [editorState.elements, globalStyles]);
 
 
 
@@ -294,6 +304,13 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     });
   }, []);
 
+  const handleUpdateGlobalStyles = useCallback((newStyles: { backgroundImageUrl?: string; backgroundColor?: string }) => {
+    setGlobalStyles(prev => ({
+      ...prev,
+      ...newStyles,
+    }));
+  }, []);
+
   const selectedElement = editorState.elements.find((el) => el.id === editorState.selectedElementId) ?? null;
 
   return (
@@ -344,6 +361,8 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             moveElement={moveElement}
             onSelectElement={handleSelectElement}
             selectedElementId={editorState.selectedElementId}
+            backgroundImageUrl={initialLayout?.globalStyles?.backgroundImageUrl}
+            backgroundColor={globalStyles.backgroundColor}
           />
         </div>
 
@@ -367,6 +386,8 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             onDeleteElement={handleDeleteElement}
             onBringToFront={handleBringToFront}
             onSendToBack={handleSendToBack}
+            onUpdateGlobalStyles={handleUpdateGlobalStyles}
+            initialLayout={{ globalStyles }}
           />
         </div>
       </div>

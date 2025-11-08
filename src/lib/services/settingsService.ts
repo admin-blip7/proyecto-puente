@@ -72,11 +72,19 @@ const stripMeta = (row: any) => {
   
   // Si los datos vienen en formato JSON en la columna 'data'
   if (data && typeof data === 'object') {
-    return {
+    const result = {
       ...data,
       id: id,
       lastUpdated: last_updated || lastUpdated
     };
+    // Ensure visualLayout is a string or undefined, not null
+    if (result.visualLayout === null) {
+      result.visualLayout = undefined;
+    } else if (result.visualLayout && typeof result.visualLayout === 'object') {
+      // If visualLayout is already an object, convert it to JSON string
+      result.visualLayout = JSON.stringify(result.visualLayout);
+    }
+    return result;
   }
   
   // Si los datos vienen directamente en el row (formato antiguo)
@@ -86,6 +94,9 @@ const stripMeta = (row: any) => {
   // Handle null visualLayout values by setting them to undefined
   if (rest.visualLayout === null) {
     rest.visualLayout = undefined;
+  } else if (rest.visualLayout && typeof rest.visualLayout === 'object') {
+    // If visualLayout is already an object, convert it to JSON string
+    rest.visualLayout = JSON.stringify(rest.visualLayout);
   }
   return rest;
 };
@@ -96,6 +107,27 @@ const fetchSettingsDoc = async (docId: string) => {
   // DEBUG: Log para verificar la estructura de la tabla settings
   log.info("DEBUG: Intentando acceder a la tabla settings", { docId });
   
+  // ADDITIONAL DEBUG: Check if table exists first
+  try {
+    log.info("DEBUG: Verificando si la tabla settings existe...");
+    const { data: tableInfo, error: tableError } = await supabase
+      .rpc('get_table_info', { table_name: SETTINGS_TABLE });
+    
+    if (tableError) {
+      log.warn("DEBUG: No se pudo verificar información de la tabla (puede no existir)", {
+        tableError: tableError.message,
+        docId
+      });
+    } else {
+      log.info("DEBUG: Información de la tabla settings", { tableInfo });
+    }
+  } catch (e) {
+    log.warn("DEBUG: Error al verificar tabla settings (continuando...)", {
+      error: e instanceof Error ? e.message : String(e),
+      docId
+    });
+  }
+  
   const { data, error } = await supabase
     .from(SETTINGS_TABLE)
     .select("*")
@@ -104,11 +136,23 @@ const fetchSettingsDoc = async (docId: string) => {
     .maybeSingle();
 
   if (error) {
-    log.error("DEBUG: Error al acceder a settings", { error: error.message, docId });
+    log.error("DEBUG: Error al acceder a settings", {
+      error: error.message,
+      errorCode: error.code,
+      details: error.details,
+      hint: error.hint,
+      docId
+    });
+    
+    // ADDITIONAL DEBUG: Check if it's a table not found error
+    if (error.code === 'PGRST116' || error.message?.includes('relation') && error.message?.includes('does not exist')) {
+      log.error("DEBUG: La tabla settings no existe en la base de datos", { docId });
+    }
+    
     throw error;
   }
 
-  log.info("DEBUG: Datos de settings recuperados", { hasData: !!data, docId });
+  log.info("DEBUG: Datos de settings recuperados", { hasData: !!data, docId, dataStructure: data ? Object.keys(data) : null });
   
   // Adaptar la estructura de datos para compatibilidad
   if (data && data.data) {

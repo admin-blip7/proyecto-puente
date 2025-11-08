@@ -47,6 +47,14 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Debug initial settings
+  console.log("DEBUG: LabelDesignerClient initialized with settings:", {
+    labelType: initialSettings.labelType,
+    hasVisualLayout: !!initialSettings.visualLayout,
+    visualLayoutLength: initialSettings.visualLayout?.length,
+    visualLayoutPreview: initialSettings.visualLayout?.substring(0, 100)
+  });
+
   const form = useForm<LabelSettings>({
     resolver: zodResolver(LabelSettingsSchema),
     defaultValues: {
@@ -389,6 +397,15 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   }, [existingLabels, form]);
 
   const watchedSettings = form.watch();
+  
+  // Debug watched settings
+  useEffect(() => {
+    console.log("DEBUG: Watched settings updated:", {
+      hasVisualLayout: !!watchedSettings.visualLayout,
+      visualLayoutLength: watchedSettings.visualLayout?.length,
+      selectedLabelType
+    });
+  }, [watchedSettings.visualLayout, selectedLabelType]);
 
   const uploadDataUrlIfNeeded = useCallback(async (dataUrl?: string | null) => {
     if (!dataUrl) return undefined;
@@ -517,12 +534,36 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
 
   const parsedLayout = useMemo(() => {
     const sourceLayout = watchedSettings.visualLayout ?? initialSettings.visualLayout;
-    if (!sourceLayout) return undefined;
+    
+    if (!sourceLayout) {
+      console.log("DEBUG: No source layout found", {
+        watched: watchedSettings.visualLayout,
+        initial: initialSettings.visualLayout
+      });
+      return undefined;
+    }
+    
     try {
-        const parsed = JSON.parse(sourceLayout);
+        // Handle both string JSON and already parsed objects
+        const parsed = typeof sourceLayout === 'string' 
+          ? JSON.parse(sourceLayout)
+          : sourceLayout;
+        
+        console.log("DEBUG: Successfully parsed layout", {
+          sourceType: typeof sourceLayout,
+          preview: typeof sourceLayout === 'string' 
+            ? sourceLayout.substring(0, 100) 
+            : Object.keys(sourceLayout)
+        });
+        
         return normalizeVisualEditorData(parsed);
     } catch (error) {
-        console.error("Invalid visual layout JSON", error);
+        console.error("Invalid visual layout JSON", error, {
+          sourceType: typeof sourceLayout,
+          preview: typeof sourceLayout === 'string' 
+            ? sourceLayout.substring(0, 200) 
+            : sourceLayout
+        });
         return undefined;
     }
   }, [watchedSettings.visualLayout, initialSettings.visualLayout]);
