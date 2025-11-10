@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Toaster } from '@/components/ui/toaster';
@@ -19,6 +20,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Block problematic service workers and fix Response issues */}
+        <Script 
+          src="/sw-block.js" 
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={`font-sans ${inter.variable} antialiased`}>
         <ErrorSuppressionScript />
         <AuthProvider>

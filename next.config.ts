@@ -77,6 +77,19 @@ const nextConfig: NextConfig = {
         })
     );
 
+    // Fix for production build issues - prevent variable hoisting problems
+    if (!dev) {
+      // Ensure proper module concatenation
+      config.optimization = {
+        ...config.optimization,
+        concatenateModules: true,
+        usedExports: true,
+        sideEffects: true,
+        // Prevent aggressive tree shaking that could cause variable reference errors
+        providedExports: true,
+      };
+    }
+
     // Mejorar configuración para desarrollo
     if (dev && !isServer) {
       // Optimizar HMR y source maps para desarrollo
@@ -109,7 +122,7 @@ const nextConfig: NextConfig = {
 
     // Optimizar source maps para producción
     if (!dev) {
-      config.devtool = 'hidden-source-map';
+      config.devtool = 'source-map';
     }
 
     return config;
