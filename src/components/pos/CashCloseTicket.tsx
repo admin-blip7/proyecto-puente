@@ -1,0 +1,136 @@
+"use client";
+
+import { CashSession } from "@/types";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { formatCurrency } from "@/lib/utils";
+
+interface CashCloseTicketProps {
+  session: CashSession;
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
+  storeRFC?: string;
+  id?: string;
+}
+
+const defaultStoreInfo = {
+  name: "Mi Tienda",
+  address: "Dirección de la Tienda",
+  phone: "555-123-4567",
+  rfc: "RFC-123456789",
+};
+
+export default function CashCloseTicket({
+  session,
+  storeName = defaultStoreInfo.name,
+  storeAddress = defaultStoreInfo.address,
+  storePhone = defaultStoreInfo.phone,
+  storeRFC = defaultStoreInfo.rfc,
+  id
+}: CashCloseTicketProps) {
+  const wrapperStyle = {
+    width: "80mm",
+    fontFamily: "'Courier New', Courier, monospace",
+  };
+
+  return (
+    <div
+      className="cash-close-ticket bg-white text-black font-mono shadow-lg p-3 text-xs"
+      style={wrapperStyle}
+      id={id}
+    >
+      {/* Header */}
+      <div className="text-center space-y-1 mb-4">
+        {storeName && <h1 className="text-lg font-bold">{storeName}</h1>}
+        {storeAddress && <p>{storeAddress}</p>}
+        {storePhone && <p>Tel: {storePhone}</p>}
+        {storeRFC && <p>RFC: {storeRFC}</p>}
+      </div>
+
+      <div className="text-center space-y-1 mb-4">
+        <p className="font-bold text-base">=== CORTE DE CAJA ===</p>
+        <p>Folio: {session.sessionId}</p>
+        <p>Fecha: {format(session.closedAt || session.openedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+      </div>
+
+      <hr className="border-dashed border-black my-2" />
+      
+      {/* Session Info */}
+      <div className="space-y-1 mb-3">
+        <p><strong>Turno:</strong></p>
+        <p>  Apertura: {format(session.openedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+        <p>  Cajero: {session.openedByName}</p>
+        {session.closedAt && (
+          <>
+            <p>  Cierre: {format(session.closedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+            <p>  Cierra: {session.closedByName}</p>
+          </>
+        )}
+      </div>
+
+      <hr className="border-dashed border-black my-2" />
+      
+      {/* Sales Summary */}
+      <div className="space-y-1 mb-3">
+        <p className="font-bold">RESUMEN DE VENTAS:</p>
+        <div className="flex justify-between">
+          <span>Fondo de Caja Inicial:</span>
+          <span>{formatCurrency(session.startingFloat ?? 0)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Ventas en Efectivo:</span>
+          <span>{formatCurrency(session.totalCashSales ?? 0)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Ventas con Tarjeta:</span>
+          <span>{formatCurrency(session.totalCardSales ?? 0)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Gastos de Caja:</span>
+          <span>{formatCurrency(session.totalCashPayouts ?? 0)}</span>
+        </div>
+      </div>
+
+      <hr className="border-dashed border-black my-2" />
+      
+      {/* Cash Count */}
+      <div className="space-y-1 mb-3">
+        <p className="font-bold">CONTEO DE EFECTIVO:</p>
+        <div className="flex justify-between">
+          <span>Efectivo Esperado:</span>
+          <span>{formatCurrency(session.expectedCashInDrawer ?? 0)}</span>
+        </div>
+        {session.actualCashCount !== undefined && (
+          <div className="flex justify-between">
+            <span>Efectivo Contado:</span>
+            <span>{formatCurrency(session.actualCashCount)}</span>
+          </div>
+        )}
+        {session.difference !== undefined && (
+          <div className={`flex justify-between font-bold ${session.difference === 0 ? '' : session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <span>Diferencia:</span>
+            <span>{session.difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(session.difference))}</span>
+          </div>
+        )}
+      </div>
+
+      <hr className="border-dashed border-black my-2" />
+      
+      {/* Totals */}
+      <div className="space-y-1 mb-4">
+        <div className="flex justify-between font-bold text-base border-t border-dashed border-black pt-1">
+          <span>TOTAL VENTAS DEL DÍA:</span>
+          <span>{formatCurrency((session.totalCashSales ?? 0) + (session.totalCardSales ?? 0))}</span>
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="text-center space-y-2">
+        <p className="text-xs">*** CORTE DE CAJA FINALIZADO ***</p>
+        <p className="text-xs">Gracias por su preferencia</p>
+        <p className="text-xs">Este documento no es un comprobante fiscal</p>
+      </div>
+    </div>
+  );
+}

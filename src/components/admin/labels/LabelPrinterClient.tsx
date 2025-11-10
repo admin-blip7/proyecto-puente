@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { Product, LabelSettings, Consignor, Supplier, LabelPrintItem } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 import { Printer, Search, Trash2, PlusCircle, Eye } from "lucide-react";
 import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { generateUniqueKey, reportInvalidIds } from "@/lib/utils/keys";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import PrintPreview from "@/components/admin/settings/PrintPreview";
 
@@ -22,30 +20,23 @@ interface LabelPrinterClientProps {
     suppliers: Supplier[];
 }
 
+// 🔥 FIX #1: Stable key generation without timestamps
+const getStableProductKey = (product: Product, index: number): string => {
+    return product.id || product.sku || `product-${index}`;
+};
+
 export default function LabelPrinterClient({ allProducts, settings, consignors, suppliers }: LabelPrinterClientProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [printList, setPrintList] = useState<LabelPrintItem[]>([]);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const consignorMap = useMemo(() => new Map(consignors.map((c) => [c.id, c.name])), [consignors]);
     const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
 
-    const getProductKey = (product: LabelPrintItem['product'], index: number = 0) => {
-      return generateUniqueKey(product, index, 'label-product');
-    };
+    // 🔥 FIX #2: Removed unstable productKeyMap that was causing re-renders
     
-    // Para funciones que necesitan buscar por productId, usamos un mapa de keys
-    const productKeyMap = useMemo(() => {
-      const map = new Map<string, string>();
-      printList.forEach((item, index) => {
-        const key = getProductKey(item.product, index);
-        const productId = item.product.id ?? item.product.sku;
-        map.set(productId, key);
-      });
-      return map;
-    }, [printList]);
-
     const resolveSupplierName = (product: Product): string | undefined => {
         type SupplierCandidate = {
             supplierName?: string;
@@ -79,7 +70,22 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
         });
     }, [searchQuery, allProducts]);
 
-    const handleSelectProduct = (product: Product) => {
+    // 🔥 FIX #3: Optimized focus management with timeout
+    const safeFocusInput = useCallback(() => {
+        // Clear any existing timeout
+        if (focusTimeoutRef.current) {
+            clearTimeout(focusTimeoutRef.current);
+        }
+        
+        // Use requestAnimationFrame for better timing
+        requestAnimationFrame(() => {
+            focusTimeoutRef.current = setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 0);
+        });
+    }, []);
+
+    const handleSelectProduct = useCallback((product: Product) => {
         const supplierName = resolveSupplierName(product);
         const consignorName = product.consignorId ? consignorMap.get(product.consignorId) : undefined;
 
@@ -95,13 +101,13 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                     ownershipType: product.ownershipType,
                     consignorName,
                     supplierName,
+                    attributes: product.attributes,
                 },
                 quantity: 1,
             };
 
             const candidateProductId = candidate.product.id ?? candidate.product.sku;
-            const candidateKey = getProductKey(candidate.product, prev.length);
-
+            
             const existingItem = prev.find((item) => {
                 const productId = item.product.id ?? item.product.sku;
                 return productId === candidateProductId;
@@ -118,41 +124,39 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
             return [...prev, candidate];
         });
 
-        // Limpiar la búsqueda pero mantener el foco
-        setSearchQuery("");
-        setIsSearchOpen(false);
-        
-        // Enfocar el input inmediatamente después de seleccionar
-        setTimeout(() => {
-            searchInputRef.current?.focus();
-        }, 100);
-    };
+        // 🔥 FIX #4: Use safe focus instead of direct focus
+        safeFocusInput();
+    }, [consignorMap, supplierMap, safeFocusInput]);
     
-    const handleSearchInputChange = (value: string) => {
+    const handleSearchInputChange = useCallback((value: string) => {
         setSearchQuery(value);
-        setIsSearchOpen(value.length > 0);
-    };
+        // Solo abrir el popover si está cerrado y hay texto
+        if (!isSearchOpen && value.length > 0) {
+            setIsSearchOpen(true);
+        }
+    }, [isSearchOpen]);
 
-    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Escape') {
             setIsSearchOpen(false);
             searchInputRef.current?.blur();
         }
-    };
+    }, []);
 
-    const handleUpdateQuantity = (productId: string, quantity: number) => {
+    // 🔥 FIX #5: Stable key for quantity updates
+    const handleUpdateQuantity = useCallback((productId: string, quantity: number) => {
         setPrintList((prev) => prev.map((item) => {
             const currentProductId = item.product.id ?? item.product.sku;
             return currentProductId === productId ? { ...item, quantity: Math.max(0, quantity) } : item;
         }));
-    };
+    }, []);
 
-    const handleRemoveItem = (productId: string) => {
+    const handleRemoveItem = useCallback((productId: string) => {
         setPrintList((prev) => prev.filter((item) => {
             const currentProductId = item.product.id ?? item.product.sku;
             return currentProductId !== productId;
         }));
-    };
+    }, []);
 
     const handleGenerate = async () => {
         if (printList.length === 0) return;
@@ -169,6 +173,15 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
         }
     };
 
+    // 🔥 FIX #6: Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (focusTimeoutRef.current) {
+                clearTimeout(focusTimeoutRef.current);
+            }
+        };
+    }, []);
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
@@ -184,7 +197,13 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                 </CardHeader>
                 <CardContent>
                     <div>
-                        <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+                        <Popover open={isSearchOpen} onOpenChange={(open) => {
+                            // Solo permitir cerrar el popover manualmente o con Escape
+                            if (!open && searchQuery.length > 0) {
+                                return; // No cerrar si hay búsqueda activa
+                            }
+                            setIsSearchOpen(open);
+                        }}>
                             <PopoverTrigger asChild className="w-full">
                                 <div className="relative">
                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -200,8 +219,8 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                 </div>
                             </PopoverTrigger>
                             <PopoverContent className="p-1 w-[--radix-popover-trigger-width]" align="start">
-                                <Command>
-                                  <CommandList>
+                                {/* 🔥 FIX #7: Removed Command wrapper to avoid cmdk conflicts */}
+                                <div className="max-h-[300px] overflow-y-auto">
                                     {printList.length > 0 && (
                                         <div className="p-2 border-b">
                                             <Button
@@ -209,22 +228,28 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                                 size="sm"
                                                 onClick={() => {
                                                     setSearchQuery("");
-                                                    setIsSearchOpen(false);
-                                                    searchInputRef.current?.focus();
+                                                    // No cerrar el popover, solo limpiar para nueva búsqueda
+                                                    safeFocusInput();
                                                 }}
                                                 className="w-full justify-between text-xs"
                                             >
-                                                Cerrar búsqueda
-                                                <PlusCircle className="h-3 w-3 rotate-45" />
+                                                Limpiar búsqueda
+                                                <PlusCircle className="h-3 w-3" />
                                             </Button>
                                         </div>
                                     )}
                                     {filteredProducts.length > 0 ? (
                                         filteredProducts.slice(0, 50).map(product => (
                                             <button
-                                                key={product.id}
+                                                key={getStableProductKey(product, filteredProducts.indexOf(product))}
+                                                // 🔥 FIX #8: Optimized mouse event handling
                                                 onMouseDown={(e) => {
                                                     e.preventDefault();
+                                                    e.stopPropagation();
+                                                }}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
                                                     handleSelectProduct(product);
                                                 }}
                                                 className="w-full text-left p-3 hover:bg-accent rounded-sm cursor-pointer flex items-center justify-between gap-2"
@@ -248,7 +273,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                                                 .slice(0, 3)
                                                                 .map(([key, value]) => (
                                                                 <span
-                                                                    key={key}
+                                                                    key={`${key}-${value}`}
                                                                     className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded"
                                                                 >
                                                                     {key}: {String(value)}
@@ -263,8 +288,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                     ) : (
                                         <div className="p-4 text-center text-sm text-muted-foreground">Escribe para buscar productos.</div>
                                     )}
-                                  </CommandList>
-                                </Command>
+                                </div>
                             </PopoverContent>
                         </Popover>
                     </div>
@@ -295,7 +319,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                 </TableRow>
                             ) : (
                                 printList.map((item, index) => {
-                                    const itemKey = getProductKey(item.product, index);
+                                    const itemKey = getStableProductKey(item.product, index);
                                     return (
                                         <TableRow key={itemKey}>
                                             <TableCell className="font-medium">{item.product.name}</TableCell>

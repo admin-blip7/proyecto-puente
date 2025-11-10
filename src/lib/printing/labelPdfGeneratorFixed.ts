@@ -63,6 +63,25 @@ const formatPlaceholderValue = (
       return settings.storeName ?? '';
     case 'barcode':
       return item.product.sku ?? '';
+    case 'battery':
+      return item.product.attributes?.battery ?? '';
+    case 'color':
+      return item.product.attributes?.color ?? '';
+    case 'aesthetic':
+      return item.product.attributes?.aesthetic ?? '';
+    case 'memory':
+      return item.product.attributes?.memory ?? '';
+    case 'allAttributes':
+      if (item.product.attributes && typeof item.product.attributes === 'object') {
+        const entries = Object.entries(item.product.attributes)
+          .filter(([_, value]) => value !== null && value !== undefined && value !== '')
+          .map(([key, value]) => `${key}: ${value}`);
+        return entries.join('\n');
+      }
+      return '';
+    case 'attribute':
+      // This is handled by the {attr:...} pattern in replaceTokensInContent
+      return '';
     default:
       return '';
   }

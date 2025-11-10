@@ -1,4 +1,3 @@
-/* @ts-nocheck */
 "use client";
 
 import { useRef, useState, useMemo, useEffect, useCallback } from "react";
@@ -19,6 +18,7 @@ import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import OpenCashDrawerDialog from "./OpenCashDrawerDialog";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
+import CashCloseTicket from "./CashCloseTicket";
 import { Skeleton } from "../ui/skeleton";
 import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
 import { getClientsWithCredit } from "@/lib/services/creditService";
@@ -26,6 +26,8 @@ import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 import { getProducts } from "@/lib/services/productService";
 import CodeScannerDialog from "./CodeScannerDialog";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 
 interface POSClientProps {
@@ -44,7 +46,12 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
+  const [printTicketSession, setPrintTicketSession] = useState<CashSession | null>(null);
+  const [ticketReady, setTicketReady] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
+  const printWindowRef = useRef<Window | null>(null);
+  const printOperationRef = useRef<{ isActive: boolean }>({ isActive: false });
+  const ticketElementRef = useRef<HTMLDivElement | null>(null);
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -70,6 +77,21 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       getClientsWithCredit().then(setAllClients);
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    if (printTicketSession) {
+      console.log('🔄 [TICKET] printTicketSession changed, setting ticketReady after delay...');
+      // Add a small delay to ensure React has time to render the element
+      const timeoutId = setTimeout(() => {
+        console.log('✅ [TICKET] Setting ticketReady to true');
+        setTicketReady(true);
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      setTicketReady(false);
+    }
+  }, [printTicketSession]);
 
 
   const addToCart = (product: Product, quantity: number = 1) => {
@@ -172,19 +194,356 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
   const handleCloseDrawer = async (actualCash: number) => {
     if (!userProfile || !activeSession) return;
+
+    console.log('🔄 [TICKET] handleCloseDrawer called with actualCash:', actualCash);
+    console.log('🔄 [TICKET] Active session:', activeSession.sessionId);
+
     try {
+        console.log('🔄 [TICKET] Closing cash session...');
         const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
+        console.log('✅ [TICKET] Cash session closed:', closedSession.sessionId);
+
         setActiveSession(null);
         setClosingDrawer(false);
-        toast({ title: "Turno Cerrado", description: `Diferencia de caja: ${formatCurrency(closedSession.difference || 0)}.`})
+
+        // Generate and print cash close ticket
+        console.log('🔄 [TICKET] Starting ticket printing process...');
+        toast({
+          title: '🔄 Cerrando turno...',
+          description: 'Generando ticket de corte de caja...',
+        });
+
+        await printCashCloseTicket(closedSession);
+
+        const difference = closedSession.difference || 0;
+        const diffText = difference === 0 ? 'Sin diferencias' : `Diferencia: ${formatCurrency(difference)}`;
+        toast({
+          title: "✅ Turno Cerrado",
+          description: `${diffText}. El ticket se está imprimiendo...`,
+        });
+
+        console.log('✅ [TICKET] Turno closed successfully, printing started');
     } catch(error) {
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo cerrar el turno de caja."})
+        console.error('❌ [TICKET] Error closing drawer:', error);
+        toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja."})
     }
   }
 
+  const printCashCloseTicket = async (session: CashSession) => {
+    console.log('🔄 [TICKET] printCashCloseTicket called with session:', session?.sessionId);
+
+    // Validate session data
+    if (!session?.sessionId) {
+      console.error('❌ [TICKET] Invalid session data for printing:', session);
+      toast({
+        title: '❌ Error de Impresión',
+        description: 'Datos de sesión inválidos',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    console.log('✅ [TICKET] Session data validated:', {
+      sessionId: session.sessionId,
+      cashierName: session.cashierName,
+      openingTime: session.openingTime,
+      closingTime: session.closingTime,
+      totalSales: session.totalSales
+    });
+
+    try {
+      console.log('🔄 [TICKET] Setting printTicketSession state...');
+      // Set session for printing - this will trigger the useEffect
+      setPrintTicketSession(session);
+      console.log('✅ [TICKET] printTicketSession state set, useEffect will trigger printing');
+    } catch (error) {
+      console.error('❌ [TICKET] Error setting printTicketSession:', error);
+      toast({
+        title: '❌ Error de Impresión',
+        description: 'No se pudo iniciar la impresión del ticket de corte de caja',
+        variant: 'destructive'
+      });
+      setPrintTicketSession(null);
+    }
+  };
+
+  // Effect to create and print ticket
+  useEffect(() => {
+    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
+      console.log('🔄 [TICKET] useEffect triggered:', { ticketReady, printSessionId: printTicketSession.sessionId });
+      printOperationRef.current.isActive = true;
+
+      // Wait for a frame to ensure the effect has completed
+      setTimeout(() => {
+        // Create the ticket element programmatically
+        const ticketElement = createTicketElement(printTicketSession);
+        console.log('🔄 [TICKET] Creating ticket element programmatically...');
+        console.log('🔄 [TICKET] Ticket element created:', {
+          id: ticketElement.id,
+          tagName: ticketElement.tagName,
+          hasChildren: ticketElement.children.length
+        });
+
+        // Append to body temporarily for html2canvas to capture
+        ticketElement.style.position = 'absolute';
+        ticketElement.style.left = '-9999px';
+        ticketElement.style.top = '0';
+        document.body.appendChild(ticketElement);
+
+        // Proceed with printing
+        console.log('✅ [TICKET] Ticket element ready, starting print...');
+        generateAndPrintPdf(ticketElement)
+          .then(() => {
+            if (printOperationRef.current.isActive) {
+              console.log('✅ [TICKET] PDF generation completed, cleaning up...');
+              // Remove the temporary element
+              if (ticketElement.parentNode) {
+                ticketElement.parentNode.removeChild(ticketElement);
+              }
+              setPrintTicketSession(null);
+            }
+          })
+          .catch((error) => {
+            if (printOperationRef.current.isActive) {
+              console.error('❌ [TICKET] Error in generateAndPrintPdf:', error);
+              toast({
+                title: '❌ Error de Impresión',
+                description: 'No se pudo imprimir el ticket. Recargue la página e intente nuevamente.',
+                variant: 'destructive'
+              });
+              setPrintTicketSession(null);
+            }
+          })
+          .finally(() => {
+            printOperationRef.current.isActive = false;
+            console.log('✅ [TICKET] Print operation completed');
+          });
+      }, 100);
+
+      return () => {
+        printOperationRef.current.isActive = false;
+      };
+    }
+  }, [ticketReady, printTicketSession, toast]);
+
+  const generateAndPrintPdf = async (ticketElement: HTMLElement) => {
+    console.log('🔄 [TICKET] Starting PDF generation...');
+    console.log('🔄 [TICKET] Ticket element found:', !!ticketElement);
+
+    try {
+      // Generate PDF
+      console.log('🔄 [TICKET] Generating canvas with html2canvas...');
+      const canvas = await html2canvas(ticketElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false, // Disable html2canvas internal logging
+        backgroundColor: '#ffffff',
+        width: 302, // 80mm at 96dpi
+        height: ticketElement.scrollHeight || 600
+      });
+
+      console.log('✅ [TICKET] Canvas generated:', {
+        width: canvas.width,
+        height: canvas.height
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      console.log('✅ [TICKET] Image data URL created');
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [80, canvas.height * 80 / canvas.width]
+      });
+
+      console.log('✅ [TICKET] PDF created with dimensions:', {
+        width: 80,
+        height: canvas.height * 80 / canvas.width
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, 80, canvas.height * 80 / canvas.width);
+
+      // Auto-print the PDF
+      pdf.autoPrint();
+      console.log('✅ [TICKET] PDF autoPrint configured');
+
+      // Create blob and URL
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      console.log('✅ [TICKET] Blob URL created:', url);
+
+      // Show info toast about printing
+      toast({
+        title: '🖨️ Imprimiendo ticket...',
+        description: 'Abriendo ventana de impresión. Si no se abre, verifique el bloqueador de popups.',
+      });
+
+      // Try to open print dialog
+      const printWindow = window.open(url, '_blank', 'width=800,height=600');
+      console.log('🔄 [TICKET] Attempting to open print window...');
+      console.log('🔄 [TICKET] Print window object:', printWindow);
+      console.log('🔄 [TICKET] Popup blocked?', !printWindow);
+
+      // Store reference for cleanup
+      printWindowRef.current = printWindow;
+
+      if (printWindow) {
+        printWindow.onload = () => {
+          console.log('✅ [TICKET] Print window loaded successfully');
+          console.log('🔄 [TICKET] Triggering print()...');
+          printWindow.print();
+
+          // Update toast
+          toast({
+            title: '✅ Impresión iniciada',
+            description: 'Use Ctrl+P o haga clic en imprimir',
+          });
+
+          setTimeout(() => {
+            if (!printWindow.closed) {
+              console.log('🔄 [TICKET] Closing print window...');
+              printWindow.close();
+            }
+            URL.revokeObjectURL(url);
+            printWindowRef.current = null;
+            console.log('✅ [TICKET] PDF generation and printing completed successfully');
+          }, 1000);
+        };
+
+        printWindow.onerror = (error) => {
+          console.error('❌ [TICKET] Print window error:', error);
+          toast({
+            title: '⚠️ Error en impresión',
+            description: 'Error al cargar la ventana de impresión. Descargando PDF...',
+            variant: 'destructive',
+          });
+          // Fallback to download
+          downloadPdf(pdf, `ticket-corte-${new Date().toISOString().split('T')[0]}.pdf`);
+          URL.revokeObjectURL(url);
+          printWindowRef.current = null;
+        };
+      } else {
+        // Window was blocked by popup blocker
+        console.warn('⚠️ [TICKET] Popup blocker detected! Window.open returned null');
+        toast({
+          title: '⚠️ Ventana bloqueada',
+          description: 'Su bloqueador de popups está impidiendo la impresión.',
+          variant: 'destructive',
+          duration: 5000,
+        });
+
+        // Wait a moment then show instructions
+        setTimeout(() => {
+          toast({
+            title: '📋 Instrucciones',
+            description: '1) Permita popups para este sitio 2) O descargue el PDF directamente',
+            duration: 7000,
+          });
+        }, 2000);
+
+        // Fallback: Download PDF directly
+        console.log('🔄 [TICKET] Falling back to direct download...');
+        downloadPdf(pdf, `ticket-corte-${new Date().toISOString().split('T')[0]}.pdf`);
+        URL.revokeObjectURL(url);
+        printWindowRef.current = null;
+        console.log('✅ [TICKET] PDF downloaded as fallback');
+      }
+    } catch (error) {
+      console.error('❌ [TICKET] Error generating PDF:', error);
+      toast({
+        title: '❌ Error al generar PDF',
+        description: 'No se pudo generar el ticket. Intente nuevamente.',
+        variant: 'destructive',
+      });
+      throw error; // Re-throw to be caught by calling function
+    }
+  };
+
+  // Create a DOM element directly for printing
+  const createTicketElement = (session: CashSession): HTMLElement => {
+    const container = document.createElement('div');
+    container.id = 'temp-ticket-' + session.sessionId;
+    container.style.cssText = `
+      width: 80mm;
+      padding: 10px;
+      background: white;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: black;
+    `;
+
+    const formatDate = (dateString: string | undefined) => {
+      if (!dateString) return 'N/A';
+      return new Date(dateString).toLocaleString('es-ES');
+    };
+
+    const formatCurrency = (value: number | undefined) => {
+      if (value === undefined || value === null) return '$0.00';
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN'
+      }).format(value);
+    };
+
+    container.innerHTML = `
+      <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
+        REPORTE DE CORTE DE CAJA
+      </div>
+      <div style="text-align: center; font-size: 10px; margin-bottom: 10px;">
+        22 ELECTRONIC GROUP
+      </div>
+      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+      <div><strong>Sesión:</strong> ${session.sessionId}</div>
+      <div><strong>Cajero:</strong> ${session.cashierName || 'N/A'}</div>
+      <div><strong>Fecha Apertura:</strong> ${formatDate(session.openingTime)}</div>
+      <div><strong>Fecha Cierre:</strong> ${formatDate(session.closingTime)}</div>
+
+      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+      <div><strong>Ventas Totales:</strong> ${formatCurrency(session.totalSales || 0)}</div>
+      <div><strong>Ventas en Efectivo:</strong> ${formatCurrency(session.totalCashSales || 0)}</div>
+      <div><strong>Ventas con Tarjeta:</strong> ${formatCurrency(session.totalCardSales || 0)}</div>
+      <div><strong>Cantidad de Ventas:</strong> ${session.salesCount || 0}</div>
+
+      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+      <div><strong>Arqueo:</strong></div>
+      <div>  Efectivo Inicial: ${formatCurrency(session.openingFloat || 0)}</div>
+      <div>  Efectivo en Caja: ${formatCurrency(session.actualCashInDrawer || 0)}</div>
+      <div>  Efectivo Esperado: ${formatCurrency(session.expectedCashInDrawer || 0)}</div>
+      <div>  <strong>Diferencia: ${formatCurrency(session.difference || 0)}</strong></div>
+
+      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+      <div style="text-align: center; font-size: 10px;">
+        ¡Gracias por su preferencia!
+      </div>
+    `;
+
+    return container;
+  };
+
+  const downloadPdf = (pdf: jsPDF, filename: string) => {
+    try {
+      pdf.save(filename);
+      console.log('✅ [TICKET] PDF downloaded successfully:', filename);
+      toast({
+        title: '📥 PDF descargado',
+        description: `Archivo guardado: ${filename}`,
+      });
+    } catch (error) {
+      console.error('❌ [TICKET] Error downloading PDF:', error);
+      toast({
+        title: '❌ Error al descargar',
+        description: 'No se pudo descargar el PDF',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const sanitize = (s: string) => s.toLowerCase().replace(/[\s\-_.]/g, "");
 
-  const tryFindProductByCode = (codeRaw: string): Product | null => {
+  const tryFindProductByCode = (codeRaw: string): Product | undefined => {
     const code = codeRaw.trim();
     const lower = code.toLowerCase();
     const sanitized = sanitize(code);
@@ -217,12 +576,12 @@ export default function POSClient({ initialProducts }: POSClientProps) {
           return sanitize(barcode) === sanitized;
         }
         return false;
-      }) || null;
+      }) || undefined;
     } catch {
       // ignore
     }
 
-    return match || null;
+    return match;
   };
 
   const handleScannedCode = (raw: string) => {
@@ -410,6 +769,16 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
       {/* Scanner Dialog */}
       <CodeScannerDialog open={isScannerOpen} onOpenChange={setScannerOpen} onResult={handleScannedCode} />
+
+      {/* Hidden ticket for printing */}
+      {printTicketSession && (
+        <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
+          <CashCloseTicket
+            id="cash-close-ticket"
+            session={printTicketSession}
+          />
+        </div>
+      )}
     </>
   );
 }
