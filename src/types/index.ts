@@ -304,6 +304,7 @@ export interface CashSession {
     expectedCashInDrawer: number;
     actualCashCount?: number;
     difference?: number;
+    ticketPdfUrl?: string;
 }
 
 export const TicketSettingsSchema = z.object({

@@ -28,6 +28,7 @@ const mapSession = (row: any): CashSession => ({
   expectedCashInDrawer: Number(row?.expectedCashInDrawer ?? 0),
   actualCashCount: row?.actualCashCount !== null ? Number(row.actualCashCount) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
+  ticketPdfUrl: row?.ticket_pdf_url ?? row?.ticketPdfUrl ?? undefined,
 });
 
 export const getAllClosedSessions = async (): Promise<CashSession[]> => {
@@ -177,4 +178,20 @@ export const closeCashSession = async (
     expectedCashInDrawer,
     difference,
   };
+};
+
+export const updateCashSessionTicketUrl = async (
+  sessionId: string,
+  ticketPdfUrl: string
+): Promise<void> => {
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from(CASH_SESSIONS_TABLE)
+    .update({ ticket_pdf_url: ticketPdfUrl })
+    .eq("firestore_id", sessionId);
+
+  if (error) {
+    log.error("Error updating cash session ticket URL", error);
+    throw new Error("Failed to update ticket PDF URL.");
+  }
 };
