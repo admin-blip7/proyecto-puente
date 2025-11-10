@@ -134,6 +134,7 @@ const replaceTokensInContent = (
 const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
   const fontFamily = element.fontFamily ?? 'Inter';
   const parts: string[] = [
+    `position:absolute`,
     `left:${(element.x ?? 0).toFixed(2)}mm`,
     `top:${(element.y ?? 0).toFixed(2)}mm`,
     `width:${(element.width ?? settings.width).toFixed(2)}mm`,
@@ -149,6 +150,7 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     }`,
     `text-align:${element.textAlign ?? 'center'}`,
     `padding:0`,
+    `margin:0`,
     `font-family:${fontFamily}`,
     `font-weight:${element.fontWeight ?? 700}`,
     `text-transform:capitalize`,
@@ -158,14 +160,20 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `line-height:1.2`,
     `flex-wrap:wrap`,
     `align-content:flex-start`,
+    `box-sizing:border-box`,
     // Force text color to black unless explicitly specified
     `color:${element.color ?? '#000000'}`,
+    // Add z-index to respect layering
+    `z-index:${element.zIndex ?? 0}`,
   ];
 
   if (element.type === 'text') {
     parts.push('height: auto');
+    parts.push('min-height: 0');
   } else {
     parts.push(`height:${(element.height ?? settings.height / 4).toFixed(2)}mm`);
+    parts.push(`max-height:${(element.height ?? settings.height / 4).toFixed(2)}mm`);
+    parts.push('overflow:hidden');
   }
 
   // Only set background color if explicitly provided
@@ -263,10 +271,39 @@ const getDocumentStyles = (origin: string = '') => `
   <style>
     /* Fuentes seguras primero */
     body { margin: 0; padding: 0; font-family: 'Inter', 'Arial', sans-serif; background: white; }
-    .label-canvas { position: relative; box-sizing: border-box; background: white; overflow: hidden; }
-    .label-element { position: absolute; box-sizing: border-box; }
-    .qr-canvas { width: 100%; height: 100%; }
-    .qr-placeholder { width: 80%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px); border-radius: 6px; }
+    .label-canvas { 
+      position: relative; 
+      box-sizing: border-box; 
+      background: white; 
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+    }
+    .label-element { 
+      position: absolute; 
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    .label-element svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .qr-canvas { 
+      width: 100%; 
+      height: 100%;
+      display: block;
+    }
+    .qr-placeholder { 
+      width: 80%; 
+      aspect-ratio: 1 / 1; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px); 
+      border-radius: 6px; 
+    }
     
     /* Fuentes Gilroy con fallback */
     @font-face { font-family: 'Gilroy'; src: local('Gilroy'), url('${origin}/font/Gilroy-Regular.ttf') format('truetype'); font-weight: 400; }
@@ -284,41 +321,41 @@ const generateAndInjectScripts = async (container: HTMLElement) => {
   const barcodeElements = container.querySelectorAll('svg[data-barcode-value]');
   for (const svg of barcodeElements) {
     const value = svg.getAttribute('data-barcode-value');
-    let height = parseInt(svg.getAttribute('data-barcode-height') || '30');
+    const height = parseInt(svg.getAttribute('data-barcode-height') || '30');
     const width = parseFloat(svg.getAttribute('data-barcode-width') || '1.4');
     const format = svg.getAttribute('data-barcode-format') || 'CODE128';
     const font = svg.getAttribute('data-barcode-font') || 'Inter';
 
     if (value) {
       try {
-        // Calculate adequate space for barcode numbers
-        // Text typically needs 20-25% of barcode height
-        const calculatedTextSize = Math.max(18, Math.round(height * 0.25));
-        const calculatedTextMargin = Math.max(12, Math.round(height * 0.30));
+        // Get the parent element to respect its dimensions
+        const parentElement = svg.parentElement;
+        const parentHeight = parentElement ? parentElement.offsetHeight : height;
+        const parentWidth = parentElement ? parentElement.offsetWidth : 0;
+        
+        // Calculate adequate space for barcode numbers based on available height
+        // Use a smaller text size relative to the actual height to ensure it fits
+        const calculatedTextSize = Math.max(10, Math.min(18, Math.round(height * 0.20)));
+        const calculatedTextMargin = Math.max(2, Math.round(height * 0.10));
+        
+        // Use the actual barcode height without adding extra space
+        const barcodeHeight = height;
 
-        // Adjust height to ensure full visibility of numbers
-        // Total height = barcode bars + text area
-        const totalBarcodeHeight = height + calculatedTextMargin + (calculatedTextSize * 0.6);
-        height = Math.max(height, Math.round(totalBarcodeHeight));
-
-        // Set explicit dimensions on SVG to ensure proper rendering
+        // Set explicit dimensions on SVG to match parent container
         const svgElement = svg as SVGElement;
-        const currentViewBox = svgElement.getAttribute('viewBox');
-        if (currentViewBox) {
-          const [, , vbWidth, vbHeight] = currentViewBox.split(' ').map(Number);
-          if (vbHeight < height) {
-            svgElement.setAttribute('viewBox', `0 0 ${vbWidth} ${height}`);
-            svgElement.setAttribute('height', height.toString());
-          }
-        }
-
-        // Use the imported JsBarcode directly with improved settings
+        svgElement.setAttribute('width', '100%');
+        svgElement.setAttribute('height', '100%');
+        svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        
+        // Use the imported JsBarcode directly with constrained settings
         (JsBarcode as any)(svgElement, value, {
           format,
           displayValue: true,
-          height,
+          height: barcodeHeight - calculatedTextSize - calculatedTextMargin - 2, // Reserve space for text
           width,
           margin: 0,
+          marginTop: 0,
+          marginBottom: 0,
           font,
           fontSize: calculatedTextSize,
           textMargin: calculatedTextMargin,
@@ -328,17 +365,10 @@ const generateAndInjectScripts = async (container: HTMLElement) => {
           textPosition: 'bottom',
         });
 
-        // Post-process: ensure the SVG has proper padding for text
-        try {
-          const bbox = (svgElement as any).getBBox();
-          const requiredHeight = bbox.y + bbox.height + calculatedTextMargin;
-          if (requiredHeight > height) {
-            svgElement.setAttribute('height', Math.ceil(requiredHeight).toString());
-          }
-        } catch (e) {
-          // Fallback if getBBox is not available
-          console.warn('Could not get bounding box for SVG, using calculated height');
-        }
+        // Ensure SVG doesn't exceed parent bounds
+        svgElement.style.maxWidth = '100%';
+        svgElement.style.maxHeight = '100%';
+        svgElement.style.display = 'block';
       } catch (error) {
         console.error('Error generating barcode:', error);
         svg.innerHTML = `<text style="font-family: monospace; font-size: 10px; fill: #000000;">${escapeHtml(value)}</text>`;

@@ -119,6 +119,7 @@ const replaceTokensInContent = (
 const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
   const fontFamily = element.fontFamily ?? 'Inter';
   const parts: string[] = [
+    `position:absolute`,
     `left:${(element.x ?? 0).toFixed(2)}mm`,
     `top:${(element.y ?? 0).toFixed(2)}mm`,
     `width:${(element.width ?? settings.width).toFixed(2)}mm`,
@@ -134,6 +135,7 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     }`,
     `text-align:${element.textAlign ?? 'center'}`,
     `padding:0`,
+    `margin:0`,
     `font-family:${fontFamily}`,
     `font-weight:${element.fontWeight ?? 700}`,
     `text-transform:capitalize`,
@@ -143,12 +145,17 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `line-height:1.2`,
     `flex-wrap:wrap`,
     `align-content:flex-start`,
+    `box-sizing:border-box`,
+    `z-index:${element.zIndex ?? 0}`,
   ];
 
   if (element.type === 'text') {
     parts.push('height: auto');
+    parts.push('min-height: 0');
   } else {
     parts.push(`height:${(element.height ?? settings.height / 4).toFixed(2)}mm`);
+    parts.push(`max-height:${(element.height ?? settings.height / 4).toFixed(2)}mm`);
+    parts.push('overflow:hidden');
   }
 
   if (element.color) parts.push(`color:${element.color}`);
@@ -246,10 +253,39 @@ const getDocumentStyles = (origin: string = '') => `
   <style>
     /* Fuentes seguras primero */
     body { margin: 0; padding: 0; font-family: 'Inter', 'Arial', sans-serif; background: white; }
-    .label-canvas { position: relative; box-sizing: border-box; background: white; overflow: hidden; }
-    .label-element { position: absolute; box-sizing: border-box; }
-    .qr-canvas { width: 100%; height: 100%; }
-    .qr-placeholder { width: 80%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px); border-radius: 6px; }
+    .label-canvas { 
+      position: relative; 
+      box-sizing: border-box; 
+      background: white; 
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+    }
+    .label-element { 
+      position: absolute; 
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    .label-element svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .qr-canvas { 
+      width: 100%; 
+      height: 100%;
+      display: block;
+    }
+    .qr-placeholder { 
+      width: 80%; 
+      aspect-ratio: 1 / 1; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      background-image: repeating-linear-gradient(45deg, rgba(15,23,42,0.2) 0, rgba(15,23,42,0.2) 6px, transparent 6px, transparent 12px); 
+      border-radius: 6px; 
+    }
     
     /* Fuentes Gilroy con fallback */
     @font-face { font-family: 'Gilroy'; src: local('Gilroy'), url('${origin}/font/Gilroy-Regular.ttf') format('truetype'); font-weight: 400; }
@@ -279,20 +315,43 @@ const generateAndInjectScripts = async (container: HTMLElement) => {
     if (value) {
       try {
         log.info(`Generating barcode for value: ${value}`);
-        (JsBarcode as any)(svg as SVGElement, value, {
+        
+        // Get the parent element to respect its dimensions
+        const parentElement = svg.parentElement;
+        const parentHeight = parentElement ? parentElement.offsetHeight : height;
+        
+        // Calculate adequate space for barcode numbers based on available height
+        const calculatedTextSize = Math.max(10, Math.min(18, Math.round(height * 0.20)));
+        const calculatedTextMargin = Math.max(2, Math.round(height * 0.10));
+        
+        // Set explicit dimensions on SVG to match parent container
+        const svgElement = svg as SVGElement;
+        svgElement.setAttribute('width', '100%');
+        svgElement.setAttribute('height', '100%');
+        svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        
+        (JsBarcode as any)(svgElement, value, {
           format,
           displayValue: true,
-          height,
+          height: height - calculatedTextSize - calculatedTextMargin - 2,
           width,
           margin: 0,
+          marginTop: 0,
+          marginBottom: 0,
           font,
-          fontSize: Math.max(16, Math.round(height * 0.25)),
-          textMargin: Math.max(8, Math.round(height * 0.15)),
+          fontSize: calculatedTextSize,
+          textMargin: calculatedTextMargin,
           background: '#ffffff',
           lineColor: '#000000',
           textAlign: 'center',
           textPosition: 'bottom',
         });
+        
+        // Ensure SVG doesn't exceed parent bounds
+        svgElement.style.maxWidth = '100%';
+        svgElement.style.maxHeight = '100%';
+        svgElement.style.display = 'block';
+        
         log.info('Barcode generated successfully');
       } catch (error) {
         log.error('Error generating barcode:', error);
