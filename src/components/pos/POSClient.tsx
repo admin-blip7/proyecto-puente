@@ -365,65 +365,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     }
   }, [toast]);
 
-  // Effect to create and print ticket
-  useEffect(() => {
-    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
-      console.log('🔄 [TICKET] useEffect triggered:', { ticketReady, printSessionId: printTicketSession.sessionId });
-      printOperationRef.current.isActive = true;
-
-      // Wait for a frame to ensure the effect has completed
-      setTimeout(() => {
-        // Create the ticket element programmatically
-        const ticketElement = createTicketElement(printTicketSession);
-        console.log('🔄 [TICKET] Creating ticket element programmatically...');
-        console.log('🔄 [TICKET] Ticket element created:', {
-          id: ticketElement.id,
-          tagName: ticketElement.tagName,
-          hasChildren: ticketElement.children.length
-        });
-
-        // Append to body temporarily for html2canvas to capture
-        ticketElement.style.position = 'absolute';
-        ticketElement.style.left = '-9999px';
-        ticketElement.style.top = '0';
-        document.body.appendChild(ticketElement);
-
-        // Proceed with printing
-        console.log('✅ [TICKET] Ticket element ready, starting print...');
-        generateAndPrintPdf(ticketElement)
-          .then(() => {
-            if (printOperationRef.current.isActive) {
-              console.log('✅ [TICKET] PDF generation completed, cleaning up...');
-              // Remove the temporary element
-              if (ticketElement.parentNode) {
-                ticketElement.parentNode.removeChild(ticketElement);
-              }
-              setPrintTicketSession(null);
-            }
-          })
-          .catch((error) => {
-            if (printOperationRef.current.isActive) {
-              console.error('❌ [TICKET] Error in generateAndPrintPdf:', error);
-              toast({
-                title: '❌ Error de Impresión',
-                description: 'No se pudo imprimir el ticket. Recargue la página e intente nuevamente.',
-                variant: 'destructive'
-              });
-              setPrintTicketSession(null);
-            }
-          })
-          .finally(() => {
-            printOperationRef.current.isActive = false;
-            console.log('✅ [TICKET] Print operation completed');
-          });
-      }, 100);
-
-      return () => {
-        printOperationRef.current.isActive = false;
-      };
-    }
-  }, [ticketReady, printTicketSession, toast, createTicketElement, generateAndPrintPdf]);
-
   const generateAndPrintPdf = useCallback(async (ticketElement: HTMLElement) => {
     console.log('🔄 [TICKET] Starting PDF generation...');
     console.log('🔄 [TICKET] Ticket element found:', !!ticketElement);
@@ -586,6 +527,65 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       throw error; // Re-throw to be caught by calling function
     }
   }, [printTicketSession, toast, downloadPdf]);
+
+  // Effect to create and print ticket
+  useEffect(() => {
+    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
+      console.log('🔄 [TICKET] useEffect triggered:', { ticketReady, printSessionId: printTicketSession.sessionId });
+      printOperationRef.current.isActive = true;
+
+      // Wait for a frame to ensure the effect has completed
+      setTimeout(() => {
+        // Create the ticket element programmatically
+        const ticketElement = createTicketElement(printTicketSession);
+        console.log('🔄 [TICKET] Creating ticket element programmatically...');
+        console.log('🔄 [TICKET] Ticket element created:', {
+          id: ticketElement.id,
+          tagName: ticketElement.tagName,
+          hasChildren: ticketElement.children.length
+        });
+
+        // Append to body temporarily for html2canvas to capture
+        ticketElement.style.position = 'absolute';
+        ticketElement.style.left = '-9999px';
+        ticketElement.style.top = '0';
+        document.body.appendChild(ticketElement);
+
+        // Proceed with printing
+        console.log('✅ [TICKET] Ticket element ready, starting print...');
+        generateAndPrintPdf(ticketElement)
+          .then(() => {
+            if (printOperationRef.current.isActive) {
+              console.log('✅ [TICKET] PDF generation completed, cleaning up...');
+              // Remove the temporary element
+              if (ticketElement.parentNode) {
+                ticketElement.parentNode.removeChild(ticketElement);
+              }
+              setPrintTicketSession(null);
+            }
+          })
+          .catch((error) => {
+            if (printOperationRef.current.isActive) {
+              console.error('❌ [TICKET] Error in generateAndPrintPdf:', error);
+              toast({
+                title: '❌ Error de Impresión',
+                description: 'No se pudo imprimir el ticket. Recargue la página e intente nuevamente.',
+                variant: 'destructive'
+              });
+              setPrintTicketSession(null);
+            }
+          })
+          .finally(() => {
+            printOperationRef.current.isActive = false;
+            console.log('✅ [TICKET] Print operation completed');
+          });
+      }, 100);
+
+      return () => {
+        printOperationRef.current.isActive = false;
+      };
+    }
+  }, [ticketReady, printTicketSession, toast, createTicketElement, generateAndPrintPdf]);
 
   const sanitize = (s: string) => s.toLowerCase().replace(/[\s\-_.]/g, "");
 
