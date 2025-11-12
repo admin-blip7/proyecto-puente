@@ -41,8 +41,18 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     log.error("Error uploading ticket PDF", error);
+    
+    // Provide more detailed error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const detailedError = errorMessage.includes("bucket")
+      ? "Storage bucket 'cash-session-tickets' does not exist. Please run the setup script."
+      : `Failed to upload ticket PDF: ${errorMessage}`;
+    
     return NextResponse.json(
-      { error: "Failed to upload ticket PDF" },
+      { 
+        error: detailedError,
+        details: errorMessage 
+      },
       { status: 500 }
     );
   }

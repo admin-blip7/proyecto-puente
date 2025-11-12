@@ -425,11 +425,24 @@ export default function POSClient({ initialProducts }: POSClientProps) {
           const uploadData = await uploadResponse.json();
           console.log('✅ [TICKET] PDF uploaded to storage:', uploadData.url);
         } else {
-          console.warn('⚠️ [TICKET] Failed to upload PDF to storage, continuing with print...');
+          const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
+          console.warn('⚠️ [TICKET] Failed to upload PDF to storage:', errorData.error || errorData.details);
+          console.warn('⚠️ [TICKET] Continuing with print... The PDF will not be saved to the cloud.');
+          // Show warning toast but don't block the print
+          toast({
+            title: '⚠️ Aviso',
+            description: 'El ticket se imprimirá pero no se guardará en la nube. Contacte al administrador.',
+            variant: 'default',
+          });
         }
       } catch (uploadError) {
         console.error('❌ [TICKET] Error uploading PDF:', uploadError);
         // Continue with printing even if upload fails
+        toast({
+          title: '⚠️ Aviso',
+          description: 'El ticket se imprimirá pero no se guardará en la nube.',
+          variant: 'default',
+        });
       }
 
       // Auto-print the PDF
