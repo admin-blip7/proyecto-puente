@@ -19,14 +19,14 @@ const STORAGE_RECEIPTS_PATH = "receipts";
 
 const mapExpense = (row: any): Expense => ({
   id: row?.firestore_id ?? row?.id ?? "",
-  expenseId: row?.expenseId ?? "",
+  expenseId: row?.expense_id ?? row?.expenseId ?? "",
   description: row?.description ?? "",
   category: row?.category ?? "",
   amount: Number(row?.amount ?? 0),
-  paidFromAccountId: row?.paidFromAccountId ?? "",
-  paymentDate: toDate(row?.paymentDate),
-  receiptUrl: row?.receiptUrl ?? undefined,
-  sessionId: row?.sessionId ?? undefined,
+  paidFromAccountId: row?.paid_from_account_id ?? row?.paidFromAccountId ?? "",
+  paymentDate: toDate(row?.payment_date ?? row?.paymentDate),
+  receiptUrl: row?.receipt_url ?? row?.receiptUrl ?? undefined,
+  sessionId: row?.session_id ?? row?.sessionId ?? undefined,
 });
 
 export const getExpenses = async (): Promise<Expense[]> => {
@@ -35,7 +35,7 @@ export const getExpenses = async (): Promise<Expense[]> => {
     const { data, error } = await supabase
       .from(EXPENSES_TABLE)
       .select("*")
-      .order("paymentDate", { ascending: false });
+      .order("payment_date", { ascending: false });
 
     if (error) {
       throw error;
@@ -102,14 +102,14 @@ export const addExpense = async (
 
   const expensePayload = {
     firestore_id: firestoreId,
-    expenseId,
+    expense_id: expenseId,
     description: expenseData.description,
     category: expenseData.category,
     amount: expenseData.amount,
-    paidFromAccountId: expenseData.paidFromAccountId,
-    paymentDate,
-    receiptUrl: receiptUrl ?? null,
-    sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (expenseData.sessionId || null),
+    paid_from_account_id: expenseData.paidFromAccountId,
+    payment_date: paymentDate,
+    receipt_url: receiptUrl ?? null,
+    session_id: activeSession ? (activeSession.firestore_id || activeSession.id) : (expenseData.sessionId || null),
   };
 
   const { data: insertedExpense, error: insertError } = await supabase
@@ -130,8 +130,8 @@ export const addExpense = async (
       expensePayload: {
         ...expensePayload,
         // Don't log sensitive data but log the structure
-        hasValidAccountId: !!expensePayload.paidFromAccountId,
-        accountId: expensePayload.paidFromAccountId
+        hasValidAccountId: !!expensePayload.paid_from_account_id,
+        accountId: expensePayload.paid_from_account_id
       }
     });
     throw new Error(`No se pudo registrar el gasto: ${insertError.message}`);
@@ -144,7 +144,7 @@ export const addExpense = async (
   // Try firestore_id first
   const { data: byFirestoreId, error: errorFirestore } = await supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id,currentBalance")
+    .select("firestore_id,current_balance")
     .eq("firestore_id", expenseData.paidFromAccountId)
     .maybeSingle();
   
@@ -154,7 +154,7 @@ export const addExpense = async (
     // If not found by firestore_id, try with id field
     const { data: byId, error: errorId } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("firestore_id,currentBalance")
+      .select("firestore_id,current_balance")
       .eq("id", expenseData.paidFromAccountId)
       .maybeSingle();
     
@@ -179,7 +179,7 @@ export const addExpense = async (
     throw new Error(`No se encontró la cuenta seleccionada. ID: ${expenseData.paidFromAccountId}`);
   }
 
-  const newBalance = Number(accountRow.currentBalance ?? 0) - expenseData.amount;
+  const newBalance = Number(accountRow.current_balance ?? accountRow.currentBalance ?? 0) - expenseData.amount;
   // Update account balance with more specific ID matching
   let accountUpdateError = null;
   // First try updating with firestore_id

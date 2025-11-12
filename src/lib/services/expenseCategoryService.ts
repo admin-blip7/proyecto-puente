@@ -12,7 +12,7 @@ const CATEGORIES_TABLE = "expense_categories";
 const mapCategory = (row: any): ExpenseCategory => ({
   id: row?.firestore_id ?? row?.id ?? "",
   name: row?.name ?? "",
-  isActive: Boolean(row?.isActive ?? false),
+  isActive: Boolean(row?.is_active ?? row?.isActive ?? false),
 });
 
 export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
@@ -21,11 +21,24 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
     const { data, error } = await supabase
       .from(CATEGORIES_TABLE)
       .select("*")
-      .eq("isActive", true)
+      .eq("is_active", true)
       .order("name", { ascending: true });
 
     if (error) {
-      throw error;
+      log.error("Error fetching expense categories", { 
+        error, 
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details
+      });
+      
+      // Provide helpful error message
+      if (error.code === '42P01') {
+        throw new Error(`La tabla 'expense_categories' no existe. Por favor ejecuta el script de configuración.`);
+      }
+      
+      throw new Error(`Error al cargar categorías: ${error.message}`);
     }
 
     const categories = (data ?? []).map(mapCategory);
@@ -50,7 +63,7 @@ export const addExpenseCategory = async (
     const payload = {
       firestore_id: firestoreId,
       name: categoryData.name,
-      isActive: categoryData.isActive ?? true,
+      is_active: categoryData.isActive ?? true,
     };
 
     const { data, error } = await supabase
@@ -60,7 +73,18 @@ export const addExpenseCategory = async (
       .single();
 
     if (error || !data) {
-      throw error ?? new Error("No se pudo crear la categoría.");
+      log.error("Error inserting expense category", {
+        error,
+        code: error?.code,
+        message: error?.message,
+        payload
+      });
+      
+      if (error?.code === '42P01') {
+        throw new Error(`La tabla 'expense_categories' no existe. Por favor ejecuta el script de configuración.`);
+      }
+      
+      throw new Error(`Error al crear categoría: ${error?.message || 'Unknown error'}`);
     }
 
     return mapCategory(data);
@@ -76,9 +100,15 @@ export const updateExpenseCategory = async (
 ): Promise<void> => {
   try {
     const supabase = getSupabaseServerClient();
+    
+    // Convert camelCase to snake_case for database
+    const dbPayload: any = {};
+    if (dataToUpdate.name !== undefined) dbPayload.name = dataToUpdate.name;
+    if (dataToUpdate.isActive !== undefined) dbPayload.is_active = dataToUpdate.isActive;
+    
     const { error } = await supabase
       .from(CATEGORIES_TABLE)
-      .update(dataToUpdate)
+      .update(dbPayload)
       .or(`firestore_id.eq.${categoryId},id.eq.${categoryId}`);
 
     if (error) {
