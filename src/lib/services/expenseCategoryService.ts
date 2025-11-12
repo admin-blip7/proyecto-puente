@@ -25,7 +25,20 @@ export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
       .order("name", { ascending: true });
 
     if (error) {
-      throw error;
+      log.error("Error fetching expense categories", { 
+        error, 
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details
+      });
+      
+      // Provide helpful error message
+      if (error.code === '42P01') {
+        throw new Error(`La tabla 'expense_categories' no existe. Por favor ejecuta el script de configuración.`);
+      }
+      
+      throw new Error(`Error al cargar categorías: ${error.message}`);
     }
 
     const categories = (data ?? []).map(mapCategory);
@@ -60,7 +73,18 @@ export const addExpenseCategory = async (
       .single();
 
     if (error || !data) {
-      throw error ?? new Error("No se pudo crear la categoría.");
+      log.error("Error inserting expense category", {
+        error,
+        code: error?.code,
+        message: error?.message,
+        payload
+      });
+      
+      if (error?.code === '42P01') {
+        throw new Error(`La tabla 'expense_categories' no existe. Por favor ejecuta el script de configuración.`);
+      }
+      
+      throw new Error(`Error al crear categoría: ${error?.message || 'Unknown error'}`);
     }
 
     return mapCategory(data);

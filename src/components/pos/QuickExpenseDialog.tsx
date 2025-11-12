@@ -43,9 +43,18 @@ export default function QuickExpenseDialog({ isOpen, onOpenChange, onExpenseAdde
 
   useEffect(() => {
     if (isOpen) {
-      getExpenseCategories().then(setCategories);
+      getExpenseCategories()
+        .then(setCategories)
+        .catch((error) => {
+          console.error('Error loading categories:', error);
+          toast({ 
+            variant: 'destructive', 
+            title: "Error al cargar categorías", 
+            description: error.message || "No se pudieron cargar las categorías. Verifique la configuración de la base de datos."
+          });
+        });
     }
-  }, [isOpen]);
+  }, [isOpen, toast]);
 
   const handleAddNewCategory = async () => {
     if (!newCategoryName.trim()) return;
@@ -58,7 +67,13 @@ export default function QuickExpenseDialog({ isOpen, onOpenChange, onExpenseAdde
       setOpenCategoryPopover(false);
       toast({ title: "Categoría Agregada", description: `Se agregó "${newCategory.name}".`});
     } catch (error) {
-      toast({ variant: 'destructive', title: "Error", description: "No se pudo agregar la categoría."});
+      console.error('Error adding category:', error);
+      const errorMessage = error instanceof Error ? error.message : "No se pudo agregar la categoría.";
+      toast({ 
+        variant: 'destructive', 
+        title: "Error al agregar categoría", 
+        description: errorMessage
+      });
     } finally {
       setLoading(false);
     }
