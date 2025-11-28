@@ -14,7 +14,7 @@ BEGIN
   JOIN cash_sessions cs ON cs.session_id = s.session_id
   WHERE cs.firestore_id = p_session_id
     AND s.payment_method = 'Efectivo'
-    AND s.status = 'completed';
+    AND (s.status = 'completed' OR s.status IS NULL);
 
   -- Calcular ventas con tarjeta para esta sesión
   SELECT COALESCE(SUM(total_amount), 0)
@@ -22,8 +22,8 @@ BEGIN
   FROM sales s
   JOIN cash_sessions cs ON cs.session_id = s.session_id
   WHERE cs.firestore_id = p_session_id
-    AND s.payment_method = 'Tarjeta'
-    AND s.status = 'completed';
+    AND (s.payment_method = 'Tarjeta de Crédito' OR s.payment_method = 'Tarjeta')
+    AND (s.status = 'completed' OR s.status IS NULL);
 
   -- Actualizar la sesión de caja con los nuevos totales
   UPDATE cash_sessions
@@ -60,15 +60,15 @@ BEGIN
   FROM sales
   WHERE session_id = v_session_record.session_id
     AND payment_method = 'Efectivo'
-    AND status = 'completed';
+    AND (status = 'completed' OR status IS NULL);
 
   -- Calcular ventas con tarjeta
   SELECT COALESCE(SUM(total_amount), 0)
   INTO v_total_card_sales
   FROM sales
   WHERE session_id = v_session_record.session_id
-    AND payment_method = 'Tarjeta'
-    AND status = 'completed';
+    AND (payment_method = 'Tarjeta de Crédito' OR payment_method = 'Tarjeta')
+    AND (status = 'completed' OR status IS NULL);
 
   -- Actualizar la sesión
   UPDATE cash_sessions

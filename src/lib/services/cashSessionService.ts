@@ -5,6 +5,7 @@ import { CashSession } from "@/types";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+import { getSalesBySession } from "./salesService";
 
 const log = getLogger("cashSessionService");
 
@@ -29,6 +30,56 @@ const mapSession = (row: any): CashSession => ({
   actualCashCount: row?.actualCashCount !== null ? Number(row.actualCashCount) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
 });
+
+/**
+ * Helper function to calculate totals on the fly
+ * This bypasses the database triggers/RPCs which might have column name mismatches
+ */
+const enrichSessionWithTotals = async (session: CashSession): Promise<CashSession> => {
+  try {
+    // Fetch all sales for this session (using fallback logic for robustness)
+    log.info(`Enriching session ${session.sessionId} with totals. Date range: ${session.openedAt} - ${session.closedAt || 'now'}`);
+
+    const sales = await getSalesBySession(
+      session.sessionId,
+      session.openedBy,
+      session.openedAt,
+      session.closedAt || new Date()
+    );
+
+    log.info(`Found ${sales.length} sales for session ${session.sessionId}`);
+
+    // Calculate totals
+    let totalCashSales = 0;
+    let totalCardSales = 0;
+
+    for (const sale of sales) {
+      if (sale.status === 'cancelled') continue;
+
+      if (sale.paymentMethod === 'Efectivo') {
+        totalCashSales += sale.totalAmount;
+      } else if (sale.paymentMethod === 'Tarjeta de Crédito' || (sale.paymentMethod as string) === 'Tarjeta') {
+        totalCardSales += sale.totalAmount;
+      }
+    }
+
+    log.info(`Calculated totals: Cash=${totalCashSales}, Card=${totalCardSales}`);
+
+    const expectedCashInDrawer = session.startingFloat + totalCashSales - session.totalCashPayouts;
+    const difference = (session.actualCashCount || 0) - expectedCashInDrawer;
+
+    return {
+      ...session,
+      totalCashSales,
+      totalCardSales,
+      expectedCashInDrawer,
+      difference: session.actualCashCount !== undefined ? difference : undefined
+    };
+  } catch (error) {
+    log.error("Error enriching session with totals", error);
+    return session; // Return original session on error
+  }
+};
 
 export const getAllClosedSessions = async (): Promise<CashSession[]> => {
   try {
@@ -65,10 +116,57 @@ export const getCurrentOpenSession = async (userId: string): Promise<CashSession
       .maybeSingle();
 
     if (error) throw error;
-    return data ? mapSession(data) : null;
+
+    if (!data) return null;
+
+    const session = mapSession(data);
+    return await enrichSessionWithTotals(session);
   } catch (error) {
     log.error("Error fetching open session", error);
     throw new Error("Failed to fetch open session.");
+  }
+};
+
+export const getAllOpenSessions = async (): Promise<CashSession[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(CASH_SESSIONS_TABLE)
+      .select("*")
+      .eq("status", "Abierto");
+
+    if (error) throw error;
+    return (data ?? []).map(mapSession);
+  } catch (error) {
+    log.error("Error fetching open sessions", error);
+    return [];
+  }
+};
+
+export const getSessionForDate = async (date: Date): Promise<CashSession | null> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const { data, error } = await supabase
+      .from(CASH_SESSIONS_TABLE)
+      .select("*")
+      .gte("openedAt", startOfDay.toISOString())
+      .lte("openedAt", endOfDay.toISOString())
+      .order("openedAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return mapSession(data);
+  } catch (error) {
+    log.error("Error fetching session for date", error);
+    return null;
   }
 };
 
@@ -112,7 +210,26 @@ export const closeCashSession = async (
   actualCashCount: number
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
-  const expectedCashInDrawer = session.startingFloat + session.totalCashSales - session.totalCashPayouts;
+
+  // Fetch the latest session data to ensure we have up-to-date totals
+  // The session object passed from client might be stale
+  const { data: freshSessionData, error: fetchError } = await supabase
+    .from(CASH_SESSIONS_TABLE)
+    .select("*")
+    .eq("firestore_id", session.id)
+    .single();
+
+  if (fetchError || !freshSessionData) {
+    log.error("Error fetching fresh session data for closing", fetchError);
+    throw new Error("Failed to fetch latest session data.");
+  }
+
+  const freshSession = mapSession(freshSessionData);
+
+  // Recalculate totals one last time to be sure
+  const enrichedSession = await enrichSessionWithTotals(freshSession);
+
+  const expectedCashInDrawer = enrichedSession.startingFloat + enrichedSession.totalCashSales - enrichedSession.totalCashPayouts;
   const difference = actualCashCount - expectedCashInDrawer;
   const closedAt = nowIso();
 
@@ -126,6 +243,9 @@ export const closeCashSession = async (
       actualCashCount,
       expectedCashInDrawer,
       difference,
+      // Also update the calculated totals in DB so they are correct for history
+      totalCashSales: enrichedSession.totalCashSales,
+      totalCardSales: enrichedSession.totalCardSales
     })
     .eq("firestore_id", session.id);
 
@@ -134,41 +254,11 @@ export const closeCashSession = async (
     throw new Error("Failed to close cash session.");
   }
 
-  try {
-    const { data: accounts, error: accountsError } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .select("firestore_id,name,currentBalance")
-      .in("name", ["Caja Chica", "Banco Principal"]);
-
-    if (!accountsError && accounts) {
-      await Promise.all(
-        accounts.map(async (account) => {
-          let delta = 0;
-          if (account.name === "Caja Chica") {
-            delta = session.totalCashSales;
-          }
-          if (account.name === "Banco Principal") {
-            delta = session.totalCardSales;
-          }
-          if (delta > 0) {
-            const newBalance = Number(account.currentBalance ?? 0) + delta;
-            const { error: updateError } = await supabase
-              .from(ACCOUNTS_TABLE)
-              .update({ current_balance: newBalance })
-              .eq("firestore_id", account.firestore_id ?? account.id);
-            if (updateError) {
-              throw updateError;
-            }
-          }
-        })
-      );
-    }
-  } catch (accountsErr) {
-    log.warn("Skipping account balance updates", accountsErr);
-  }
+  // NOTE: Account balance updates now happen separately via depositToCajaChica
+  // This allows explicit verification of cash deposit amount before updating Caja Chica
 
   return {
-    ...session,
+    ...enrichedSession,
     status: "Cerrado",
     closedBy: userId,
     closedByName: userName,
@@ -177,4 +267,62 @@ export const closeCashSession = async (
     expectedCashInDrawer,
     difference,
   };
+};
+
+/**
+ * Deposits a specified amount to Caja Chica account
+ * This function should be called after cash session closure with explicit user verification
+ */
+export const depositToCajaChica = async (
+  sessionId: string,
+  depositAmount: number
+): Promise<void> => {
+  if (depositAmount < 0) {
+    throw new Error("Deposit amount cannot be negative.");
+  }
+
+  if (depositAmount === 0) {
+    log.info(`No deposit made for session ${sessionId} - amount is 0`);
+    return;
+  }
+
+  const supabase = getSupabaseServerClient();
+
+  try {
+    // Find Caja Chica account
+    const { data: cajaChicaAccount, error: findError } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("id,firestore_id,name,current_balance")
+      .eq("name", "Caja Chica")
+      .maybeSingle();
+
+    if (findError) {
+      log.error("Error finding Caja Chica account", findError);
+      throw new Error("Failed to find Caja Chica account.");
+    }
+
+    if (!cajaChicaAccount) {
+      log.error("Caja Chica account not found");
+      throw new Error("Caja Chica account does not exist.");
+    }
+
+    // Update balance
+    const currentBalance = Number(cajaChicaAccount.current_balance ?? 0);
+    const newBalance = currentBalance + depositAmount;
+
+    const { error: updateError } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .update({ current_balance: newBalance })
+      .eq("firestore_id", cajaChicaAccount.firestore_id ?? cajaChicaAccount.id);
+
+    if (updateError) {
+      log.error("Error updating Caja Chica balance", updateError);
+      throw new Error("Failed to update Caja Chica balance.");
+    }
+
+    log.info(`Successfully deposited ${depositAmount} to Caja Chica for session ${sessionId}`);
+  } catch (error) {
+    log.error("Error in depositToCajaChica", error);
+    throw error;
+  }
 };

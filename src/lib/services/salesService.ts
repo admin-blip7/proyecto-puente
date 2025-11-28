@@ -1,3 +1,5 @@
+"use server";
+
 import { Sale, CartItem } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
@@ -52,7 +54,7 @@ export const getSales = async (includeStatus?: 'all' | 'completed' | 'cancelled'
     }
 
     const sales = (data || []).map(mapSale);
-    
+
     // Debug: Log para verificar si la venta SALE-731410C0 está en los resultados
     const targetSale = sales.find(s => s.saleId === 'SALE-731410C0');
     if (targetSale) {
@@ -65,11 +67,72 @@ export const getSales = async (includeStatus?: 'all' | 'completed' | 'cancelled'
       log.warn('SALE-731410C0 not found in getSales results');
       log.info('Available saleIds (first 10):', sales.slice(0, 10).map(s => s.saleId));
     }
-    
+
     return sales;
   } catch (error) {
     log.error("Error in getSales", error);
     throw error;
+  }
+};
+
+export const getSalesBySession = async (
+  sessionId: string,
+  cashierId?: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<Sale[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+
+    // 1. Try fetching by sessionId (camelCase)
+    let { data, error } = await supabase
+      .from(SALES_TABLE)
+      .select("*")
+      .eq("sessionId", sessionId)
+      .order("createdAt", { ascending: false });
+
+    // 2. Fallback: If no sales found and we have time range info, try fetching by time range
+    if ((!data || data.length === 0) && cashierId && startDate && endDate) {
+      log.info(`No sales found by session ID ${sessionId}, trying time range fallback...`);
+      log.info(`Fallback params: cashierId=${cashierId}, start=${startDate.toISOString()}, end=${endDate.toISOString()}`);
+
+      // Fetch recent sales for this cashier and filter in memory to avoid DB type errors
+      // (createdAt might be mixed JSON/String types causing SQL errors with gte/lte)
+      const { data: dataTime, error: errorTime } = await supabase
+        .from(SALES_TABLE)
+        .select("*")
+        .eq("cashierId", cashierId)
+        .order("createdAt", { ascending: false })
+        .limit(100);
+
+      if (errorTime) {
+        log.error("Error in fallback sales fetch:", errorTime);
+      } else {
+        // Filter in memory
+        const filteredSales = (dataTime || []).filter(row => {
+          const rowDate = toDate(row.createdAt);
+          return rowDate >= startDate && rowDate <= endDate;
+        });
+
+        log.info(`Fallback found ${filteredSales.length} sales (filtered from ${dataTime?.length || 0})`);
+
+        if (filteredSales.length > 0) {
+          data = filteredSales;
+          error = null;
+        }
+      }
+    }
+
+    if (error) {
+      log.error("Error fetching sales by session", error);
+      // Don't throw, just return empty to avoid breaking the UI
+      return [];
+    }
+
+    return (data || []).map(mapSale);
+  } catch (error) {
+    log.error("Error in getSalesBySession", error);
+    return [];
   }
 };
 
@@ -234,8 +297,24 @@ export const addSaleAndUpdateStock = async (
     // Actualizar inventario para cada item
     for (const item of cartItems) {
       try {
+        // Si es una reparación, procesar la recolección de ganancias
+        if (item.repairId) {
+          log.info(`Processing repair collection for repairId: ${item.repairId}`);
+          const { error: repairError } = await supabase.rpc('collect_repair_profit', {
+            p_repair_id: item.repairId
+          });
+
+          if (repairError) {
+            log.error(`Error collecting profit for repair ${item.repairId}`, repairError);
+            // No lanzamos error para no detener la venta, pero logueamos el fallo
+          } else {
+            log.info(`Successfully collected profit for repair ${item.repairId}`);
+          }
+          continue; // Saltar actualización de stock para reparaciones
+        }
+
         log.info(`Updating stock for product: ${item.name} (ID: ${item.id})`);
-        
+
         // Obtener el producto actual usando firestore_id
         const { data: product, error: productError } = await supabase
           .from(PRODUCTS_TABLE)
@@ -261,7 +340,7 @@ export const addSaleAndUpdateStock = async (
         // Actualizar el stock usando firestore_id
         const { error: updateError } = await supabase
           .from(PRODUCTS_TABLE)
-          .update({ 
+          .update({
             stock: newStock,
             updated_at: now
           })
@@ -306,7 +385,7 @@ export const addSaleAndUpdateStock = async (
     if (crmClientId && !skipCrmInteraction) {
       try {
         log.info(`Updating CRM client ${crmClientId} with sale info`);
-        
+
         // First fetch the client by firestore_id to get the database ID and current purchases
         const { data: clientData, error: fetchError } = await supabase
           .from('crm_clients')
@@ -320,12 +399,12 @@ export const addSaleAndUpdateStock = async (
         }
 
         const dbClientId = clientData.id;
-        
+
         // Update client total_purchases (sum, not replace) and last_contact_date
         const currentTotal = clientData.total_purchases || 0;
         const newTotalPurchases = currentTotal + saleData.totalAmount;
         log.info(`Updating client ${crmClientId} total_purchases: ${currentTotal} + ${saleData.totalAmount} = ${newTotalPurchases}`);
-        
+
         const { data: updatedClient, error: updateError } = await supabase
           .from('crm_clients')
           .update({

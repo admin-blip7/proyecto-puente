@@ -15,10 +15,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3, Trash2, Loader2 } from "lucide-react";
+import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3, Trash2, Loader2, Printer } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
+import SaleSummaryDialog from "@/components/pos/SaleSummaryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -50,7 +51,7 @@ interface SalesHistoryClientProps {
 export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
   const [sales, setSales] = useState<Sale[]>(() => initialSales);
   const router = useRouter();
-  
+
   // Sync sales state with initialSales prop if it changes
   React.useEffect(() => {
     setSales(prevSales => {
@@ -69,12 +70,14 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   }, [initialSales]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
+  const [saleToReprint, setSaleToReprint] = useState<Sale | null>(null);
+  const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [excludeFamiliar, setExcludeFamiliar] = useState(false);
   const [sortField, setSortField] = useState<keyof Sale | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
-  
+
   // Selection state
   const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -88,15 +91,20 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
   const handleWarrantyCreated = (warranty: Warranty) => {
     toast({
-        title: "Garantía Registrada",
-        description: `Se ha creado la garantía para el producto ${warranty.productName}.`
+      title: "Garantía Registrada",
+      description: `Se ha creado la garantía para el producto ${warranty.productName}.`
     });
     setWarrantyDialogOpen(false);
     setSelectedSale(null);
   }
 
+  const handleReprintTicket = (sale: Sale) => {
+    setSaleToReprint(sale);
+    setIsReprintDialogOpen(true);
+  };
+
   const toggleCollapsible = (saleId: string) => {
-    setOpenCollapsibles(prev => ({...prev, [saleId]: !prev[saleId]}));
+    setOpenCollapsibles(prev => ({ ...prev, [saleId]: !prev[saleId] }));
   }
 
   const handleSort = (field: keyof Sale) => {
@@ -110,7 +118,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     }
   };
 
-  
+
 
   const getProduct = useCallback((productId: string) => {
     return products.find(p => p.id === productId);
@@ -124,7 +132,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   }> = ({ children, field, className }) => {
     const isActive = sortField === field;
     const direction = isActive ? sortDirection : null;
-    
+
     return (
       <Button
         variant="ghost"
@@ -151,7 +159,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const deduplicatedSales = useMemo(() => {
     const seenIds = new Set();
     const uniqueSales = [];
-    
+
     for (const sale of sales) {
       const id = sale.id || sale.saleId;
       if (!seenIds.has(id)) {
@@ -159,11 +167,11 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         uniqueSales.push(sale);
       }
     }
-    
+
     if (seenIds.size !== sales.length) {
       console.warn(`Removed ${sales.length - uniqueSales.length} duplicate sales entries`);
     }
-    
+
     return uniqueSales;
   }, [sales]);
 
@@ -219,7 +227,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const selectAllState = useMemo(() => {
     const visibleSaleIds = filteredSales.map(sale => sale.saleId);
     const selectedVisible = visibleSaleIds.filter(id => selectedSaleIds.has(id));
-    
+
     if (selectedVisible.length === 0) {
       return { checked: false, indeterminate: false };
     } else if (selectedVisible.length === visibleSaleIds.length) {
@@ -293,7 +301,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         .filter((r: any) => r.success)
         .map((r: any) => r.saleId);
 
-      setSales(prevSales => 
+      setSales(prevSales =>
         prevSales.filter(sale => !successfulIds.includes(sale.saleId))
       );
 
@@ -342,16 +350,16 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       if (invalidSales.length > 0) {
         console.warn('Sales with invalid IDs found:', invalidSales.length);
       }
-      
+
       // Check for duplicate saleIds
       const saleIds = sales.map(s => s.saleId).filter(Boolean);
       const duplicateIds = saleIds.filter((id, index) => saleIds.indexOf(id) !== index);
       if (duplicateIds.length > 0) {
         console.warn('Duplicate saleIds found:', [...new Set(duplicateIds)]);
       }
-      
+
       console.log('Total sales loaded:', sales.length);
-      
+
       // Debug: Check for the specific sale SALE-731410C0
       const targetSale = sales.find(s => s.saleId === 'SALE-731410C0');
       if (targetSale) {
@@ -379,16 +387,16 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
     let dailyCost = 0;
     let dailyProfit = 0;
-    
+
     todaySales.forEach(sale => {
-        sale.items.forEach(item => {
-            const product = getProduct(item.productId);
-            if (product && (!excludeFamiliar || product.ownershipType !== 'Familiar')) {
-                const cost = product.cost || 0;
-                dailyCost += cost * item.quantity;
-                dailyProfit += (item.priceAtSale - cost) * item.quantity;
-            }
-        });
+      sale.items.forEach(item => {
+        const product = getProduct(item.productId);
+        if (product && (!excludeFamiliar || product.ownershipType !== 'Familiar')) {
+          const cost = product.cost || 0;
+          dailyCost += cost * item.quantity;
+          dailyProfit += (item.priceAtSale - cost) * item.quantity;
+        }
+      });
     });
 
     return { dailyCost, dailyProfit };
@@ -417,8 +425,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => router.push('/admin/sales/consignor-reports')}
             className="flex items-center gap-2"
           >
@@ -465,7 +473,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         </Card>
       )}
 
-       <div className="grid gap-4 md:grid-cols-2 mb-4">
+      <div className="grid gap-4 md:grid-cols-2 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Costo Total del Día</CardTitle>
@@ -494,10 +502,10 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-370px)]">
-             <div className="relative w-full overflow-auto">
-                <Table>
+            <div className="relative w-full overflow-auto">
+              <Table>
                 <TableHeader>
-                    <TableRow>
+                  <TableRow>
                     <TableHead className="w-[40px]">
                       <Checkbox
                         checked={selectAllState.indeterminate ? "indeterminate" : selectAllState.checked}
@@ -525,107 +533,111 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                       <SortableHeader field="totalAmount" className="justify-end">Monto Total</SortableHeader>
                     </TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredSales.map((sale, index) => {
-                      // Create a unique key that combines sale id, saleId, timestamp and index to ensure uniqueness
-                      const uniqueKey = `${sale.id || sale.saleId}-${sale.createdAt.getTime()}-${index}`;
-                      const collapsibleKey = uniqueKey;
-                      
-                      return (
+                  {filteredSales.map((sale, index) => {
+                    // Create a unique key that combines sale id, saleId, timestamp and index to ensure uniqueness
+                    const uniqueKey = `${sale.id || sale.saleId}-${sale.createdAt.getTime()}-${index}`;
+                    const collapsibleKey = uniqueKey;
+
+                    return (
                       <Fragment key={uniqueKey}>
-                          <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox
-                                    checked={selectedSaleIds.has(sale.saleId)}
-                                    onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
-                                    aria-label={`Seleccionar venta ${sale.saleId}`}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="icon">
-                                      {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                      <span className="sr-only">Toggle details</span>
-                                  </Button>
-                                </TableCell>
-                                <TableCell className="font-medium">{sale.saleId}</TableCell>
-                                <TableCell>
-                                {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
-                                </TableCell>
-                                <TableCell>
-                                    <div className="font-medium">{sale.customerName || 'N/A'}</div>
-                                    <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
-                                </TableCell>
-                                <TableCell>{sale.cashierName}</TableCell>
-                                <TableCell>
-                                <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
-                                    {sale.paymentMethod}
-                                </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">{formatCurrency(sale.totalAmount)}</TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                                            <span className="sr-only">Abrir menú</span>
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
-                                            <ShieldPlus className="mr-2 h-4 w-4" />
-                                            <span>Registrar Garantía</span>
-                                        </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                            {openCollapsibles[collapsibleKey] && (
-                              <TableRow>
-                                  <TableCell colSpan={9} className="p-0 border-0">
-                                      <div className="p-4 bg-muted/50">
-                                        <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
-                                        <Table>
-                                            <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Producto</TableHead>
-                                                <TableHead>Series/IMEIs</TableHead>
-                                                <TableHead className="text-right">Cantidad</TableHead>
-                                                <TableHead className="text-right">Precio Unit.</TableHead>
-                                                <TableHead className="text-right">Costo Unit.</TableHead>
-                                                <TableHead className="text-right">Ganancia</TableHead>
-                                            </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                            {sale.items.map((item, itemIndex) => {
-                                                const product = getProduct(item.productId);
-                                                const cost = product?.cost || 0;
-                                                const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
-                                                return (
-                                                <TableRow key={`${uniqueKey}-item-${itemIndex}-${item.productId}-${item.serials?.join('-') || 'no-serials'}`}>
-                                                    <TableCell>{item.name}</TableCell>
-                                                    <TableCell>{renderSerials(item, sale.saleId)}</TableCell>
-                                                    <TableCell className="text-right">{item.quantity}</TableCell>
-                                                    <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
-                                    <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
-                                    {formatCurrency(profit)}
-                                    </TableCell>
-                                                </TableRow>
-                                                );
-                                            })}
-                                            </TableBody>
-                                        </Table>
-                                      </div>
-                                  </TableCell>
-                              </TableRow>
-                            )}
-                        </Fragment>
-                      );
-                    })}
+                        <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedSaleIds.has(sale.saleId)}
+                              onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
+                              aria-label={`Seleccionar venta ${sale.saleId}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon">
+                              {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <span className="sr-only">Toggle details</span>
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-medium">{sale.saleId}</TableCell>
+                          <TableCell>
+                            {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{sale.customerName || 'N/A'}</div>
+                            <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
+                          </TableCell>
+                          <TableCell>{sale.cashierName}</TableCell>
+                          <TableCell>
+                            <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
+                              {sale.paymentMethod}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(sale.totalAmount)}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                                  <span className="sr-only">Abrir menú</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
+                                  <ShieldPlus className="mr-2 h-4 w-4" />
+                                  <span>Registrar Garantía</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReprintTicket(sale); }}>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  <span>Reimprimir Ticket</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                        {openCollapsibles[collapsibleKey] && (
+                          <TableRow>
+                            <TableCell colSpan={9} className="p-0 border-0">
+                              <div className="p-4 bg-muted/50">
+                                <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Producto</TableHead>
+                                      <TableHead>Series/IMEIs</TableHead>
+                                      <TableHead className="text-right">Cantidad</TableHead>
+                                      <TableHead className="text-right">Precio Unit.</TableHead>
+                                      <TableHead className="text-right">Costo Unit.</TableHead>
+                                      <TableHead className="text-right">Ganancia</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {sale.items.map((item, itemIndex) => {
+                                      const product = getProduct(item.productId);
+                                      const cost = product?.cost || 0;
+                                      const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
+                                      return (
+                                        <TableRow key={`${uniqueKey}-item-${itemIndex}-${item.productId}-${item.serials?.join('-') || 'no-serials'}`}>
+                                          <TableCell>{item.name}</TableCell>
+                                          <TableCell>{renderSerials(item, sale.saleId)}</TableCell>
+                                          <TableCell className="text-right">{item.quantity}</TableCell>
+                                          <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
+                                          <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
+                                          <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
+                                            {formatCurrency(profit)}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
-                </Table>
+              </Table>
             </div>
           </ScrollArea>
         </CardContent>
@@ -673,10 +685,18 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
       {selectedSale && (
         <CreateWarrantyDialog
-            isOpen={isWarrantyDialogOpen}
-            onOpenChange={setWarrantyDialogOpen}
-            sale={selectedSale}
-            onWarrantyCreated={handleWarrantyCreated}
+          isOpen={isWarrantyDialogOpen}
+          onOpenChange={setWarrantyDialogOpen}
+          sale={selectedSale}
+          onWarrantyCreated={handleWarrantyCreated}
+        />
+      )}
+
+      {saleToReprint && (
+        <SaleSummaryDialog
+          isOpen={isReprintDialogOpen}
+          onOpenChange={setIsReprintDialogOpen}
+          sale={saleToReprint}
         />
       )}
     </>

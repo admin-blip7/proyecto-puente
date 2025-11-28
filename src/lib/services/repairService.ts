@@ -53,6 +53,26 @@ export const getRepairOrders = async (): Promise<RepairOrder[]> => {
   }
 };
 
+export const getReadyRepairs = async (): Promise<RepairOrder[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(REPAIRS_TABLE)
+      .select("*")
+      .eq("status", "Listo para Entrega")
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapRepairOrder);
+  } catch (error) {
+    log.error("Error fetching ready repairs", error);
+    return [];
+  }
+};
+
 const getNextOrderId = async (): Promise<string> => {
   const supabase = getSupabaseServerClient();
   const { count, error } = await supabase
@@ -113,7 +133,7 @@ export const addRepairOrder = async (
       try {
         log.info(`Creating/linking CRM client for repair: ${orderData.customerName}`);
         const { createCRMClientFromSale } = await import("./crmClientService");
-        
+
         const crmClient = await createCRMClientFromSale({
           name: orderData.customerName,
           phone: orderData.customerPhone,

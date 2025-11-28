@@ -38,9 +38,12 @@ interface RepairDashboardProps {
 const statusIcons = {
   "Recibido": Receipt,
   "En progreso": Timer,
-  "Listo para entrega": Check,
+  "Listo para Entrega": Check,
   "Cancelado": X,
   "Completado": Check,
+  "En Diagnóstico": Timer,
+  "Esperando Refacción": Timer,
+  "En Reparación": Timer,
 };
 
 const serviceIcons = {
@@ -60,7 +63,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [isPrintDialogOpen, setPrintDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["Recibido", "Listo para entrega"]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["Recibido", "Listo para Entrega"]);
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleOrderAdded = (newOrder: RepairOrder) => {
@@ -113,8 +116,8 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
         </div>
       `;
     } else {
-        const { header, body, footer } = ticketSettings;
-        content = `
+      const { header, body, footer } = ticketSettings;
+      content = `
             <div style="width: 80mm; font-family: 'Courier New', Courier, monospace; color: black; padding: 3mm; font-size: ${body.fontSize === 'xs' ? '10px' : body.fontSize === 'sm' ? '12px' : '14px'};">
                 <div style="text-align: center; margin-bottom: 1rem;">
                 ${header.showLogo && header.logoUrl ? `<img src="${header.logoUrl}" alt="Logo" style="max-width: 60px; max-height: 60px; margin: 0 auto;"/>` : ''}
@@ -146,19 +149,19 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
     printWindow.document.write('</body></html>');
 
     if (isLabel) {
-        try {
-             JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
-                format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
-            });
-        } catch(e) { console.error(e); }
+      try {
+        JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
+          format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
+        });
+      } catch (e) { console.error(e); }
     }
 
     printWindow.document.close();
     printWindow.focus();
 
     setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
+      printWindow.print();
+      printWindow.close();
     }, 250);
   };
 
@@ -178,7 +181,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
     const counts = {
       "Recibido": 0,
       "En progreso": 0,
-      "Listo para entrega": 0,
+      "Listo para Entrega": 0,
       "Cancelado": 0,
       "Completado": 0,
     };
@@ -203,7 +206,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
   const statusCards = [
     { key: "Recibido", label: "Nuevas órdenes", color: "blue", bgColor: "bg-blue-100", darkBgColor: "dark:bg-blue-900", iconColor: "text-blue-500" },
     { key: "En progreso", label: "En progreso", color: "yellow", bgColor: "bg-yellow-100", darkBgColor: "dark:bg-yellow-900", iconColor: "text-yellow-500" },
-    { key: "Listo para entrega", label: "Listos para entrega", color: "green", bgColor: "bg-green-100", darkBgColor: "dark:bg-green-900", iconColor: "text-green-500" },
+    { key: "Listo para Entrega", label: "Listos para entrega", color: "green", bgColor: "bg-green-100", darkBgColor: "dark:bg-green-900", iconColor: "text-green-500" },
     { key: "Completado", label: "Completadas", color: "green", bgColor: "bg-emerald-100", darkBgColor: "dark:bg-emerald-900", iconColor: "text-emerald-600" },
     { key: "Cancelado", label: "Cancelados", color: "red", bgColor: "bg-red-100", darkBgColor: "dark:bg-red-900", iconColor: "text-red-500" },
   ];
@@ -251,9 +254,8 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* Tarjeta para ver todas las órdenes */}
           <Card
-            className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-              selectedStatuses.length === 0 ? 'ring-2 ring-primary' : ''
-            }`}
+            className={`p-4 cursor-pointer transition-all hover:shadow-md ${selectedStatuses.length === 0 ? 'ring-2 ring-primary' : ''
+              }`}
             onClick={() => setSelectedStatuses([])}
           >
             <CardContent className="p-0">
@@ -278,9 +280,8 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
             return (
               <Card
                 key={card.key}
-                className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-                  isActive ? 'ring-2 ring-primary' : ''
-                }`}
+                className={`p-4 cursor-pointer transition-all hover:shadow-md ${isActive ? 'ring-2 ring-primary' : ''
+                  }`}
                 onClick={() => handleStatusCardClick(card.key)}
               >
                 <CardContent className="p-0">
@@ -358,7 +359,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
                   className="w-full justify-start"
                   onClick={() => {
                     setSearchTerm("");
-                    setSelectedStatuses(["Listo para entrega"]);
+                    setSelectedStatuses(["Listo para Entrega"]);
                   }}
                 >
                   Listas para entregar
@@ -368,7 +369,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
                   className="w-full justify-start"
                   onClick={() => {
                     setSearchTerm("");
-                    setSelectedStatuses(["Completado", "Listo para entrega"]);
+                    setSelectedStatuses(["Completado", "Listo para Entrega"]);
                   }}
                 >
                   Completadas
@@ -388,12 +389,11 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
 
               return (
                 <Card key={order.id} className="p-4 shadow-lg relative">
-                  <span className={`absolute top-4 right-4 text-xs font-semibold px-2 py-1 rounded-full ${
-                    isStatusNew ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" :
+                  <span className={`absolute top-4 right-4 text-xs font-semibold px-2 py-1 rounded-full ${isStatusNew ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" :
                     isStatusInProgress ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300" :
-                    isStatusReady ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300" :
-                    "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300"
-                  }`}>
+                      isStatusReady ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300" :
+                        "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300"
+                    }`}>
                     {order.status}
                   </span>
 

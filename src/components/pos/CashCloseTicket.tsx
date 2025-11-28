@@ -1,9 +1,11 @@
 "use client";
 
-import { CashSession } from "@/types";
+import { CashSession, Income } from "@/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatCurrency } from "@/lib/utils";
+import { getIncomesBySession } from "@/lib/services/incomeService";
+import { useEffect, useState } from "react";
 
 interface CashCloseTicketProps {
   session: CashSession;
@@ -34,6 +36,14 @@ export default function CashCloseTicket({
     fontFamily: "'Courier New', Courier, monospace",
   };
 
+  const [incomes, setIncomes] = useState<Income[]>([]);
+
+  useEffect(() => {
+    if (session?.sessionId) {
+      getIncomesBySession(session.sessionId).then(setIncomes);
+    }
+  }, [session?.sessionId]);
+
   return (
     <div
       className="cash-close-ticket bg-white text-black font-mono shadow-lg p-3 text-xs"
@@ -55,7 +65,7 @@ export default function CashCloseTicket({
       </div>
 
       <hr className="border-dashed border-black my-2" />
-      
+
       {/* Session Info */}
       <div className="space-y-1 mb-3">
         <p><strong>Turno:</strong></p>
@@ -70,7 +80,7 @@ export default function CashCloseTicket({
       </div>
 
       <hr className="border-dashed border-black my-2" />
-      
+
       {/* Sales Summary */}
       <div className="space-y-1 mb-3">
         <p className="font-bold">RESUMEN DE VENTAS:</p>
@@ -90,10 +100,32 @@ export default function CashCloseTicket({
           <span>Gastos de Caja:</span>
           <span>{formatCurrency(session.totalCashPayouts ?? 0)}</span>
         </div>
+        <div className="flex justify-between">
+          <span>Ingresos de Caja:</span>
+          <span>{formatCurrency(incomes.reduce((acc, inc) => acc + inc.amount, 0))}</span>
+        </div>
       </div>
 
       <hr className="border-dashed border-black my-2" />
-      
+
+      {/* Incomes Detail */}
+      {incomes.length > 0 && (
+        <>
+          <div className="space-y-1 mb-3">
+            <p className="font-bold">DETALLE DE INGRESOS:</p>
+            {incomes.map((income, index) => (
+              <div key={index} className="flex justify-between">
+                <span>{income.description || income.category}</span>
+                <span>{formatCurrency(income.amount)}</span>
+              </div>
+            ))}
+          </div>
+          <hr className="border-dashed border-black my-2" />
+        </>
+      )}
+
+      <hr className="border-dashed border-black my-2" />
+
       {/* Cash Count */}
       <div className="space-y-1 mb-3">
         <p className="font-bold">CONTEO DE EFECTIVO:</p>
@@ -116,7 +148,7 @@ export default function CashCloseTicket({
       </div>
 
       <hr className="border-dashed border-black my-2" />
-      
+
       {/* Totals */}
       <div className="space-y-1 mb-4">
         <div className="flex justify-between font-bold text-base border-t border-dashed border-black pt-1">
@@ -124,7 +156,7 @@ export default function CashCloseTicket({
           <span>{formatCurrency((session.totalCashSales ?? 0) + (session.totalCardSales ?? 0))}</span>
         </div>
       </div>
-      
+
       {/* Footer */}
       <div className="text-center space-y-2">
         <p className="text-xs">*** CORTE DE CAJA FINALIZADO ***</p>

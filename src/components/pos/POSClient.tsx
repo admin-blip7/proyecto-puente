@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo, useEffect, useCallback } from "react";
-import { Product, CartItem, CashSession, ClientProfile } from "@/types";
+import { Product, CartItem, CashSession, ClientProfile, Expense, Sale, Income } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
 import ShoppingCart from "./ShoppingCart";
@@ -11,13 +11,24 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getCurrentOpenSession, openCashSession, closeCashSession } from "@/lib/services/cashSessionService";
+import { getCurrentOpenSession, openCashSession, closeCashSession, depositToCajaChica } from "@/lib/services/cashSessionService";
+import { getExpensesBySession } from "@/lib/services/financeService";
+import { getIncomesBySession } from "@/lib/services/incomeService";
+import { getSalesBySession } from "@/lib/services/salesService";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import OpenCashDrawerDialog from "./OpenCashDrawerDialog";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
+import CashDepositVerificationDialog from "./CashDepositVerificationDialog";
 import CashCloseTicket from "./CashCloseTicket";
 import { Skeleton } from "../ui/skeleton";
 import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
@@ -43,12 +54,51 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [activeSession, setActiveSession] = useState<CashSession | null | undefined>(undefined); // undefined means loading
   const [isOpeningDrawer, setOpeningDrawer] = useState(false);
   const [isClosingDrawer, setClosingDrawer] = useState(false);
+  const [showDepositVerification, setShowDepositVerification] = useState(false);
+  const [closedSessionData, setClosedSessionData] = useState<CashSession | null>(null);
   const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
+  const [showRepairsDialog, setShowRepairsDialog] = useState(false);
   const [printTicketSession, setPrintTicketSession] = useState<CashSession | null>(null);
+  const [ticketExpenses, setTicketExpenses] = useState<Expense[]>([]);
+  const [ticketIncomes, setTicketIncomes] = useState<Income[]>([]);
+  const [ticketSales, setTicketSales] = useState<Sale[]>([]);
   const [ticketReady, setTicketReady] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
+
+  const handleAddRepairToCart = (repair: RepairOrder) => {
+    const repairProduct: Product = {
+      id: `repair-${repair.id}`,
+      firestore_id: `repair-${repair.id}`,
+      sku: `REP-${repair.orderId}`,
+      name: `Reparación #${repair.orderId} - ${repair.deviceModel}`,
+      description: repair.reportedIssue,
+      price: repair.totalPrice,
+      cost: repair.totalCost,
+      stock: 1,
+      minStock: 0,
+      categoryId: 'services',
+      categoryName: 'Servicios',
+      type: 'Servicio',
+      ownershipType: 'Propio',
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const cartItem: CartItem = {
+      ...repairProduct,
+      quantity: 1,
+      repairId: repair.id
+    };
+
+    setCart(prev => [...prev, cartItem]);
+    toast({
+      title: "Reparación agregada",
+      description: `Orden #${repair.orderId} agregada al carrito.`
+    });
+  };
   const printWindowRef = useRef<Window | null>(null);
   const printOperationRef = useRef<{ isActive: boolean }>({ isActive: false });
   const ticketElementRef = useRef<HTMLDivElement | null>(null);
@@ -61,6 +111,12 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     try {
       const updatedProducts = await getProducts();
       setProducts(updatedProducts);
+
+      // Also refresh the active session to get updated totals
+      if (userProfile) {
+        const session = await getCurrentOpenSession(userProfile.uid);
+        setActiveSession(session);
+      }
     } catch (error) {
       console.error('Error refreshing products:', error);
       toast({
@@ -69,12 +125,15 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, userProfile]);
 
   useEffect(() => {
     if (userProfile) {
       getCurrentOpenSession(userProfile.uid).then(setActiveSession);
       getClientsWithCredit().then(setAllClients);
+
+      // FORCE CLEAR any residual localStorage item that might be causing the dialog to pop up
+      localStorage.removeItem('pendingDepositVerification');
     }
   }, [userProfile]);
 
@@ -97,7 +156,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const addToCart = (product: Product, quantity: number = 1) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
-      
+
       const fullProduct = products.find(p => p.id === product.id);
       if (!fullProduct) return prevCart; // Should not happen
 
@@ -113,7 +172,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       if (quantity <= fullProduct.stock) {
         const newItem = { ...fullProduct, quantity: quantity };
         if (prevCart.length === 0) {
-            setSelectedCartItem(newItem);
+          setSelectedCartItem(newItem);
         }
         return [...prevCart, newItem];
       }
@@ -133,22 +192,22 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
   const updateQuantity = (productId: string, quantity: number) => {
     setCart((prevCart) => {
-       const productInStock = products.find(p => p.id === productId);
-       if (!productInStock) return prevCart;
+      const productInStock = products.find(p => p.id === productId);
+      if (!productInStock) return prevCart;
 
-       const newQuantity = Math.max(0, Math.min(quantity, productInStock.stock));
-       
-       if (newQuantity === 0) {
-         const newCart = prevCart.filter((item) => item.id !== productId);
-         if(selectedCartItem?.id === productId) {
-            const newSelectedItem = newCart.length > 0 ? newCart[0] : null;
-            setSelectedCartItem(newSelectedItem);
-         }
-         return newCart;
-       }
-       return prevCart.map((item) =>
-         item.id === productId ? { ...item, quantity: newQuantity } : item
-       );
+      const newQuantity = Math.max(0, Math.min(quantity, productInStock.stock));
+
+      if (newQuantity === 0) {
+        const newCart = prevCart.filter((item) => item.id !== productId);
+        if (selectedCartItem?.id === productId) {
+          const newSelectedItem = newCart.length > 0 ? newCart[0] : null;
+          setSelectedCartItem(newSelectedItem);
+        }
+        return newCart;
+      }
+      return prevCart.map((item) =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      );
     });
   };
 
@@ -161,16 +220,16 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     return products.filter(
       (product) =>
         (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())) &&
+          product.sku.toLowerCase().includes(searchQuery.toLowerCase())) &&
         product.type === 'Venta'
     );
   }, [products, searchQuery]);
-  
+
   const selectedProductDetails = useMemo(() => {
     if (!selectedCartItem) return null;
     return products.find(p => p.id === selectedCartItem.id);
   }, [selectedCartItem, products]);
-  
+
   const comboProducts = useMemo(() => {
     if (!selectedProductDetails || !selectedProductDetails.comboProductIds) return [];
     return selectedProductDetails.comboProductIds.map(id => products.find(p => p.id === id)).filter(Boolean) as Product[];
@@ -183,88 +242,124 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const handleOpenDrawer = async (startingFloat: number) => {
     if (!userProfile) return;
     try {
-        const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat);
-        setActiveSession(newSession);
-        setOpeningDrawer(false);
-        toast({ title: "Turno Abierto", description: "La caja está lista para registrar ventas."})
-    } catch(error) {
-        toast({ variant: 'destructive', title: "Error", description: "No se pudo abrir el turno de caja."})
+      const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat);
+      setActiveSession(newSession);
+      setOpeningDrawer(false);
+      toast({ title: "Turno Abierto", description: "La caja está lista para registrar ventas." })
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error", description: "No se pudo abrir el turno de caja." })
     }
   }
 
   const handleCloseDrawer = async (actualCash: number) => {
     if (!userProfile || !activeSession) return;
 
-    console.log('🔄 [TICKET] handleCloseDrawer called with actualCash:', actualCash);
-    console.log('🔄 [TICKET] Active session:', activeSession.sessionId);
+    console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
+    console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
-        console.log('🔄 [TICKET] Closing cash session...');
-        const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
-        console.log('✅ [TICKET] Cash session closed:', closedSession.sessionId);
+      console.log('🔄 [SESSION] Closing cash session...');
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
+      console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
-        setActiveSession(null);
-        setClosingDrawer(false);
+      setActiveSession(null);
+      setClosingDrawer(false);
 
-        // Generate and print cash close ticket
-        console.log('🔄 [TICKET] Starting ticket printing process...');
-        toast({
-          title: '🔄 Cerrando turno...',
-          description: 'Generando ticket de corte de caja...',
-        });
+      // Save closed session and show deposit verification dialog
+      setClosedSessionData(closedSession);
+      setShowDepositVerification(true);
 
-        await printCashCloseTicket(closedSession);
+      toast({
+        title: "✅ Turno Cerrado",
+        description: "Ahora verifica el depósito a Caja Chica",
+      });
 
-        const difference = closedSession.difference || 0;
-        const diffText = difference === 0 ? 'Sin diferencias' : `Diferencia: ${formatCurrency(difference)}`;
-        toast({
-          title: "✅ Turno Cerrado",
-          description: `${diffText}. El ticket se está imprimiendo...`,
-        });
-
-        console.log('✅ [TICKET] Turno closed successfully, printing started');
-    } catch(error) {
-        console.error('❌ [TICKET] Error closing drawer:', error);
-        toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja."})
+      console.log('✅ [SESSION] Session closed, showing deposit verification');
+    } catch (error) {
+      console.error('❌ [SESSION] Error closing drawer:', error);
+      toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja." })
     }
   }
 
-  const printCashCloseTicket = async (session: CashSession) => {
-    console.log('🔄 [TICKET] printCashCloseTicket called with session:', session?.sessionId);
+  const handleDepositConfirmation = async (depositAmount: number) => {
+    if (!closedSessionData) return;
 
-    // Validate session data
-    if (!session?.sessionId) {
-      console.error('❌ [TICKET] Invalid session data for printing:', session);
-      toast({
-        title: '❌ Error de Impresión',
-        description: 'Datos de sesión inválidos',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    console.log('✅ [TICKET] Session data validated:', {
-      sessionId: session.sessionId,
-      cashierName: session.cashierName,
-      openingTime: session.openingTime,
-      closingTime: session.closingTime,
-      totalSales: session.totalSales
-    });
+    console.log('🔄 [DEPOSIT] Confirming deposit:', depositAmount);
 
     try {
-      console.log('🔄 [TICKET] Setting printTicketSession state...');
-      // Set session for printing - this will trigger the useEffect
-      setPrintTicketSession(session);
-      console.log('✅ [TICKET] printTicketSession state set, useEffect will trigger printing');
-    } catch (error) {
-      console.error('❌ [TICKET] Error setting printTicketSession:', error);
+      await depositToCajaChica(closedSessionData.sessionId, depositAmount);
+      console.log('✅ [DEPOSIT] Successfully deposited to Caja Chica');
+
       toast({
-        title: '❌ Error de Impresión',
-        description: 'No se pudo iniciar la impresión del ticket de corte de caja',
-        variant: 'destructive'
+        title: "✅ Depósito Confirmado",
+        description: `${formatCurrency(depositAmount)} agregados a Caja Chica`,
       });
-      setPrintTicketSession(null);
+
+      // Now print the ticket after deposit confirmation
+      await printCashCloseTicket(closedSessionData);
+
+      setClosedSessionData(null);
+      setShowDepositVerification(false);
+    } catch (error) {
+      console.error('❌ [DEPOSIT] Error depositing to Caja Chica:', error);
+      throw error; // Re-throw to let the dialog handle it
     }
+  }
+
+  const handleSkipDeposit = () => {
+    console.log('⚠️ [DEPOSIT] User skipped deposit to Caja Chica');
+
+    if (!closedSessionData) return;
+
+    toast({
+      title: "ℹ️ Depósito Omitido",
+      description: "No se realizó depósito a Caja Chica",
+    });
+
+    // Print ticket even if deposit was skipped
+    printCashCloseTicket(closedSessionData);
+
+    setClosedSessionData(null);
+    setShowDepositVerification(false);
+  }
+
+  const printCashCloseTicket = async (session: CashSession) => {
+    console.log('🔄 [TICKET] Preparing ticket for session:', session.sessionId);
+
+    // Fetch expenses and sales for this session
+    try {
+      const expenses = await getExpensesBySession(
+        session.sessionId,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+      console.log('✅ [TICKET] Expenses fetched:', expenses.length);
+      setTicketExpenses(expenses);
+
+      const incomes = await getIncomesBySession(
+        session.sessionId,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+      console.log('✅ [TICKET] Incomes fetched:', incomes.length);
+      setTicketIncomes(incomes);
+
+      const sales = await getSalesBySession(
+        session.sessionId,
+        session.openedBy,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+      console.log('✅ [TICKET] Sales fetched:', sales.length);
+      setTicketSales(sales);
+    } catch (error) {
+      console.error('❌ [TICKET] Error fetching data:', error);
+      setTicketExpenses([]);
+      setTicketSales([]);
+    }
+
+    setPrintTicketSession(session);
+    setTicketReady(true);
   };
 
   // Effect to create and print ticket
@@ -275,49 +370,15 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
       // Wait for a frame to ensure the effect has completed
       setTimeout(() => {
-        // Create the ticket element programmatically
-        const ticketElement = createTicketElement(printTicketSession);
-        console.log('🔄 [TICKET] Creating ticket element programmatically...');
-        console.log('🔄 [TICKET] Ticket element created:', {
-          id: ticketElement.id,
-          tagName: ticketElement.tagName,
-          hasChildren: ticketElement.children.length
-        });
-
-        // Append to body temporarily for html2canvas to capture
-        ticketElement.style.position = 'absolute';
-        ticketElement.style.left = '-9999px';
-        ticketElement.style.top = '0';
-        document.body.appendChild(ticketElement);
+        // Create the ticket HTML string
+        const ticketHtml = createTicketHtml(printTicketSession);
 
         // Proceed with printing
-        console.log('✅ [TICKET] Ticket element ready, starting print...');
-        generateAndPrintPdf(ticketElement)
-          .then(() => {
-            if (printOperationRef.current.isActive) {
-              console.log('✅ [TICKET] PDF generation completed, cleaning up...');
-              // Remove the temporary element
-              if (ticketElement.parentNode) {
-                ticketElement.parentNode.removeChild(ticketElement);
-              }
-              setPrintTicketSession(null);
-            }
-          })
-          .catch((error) => {
-            if (printOperationRef.current.isActive) {
-              console.error('❌ [TICKET] Error in generateAndPrintPdf:', error);
-              toast({
-                title: '❌ Error de Impresión',
-                description: 'No se pudo imprimir el ticket. Recargue la página e intente nuevamente.',
-                variant: 'destructive'
-              });
-              setPrintTicketSession(null);
-            }
-          })
-          .finally(() => {
-            printOperationRef.current.isActive = false;
-            console.log('✅ [TICKET] Print operation completed');
-          });
+        console.log('✅ [TICKET] Ticket HTML ready, starting print...');
+        printHtml(ticketHtml);
+
+        setPrintTicketSession(null);
+        printOperationRef.current.isActive = false;
       }, 100);
 
       return () => {
@@ -326,202 +387,165 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     }
   }, [ticketReady, printTicketSession, toast]);
 
-  const generateAndPrintPdf = async (ticketElement: HTMLElement) => {
-    console.log('🔄 [TICKET] Starting PDF generation...');
-    console.log('🔄 [TICKET] Ticket element found:', !!ticketElement);
-
-    try {
-      // Generate PDF
-      console.log('🔄 [TICKET] Generating canvas with html2canvas...');
-      const canvas = await html2canvas(ticketElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false, // Disable html2canvas internal logging
-        backgroundColor: '#ffffff',
-        width: 302, // 80mm at 96dpi
-        height: ticketElement.scrollHeight || 600
-      });
-
-      console.log('✅ [TICKET] Canvas generated:', {
-        width: canvas.width,
-        height: canvas.height
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      console.log('✅ [TICKET] Image data URL created');
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [80, canvas.height * 80 / canvas.width]
-      });
-
-      console.log('✅ [TICKET] PDF created with dimensions:', {
-        width: 80,
-        height: canvas.height * 80 / canvas.width
-      });
-
-      pdf.addImage(imgData, 'PNG', 0, 0, 80, canvas.height * 80 / canvas.width);
-
-      // Auto-print the PDF
-      pdf.autoPrint();
-      console.log('✅ [TICKET] PDF autoPrint configured');
-
-      // Create blob and URL
-      const blob = pdf.output('blob');
-      const url = URL.createObjectURL(blob);
-      console.log('✅ [TICKET] Blob URL created:', url);
-
-      // Show info toast about printing
+  const printHtml = (htmlContent: string) => {
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Ticket de Corte - ${new Date().toLocaleDateString()}</title>
+            <style>
+              body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; }
+              @media print {
+                body { margin: 0; padding: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } else {
       toast({
-        title: '🖨️ Imprimiendo ticket...',
-        description: 'Abriendo ventana de impresión. Si no se abre, verifique el bloqueador de popups.',
+        title: '⚠️ Ventana bloqueada',
+        description: 'Permita los popups para imprimir el ticket.',
+        variant: 'destructive'
       });
-
-      // Try to open print dialog
-      const printWindow = window.open(url, '_blank', 'width=800,height=600');
-      console.log('🔄 [TICKET] Attempting to open print window...');
-      console.log('🔄 [TICKET] Print window object:', printWindow);
-      console.log('🔄 [TICKET] Popup blocked?', !printWindow);
-
-      // Store reference for cleanup
-      printWindowRef.current = printWindow;
-
-      if (printWindow) {
-        printWindow.onload = () => {
-          console.log('✅ [TICKET] Print window loaded successfully');
-          console.log('🔄 [TICKET] Triggering print()...');
-          printWindow.print();
-
-          // Update toast
-          toast({
-            title: '✅ Impresión iniciada',
-            description: 'Use Ctrl+P o haga clic en imprimir',
-          });
-
-          setTimeout(() => {
-            if (!printWindow.closed) {
-              console.log('🔄 [TICKET] Closing print window...');
-              printWindow.close();
-            }
-            URL.revokeObjectURL(url);
-            printWindowRef.current = null;
-            console.log('✅ [TICKET] PDF generation and printing completed successfully');
-          }, 1000);
-        };
-
-        printWindow.onerror = (error) => {
-          console.error('❌ [TICKET] Print window error:', error);
-          toast({
-            title: '⚠️ Error en impresión',
-            description: 'Error al cargar la ventana de impresión. Descargando PDF...',
-            variant: 'destructive',
-          });
-          // Fallback to download
-          downloadPdf(pdf, `ticket-corte-${new Date().toISOString().split('T')[0]}.pdf`);
-          URL.revokeObjectURL(url);
-          printWindowRef.current = null;
-        };
-      } else {
-        // Window was blocked by popup blocker
-        console.warn('⚠️ [TICKET] Popup blocker detected! Window.open returned null');
-        toast({
-          title: '⚠️ Ventana bloqueada',
-          description: 'Su bloqueador de popups está impidiendo la impresión.',
-          variant: 'destructive',
-          duration: 5000,
-        });
-
-        // Wait a moment then show instructions
-        setTimeout(() => {
-          toast({
-            title: '📋 Instrucciones',
-            description: '1) Permita popups para este sitio 2) O descargue el PDF directamente',
-            duration: 7000,
-          });
-        }, 2000);
-
-        // Fallback: Download PDF directly
-        console.log('🔄 [TICKET] Falling back to direct download...');
-        downloadPdf(pdf, `ticket-corte-${new Date().toISOString().split('T')[0]}.pdf`);
-        URL.revokeObjectURL(url);
-        printWindowRef.current = null;
-        console.log('✅ [TICKET] PDF downloaded as fallback');
-      }
-    } catch (error) {
-      console.error('❌ [TICKET] Error generating PDF:', error);
-      toast({
-        title: '❌ Error al generar PDF',
-        description: 'No se pudo generar el ticket. Intente nuevamente.',
-        variant: 'destructive',
-      });
-      throw error; // Re-throw to be caught by calling function
     }
   };
 
-  // Create a DOM element directly for printing
-  const createTicketElement = (session: CashSession): HTMLElement => {
-    const container = document.createElement('div');
-    container.id = 'temp-ticket-' + session.sessionId;
-    container.style.cssText = `
-      width: 80mm;
-      padding: 10px;
-      background: white;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      color: black;
-    `;
-
-    const formatDate = (dateString: string | undefined) => {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleString('es-ES');
-    };
-
-    const formatCurrency = (value: number | undefined) => {
-      if (value === undefined || value === null) return '$0.00';
-      return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN'
-      }).format(value);
-    };
-
-    container.innerHTML = `
-      <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
-        REPORTE DE CORTE DE CAJA
-      </div>
-      <div style="text-align: center; font-size: 10px; margin-bottom: 10px;">
-        22 ELECTRONIC GROUP
-      </div>
-      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-      <div><strong>Sesión:</strong> ${session.sessionId}</div>
-      <div><strong>Cajero:</strong> ${session.cashierName || 'N/A'}</div>
-      <div><strong>Fecha Apertura:</strong> ${formatDate(session.openingTime)}</div>
-      <div><strong>Fecha Cierre:</strong> ${formatDate(session.closingTime)}</div>
-
-      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-      <div><strong>Ventas Totales:</strong> ${formatCurrency(session.totalSales || 0)}</div>
-      <div><strong>Ventas en Efectivo:</strong> ${formatCurrency(session.totalCashSales || 0)}</div>
-      <div><strong>Ventas con Tarjeta:</strong> ${formatCurrency(session.totalCardSales || 0)}</div>
-      <div><strong>Cantidad de Ventas:</strong> ${session.salesCount || 0}</div>
-
-      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-      <div><strong>Arqueo:</strong></div>
-      <div>  Efectivo Inicial: ${formatCurrency(session.openingFloat || 0)}</div>
-      <div>  Efectivo en Caja: ${formatCurrency(session.actualCashInDrawer || 0)}</div>
-      <div>  Efectivo Esperado: ${formatCurrency(session.expectedCashInDrawer || 0)}</div>
-      <div>  <strong>Diferencia: ${formatCurrency(session.difference || 0)}</strong></div>
-
-      <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-      <div style="text-align: center; font-size: 10px;">
-        ¡Gracias por su preferencia!
-      </div>
-    `;
-
-    return container;
+  // Helper to format currency
+  const formatCurrencyVal = (value: number | undefined) => {
+    if (value === undefined || value === null) return '$0.00';
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN'
+    }).format(value);
   };
+
+  // Helper to format date
+  const formatDateVal = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('es-ES');
+  };
+
+  const createTicketHtml = (session: CashSession): string => {
+    // Group sales items by product
+    const soldProducts: Record<string, { name: string; quantity: number; total: number }> = {};
+
+    ticketSales.forEach(sale => {
+      if (sale.status !== 'cancelled') {
+        sale.items.forEach(item => {
+          const key = item.name; // Group by name
+          if (!soldProducts[key]) {
+            soldProducts[key] = { name: item.name, quantity: 0, total: 0 };
+          }
+          soldProducts[key].quantity += item.quantity;
+          soldProducts[key].total += (item.priceAtSale * item.quantity);
+        });
+      }
+    });
+
+    const soldProductsList = Object.values(soldProducts);
+
+    return `
+      <div style="width: 80mm; margin: 0 auto;">
+        <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
+          REPORTE DE CORTE DE CAJA
+        </div>
+        <div style="text-align: center; font-size: 10px; margin-bottom: 10px;">
+          22 ELECTRONIC GROUP
+        </div>
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Sesión:</strong> ${session.sessionId}</div>
+        <div><strong>Cajero:</strong> ${session.closedByName || session.openedByName || 'N/A'}</div>
+        <div><strong>Fecha Apertura:</strong> ${formatDateVal(session.openedAt?.toString())}</div>
+        <div><strong>Fecha Cierre:</strong> ${formatDateVal(session.closedAt?.toString())}</div>
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Productos Vendidos:</strong></div>
+        ${soldProductsList.length > 0 ?
+        soldProductsList.map(item => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+              <span>${item.quantity}x ${item.name}</span>
+              <span>${formatCurrencyVal(item.total)}</span>
+            </div>
+          `).join('')
+        : '<div style="font-style: italic;">No hubo ventas registradas</div>'
+      }
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Ventas Totales:</strong> ${formatCurrencyVal((session.totalCashSales || 0) + (session.totalCardSales || 0))}</div>
+        <div><strong>Ventas en Efectivo:</strong> ${formatCurrencyVal(session.totalCashSales || 0)}</div>
+        <div><strong>Ventas con Tarjeta:</strong> ${formatCurrencyVal(session.totalCardSales || 0)}</div>
+        
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Gastos (Salidas de Efectivo):</strong></div>
+        ${ticketExpenses.length > 0 ?
+        ticketExpenses.map(exp => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+              <span>${exp.description || exp.category}</span>
+              <span>${formatCurrencyVal(exp.amount)}</span>
+            </div>
+          `).join('')
+        : '<div style="font-style: italic;">No hubo gastos registrados</div>'
+      }
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 2px;">
+          <span>Total Gastos:</span>
+          <span>${formatCurrencyVal(session.totalCashPayouts || 0)}</span>
+        </div>
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Ingresos (Entradas de Efectivo):</strong></div>
+        ${ticketIncomes.length > 0 ?
+        ticketIncomes.map(inc => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+              <span>${inc.description || inc.category}</span>
+              <span>${formatCurrencyVal(inc.amount)}</span>
+            </div>
+          `).join('')
+        : '<div style="font-style: italic;">No hubo ingresos registrados</div>'
+      }
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 2px;">
+          <span>Total Ingresos:</span>
+          <span>${formatCurrencyVal(ticketIncomes.reduce((sum, i) => sum + i.amount, 0))}</span>
+        </div>
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+
+        <div><strong>Arqueo:</strong></div>
+        <div>  Efectivo Inicial: ${formatCurrencyVal(session.startingFloat || 0)}</div>
+        <div>  (+) Ventas Efectivo: ${formatCurrencyVal(session.totalCashSales || 0)}</div>
+        <div>  (-) Gastos Efectivo: ${formatCurrencyVal(session.totalCashPayouts || 0)}</div>
+        <div style="border-top: 1px dotted black; margin: 2px 0;"></div>
+        <div>  Efectivo Esperado: ${formatCurrencyVal(session.expectedCashInDrawer || 0)}</div>
+        <div>  Efectivo en Caja: ${formatCurrencyVal(session.actualCashCount || 0)}</div>
+        <div>  <strong>Diferencia: ${formatCurrencyVal(session.difference || 0)}</strong></div>
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        <div style="text-align: center; font-size: 10px;">
+          ¡Gracias por su preferencia!
+        </div>
+      </div>
+    `;
+  };
+
+  // Create a DOM element directly for printing
+
 
   const downloadPdf = (pdf: jsPDF, filename: string) => {
     try {
@@ -613,80 +637,97 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     toast({ title: "Producto agregado", description: `${product.name} agregado al carrito.` });
   };
 
-  
+
   if (activeSession === undefined) {
     return (
-        <div className="flex items-center justify-center h-full">
-            <div className="space-y-4 w-full max-w-lg p-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-48 w-full" />
-            </div>
+      <div className="flex items-center justify-center h-full">
+        <div className="space-y-4 w-full max-w-lg p-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-48 w-full" />
         </div>
+      </div>
     )
   }
 
   if (!activeSession) {
     return (
-        <>
-            <div className="h-full flex items-center justify-center">
-                <div className="text-center space-y-4">
-                    <Lock className="h-16 w-16 mx-auto text-muted-foreground" />
-                    <h2 className="text-2xl font-bold">Caja Cerrada</h2>
-                    <p className="text-muted-foreground">Debes abrir un turno para poder empezar a vender.</p>
-                    <Button size="lg" onClick={() => setOpeningDrawer(true)}>
-                        <Unlock className="mr-2"/>
-                        Abrir Turno
-                    </Button>
-                </div>
-            </div>
-            <OpenCashDrawerDialog 
-                isOpen={isOpeningDrawer}
-                onOpenChange={setOpeningDrawer}
-                onConfirm={handleOpenDrawer}
-            />
-        </>
+      <>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <Lock className="h-16 w-16 mx-auto text-muted-foreground" />
+            <h2 className="text-2xl font-bold">Caja Cerrada</h2>
+            <p className="text-muted-foreground">Debes abrir un turno para poder empezar a vender.</p>
+            <Button size="lg" onClick={() => setOpeningDrawer(true)}>
+              <Unlock className="mr-2" />
+              Abrir Turno
+            </Button>
+          </div>
+        </div>
+        <OpenCashDrawerDialog
+          isOpen={isOpeningDrawer}
+          onOpenChange={setOpeningDrawer}
+          onConfirm={handleOpenDrawer}
+        />
+        {closedSessionData && (
+          <CashDepositVerificationDialog
+            isOpen={showDepositVerification}
+            onOpenChange={setShowDepositVerification}
+            session={closedSessionData}
+            onConfirm={handleDepositConfirmation}
+            onSkip={handleSkipDeposit}
+          />
+        )}
+      </>
     )
   }
 
 
-  
+
   return (
     <>
-    <div className="grid h-full grid-cols-1 lg:grid-cols-12">
-      <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6 overflow-hidden">
-        <Header 
-          searchQuery={searchQuery} 
-          onSearchQueryChange={setSearchQuery} 
-          actionSlot={
-            <Button variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Abrir escáner">
-              <QrCode className="h-5 w-5" />
+      <div className="grid h-full grid-cols-1 lg:grid-cols-12">
+        <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6 overflow-hidden">
+          <Header
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            actionSlot={
+              <Button variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Abrir escáner">
+                <QrCode className="h-5 w-5" />
+              </Button>
+            }
+          />
+          <div className="mt-6 flex items-center justify-between">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
+            <Button
+              onClick={() => setShowBuscadorCompatibilidad(true)}
+              variant="outline"
+              className="hidden md:flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              Buscar Micas
             </Button>
-          }
-        />
-        <div className="mt-6 flex items-center justify-between">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
-          <Button
-            onClick={() => setShowBuscadorCompatibilidad(true)}
-            variant="outline"
-            className="hidden md:flex items-center gap-2"
-          >
-            <Search className="w-4 h-4" />
-            Buscar Micas
-          </Button>
-        </div>
-        <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
-          <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))'}}>
-            {filteredProducts.map((product, index) => (
-              <ProductCard key={`${product.id}-${index}`} product={product} onAddToCart={() => addToCart(product)} />
-            ))}
+            <Button
+              onClick={() => setShowRepairsDialog(true)}
+              variant="outline"
+              className="hidden md:flex items-center gap-2"
+            >
+              <Wrench className="w-4 h-4" />
+              Reparaciones
+            </Button>
           </div>
-        </ScrollArea>
-      </div>
-       <div className="hidden lg:flex lg:col-span-5 flex-row h-full">
-        
-        
-         <div className="flex-1 flex flex-col h-full bg-card shadow-inner border-l">
+          <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
+            <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+              {filteredProducts.map((product, index) => (
+                <ProductCard key={`${product.id}-${index}`} product={product} onAddToCart={() => addToCart(product)} />
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+        <div className="hidden lg:flex lg:col-span-5 flex-row h-full">
+
+
+          <div className="flex-1 flex flex-col h-full bg-card shadow-inner border-l">
             <ShoppingCart
               cartItems={cart}
               onUpdateQuantity={updateQuantity}
@@ -697,39 +738,40 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               onCloseSession={() => setClosingDrawer(true)}
               onFinanceSale={() => setFinancePlanOpen(true)}
               onSuccessfulSale={refreshProducts}
+              activeSessionId={activeSession?.id}
             />
-         </div>
-       </div>
+          </div>
+        </div>
 
-       {/* Mobile Buttons */}
-      <div className="lg:hidden fixed bottom-4 right-4 z-50 flex gap-2">
-        {/* Buscador de Micas flotante */}
-        <Button
-          onClick={() => setShowBuscadorCompatibilidad(true)}
-          size="icon"
-          className="w-14 h-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700"
-        >
-          <Package className="h-6 w-6" />
-        </Button>
+        {/* Mobile Buttons */}
+        <div className="lg:hidden fixed bottom-4 right-4 z-50 flex gap-2">
+          {/* Buscador de Micas flotante */}
+          <Button
+            onClick={() => setShowBuscadorCompatibilidad(true)}
+            size="icon"
+            className="w-14 h-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700"
+          >
+            <Package className="h-6 w-6" />
+          </Button>
 
-        {/* Mobile Cart Sheet */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button size="icon" className="w-16 h-16 rounded-full shadow-2xl">
-              <ShoppingCartIcon className="h-7 w-7" />
-              {totalCartItems > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="absolute top-0 right-0 -translate-x-1 translate-y-1 rounded-full px-2"
-                >
-                  {totalCartItems}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="p-0 flex flex-col w-full sm:max-w-md">
-            <SheetTitle className="sr-only">Mi Pedido</SheetTitle>
-             <ShoppingCart
+          {/* Mobile Cart Sheet */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button size="icon" className="w-16 h-16 rounded-full shadow-2xl">
+                <ShoppingCartIcon className="h-7 w-7" />
+                {totalCartItems > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="absolute top-0 right-0 -translate-x-1 translate-y-1 rounded-full px-2"
+                  >
+                    {totalCartItems}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="p-0 flex flex-col w-full sm:max-w-md">
+              <SheetTitle className="sr-only">Mi Pedido</SheetTitle>
+              <ShoppingCart
                 cartItems={cart}
                 onUpdateQuantity={updateQuantity}
                 onClearCart={clearCart}
@@ -740,17 +782,27 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 onCloseSession={() => setClosingDrawer(true)}
                 onFinanceSale={() => setFinancePlanOpen(true)}
                 onSuccessfulSale={refreshProducts}
-             />
-          </SheetContent>
-        </Sheet>
+                activeSessionId={activeSession?.id}
+              />
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
-    </div>
-     <CloseCashDrawerDialog
+      <CloseCashDrawerDialog
         isOpen={isClosingDrawer}
         onOpenChange={setClosingDrawer}
         session={activeSession}
         onConfirm={handleCloseDrawer}
       />
+      {closedSessionData && (
+        <CashDepositVerificationDialog
+          isOpen={showDepositVerification}
+          onOpenChange={setShowDepositVerification}
+          session={closedSessionData}
+          onConfirm={handleDepositConfirmation}
+          onSkip={handleSkipDeposit}
+        />
+      )}
       <CreateFinancePlanDialog
         isOpen={isFinancePlanOpen}
         onOpenChange={setFinancePlanOpen}
@@ -770,6 +822,13 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       {/* Scanner Dialog */}
       <CodeScannerDialog open={isScannerOpen} onOpenChange={setScannerOpen} onResult={handleScannedCode} />
 
+      {/* Repairs Dialog */}
+      <RepairsDialog
+        isOpen={showRepairsDialog}
+        onOpenChange={setShowRepairsDialog}
+        onAddRepair={handleAddRepairToCart}
+      />
+
       {/* Hidden ticket for printing */}
       {printTicketSession && (
         <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
@@ -780,5 +839,62 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         </div>
       )}
     </>
+  );
+}
+
+import { getReadyRepairs } from "@/lib/services/repairService";
+import { RepairOrder } from "@/types";
+import { Wrench } from "lucide-react";
+
+function RepairsDialog({ isOpen, onOpenChange, onAddRepair }: { isOpen: boolean; onOpenChange: (open: boolean) => void; onAddRepair: (repair: RepairOrder) => void }) {
+  const [repairs, setRepairs] = useState<RepairOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      getReadyRepairs()
+        .then(setRepairs)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Reparaciones Listas para Entrega</DialogTitle>
+          <DialogDescription>
+            Selecciona una reparación para cobrarla en caja.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-[400px] pr-4">
+          {loading ? (
+            <div className="flex justify-center p-4">Cargando...</div>
+          ) : repairs.length === 0 ? (
+            <div className="text-center p-4 text-muted-foreground">No hay reparaciones listas para entrega.</div>
+          ) : (
+            <div className="space-y-2">
+              {repairs.map((repair) => (
+                <Card key={repair.id} className="cursor-pointer hover:bg-muted/50" onClick={() => { onAddRepair(repair); onOpenChange(false); }}>
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <div className="font-bold">Orden #{repair.orderId}</div>
+                      <div className="text-sm text-muted-foreground">{repair.customerName} - {repair.deviceModel}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{repair.reportedIssue}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-lg">{formatCurrency(repair.totalPrice)}</div>
+                      <Badge variant="outline" className="mt-1">Listo</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

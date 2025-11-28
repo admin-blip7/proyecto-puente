@@ -69,9 +69,16 @@ export const updateAccount = async (
 ): Promise<void> => {
   try {
     const supabase = getSupabaseServerClient();
+
+    // Transform camelCase to snake_case
+    const payload: any = {};
+    if (dataToUpdate.name !== undefined) payload.name = dataToUpdate.name;
+    if (dataToUpdate.type !== undefined) payload.type = dataToUpdate.type;
+    if (dataToUpdate.currentBalance !== undefined) payload.current_balance = dataToUpdate.currentBalance;
+
     const { error } = await supabase
       .from(ACCOUNTS_TABLE)
-      .update(dataToUpdate)
+      .update(payload)
       .or(`firestore_id.eq.${accountId},id.eq.${accountId}`);
 
     if (error) {

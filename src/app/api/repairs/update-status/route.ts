@@ -13,32 +13,47 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseServerClient();
+    let data;
+    let error;
 
-    // Primero intentar encontrar por firestore_id
-    let { data, error } = await supabase
-      .from('repair_orders')
-      .update({
-        status,
-        completedAt: completedAt || null,
-      })
-      .eq('firestore_id', orderId)
-      .select('*')
-      .single();
-
-    // Si no funciona, intentar por id (para casos donde sea UUID)
-    if (error && error.code === 'PGRST116') {
-      const result = await supabase
+    // Si el estado es Completado, usar la función RPC para manejar la lógica de negocio (ganancias)
+    if (status === 'Completado') {
+      const result = await supabase.rpc('collect_repair_profit', {
+        p_repair_id: orderId
+      });
+      data = result.data;
+      error = result.error;
+    } else {
+      // Para otros estados, usar la actualización normal
+      // Primero intentar encontrar por firestore_id
+      const result1 = await supabase
         .from('repair_orders')
         .update({
           status,
           completedAt: completedAt || null,
         })
-        .eq('id', orderId)
+        .eq('firestore_id', orderId)
         .select('*')
         .single();
 
-      data = result.data;
-      error = result.error;
+      data = result1.data;
+      error = result1.error;
+
+      // Si no funciona, intentar por id (para casos donde sea UUID)
+      if (error && error.code === 'PGRST116') {
+        const result2 = await supabase
+          .from('repair_orders')
+          .update({
+            status,
+            completedAt: completedAt || null,
+          })
+          .eq('id', orderId)
+          .select('*')
+          .single();
+
+        data = result2.data;
+        error = result2.error;
+      }
     }
 
     if (error) {

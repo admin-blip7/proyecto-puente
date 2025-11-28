@@ -51,7 +51,7 @@ interface RepairDetailsDialogProps {
 const statusIcons = {
   "Recibido": { icon: CheckCircle, color: "text-blue-500", bg: "bg-blue-100 dark:bg-blue-900" },
   "En progreso": { icon: CheckCircle, color: "text-yellow-500", bg: "bg-yellow-100 dark:bg-yellow-900" },
-  "Listo para entrega": { icon: CheckCircle, color: "text-green-500", bg: "bg-green-100 dark:bg-green-900" },
+  "Listo para Entrega": { icon: CheckCircle, color: "text-green-500", bg: "bg-green-100 dark:bg-green-900" },
   "Cancelado": { icon: CheckCircle, color: "text-red-500", bg: "bg-red-100 dark:bg-red-900" },
   "Completado": { icon: CheckCircle, color: "text-green-500", bg: "bg-green-100 dark:bg-green-900" },
 };
@@ -75,8 +75,8 @@ export default function RepairDetailsDialog({
   const [editingServices, setEditingServices] = useState(false);
   const [editingParts, setEditingParts] = useState(false);
   const [editingSteps, setEditingSteps] = useState(false);
-  const [services, setServices] = useState(order?.partsUsed || []);
-  const [partsNeeded, setPartsNeeded] = useState(order?.partsUsed || []);
+  const [services, setServices] = useState<any[]>(order?.partsUsed || []);
+  const [partsNeeded, setPartsNeeded] = useState<any[]>(order?.partsUsed || []);
   const [repairSteps, setRepairSteps] = useState([
     { id: 1, text: "Diagnóstico inicial completo.", completed: true },
     { id: 2, text: "Reparar dispositivo.", completed: order?.status !== "Recibido" },
@@ -105,10 +105,10 @@ export default function RepairDetailsDialog({
       setNotes(order.technicianNotes || "");
       setServices(order.partsUsed || []);
       setPartsNeeded(order.partsUsed || []);
-      setRepairSteps(order.repairSteps || [
+      setRepairSteps((order as any).repairSteps || [
         { id: 1, text: "Diagnóstico inicial completo.", completed: true },
         { id: 2, text: "Reparar dispositivo.", completed: order.status !== "Recibido" },
-        { id: 3, text: "Pruebas finales y calibración.", completed: order.status === "Listo para entrega" || order.status === "Completado" }
+        { id: 3, text: "Pruebas finales y calibración.", completed: order.status === "Listo para Entrega" || order.status === "Completado" }
       ]);
       setNewService("");
       setNewPart("");
@@ -212,9 +212,9 @@ ${notes || 'Sin notas'}
 Servicios Realizados:
 ---------------------
 ${order.partsUsed.length > 0
-  ? order.partsUsed.map(part => `- ${part.name} (x${part.quantity}) - $${formatCurrency(part.price)}`).join('\n')
-  : 'No se han agregado servicios'
-}
+        ? order.partsUsed.map(part => `- ${part.name} (x${part.quantity}) - $${formatCurrency(part.price)}`).join('\n')
+        : 'No se han agregado servicios'
+      }
 
 Costos:
 -------
@@ -345,7 +345,7 @@ Firma del Cliente: _________________
       });
     }
 
-    if (order.status === "En progreso") {
+    if (["En Diagnóstico", "Esperando Refacción", "En Reparación"].includes(order.status)) {
       events.push({
         title: "En Reparación",
         time: safeFormat(new Date(), "dd 'de' MMMM, yyyy - HH:mm a"),
@@ -353,7 +353,7 @@ Firma del Cliente: _________________
       });
     }
 
-    if (order.status === "Listo para entrega" || order.status === "Completado") {
+    if (order.status === "Listo para Entrega" || order.status === "Completado") {
       events.push({
         title: "Reparación Completada",
         time: safeFormat(order.completedAt, "dd 'de' MMMM, yyyy - HH:mm a"),

@@ -10,7 +10,7 @@ const log = getLogger("salesAPI");
 export async function POST(request: Request) {
   try {
     log.info("Sales API endpoint called");
-    
+
     const body = await request.json();
     const { saleData, cartItems, crmClientId } = body;
 
@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     }
 
     log.info(`Processing sale with ${cartItems.length} items`);
-    log.info(`Sale data:`, { 
-      totalAmount: saleData.totalAmount, 
+    log.info(`Sale data:`, {
+      totalAmount: saleData.totalAmount,
       paymentMethod: saleData.paymentMethod,
       cashierId: saleData.cashierId,
       crmClientId: crmClientId
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         log.info(`Creating new CRM client for: ${saleData.customerName}`);
         log.info(`Sale details for new client - amount: ${saleData.totalAmount}, payment: ${saleData.paymentMethod}`);
         const { createCRMClientFromSale } = await import("@/lib/services/crmClientService");
-        
+
         const newClient = await createCRMClientFromSale({
           name: saleData.customerName,
           phone: saleData.customerPhone,
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
           saleAmount: saleData.totalAmount,
           saleId: `SALE-${Math.random().toString(36).substr(2, 8).toUpperCase()}`
         });
-        
+
         if (newClient && newClient.id) {
           finalCrmClientId = newClient.id.toString();
           log.info(`Created new CRM client with ID: ${finalCrmClientId}, totalPurchases: ${newClient.totalPurchases}`);
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       // Actualizar los totales de la sesión
       log.info("Updating session totals...");
       const { error: rpcError } = await supabase.rpc("update_cash_session_totals_by_session", {
-        session_id_param: activeSession.sessionId
+        session_id_param: activeSession.id
       });
 
       if (rpcError) {
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     log.error("Error processing sale:", error);
-    
+
     return NextResponse.json({
       success: false,
       error: "Error al procesar la venta",
