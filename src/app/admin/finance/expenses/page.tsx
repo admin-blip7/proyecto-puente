@@ -13,18 +13,19 @@ export const metadata = {
 
 async function getInitialData() {
     try {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
+        const startOfMonth = new Date('2024-01-01');
         startOfMonth.setHours(0, 0, 0, 0);
 
         const endOfMonth = new Date();
+        // endOfMonth.setMonth(endOfMonth.getMonth() + 1); // No need to go to next month, just current time is fine for "up to now"
+        // But to be safe and match original logic of "end of current month":
         endOfMonth.setMonth(endOfMonth.getMonth() + 1);
         endOfMonth.setDate(0);
         endOfMonth.setHours(23, 59, 59, 999);
 
         const [expenses, incomes, transfers, accounts, expenseCategories, incomeCategories] = await Promise.all([
             getExpensesByDateRange(startOfMonth, endOfMonth),
-            getIncomes(), // Ideally filter by date too, but for now fetch all or add date range
+            getIncomes(startOfMonth, endOfMonth),
             getTransfers(), // Ideally filter by date too
             getAccounts(),
             getExpenseCategories(),

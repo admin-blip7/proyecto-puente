@@ -36,8 +36,8 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
 
   // Allow http, https, and relative URLs
   return url.startsWith('http://') ||
-         url.startsWith('https://') ||
-         (!url.startsWith('data:') && !url.startsWith('blob:'));
+    url.startsWith('https://') ||
+    (!url.startsWith('data:') && !url.startsWith('blob:'));
 };
 
 interface BarcodeJob {
@@ -143,12 +143,11 @@ const buildElementStyle = (element: VisualElement, settings: LabelSettings) => {
     `font-size:${(element.fontSize ?? settings.fontSize).toFixed(0)}px`,
     `display:flex`,
     `align-items:flex-start`,
-    `justify-content:${
-      element.textAlign === 'left'
-        ? 'flex-start'
-        : element.textAlign === 'right'
-          ? 'flex-end'
-          : 'center'
+    `justify-content:${element.textAlign === 'left'
+      ? 'flex-start'
+      : element.textAlign === 'right'
+        ? 'flex-end'
+        : 'center'
     }`,
     `text-align:${element.textAlign ?? 'center'}`,
     `padding:0`,
@@ -245,17 +244,17 @@ const renderVisualLabel = (
 
     if (coercedType === 'qrcode') {
       const key = (element.qrPlaceholderKey as PlaceholderKey | undefined) ?? 'sku';
-  const qrValue = formatPlaceholderValue(key, item, settings, context);
-  if (qrValue) {
-    const canvasId = `qr-${item.product.sku}-${Math.random().toString(36).slice(2, 8)}`;
-    const sizePx = element.width ? Math.max(40, Math.round(mmToPx(element.width))) : Math.round(mmToPx(settings.width * 0.25));
-    context.qrJobs.push({ id: canvasId, value: qrValue, size: sizePx });
-    html += `<div class="label-element" style="${style}"><canvas id="${canvasId}" width="${sizePx}" height="${sizePx}" class="qr-canvas"></canvas></div>`;
-    return;
-  }
-  html += `<div class="label-element" style="${style}"><div class="qr-placeholder">{SKU}</div></div>`;
-  return;
-}
+      const qrValue = formatPlaceholderValue(key, item, settings, context);
+      if (qrValue) {
+        const canvasId = `qr-${item.product.sku}-${Math.random().toString(36).slice(2, 8)}`;
+        const sizePx = element.width ? Math.max(40, Math.round(mmToPx(element.width))) : Math.round(mmToPx(settings.width * 0.25));
+        context.qrJobs.push({ id: canvasId, value: qrValue, size: sizePx });
+        html += `<div class="label-element" style="${style}"><canvas id="${canvasId}" width="${sizePx}" height="${sizePx}" class="qr-canvas"></canvas></div>`;
+        return;
+      }
+      html += `<div class="label-element" style="${style}"><div class="qr-placeholder">{SKU}</div></div>`;
+      return;
+    }
 
     const content = element.content ?? '';
     const processed = replaceTokensInContent(content, item, settings, context);
@@ -292,24 +291,17 @@ export const generateAndPrintLabels = async (
   try {
     // Generate PDF and open in new window for printing
     const pdfBlob = await generateLabelPdf(items, settings, {
-      returnBlob: true,
-      onProgress: options?.onProgress,
-      onStatus: options?.onStatus,
-      signal: options?.signal
+      returnBlob: true
     }) as Blob;
-    
+
     // Create object URL and open in new window for printing
     const url = URL.createObjectURL(pdfBlob);
     const printWindow = window.open(url, '_blank');
-    
+
     if (printWindow) {
       printWindow.onload = () => {
-        printWindow.print();
-        // Clean up after printing
-        setTimeout(() => {
-          printWindow.close();
-          URL.revokeObjectURL(url);
-        }, 100);
+        // Auto-print disabled to prevent window opening/closing issues
+        // printWindow.print();
       };
     } else {
       // If popup is blocked, fallback to download
@@ -322,7 +314,7 @@ export const generateAndPrintLabels = async (
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
-      
+
       alert('La ventana de impresión fue bloqueada. El PDF se ha descargado automáticamente.');
     }
   } catch (error) {

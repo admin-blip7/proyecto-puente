@@ -34,19 +34,40 @@ const mapCategory = (row: any): IncomeCategory => ({
     isActive: Boolean(row?.isActive ?? false),
 });
 
-export const getIncomes = async (): Promise<Income[]> => {
+export const getIncomes = async (startDate?: Date, endDate?: Date): Promise<Income[]> => {
     try {
         const supabase = getSupabaseServerClient();
-        const { data, error } = await supabase
+
+        // 1. Fetch Incomes
+        let incomeQuery = supabase
             .from(INCOMES_TABLE)
             .select("*")
             .order("paymentDate", { ascending: false });
 
-        if (error) {
-            throw error;
+        if (startDate && endDate) {
+            incomeQuery = incomeQuery
+                .gte("paymentDate", startDate.toISOString())
+                .lte("paymentDate", endDate.toISOString());
         }
 
-        return (data ?? []).map(mapIncome);
+        const { data: incomesData, error: incomesError } = await incomeQuery;
+
+        if (incomesError) {
+            throw incomesError;
+        }
+
+        const incomes = (incomesData ?? []).map(mapIncome);
+
+        // 2. Fetch Sales - REMOVED per user request. 
+        // User wants to see only "Corte de Caja" (Deposits) in Income tab, not individual sales.
+        const sales: Income[] = [];
+
+        // 3. Merge and Sort
+        const allIncome = [...incomes, ...sales].sort((a, b) =>
+            b.paymentDate.getTime() - a.paymentDate.getTime()
+        );
+
+        return allIncome;
     } catch (error) {
         log.error("Error fetching incomes", error);
         return [];

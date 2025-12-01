@@ -1,3 +1,4 @@
+import "@/lib/polyfill-storage";
 import { createClient } from "@supabase/supabase-js";
 // import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
@@ -12,7 +13,7 @@ export const getSupabaseServerClient = () => {
     } else {
       console.warn("⚠️ Supabase server credentials not configured, falling back to client client");
     }
-    
+
     // Fallback to client client for development or when service role is not available
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !anonKey) {
@@ -20,7 +21,7 @@ export const getSupabaseServerClient = () => {
         "No Supabase credentials available. Please check your environment configuration."
       );
     }
-    
+
     return createClient(supabaseUrl, anonKey, {
       auth: {
         persistSession: false,

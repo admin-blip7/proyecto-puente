@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { CashSession, Expense } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, DollarSign, TrendingDown, TrendingUp, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -25,6 +26,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getExpensesByDateRange, getDailySalesStats } from "@/lib/services/financeService";
 
 interface CashHistoryClientProps {
@@ -370,111 +378,93 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-400px)] w-full">
-            <div className="relative w-full overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <Button variant="ghost" onClick={() => handleSort('sessionId')}>
-                        ID Sesión
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button variant="ghost" onClick={() => handleSort('closedAt')}>
-                        Fecha Cierre
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button variant="ghost" onClick={() => handleSort('closedByName')}>
-                        Cajero
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      Ventas del Día
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('startingFloat')}>
-                        Fondo Inicial
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('totalCashSales')}>
-                        Ventas Efectivo
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('expectedCashInDrawer')}>
-                        Efectivo Esperado
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('actualCashCount')}>
-                        Efectivo Contado
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button variant="ghost" onClick={() => handleSort('difference')}>
-                        Diferencia
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dailyRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center">
-                        No hay datos en este periodo.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    dailyRows.map((row) => (
-                      <TableRow key={row.date}>
-                        <TableCell className="font-mono">
-                          {row.session ? row.session.sessionId : '-'}
-                        </TableCell>
-                        <TableCell>
+          <div className="flex justify-end mb-4">
+            <Select
+              value={sortConfig?.key || "closedAt"}
+              onValueChange={(value) => handleSort(value as any)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="closedAt">Fecha</SelectItem>
+                <SelectItem value="sessionId">ID Sesión</SelectItem>
+                <SelectItem value="closedByName">Cajero</SelectItem>
+                <SelectItem value="totalCashSales">Ventas Efectivo</SelectItem>
+                <SelectItem value="difference">Diferencia</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Card Grid View (Desktop & Mobile) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {dailyRows.length === 0 ? (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                No hay datos en este periodo.
+              </div>
+            ) : (
+              dailyRows.map((row) => (
+                <Card key={row.date} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-bold text-lg">
                           {row.session ? formatDateTime(row.session.closedAt) : format(row.dateObj, "dd MMM yyyy", { locale: es })}
-                        </TableCell>
-                        <TableCell>
-                          {row.session ? row.session.closedByName : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-blue-600">
-                          {formatCurrency(row.dailySalesTotal)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {row.session ? formatCurrency(row.session.startingFloat ?? 0) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          {row.session ? formatCurrency(row.session.totalCashSales ?? 0) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {row.session ? formatCurrency(row.session.expectedCashInDrawer ?? 0) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {row.session ? formatCurrency(row.session.actualCashCount ?? 0) : '-'}
-                        </TableCell>
-                        <TableCell className={cn("text-right font-bold",
+                        </div>
+                        <div className="text-sm text-muted-foreground font-mono">
+                          {row.session ? row.session.sessionId : 'Sin sesión'}
+                        </div>
+                      </div>
+                      <Badge variant={row.session ? "default" : "secondary"}>
+                        {row.session ? "Cerrado" : "Sin Datos"}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Cajero:</span>
+                        <span className="font-medium">{row.session ? row.session.closedByName : '-'}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 py-2 border-y border-dashed my-2">
+                        <div>
+                          <span className="text-xs text-muted-foreground block">Ventas del Día</span>
+                          <span className="font-bold text-blue-600 text-base">{formatCurrency(row.dailySalesTotal)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-muted-foreground block">Ventas Efectivo</span>
+                          <span className="font-bold text-green-600 text-base">{row.session ? formatCurrency(row.session.totalCashSales ?? 0) : '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Fondo Inicial:</span>
+                        <span>{row.session ? formatCurrency(row.session.startingFloat ?? 0) : '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Efectivo Esperado:</span>
+                        <span>{row.session ? formatCurrency(row.session.expectedCashInDrawer ?? 0) : '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Efectivo Contado:</span>
+                        <span className="font-semibold">{row.session ? formatCurrency(row.session.actualCashCount ?? 0) : '-'}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2 mt-2 border-t bg-muted/20 -mx-4 px-4 py-2">
+                        <span className="font-medium">Diferencia:</span>
+                        <span className={cn("font-bold text-lg",
                           row.session?.difference && row.session.difference > 0 && "text-green-600",
                           row.session?.difference && row.session.difference < 0 && "text-red-600"
                         )}>
                           {row.session ? formatCurrency(row.session.difference ?? 0) : '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </ScrollArea>
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

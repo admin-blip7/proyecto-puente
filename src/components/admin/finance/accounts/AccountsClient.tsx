@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Account } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, MoreHorizontal, Landmark, Wallet, Banknote } from "lucide-react";
+import { PlusCircle, Edit, MoreHorizontal, Landmark, Wallet, Banknote, Trash2 } from "lucide-react";
+import { deleteAccount } from "@/lib/services/accountService";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddEditAccountDialog from "./AddEditAccountDialog";
+import AccountTransactionsDialog from "./AccountTransactionsDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { History } from "lucide-react";
 
 interface AccountsClientProps {
   initialAccounts: Account[];
@@ -32,6 +35,7 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [isAddEditOpen, setAddEditOpen] = useState(false);
+  const [isHistoryOpen, setHistoryOpen] = useState(false);
 
   const handleOpenAddDialog = () => {
     setSelectedAccount(null);
@@ -45,22 +49,41 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
     setAddEditOpen(true);
   };
 
+  const handleOpenHistoryDialog = (e: React.MouseEvent, account: Account) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedAccount(account);
+    setHistoryOpen(true);
+  };
+
   const handleAccountAdded = (newAccount: Account) => {
-    setAccounts(prev => [newAccount, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
+    setAccounts(prev => [newAccount, ...prev].sort((a, b) => a.name.localeCompare(b.name)));
   };
 
   const handleAccountUpdated = (updatedAccount: Account) => {
     setAccounts(prev => prev.map(a => (a.id === updatedAccount.id ? updatedAccount : a)));
   };
 
+  const handleDeleteAccount = async (account: Account) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.`)) {
+      try {
+        await deleteAccount(account.id);
+        setAccounts(prev => prev.filter(a => a.id !== account.id));
+      } catch (error) {
+        console.error("Error deleting account:", error);
+        alert("Hubo un error al eliminar la cuenta.");
+      }
+    }
+  };
+
   const getAccountIcon = (type: Account['type']) => {
     switch (type) {
-        case 'Banco': return <Landmark className="h-5 w-5 text-muted-foreground" />;
-        case 'Efectivo': return <Banknote className="h-5 w-5 text-muted-foreground" />;
-        case 'Billetera Digital': return <Wallet className="h-5 w-5 text-muted-foreground" />;
-        default: return <Landmark className="h-5 w-5 text-muted-foreground" />;
+      case 'Banco': return <Landmark className="h-5 w-5 text-muted-foreground" />;
+      case 'Efectivo': return <Banknote className="h-5 w-5 text-muted-foreground" />;
+      case 'Billetera Digital': return <Wallet className="h-5 w-5 text-muted-foreground" />;
+      default: return <Landmark className="h-5 w-5 text-muted-foreground" />;
     }
-}
+  }
 
 
   return (
@@ -115,10 +138,31 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                               <div
                                 className="flex items-center w-full"
+                                onClick={(e) => handleOpenHistoryDialog(e, account)}
+                              >
+                                <History className="mr-2 h-4 w-4" />
+                                <span>Ver Movimientos</span>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <div
+                                className="flex items-center w-full"
                                 onClick={(e) => handleOpenEditDialog(e, account)}
                               >
                                 <Edit className="mr-2 h-4 w-4" />
                                 <span>Editar</span>
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <div
+                                className="flex items-center w-full text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteAccount(account);
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Eliminar</span>
                               </div>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -139,6 +183,12 @@ export default function AccountsClient({ initialAccounts }: AccountsClientProps)
         account={selectedAccount}
         onAccountAdded={handleAccountAdded}
         onAccountUpdated={handleAccountUpdated}
+      />
+
+      <AccountTransactionsDialog
+        isOpen={isHistoryOpen}
+        onOpenChange={setHistoryOpen}
+        account={selectedAccount}
       />
     </>
   );

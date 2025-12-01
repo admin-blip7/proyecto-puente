@@ -12,22 +12,22 @@ const ASSETS_TABLE = "fixed_assets";
 
 const mapAsset = (row: any): FixedAsset => ({
   id: row?.firestore_id ?? row?.id ?? "",
-  assetId: row?.assetId ?? "",
+  assetId: row?.assetid ?? row?.assetId ?? "",
   name: row?.name ?? "",
   category: row?.category ?? "Otro",
-  purchaseDate: toDate(row?.purchaseDate),
-  purchaseCost: Number(row?.purchaseCost ?? 0),
-  usefulLifeYrs: Number(row?.usefulLifeYrs ?? 1),
-  salvageValue: Number(row?.salvageValue ?? 0),
-  currentValue: Number(row?.currentValue ?? 0),
-  depreciationMethod: row?.depreciationMethod ?? "Lineal",
-  lastDepreciationDate: toDate(row?.lastDepreciationDate),
+  purchaseDate: toDate(row?.purchasedate ?? row?.purchaseDate),
+  purchaseCost: Number(row?.purchasecost ?? row?.purchaseCost ?? 0),
+  usefulLifeYrs: Number(row?.usefullifeyrs ?? row?.usefulLifeYrs ?? 1),
+  salvageValue: Number(row?.salvagevalue ?? row?.salvageValue ?? 0),
+  currentValue: Number(row?.currentvalue ?? row?.currentValue ?? 0),
+  depreciationMethod: row?.depreciationmethod ?? row?.depreciationMethod ?? "Lineal",
+  lastDepreciationDate: toDate(row?.lastdepreciationdate ?? row?.lastDepreciationDate),
 });
 
 export const getAssets = async (): Promise<FixedAsset[]> => {
   const startTime = Date.now();
   const requestId = `assets-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[getAssets] Starting request`, {
       requestId,
@@ -86,18 +86,18 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
       // Realizar la consulta principal con manejo flexible de nombres de columna
       let result;
       let error;
-      
+
       // Intentar con diferentes nombres de columna para la ordenación
       const sortColumns = ["purchaseDate", "purchase_date", "purchasedate"];
       let sortColumnFound = false;
-      
+
       for (const sortColumn of sortColumns) {
         try {
           result = await supabase
             .from(ASSETS_TABLE)
             .select("*")
             .order(sortColumn, { ascending: false });
-          
+
           if (!result.error) {
             sortColumnFound = true;
             log.debug(`[getAssets] Successfully used sort column: ${sortColumn}`, { requestId });
@@ -110,7 +110,7 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
           });
         }
       }
-      
+
       // Si ningún nombre de columna funciona, hacer consulta sin ordenación
       if (!sortColumnFound) {
         log.warn(`[getAssets] No valid sort column found, using unsorted query`, { requestId });
@@ -118,7 +118,7 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
           .from(ASSETS_TABLE)
           .select("*");
       }
-      
+
       // Asegurar que result esté definido
       if (!result) {
         throw new Error("Failed to execute asset query");
@@ -154,7 +154,7 @@ export const getAssets = async (): Promise<FixedAsset[]> => {
 
     const processingTime = Date.now() - startTime;
     const assetCount = data?.length || 0;
-    
+
     log.info(`[getAssets] Successfully completed`, {
       requestId,
       assetCount,
@@ -195,7 +195,7 @@ export const addAsset = async (
 ): Promise<FixedAsset> => {
   const startTime = Date.now();
   const requestId = `add-asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[addAsset] Starting request`, {
       requestId,
@@ -223,17 +223,17 @@ export const addAsset = async (
 
     const payload = {
       firestore_id: firestoreId,
-      assetId,
+      assetid: assetId,
       name: assetData.name.trim(),
       category: assetData.category ?? "Otro",
-      purchaseDate: assetData.purchaseDate.toISOString(),
-      purchaseCost: assetData.purchaseCost,
-      usefulLifeYrs: assetData.usefulLifeYrs ?? 1,
-      salvageValue: assetData.salvageValue ?? 0,
-      currentValue: assetData.purchaseCost,
-      depreciationMethod: assetData.depreciationMethod ?? "Lineal",
-      lastDepreciationDate: assetData.purchaseDate.toISOString(),
-      createdAt: nowIso(),
+      purchasedate: assetData.purchaseDate.toISOString(),
+      purchasecost: assetData.purchaseCost,
+      usefullifeyrs: assetData.usefulLifeYrs ?? 1,
+      salvagevalue: assetData.salvageValue ?? 0,
+      currentvalue: assetData.purchaseCost,
+      depreciationmethod: assetData.depreciationMethod ?? "Lineal",
+      lastdepreciationdate: assetData.purchaseDate.toISOString(),
+      createdat: nowIso(),
     };
 
     const { data, error } = await supabase
@@ -254,7 +254,7 @@ export const addAsset = async (
 
     const processingTime = Date.now() - startTime;
     const mappedAsset = mapAsset(data);
-    
+
     log.info(`[addAsset] Successfully completed`, {
       requestId,
       assetId: mappedAsset.id,
@@ -279,7 +279,7 @@ export const addAsset = async (
 export const runAnnualDepreciation = async (): Promise<number> => {
   const startTime = Date.now();
   const requestId = `depreciation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[runAnnualDepreciation] Starting depreciation process`, {
       requestId,
@@ -287,7 +287,7 @@ export const runAnnualDepreciation = async (): Promise<number> => {
     });
 
     const supabase = getSupabaseServerClient();
-    
+
     // Cargar todos los activos
     const { data, error } = await supabase.from(ASSETS_TABLE).select("*");
     if (error) {
@@ -316,7 +316,7 @@ export const runAnnualDepreciation = async (): Promise<number> => {
     for (const asset of assets) {
       try {
         processedCount++;
-        
+
         const yearsSinceLast =
           (today.getTime() - asset.lastDepreciationDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
 
@@ -334,8 +334,8 @@ export const runAnnualDepreciation = async (): Promise<number> => {
             const { error: updateError } = await supabase
               .from(ASSETS_TABLE)
               .update({
-                currentValue: newValue,
-                lastDepreciationDate: today.toISOString(),
+                currentvalue: newValue,
+                lastdepreciationdate: today.toISOString(),
               })
               .or(`firestore_id.eq.${asset.id},id.eq.${asset.id}`);
 

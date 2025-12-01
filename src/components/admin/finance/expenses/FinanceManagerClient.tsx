@@ -206,7 +206,7 @@ export default function FinanceManagerClient({
                 <Card className="relative overflow-hidden">
                     <div className="absolute -top-8 -right-8 w-24 h-24 bg-red-500/5 dark:bg-red-500/10 rounded-full"></div>
                     <CardHeader>
-                        <CardTitle className="text-base font-medium text-muted-foreground">Gastos del Mes</CardTitle>
+                        <CardTitle className="text-base font-medium text-muted-foreground">Gastos Totales</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export default function FinanceManagerClient({
                 <Card className="relative overflow-hidden">
                     <div className="absolute -top-8 -right-8 w-24 h-24 bg-green-500/5 dark:bg-green-500/10 rounded-full"></div>
                     <CardHeader>
-                        <CardTitle className="text-base font-medium text-muted-foreground">Ingresos del Mes</CardTitle>
+                        <CardTitle className="text-base font-medium text-muted-foreground">Ingresos Totales</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex items-center gap-2">

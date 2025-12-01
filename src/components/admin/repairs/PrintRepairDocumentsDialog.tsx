@@ -36,6 +36,8 @@ export default function PrintRepairDocumentsDialog({
           ${header.show.storeName ? `<h1 style="font-size: 1.2em; font-weight: bold;">${header.storeName}</h1>` : ''}
           ${header.show.address ? `<p>${header.address}</p>` : ''}
           ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
+          ${header.show.rfc ? `<p>RFC: ${header.rfc}</p>` : ''}
+          ${header.show.website ? `<p>${header.website}</p>` : ''}
         </div>
         <p>Folio: ${order.orderId}</p>
         <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
@@ -74,12 +76,12 @@ export default function PrintRepairDocumentsDialog({
       alert("El navegador bloqueó la ventana de impresión. Por favor, habilita las ventanas emergentes.");
       return;
     }
-    
+
     const content = contentGenerator();
-    
+
     printWindow.document.write('<html><head><title>Imprimir</title>');
     if (isLabel) {
-        printWindow.document.write(`
+      printWindow.document.write(`
             <style>
                 @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
                 body { margin: 0; padding: 0; }
@@ -91,24 +93,25 @@ export default function PrintRepairDocumentsDialog({
     printWindow.document.write('</body></html>');
 
     if (isLabel) {
-        try {
-             JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
-                format: 'CODE128',
-                displayValue: false,
-                height: labelSettings.barcodeHeight,
-                width: 1.5,
-                margin: 0,
-            });
-        } catch(e) { console.error(e); }
+      try {
+        JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
+          format: 'CODE128',
+          displayValue: false,
+          height: labelSettings.barcodeHeight,
+          width: 1.5,
+          margin: 0,
+        });
+      } catch (e) { console.error(e); }
     }
 
     printWindow.document.close();
     printWindow.focus();
-    
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 250);
+
+    // Auto-print disabled
+    // setTimeout(() => {
+    //     printWindow.print();
+    //     printWindow.close();
+    // }, 250);
   };
 
   return (
@@ -121,14 +124,14 @@ export default function PrintRepairDocumentsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-4 py-4">
-            <Button size="lg" onClick={() => handlePrint(generateTicketHTML, false)}>
-                <Printer className="mr-2 h-5 w-5" />
-                Imprimir Ticket de Cliente
-            </Button>
-            <Button size="lg" variant="secondary" onClick={() => handlePrint(generateLabelHTML, true)}>
-                <Tag className="mr-2 h-5 w-5" />
-                Imprimir Etiqueta para Dispositivo
-            </Button>
+          <Button size="lg" onClick={() => handlePrint(generateTicketHTML, false)}>
+            <Printer className="mr-2 h-5 w-5" />
+            Imprimir Ticket de Cliente
+          </Button>
+          <Button size="lg" variant="secondary" onClick={() => handlePrint(generateLabelHTML, true)}>
+            <Tag className="mr-2 h-5 w-5" />
+            Imprimir Etiqueta para Dispositivo
+          </Button>
         </div>
         <DialogFooter>
           <Button type="button" onClick={() => onOpenChange(false)}>

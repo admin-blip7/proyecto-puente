@@ -7,6 +7,7 @@ import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 import { registerSaleInCRM } from "@/lib/utils/crmUtils";
+import { depositSaleToAccount } from "./financeService";
 
 const log = getLogger("salesService");
 
@@ -243,6 +244,11 @@ export const addSaleAndUpdateStock = async (
     }
 
     log.info(`Sale ${saleId} inserted successfully`);
+
+    // Deposit cash sales to 'Caja Chica'
+    if (sale.paymentMethod === 'Efectivo') {
+      await depositSaleToAccount(sale.totalAmount, sale.paymentMethod, saleId);
+    }
 
     // Actualizar balance de consignadores si hay productos de consignación
     for (const item of sale.items) {

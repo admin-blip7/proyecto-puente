@@ -256,6 +256,13 @@ export const addExpense = async (
     throw new Error("La cuenta de origen del pago es requerida.");
   }
 
+  // Check if we have admin privileges (Service Role Key)
+  // This is required because we are updating accounts and sessions which might be restricted.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NODE_ENV === 'production') {
+    // In production, we must have the key. In dev, we might warn.
+    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Expense creation might fail due to RLS.");
+  }
+
   const supabase = getSupabaseServerClient();
   const expenseId = `EXP-${uuidv4().split("-")[0].toUpperCase()}`;
   const firestoreId = uuidv4();
@@ -289,7 +296,7 @@ export const addExpense = async (
     description: expenseData.description,
     category: expenseData.category,
     amount: expenseData.amount,
-    paid_from_account_id: expenseData.paidFromAccountId,
+    paidFromAccountId: expenseData.paidFromAccountId,
     paymentDate,
     receiptUrl: receiptUrl ?? null,
     sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (expenseData.sessionId || null),
@@ -313,8 +320,8 @@ export const addExpense = async (
       expensePayload: {
         ...expensePayload,
         // Don't log sensitive data but log the structure
-        hasValidAccountId: !!expensePayload.paid_from_account_id,
-        accountId: expensePayload.paid_from_account_id
+        hasValidAccountId: !!expensePayload.paidFromAccountId,
+        accountId: expensePayload.paidFromAccountId
       }
     });
     throw new Error(`No se pudo registrar el gasto: ${insertError.message}`);
@@ -327,7 +334,7 @@ export const addExpense = async (
   // Try firestore_id first
   const { data: byFirestoreId, error: errorFirestore } = await supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id,currentBalance")
+    .select("firestore_id,current_balance")
     .eq("firestore_id", expenseData.paidFromAccountId)
     .maybeSingle();
 
@@ -337,7 +344,7 @@ export const addExpense = async (
     // If not found by firestore_id, try with id field
     const { data: byId, error: errorId } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("firestore_id,currentBalance")
+      .select("firestore_id,current_balance")
       .eq("id", expenseData.paidFromAccountId)
       .maybeSingle();
 
@@ -359,10 +366,14 @@ export const addExpense = async (
         id: expenseData.paidFromAccountId
       }
     });
+
+    // ROLLBACK: Delete the inserted expense since we can't process the payment
+    await supabase.from(EXPENSES_TABLE).delete().eq("id", insertedExpense.id);
+
     throw new Error(`No se encontró la cuenta seleccionada. ID: ${expenseData.paidFromAccountId}`);
   }
 
-  const newBalance = Number(accountRow.currentBalance ?? 0) - expenseData.amount;
+  const newBalance = Number(accountRow.current_balance ?? 0) - expenseData.amount;
   // Update account balance with more specific ID matching
   let accountUpdateError = null;
   // First try updating with firestore_id
@@ -382,6 +393,9 @@ export const addExpense = async (
 
   if (accountUpdateError) {
     log.warn("Failed to update account balance", accountUpdateError);
+    // ROLLBACK: Delete the inserted expense since we failed to update balance
+    await supabase.from(EXPENSES_TABLE).delete().eq("id", insertedExpense.id);
+    throw new Error("Falló la actualización del saldo de la cuenta. Se canceló el registro del gasto.");
   }
 
   if (activeSession) {
@@ -414,14 +428,22 @@ export const addExpense = async (
 
     if (sessionUpdateError) {
       log.warn("Failed to update cash session with expense", sessionUpdateError);
+      // We don't rollback here because the expense is valid and paid, just session tracking failed.
+      // But maybe we should? For now, let's keep it as warning.
     }
   }
 
-  if (accountUpdateError) {
-    log.warn("Failed to update account balance", accountUpdateError);
-  }
+  // Ensure we return a serializable object to avoid "Server Components render" errors
+  // Next.js handles Date objects, but sometimes it's safer to be explicit if issues arise.
+  // However, the main issue is likely the error thrown above not being caught/serialized well.
 
-  return mapExpense(insertedExpense);
+  try {
+    return mapExpense(insertedExpense);
+  } catch (mapError) {
+    log.error("Error mapping expense response", mapError);
+    // Return a safe fallback or re-throw a clean error
+    throw new Error("Gasto registrado pero hubo un error al procesar la respuesta.");
+  }
 };
 
 export const addInterestEarnings = async (
@@ -721,5 +743,151 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
     if (deleteError2) {
       throw new Error(`No se pudo eliminar el gasto: ${deleteError2.message}`);
     }
+  }
+};
+
+export const depositSaleToAccount = async (
+  amount: number,
+  paymentMethod: string,
+  saleId: string
+): Promise<void> => {
+  // Only process cash sales
+  if (paymentMethod !== 'Efectivo') {
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseServerClient();
+
+    // 1. Find the "Caja Chica" account (or similar)
+    // We'll look for an account named "Caja Chica" first, then any "Efectivo" type account
+    let { data: account, error: accountError } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("*")
+      .ilike("name", "%Caja Chica%")
+      .maybeSingle();
+
+    if (!account) {
+      // Fallback: Find first 'Efectivo' account
+      const { data: cashAccount, error: cashError } = await supabase
+        .from(ACCOUNTS_TABLE)
+        .select("*")
+        .eq("type", "Efectivo")
+        .limit(1)
+        .maybeSingle();
+
+      if (cashAccount) {
+        account = cashAccount;
+      }
+    }
+
+    if (!account) {
+      log.warn("No 'Caja Chica' or 'Efectivo' account found. Cannot deposit cash sale.");
+      return;
+    }
+
+    log.info(`Depositing sale ${saleId} ($${amount}) to account: ${account.name} (${account.firestore_id})`);
+
+    // 2. Update the account balance
+    const newBalance = Number(account.current_balance ?? 0) + amount;
+
+    const { error: updateError } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .update({ current_balance: newBalance })
+      .eq("firestore_id", account.firestore_id);
+
+    if (updateError) {
+      // Try fallback to ID
+      const { error: updateError2 } = await supabase
+        .from(ACCOUNTS_TABLE)
+        .update({ current_balance: newBalance })
+        .eq("id", account.id);
+
+      if (updateError2) {
+        log.error("Error updating account balance for cash deposit", updateError2);
+        throw new Error("Error al depositar venta en Caja Chica.");
+      }
+    }
+
+    log.info(`Deposit successful. New balance for ${account.name}: ${newBalance}`);
+
+  } catch (error) {
+    log.error("Error in depositSaleToAccount", error);
+    // We don't throw here to avoid failing the entire sale process, but we log it.
+  }
+};
+
+export interface AccountTransaction {
+  id: string;
+  date: Date;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category?: string;
+  referenceId?: string;
+}
+
+export const getAccountTransactions = async (accountId: string): Promise<AccountTransaction[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+
+    // 0. Resolve Account IDs (UUID and Firestore ID) to ensure we catch all linked records
+    const { data: account } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("id, firestore_id")
+      .or(`id.eq.${accountId},firestore_id.eq.${accountId}`)
+      .maybeSingle();
+
+    const idsToCheck = account
+      ? [account.id, account.firestore_id].filter((id): id is string => !!id)
+      : [accountId];
+
+    // 1. Fetch Expenses (paidFromAccountId)
+    const { data: expenses, error: expenseError } = await supabase
+      .from(EXPENSES_TABLE)
+      .select("*")
+      .in("paidFromAccountId", idsToCheck)
+      .order("paymentDate", { ascending: false });
+
+    if (expenseError) throw expenseError;
+
+    // 2. Fetch Incomes (destinationAccountId)
+    const { data: incomes, error: incomeError } = await supabase
+      .from("incomes")
+      .select("*")
+      .in("destinationAccountId", idsToCheck)
+      .order("paymentDate", { ascending: false });
+
+    if (incomeError) throw incomeError;
+
+    // 3. Map to common structure
+    const expenseTransactions: AccountTransaction[] = (expenses || []).map((e: any) => ({
+      id: e.id || e.firestore_id,
+      date: toDate(e.paymentDate),
+      description: e.description,
+      amount: Number(e.amount),
+      type: 'expense',
+      category: e.category,
+      referenceId: e.expenseId
+    }));
+
+    const incomeTransactions: AccountTransaction[] = (incomes || []).map((i: any) => ({
+      id: i.id || i.firestore_id,
+      date: toDate(i.paymentDate),
+      description: i.description,
+      amount: Number(i.amount),
+      type: 'income',
+      category: i.category,
+      referenceId: i.incomeId
+    }));
+
+    // 4. Merge and Sort
+    return [...expenseTransactions, ...incomeTransactions].sort((a, b) =>
+      b.date.getTime() - a.date.getTime()
+    );
+
+  } catch (error) {
+    log.error("Error fetching account transactions", error);
+    return [];
   }
 };

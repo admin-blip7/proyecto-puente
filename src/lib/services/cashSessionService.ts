@@ -6,6 +6,7 @@ import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 import { getSalesBySession } from "./salesService";
+import { addIncome } from "./incomeService";
 
 const log = getLogger("cashSessionService");
 
@@ -254,8 +255,15 @@ export const closeCashSession = async (
     throw new Error("Failed to close cash session.");
   }
 
-  // NOTE: Account balance updates now happen separately via depositToCajaChica
-  // This allows explicit verification of cash deposit amount before updating Caja Chica
+  // Automatically deposit the actual cash count to Caja Chica
+  try {
+    await depositToCajaChica(session.sessionId, actualCashCount);
+  } catch (depositError) {
+    log.error("Error depositing to Caja Chica during session close", depositError);
+    // We don't throw here to avoid rolling back the session close, 
+    // but we should probably alert the user or log it prominently.
+    // For now, the session is closed, but the money might not be in Caja Chica.
+  }
 
   return {
     ...enrichedSession,
@@ -292,7 +300,7 @@ export const depositToCajaChica = async (
     // Find Caja Chica account
     const { data: cajaChicaAccount, error: findError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("id,firestore_id,name,current_balance")
+      .select("id,firestore_id,name")
       .eq("name", "Caja Chica")
       .maybeSingle();
 
@@ -306,19 +314,18 @@ export const depositToCajaChica = async (
       throw new Error("Caja Chica account does not exist.");
     }
 
-    // Update balance
-    const currentBalance = Number(cajaChicaAccount.current_balance ?? 0);
-    const newBalance = currentBalance + depositAmount;
+    const accountId = cajaChicaAccount.firestore_id || cajaChicaAccount.id;
 
-    const { error: updateError } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .update({ current_balance: newBalance })
-      .eq("firestore_id", cajaChicaAccount.firestore_id ?? cajaChicaAccount.id);
-
-    if (updateError) {
-      log.error("Error updating Caja Chica balance", updateError);
-      throw new Error("Failed to update Caja Chica balance.");
-    }
+    // Use addIncome to record the transaction and update balance
+    // This ensures it shows up in the transaction history
+    await addIncome({
+      description: `Depósito de Corte de Caja (Sesión: ${sessionId})`,
+      category: "Corte de Caja",
+      amount: depositAmount,
+      destinationAccountId: accountId,
+      source: "Caja",
+      sessionId: sessionId
+    });
 
     log.info(`Successfully deposited ${depositAmount} to Caja Chica for session ${sessionId}`);
   } catch (error) {

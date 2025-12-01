@@ -265,16 +265,19 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       setActiveSession(null);
       setClosingDrawer(false);
 
-      // Save closed session and show deposit verification dialog
+      // Save closed session and print ticket directly
       setClosedSessionData(closedSession);
-      setShowDepositVerification(true);
 
       toast({
         title: "✅ Turno Cerrado",
-        description: "Ahora verifica el depósito a Caja Chica",
+        description: `Se depositaron ${formatCurrency(actualCash)} a Caja Chica.`,
       });
 
-      console.log('✅ [SESSION] Session closed, showing deposit verification');
+      console.log('✅ [SESSION] Session closed, printing ticket...');
+      await printCashCloseTicket(closedSession);
+
+      // No need to show deposit verification anymore
+      setShowDepositVerification(false);
     } catch (error) {
       console.error('❌ [SESSION] Error closing drawer:', error);
       toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja." })

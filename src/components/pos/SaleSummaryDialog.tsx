@@ -35,8 +35,8 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
   const handleDownloadPdf = async () => {
     const ticketElement = printAreaRef.current?.querySelector('.ticket-preview');
     if (!ticketElement || !settings) {
-        console.error("No se encontró el elemento del ticket para generar el PDF.");
-        return;
+      console.error("No se encontró el elemento del ticket para generar el PDF.");
+      return;
     }
 
     setIsGeneratingPdf(true);
@@ -61,14 +61,15 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
 
       // Auto print
-      pdf.autoPrint();
+      // Auto print disabled
+      // pdf.autoPrint();
       const pdfBlob = pdf.output('bloburl');
       window.open(pdfBlob.toString(), '_blank');
 
     } catch (error) {
-        console.error("Error al generar el PDF:", error);
+      console.error("Error al generar el PDF:", error);
     } finally {
-        setIsGeneratingPdf(false);
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -82,21 +83,21 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale }: SaleSu
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] my-4 bg-muted rounded-lg flex items-center justify-center p-4">
-            {isLoading || !settings ? (
-                <div className="flex items-center justify-center h-48">
-                    <Loader2 className="animate-spin" />
-                </div>
-            ) : (
-                <div ref={printAreaRef} className="flex justify-center">
-                    <PrintableTicket settings={settings} sale={sale} />
-                </div>
-            )}
+          {isLoading || !settings ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="animate-spin" />
+            </div>
+          ) : (
+            <div ref={printAreaRef} className="flex justify-center">
+              <PrintableTicket settings={settings} sale={sale} />
+            </div>
+          )}
         </ScrollArea>
         <DialogFooter className="sm:justify-between">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isGeneratingPdf}>
-              <X className="mr-2 h-4 w-4" />
-              Cerrar
-            </Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isGeneratingPdf}>
+            <X className="mr-2 h-4 w-4" />
+            Cerrar
+          </Button>
           <Button onClick={handleDownloadPdf} disabled={isLoading || isGeneratingPdf}>
             {isGeneratingPdf ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
