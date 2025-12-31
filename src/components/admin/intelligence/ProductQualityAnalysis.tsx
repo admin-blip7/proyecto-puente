@@ -8,8 +8,7 @@ import { getWarranties } from "@/lib/services/warrantyService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, Bot, Cpu, Loader2 } from "lucide-react";
-import { analyzeProductQuality } from "@/ai/flows/analyze-product-quality";
-import { ProductQualityOutput } from "@/ai/flows/types";
+// import { analyzeProductQuality } from "@/ai/flows/analyze-product-quality";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProductQualityAnalysisProps {
@@ -24,13 +23,13 @@ interface ProductStats {
     totalWarranties: number;
     warrantyRate: number;
     commonReasons: string[];
-    analysis?: ProductQualityOutput;
+    analysis?: any;
 }
 
 export default function ProductQualityAnalysis({ allProducts, allSales }: ProductQualityAnalysisProps) {
     const [warranties, setWarranties] = useState<Warranty[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [analysisResults, setAnalysisResults] = useState<Record<string, ProductQualityOutput>>({});
+    const [analysisResults, setAnalysisResults] = useState<Record<string, any>>({});
     const [loadingAnalysisFor, setLoadingAnalysisFor] = useState<string | null>(null);
     const { toast } = useToast();
 
@@ -62,7 +61,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
             const productWarranties = warrantyMap.get(product.id) || [];
             const totalWarranties = productWarranties.length;
             const warrantyRate = totalSold > 0 ? (totalWarranties / totalSold) * 100 : 0;
-            
+
             const reasonCounts: Record<string, number> = {};
             productWarranties.forEach(w => {
                 // Simple pattern matching for reasons
@@ -71,8 +70,8 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                 else if (reason.includes("pantalla") || reason.includes("display")) reasonCounts["Falla de Pantalla"] = (reasonCounts["Falla de Pantalla"] || 0) + 1;
                 else reasonCounts["Otro"] = (reasonCounts["Otro"] || 0) + 1;
             });
-            
-            const commonReasons = Object.entries(reasonCounts).sort((a,b) => b[1] - a[1]).map(([reason]) => reason);
+
+            const commonReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).map(([reason]) => reason);
 
             return {
                 productId: product.id,
@@ -83,14 +82,15 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                 commonReasons
             };
         })
-        .filter(p => p.totalWarranties > 0)
-        .sort((a, b) => b.warrantyRate - a.warrantyRate);
+            .filter(p => p.totalWarranties > 0)
+            .sort((a, b) => b.warrantyRate - a.warrantyRate);
 
     }, [allProducts, allSales, warranties]);
 
     const handleRunAnalysis = async (product: ProductStats) => {
         setLoadingAnalysisFor(product.productId);
         try {
+            /*
             const result = await analyzeProductQuality({
                 productName: product.name,
                 totalSold: product.totalSold,
@@ -99,6 +99,8 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                 commonReasons: product.commonReasons,
             });
             setAnalysisResults(prev => ({ ...prev, [product.productId]: result }));
+            */
+            setAnalysisResults(prev => ({ ...prev, [product.productId]: { analysis: "IA Desactivada", recommendation: "Funcionalidad desactivada." } }));
         } catch (error) {
             console.error("Error analyzing product quality:", error);
             toast({ variant: "destructive", title: "Error de IA", description: "No se pudo generar el análisis." });
@@ -111,7 +113,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
     return (
         <Card>
             <CardHeader>
-                 <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <Cpu className="h-6 w-6 text-primary" />
                     <CardTitle>Análisis de Calidad de Producto con IA</CardTitle>
                 </div>
@@ -120,7 +122,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                 <ScrollArea className="h-[400px] w-full">
+                <ScrollArea className="h-[400px] w-full">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -133,7 +135,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                 <TableRow><TableCell colSpan={5} className="h-24 text-center">Cargando datos de garantías...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={5} className="h-24 text-center">Cargando datos de garantías...</TableCell></TableRow>
                             ) : productStats.length > 0 ? (
                                 productStats.map(product => {
                                     const analysis = analysisResults[product.productId];
@@ -145,7 +147,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                                             <TableCell className="text-center font-bold">{product.warrantyRate.toFixed(2)}%</TableCell>
                                             <TableCell className="text-right">
                                                 {analysis ? (
-                                                     <div className="space-y-2 text-left p-2 rounded-md bg-muted/50">
+                                                    <div className="space-y-2 text-left p-2 rounded-md bg-muted/50">
                                                         <p className="font-semibold text-primary">Análisis:</p>
                                                         <p className="text-xs">{analysis.analysis}</p>
                                                         <p className="font-semibold text-amber-600">Recomendación:</p>
@@ -153,7 +155,7 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                                                     </div>
                                                 ) : (
                                                     <Button variant="secondary" size="sm" onClick={() => handleRunAnalysis(product)} disabled={loadingAnalysisFor === product.productId}>
-                                                        {loadingAnalysisFor === product.productId ? <Loader2 className="h-4 w-4 animate-spin"/> : <Bot className="h-4 w-4" />}
+                                                        {loadingAnalysisFor === product.productId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                                                         <span className="ml-2">Analizar</span>
                                                     </Button>
                                                 )}
@@ -165,8 +167,8 @@ export default function ProductQualityAnalysis({ allProducts, allSales }: Produc
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center">
                                         <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                           <AlertCircle className="h-4 w-4" />
-                                           <span>No hay productos con garantías registradas.</span>
+                                            <AlertCircle className="h-4 w-4" />
+                                            <span>No hay productos con garantías registradas.</span>
                                         </div>
                                     </TableCell>
                                 </TableRow>

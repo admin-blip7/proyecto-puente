@@ -28,6 +28,7 @@ export interface Product {
   status?: string;
   updatedAt?: Date;
   attributes?: Record<string, any>; // Atributos específicos por categoría
+  imageUrls?: string[];
 }
 
 
@@ -112,6 +113,8 @@ export interface Sale {
   cancelledAt?: Date;
   cancelledBy?: string;
   cancelReason?: string;
+  amountPaid?: number;
+  changeGiven?: number;
 }
 
 export interface Warranty {
@@ -169,6 +172,12 @@ export interface StockEntryItem {
   consignorId?: string;
   category?: string;
   attributes?: Record<string, any>;
+  // Image Management Fields
+  imageFile?: File;
+  imageUrl?: string;           // URL temporal (blob o deAPI)
+  imagePublicUrl?: string;     // URL pública después de subir a Supabase
+  isImageProcessing?: boolean;
+  hasOptimizedImage?: boolean; // Si ya fue mejorada con IA
 }
 
 export interface RepairPart {
@@ -312,6 +321,10 @@ export interface CashSession {
   expectedCashInDrawer: number;
   actualCashCount?: number;
   difference?: number;
+  bagsStartAmounts?: Record<string, number>;
+  bagsSalesAmounts?: Record<string, number>;
+  bagsEndAmounts?: Record<string, number>;
+  previousSessionConfirmedAt?: Date;
 }
 
 export const TicketSettingsSchema = z.object({

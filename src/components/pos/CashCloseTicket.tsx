@@ -149,6 +149,26 @@ export default function CashCloseTicket({
 
       <hr className="border-dashed border-black my-2" />
 
+      {/* Bag Balances */}
+      <div className="space-y-1 mb-3">
+        <p className="font-bold">SALDOS DE BOLSAS:</p>
+        {['recargas', 'mimovil', 'servicios'].map(key => {
+          const start = (session.bagsStartAmounts as any)?.[key] || 0;
+          const sale = (session.bagsSalesAmounts as any)?.[key] || 0;
+          const end = (session.bagsEndAmounts as any)?.[key] || (start - sale);
+          return (
+            <div key={key} className="flex justify-between text-xs">
+              <span className="capitalize">{key}:</span>
+              <span>
+                {formatCurrency(start)} - {formatCurrency(sale)} = <strong>{formatCurrency(end)}</strong>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <hr className="border-dashed border-black my-2" />
+
       {/* Totals */}
       <div className="space-y-1 mb-4">
         <div className="flex justify-between font-bold text-base border-t border-dashed border-black pt-1">

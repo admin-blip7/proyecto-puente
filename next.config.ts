@@ -55,6 +55,26 @@ const nextConfig: NextConfig = {
         hostname: '*.supabase.co',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'depinprod.s3.pl-waw.scw.cloud',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'aaftjwktzpnyjwklroww.supabase.co',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'encrypted-tbn0.gstatic.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
+      }
     ],
   },
   webpack: (config, { dev, isServer }) => {

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
 import CategoryAttributes, { productCategories } from "./CategoryAttributes";
 import CurrencyInput from "@/components/ui/currency-input";
+import ProductImageManager from "./ProductImageManager";
 import { getLogger } from "@/lib/logger";
 const log = getLogger("EditProductForm");
 
@@ -32,6 +33,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
     ...product,
     attributes: product.attributes || {},
     category: product.category || '',
+    imageUrls: product.imageUrls || [],
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -42,26 +44,27 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
       ...product,
       attributes: product.attributes || {},
       category: product.category || '',
+      imageUrls: product.imageUrls || [],
     });
   }, [product]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
+
     let processedValue: string | number = value;
     if (type === 'number') {
-        processedValue = value === '' ? '' : Number(value);
+      processedValue = value === '' ? '' : Number(value);
     }
 
     setFormData(prevData => ({ ...prevData, [name]: processedValue }));
   };
-  
+
   const handleSelectChange = (name: keyof Product, value: string) => {
     const updatedFormData = { ...formData, [name]: value };
-     if (name === 'ownershipType' && value === 'Familiar') {
+    if (name === 'ownershipType' && value === 'Familiar') {
       updatedFormData.price = updatedFormData.cost;
     }
-     if (name === 'ownershipType' && value !== 'Consigna') {
+    if (name === 'ownershipType' && value !== 'Consigna') {
       updatedFormData.consignorId = undefined;
     }
     // Si cambia la categoría, limpiar los atributos
@@ -70,17 +73,17 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
     }
     setFormData(updatedFormData);
   };
-  
-   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newCost = Number(e.target.value);
     setFormData(prevData => {
-        const newData = { ...prevData, cost: newCost };
-        if (newData.ownershipType === 'Familiar') {
-            newData.price = newCost;
-        }
-        return newData;
+      const newData = { ...prevData, cost: newCost };
+      if (newData.ownershipType === 'Familiar') {
+        newData.price = newCost;
+      }
+      return newData;
     });
-   };
+  };
 
   const handleSaveChanges = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -89,13 +92,13 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
 
     try {
       await updateProduct(product.id, formData);
-      
+
       log.info("¡Éxito! Producto actualizado.");
       toast({
         title: "Producto Actualizado",
         description: `El producto "${formData.name}" ha sido guardado exitosamente.`,
       });
-      
+
       router.push('/admin');
       router.refresh();
 
@@ -106,15 +109,15 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
         title: "Error al Guardar",
         description: "No se pudo actualizar el producto. Revisa la consola para más detalles.",
       });
-     } finally {
-       setIsLoading(false);
-     }
-   };
-  
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formMethodsForSelector = {
     watch: (fieldName: keyof Product) => formData[fieldName],
     setValue: (fieldName: keyof Product, value: any) => {
-      setFormData(prev => ({...prev, [fieldName]: value}));
+      setFormData(prev => ({ ...prev, [fieldName]: value }));
     },
     getValues: (fieldName: keyof Product) => formData[fieldName],
   };
@@ -144,6 +147,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
           <TabsTrigger value="general">Información General</TabsTrigger>
           <TabsTrigger value="pricing">Precios y Stock</TabsTrigger>
           <TabsTrigger value="classification">Clasificación</TabsTrigger>
+          <TabsTrigger value="images">Imágenes</TabsTrigger>
           <TabsTrigger value="relations">Combos y Etiquetas</TabsTrigger>
         </TabsList>
 
@@ -171,20 +175,20 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="cost">Costo de Compra</Label>
-                    <CurrencyInput 
-                      id="cost" 
-                      name="cost" 
-                      value={formData.cost} 
+                    <CurrencyInput
+                      id="cost"
+                      name="cost"
+                      value={formData.cost}
                       onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
                       showCurrencyLabel={false}
                     />
                   </div>
                   <div>
                     <Label htmlFor="price">Precio de Venta</Label>
-                    <CurrencyInput 
-                      id="price" 
-                      name="price" 
-                      value={formData.price} 
+                    <CurrencyInput
+                      id="price"
+                      name="price"
+                      value={formData.price}
                       onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
                       disabled={formData.ownershipType === 'Familiar'}
                       showCurrencyLabel={false}
@@ -282,6 +286,22 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
             </Card>
           </TabsContent>
 
+          <TabsContent value="images">
+            <Card>
+              <CardHeader>
+                <CardTitle>Imágenes del Producto</CardTitle>
+                <CardDescription>Sube fotos o genera imágenes con IA</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProductImageManager
+                  imageUrls={formData.imageUrls || []}
+                  onChange={(urls) => setFormData(prev => ({ ...prev, imageUrls: urls }))}
+                  productName={formData.name}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="relations">
             <Card>
               <CardHeader>
@@ -289,7 +309,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                 <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
+                <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -20,13 +20,13 @@ import {
 } from "@/components/ui/dialog";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getCurrentOpenSession, openCashSession, closeCashSession, depositToCajaChica } from "@/lib/services/cashSessionService";
+import { getCurrentOpenSession, openCashSession, closeCashSession, depositToCajaChica, getLastClosedSession } from "@/lib/services/cashSessionService";
 import { getExpensesBySession } from "@/lib/services/financeService";
 import { getIncomesBySession } from "@/lib/services/incomeService";
 import { getSalesBySession } from "@/lib/services/salesService";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
-import OpenCashDrawerDialog from "./OpenCashDrawerDialog";
+import OpenSessionWizard from "./OpenSessionWizard";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
 import CashDepositVerificationDialog from "./CashDepositVerificationDialog";
 import CashCloseTicket from "./CashCloseTicket";
@@ -57,6 +57,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [showDepositVerification, setShowDepositVerification] = useState(false);
   const [closedSessionData, setClosedSessionData] = useState<CashSession | null>(null);
   const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
+  const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
   const [showRepairsDialog, setShowRepairsDialog] = useState(false);
@@ -236,13 +237,22 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   }, [selectedProductDetails, products]);
 
   const totalCartItems = useMemo(() => {
+
+
     return cart.reduce((total, item) => total + item.quantity, 0);
   }, [cart]);
 
-  const handleOpenDrawer = async (startingFloat: number) => {
+  // Load last closed session when opening drawer
+  useEffect(() => {
+    if (isOpeningDrawer) {
+      getLastClosedSession().then(setLastClosedSession);
+    }
+  }, [isOpeningDrawer]);
+
+  const handleOpenDrawer = async (startingFloat: number, bagsStartAmounts: Record<string, number>, previousSessionConfirmedAt?: Date) => {
     if (!userProfile) return;
     try {
-      const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat);
+      const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat, bagsStartAmounts, previousSessionConfirmedAt);
       setActiveSession(newSession);
       setOpeningDrawer(false);
       toast({ title: "Turno Abierto", description: "La caja está lista para registrar ventas." })
@@ -251,15 +261,18 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number) => {
+  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}) => {
     if (!userProfile || !activeSession) return;
+
+    // Log param to satisfy linter if unused, or use it
+    console.log('Bag Sales:', bagsSalesAmounts);
 
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
     console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash);
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -540,6 +553,16 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         <div>  <strong>Diferencia: ${formatCurrencyVal(session.difference || 0)}</strong></div>
 
         <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        <div><strong>Saldos de Bolsas:</strong></div>
+        ${(['recargas', 'mimovil', 'servicios']).map(key => {
+        // Cast to any to access dynamic props if TS complains, or rely on interface
+        const start = (session.bagsStartAmounts as any)?.[key] || 0;
+        const sale = (session.bagsSalesAmounts as any)?.[key] || 0;
+        const end = (session.bagsEndAmounts as any)?.[key] || (start - sale);
+        return `<div>  ${key.charAt(0).toUpperCase() + key.slice(1)}: ${formatCurrencyVal(start)} - ${formatCurrencyVal(sale)} = <strong>${formatCurrencyVal(end)}</strong></div>`;
+      }).join('')}
+
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
         <div style="text-align: center; font-size: 10px;">
           ¡Gracias por su preferencia!
         </div>
@@ -667,10 +690,11 @@ export default function POSClient({ initialProducts }: POSClientProps) {
             </Button>
           </div>
         </div>
-        <OpenCashDrawerDialog
+        <OpenSessionWizard
           isOpen={isOpeningDrawer}
           onOpenChange={setOpeningDrawer}
           onConfirm={handleOpenDrawer}
+          lastClosedSession={lastClosedSession}
         />
         {closedSessionData && (
           <CashDepositVerificationDialog

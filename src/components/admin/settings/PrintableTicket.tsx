@@ -30,11 +30,11 @@ const sampleSale: Sale = {
 };
 
 const getCalculatedTotals = (items: Sale['items']) => {
-    const subtotal = items.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
-    // Assuming a 16% tax rate for calculation. This should be dynamic in a real app.
-    const tax = subtotal * 0.16; 
-    const total = subtotal + tax;
-    return { subtotal, tax, total };
+  const subtotal = items.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+  // Assuming a 16% tax rate for calculation. This should be dynamic in a real app.
+  const tax = subtotal * 0.16;
+  const total = subtotal + tax;
+  return { subtotal, tax, total };
 }
 
 export default function PrintableTicket({ settings, sale }: PrintableTicketProps) {
@@ -50,7 +50,7 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
   const wrapperStyle = {
     width: `${settings.paperWidth || 80}mm`,
     fontFamily: "'Courier New', Courier, monospace",
-    fontWeight: isBold ? 'bold' : 'normal',
+    fontWeight: 'bold', // User requested all text to be bold
     fontStyle: isItalic ? 'italic' : 'normal',
   };
 
@@ -81,66 +81,78 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
       </div>
 
       <hr className="border-dashed border-black my-2" />
-      
+
       {/* Body */}
       <div>
         <table className="w-full">
-            <thead>
-                <tr className="border-b border-dashed border-black">
-                    {body.showQuantity && <th className="text-left pb-1">CANT</th>}
-                    <th className="text-left pb-1">DESC</th>
-                    {body.showUnitPrice && <th className="text-right pb-1">P.U.</th>}
-                    {body.showTotal && <th className="text-right pb-1">IMPORTE</th>}
-                </tr>
-            </thead>
-            <tbody>
-                {displaySale.items.map((item, index) => (
-                    <tr key={index}>
-                        {body.showQuantity && <td className="align-top pr-1">{item.quantity}</td>}
-                        <td className="align-top">{item.name}</td>
-                        {body.showUnitPrice && <td className="align-top text-right px-1">{formatCurrency(item.priceAtSale ?? 0)}</td>}
-                        {body.showTotal && <td className="align-top text-right pl-1">{formatCurrency((item.priceAtSale ?? 0) * (item.quantity ?? 0))}</td>}
-                    </tr>
-                ))}
-            </tbody>
+          <thead>
+            <tr className="border-b border-dashed border-black">
+              {body.showQuantity && <th className="text-left pb-1">CANT</th>}
+              <th className="text-left pb-1">DESC</th>
+              {body.showUnitPrice && <th className="text-right pb-1">P.U.</th>}
+              {body.showTotal && <th className="text-right pb-1">IMPORTE</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {displaySale.items.map((item, index) => (
+              <tr key={index}>
+                {body.showQuantity && <td className="align-top pr-1">{item.quantity}</td>}
+                <td className="align-top">{item.name}</td>
+                {body.showUnitPrice && <td className="align-top text-right px-1">{formatCurrency(item.priceAtSale ?? 0)}</td>}
+                {body.showTotal && <td className="align-top text-right pl-1">{formatCurrency((item.priceAtSale ?? 0) * (item.quantity ?? 0))}</td>}
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
-      
+
       <hr className="border-dashed border-black my-2" />
 
       {/* Footer */}
       <div className="space-y-1">
         {footer.showSubtotal && (
-            <div className="flex justify-between">
-                <span>SUBTOTAL:</span>
-                <span>{formatCurrency(subtotal ?? 0)}</span>
-            </div>
+          <div className="flex justify-between">
+            <span>SUBTOTAL:</span>
+            <span>{formatCurrency(subtotal ?? 0)}</span>
+          </div>
         )}
         {footer.showTaxes && (
-            <div className="flex justify-between">
-                <span>IVA:</span>
-                <span>{formatCurrency(tax ?? 0)}</span>
-            </div>
+          <div className="flex justify-between">
+            <span>IVA:</span>
+            <span>{formatCurrency(tax ?? 0)}</span>
+          </div>
         )}
         {footer.showDiscounts && (
-            <div className="flex justify-between">
-                <span>DESCUENTOS:</span>
-                <span>$0.00</span>
-            </div>
+          <div className="flex justify-between">
+            <span>DESCUENTOS:</span>
+            <span>$0.00</span>
+          </div>
         )}
         <div className="flex justify-between font-bold text-lg border-t border-dashed border-black pt-1">
-            <span>TOTAL:</span>
-            <span>{formatCurrency(displaySale.totalAmount ?? 0)}</span>
+          <span>TOTAL:</span>
+          <span>{formatCurrency(displaySale.totalAmount ?? 0)}</span>
         </div>
+        {displaySale.amountPaid !== undefined && (
+          <div className="flex justify-between border-dashed border-black pt-1">
+            <span>RECIBIDO:</span>
+            <span>{formatCurrency(displaySale.amountPaid)}</span>
+          </div>
+        )}
+        {displaySale.changeGiven !== undefined && (
+          <div className="flex justify-between border-dashed border-black pt-1">
+            <span>CAMBIO:</span>
+            <span>{formatCurrency(displaySale.changeGiven)}</span>
+          </div>
+        )}
       </div>
-      
+
       <div className="text-center mt-4 space-y-2">
         {footer.thankYouMessage && <p>{footer.thankYouMessage}</p>}
         {footer.additionalInfo && <p className="text-xs">{footer.additionalInfo}</p>}
         {footer.showQrCode && footer.qrCodeUrl && (
-            <div className="flex justify-center pt-2">
-                <QRCode value={footer.qrCodeUrl} size={80} quietZone={0} />
-            </div>
+          <div className="flex justify-center pt-2">
+            <QRCode value={footer.qrCodeUrl} size={80} quietZone={0} />
+          </div>
         )}
       </div>
     </div>

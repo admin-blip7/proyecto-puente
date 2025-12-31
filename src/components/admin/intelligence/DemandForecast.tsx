@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Product, Sale } from "@/types";
-import { forecastDemand } from "@/ai/flows/forecast-demand";
-import { ForecastDemandOutput } from "@/ai/flows/types";
+// import { forecastDemand } from "@/ai/flows/forecast-demand";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
@@ -30,7 +29,7 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [forecastResult, setForecastResult] = useState<ForecastDemandOutput | null>(null);
+    const [forecastResult, setForecastResult] = useState<any | null>(null);
     const { toast } = useToast();
 
     const handleSelectProduct = (product: Product) => {
@@ -61,13 +60,19 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
                 date: date,
                 quantitySold: quantity
             }));
-            
-            const result = await forecastDemand({ 
+
+            /*
+            const result = await forecastDemand({
                 productName: selectedProduct.name,
                 historicalSales: historicalSales,
             });
 
             setForecastResult(result);
+            */
+            setForecastResult({
+                analysisSummary: "Funcionalidad de IA desactivada.",
+                forecast: []
+            });
 
         } catch (error) {
             // Suppress console.error to avoid ERR_ABORTED logs
@@ -77,12 +82,12 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
             setIsLoading(false);
         }
     }
-    
+
     const chartData = useMemo(() => {
         if (!selectedProduct) return [];
-    
+
         const dataMap = new Map<string, ChartData>();
-        
+
         // Populate historical data
         sales.forEach(sale => {
             sale.items.forEach(item => {
@@ -93,19 +98,19 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
                 }
             });
         });
-    
+
         // Populate forecasted data
         if (forecastResult) {
-            forecastResult.forecast.forEach(point => {
+            forecastResult.forecast.forEach((point: any) => {
                 const dateStr = format(parseISO(point.date), "dd MMM");
                 const current = dataMap.get(dateStr) || { date: dateStr };
                 dataMap.set(dateStr, { ...current, forecasted: point.predictedQuantity });
             });
         }
-    
-        const sortedData = Array.from(dataMap.values()).sort((a,b) => a.date.localeCompare(b.date));
+
+        const sortedData = Array.from(dataMap.values()).sort((a, b) => a.date.localeCompare(b.date));
         return sortedData;
-        
+
     }, [selectedProduct, sales, forecastResult]);
 
     return (
@@ -154,10 +159,10 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
                         Generar Pronóstico
                     </Button>
                 </div>
-                
+
                 {forecastResult && (
                     <div className="space-y-4 pt-4">
-                         <Card className="bg-muted/50">
+                        <Card className="bg-muted/50">
                             <CardHeader className="flex-row items-start gap-4 space-y-0">
                                 <div className="flex-shrink-0">
                                     <Bot className="h-6 w-6 text-primary" />
@@ -169,7 +174,7 @@ export default function DemandForecast({ products, sales }: DemandForecastProps)
                             </CardHeader>
                         </Card>
                         <div className="h-[300px]">
-                             <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="date" />

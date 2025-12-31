@@ -13,6 +13,18 @@ const log = getLogger("cashSessionService");
 const CASH_SESSIONS_TABLE = "cash_sessions";
 const ACCOUNTS_TABLE = "accounts";
 
+const calculateBagsEndAmounts = (
+  start: Record<string, number>,
+  sales: Record<string, number>
+): Record<string, number> => {
+  const result: Record<string, number> = { ...start };
+  for (const [key, value] of Object.entries(sales)) {
+    const startVal = result[key] || 0;
+    result[key] = startVal - value;
+  }
+  return result;
+};
+
 const mapSession = (row: any): CashSession => ({
   id: row?.firestore_id ?? row?.id ?? "",
   sessionId: row?.sessionId ?? "",
@@ -30,6 +42,10 @@ const mapSession = (row: any): CashSession => ({
   expectedCashInDrawer: Number(row?.expectedCashInDrawer ?? 0),
   actualCashCount: row?.actualCashCount !== null ? Number(row.actualCashCount) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
+  bagsStartAmounts: row?.bags_start_amounts ?? {},
+  bagsSalesAmounts: row?.bags_sales_amounts ?? {},
+  bagsEndAmounts: row?.bags_end_amounts ?? {},
+  previousSessionConfirmedAt: row?.previous_session_confirmed_at ? toDate(row.previous_session_confirmed_at) : undefined,
 });
 
 /**
@@ -104,6 +120,30 @@ export const getAllClosedSessions = async (): Promise<CashSession[]> => {
   }
 };
 
+export const getLastClosedSession = async (): Promise<CashSession | null> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(CASH_SESSIONS_TABLE)
+      .select("*")
+      .eq("status", "Cerrado")
+      .order("closedAt", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    // Enrich with totals might not be strictly necessary if we stored them on close, 
+    // but good for safety. However, for "Bag" balances, we trust the stored data?
+    // The stored data has bags_end_amounts.
+    return mapSession(data);
+  } catch (error) {
+    log.error("Error fetching last closed session", error);
+    return null;
+  }
+};
+
 export const getCurrentOpenSession = async (userId: string): Promise<CashSession | null> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -174,7 +214,9 @@ export const getSessionForDate = async (date: Date): Promise<CashSession | null>
 export const openCashSession = async (
   userId: string,
   userName: string,
-  startingFloat: number
+  startingFloat: number,
+  bagsStartAmounts: Record<string, number> = {},
+  previousSessionConfirmedAt?: Date
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
   const firestoreId = uuidv4();
@@ -193,6 +235,10 @@ export const openCashSession = async (
     totalCardSales: 0,
     totalCashPayouts: 0,
     expectedCashInDrawer: startingFloat,
+    bags_start_amounts: bagsStartAmounts,
+    bags_sales_amounts: {},
+    bags_end_amounts: {},
+    previous_session_confirmed_at: previousSessionConfirmedAt ? previousSessionConfirmedAt.toISOString() : null,
   };
 
   const { error } = await supabase.from(CASH_SESSIONS_TABLE).insert(payload);
@@ -208,7 +254,8 @@ export const closeCashSession = async (
   session: CashSession,
   userId: string,
   userName: string,
-  actualCashCount: number
+  actualCashCount: number,
+  bagsSalesAmounts: Record<string, number> = {}
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
 
@@ -246,7 +293,9 @@ export const closeCashSession = async (
       difference,
       // Also update the calculated totals in DB so they are correct for history
       totalCashSales: enrichedSession.totalCashSales,
-      totalCardSales: enrichedSession.totalCardSales
+      totalCardSales: enrichedSession.totalCardSales,
+      bags_sales_amounts: bagsSalesAmounts,
+      bags_end_amounts: calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts)
     })
     .eq("firestore_id", session.id);
 

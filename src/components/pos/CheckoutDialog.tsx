@@ -183,6 +183,8 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             customerEmail: null,
             crmClientId: selectedCRMClient || null,
             cashSessionId: activeSessionId || null,
+            amountPaid: paymentMethod === 'Efectivo' ? amountPaid : totalAmount,
+            changeGiven: paymentMethod === 'Efectivo' ? (change > 0 ? change : 0) : 0,
         }
 
         try {

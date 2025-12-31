@@ -19,41 +19,41 @@ const resolveConsignorId = async (consignorId: string | undefined): Promise<stri
     log.warn(`Empty consignor ID provided`);
     return null;
   }
-  
+
   const supabase = getSupabaseServerClient();
-  
+
   // First try to find by direct ID match
   const { data, error } = await supabase
     .from("consignors")
     .select("id, name")
     .eq("id", consignorId)
     .maybeSingle();
-    
+
   if (error) {
     log.error(`Error querying consignor by ID: ${consignorId}`, error);
   }
-  
+
   if (data) {
     log.info(`Found consignor by ID: ${consignorId} -> ${data.name} (${data.id})`);
     return data.id;
   }
-  
+
   // If not found by ID, try by firestore_id
   const { data: firestoreData, error: firestoreError } = await supabase
     .from("consignors")
     .select("id, name")
     .eq("firestore_id", consignorId)
     .maybeSingle();
-    
+
   if (firestoreError) {
     log.error(`Error querying consignor by firestore_id: ${consignorId}`, firestoreError);
   }
-  
+
   if (firestoreData) {
     log.info(`Found consignor by firestore_id: ${consignorId} -> ${firestoreData.name} (${firestoreData.id})`);
     return firestoreData.id;
   }
-  
+
   log.warn(`Consignor not found for ID: ${consignorId}`);
   return null;
 };
@@ -98,6 +98,7 @@ const mapProduct = (row: any, index: number): Product => ({
   searchKeywords: Array.isArray(row?.search_keywords) ? row.search_keywords : [],
   category: row?.category ?? undefined,
   attributes: row?.attributes ?? {},
+  imageUrls: Array.isArray(row?.image_urls) ? row.image_urls : [],
 });
 
 const fetchProductRow = async (productId: string) => {
@@ -157,6 +158,42 @@ export const getProducts = async (): Promise<Product[]> => {
   }
 };
 
+export const searchProducts = async (query: string): Promise<Product[]> => {
+  try {
+    if (!query || query.trim().length === 0) return [];
+
+    const supabase = getSupabaseServerClient();
+    const searchTerm = `%${query.trim()}%`;
+
+    // Search by name, SKU, or search_keywords (requires specific syntax for array columns or just keep it simple with OR)
+    // For arrays in supabase you often use .cs (contains) or text search, but simple OR on text columns is easiest for now.
+    // 'search_keywords' is a text array.
+
+    const { data, error } = await supabase
+      .from(PRODUCTS_TABLE)
+      .select("*")
+      .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
+      .limit(50)
+      .order("name", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    // Map and ensure uniqueness just in case
+    const products = (data ?? []).map((row, index) => mapProduct(row, index));
+    const uniqueProducts = products.filter(
+      (product, index, self) =>
+        index === self.findIndex((p) => p.id === product.id)
+    );
+
+    return uniqueProducts;
+  } catch (error) {
+    log.error("Error searching products:", error);
+    return [];
+  }
+};
+
 export const getProductById = async (productId: string): Promise<Product | null> => {
   try {
     const row = await fetchProductRow(productId);
@@ -192,9 +229,10 @@ export const addProduct = async (
     reorder_point: productData.reorderPoint ?? 0,
     combo_product_ids: productData.comboProductIds ?? [],
     compatibility_tags: productData.compatibilityTags ?? [],
-    search_keywords: searchKeywords, // Corregido: search_keywords en lugar de searchKeywords
+    search_keywords: searchKeywords,
     category: productData.category ?? null,
     attributes: productData.attributes ?? {},
+    image_urls: productData.imageUrls ?? [],
     created_at: createdAt,
   };
 
@@ -243,6 +281,7 @@ export const updateProduct = async (
       search_keywords: searchKeywords, // Corregido: search_keywords en lugar de searchKeywords
       category: productData.category ?? existingRow.category,
       attributes: productData.attributes ?? existingRow.attributes ?? {},
+      image_urls: productData.imageUrls ?? existingRow.image_urls ?? [],
     })
     .eq("firestore_id", existingRow.firestore_id ?? productId);
 
@@ -265,12 +304,12 @@ export const processStockEntry = async (
 ): Promise<StockEntryItem[]> => {
   const supabase = getSupabaseServerClient();
   const processedItems: StockEntryItem[] = [];
-  
+
   // Validación inicial de los datos de entrada
   if (!entryItems || entryItems.length === 0) {
     throw new Error("No hay productos para procesar.");
   }
-  
+
   if (!userId || userId.trim() === '') {
     throw new Error("ID de usuario no válido.");
   }
@@ -280,33 +319,33 @@ export const processStockEntry = async (
       userId,
       itemCount: entryItems.length
     });
-    
+
     for (const item of entryItems) {
       // Validaciones de cada item antes de procesar
       if (!item.name || item.name.trim() === '') {
         throw new Error(`El producto con SKU "${item.sku || 'N/A'}" no tiene un nombre válido.`);
       }
-      
+
       if (!item.sku || item.sku.trim() === '') {
         throw new Error(`El producto "${item.name}" no tiene un SKU válido.`);
       }
-      
+
       if (!item.quantity || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
         throw new Error(`El producto "${item.name}" debe tener una cantidad válida (entero mayor a 0).`);
       }
-      
+
       if (item.cost < 0) {
         throw new Error(`El producto "${item.name}" no puede tener un costo negativo.`);
       }
-      
+
       if (item.price < 0) {
         throw new Error(`El producto "${item.name}" no puede tener un precio negativo.`);
       }
-      
+
       if (item.ownershipType === 'Consigna' && (!item.consignorId || item.consignorId.trim() === '')) {
         throw new Error(`El producto en consigna "${item.name}" debe tener un consignador seleccionado.`);
       }
-      
+
       let productId = item.productId;
       let isNewProduct = false;
       let row = null;
@@ -350,6 +389,7 @@ export const processStockEntry = async (
               compatibilityTags: [],
               category: item.category,
               attributes: item.attributes,
+              imageUrls: item.imageUrl ? [item.imageUrl] : [],
             } as Omit<Product, "id" | "createdAt" | "searchKeywords">);
 
             productId = newProduct.id;
@@ -381,11 +421,20 @@ export const processStockEntry = async (
       // Actualizar stock si no es nuevo producto
       if (!isNewProduct && row) {
         const currentStock = Number(row.stock ?? 0);
-        
+
         // Resolve consignor ID to proper PostgreSQL UUID for updates
         const resolvedConsignorId = await resolveConsignorId(item.consignorId);
-        
-        const updateData = {
+
+        // Handle images update
+        let updatedImageUrls = undefined;
+        if (item.imageUrl) {
+          const currentImages = Array.isArray(row.image_urls) ? row.image_urls : [];
+          if (!currentImages.includes(item.imageUrl)) {
+            updatedImageUrls = [...currentImages, item.imageUrl];
+          }
+        }
+
+        const updateData: any = {
           stock: currentStock + item.quantity,
           cost: item.cost,
           price: item.price,
@@ -394,13 +443,17 @@ export const processStockEntry = async (
           category: item.category ?? null,
           attributes: item.attributes ?? {},
         };
-        
+
+        if (updatedImageUrls) {
+          updateData.image_urls = updatedImageUrls;
+        }
+
         log.info(`Updating existing product ${productId}`, {
           currentStock,
           newStock: currentStock + item.quantity,
           quantityAdded: item.quantity
         });
-        
+
         const { error: updateError } = await supabase
           .from(PRODUCTS_TABLE)
           .update(updateData)
@@ -426,7 +479,7 @@ export const processStockEntry = async (
           isNewProduct
         },
       };
-      
+
       const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert(logData);
 
       if (logError) {
@@ -447,7 +500,7 @@ export const processStockEntry = async (
       userId,
       itemCount: entryItems.length
     });
-    
+
     // Propagar el error con un mensaje más descriptivo
     if (error instanceof Error) {
       throw error;
@@ -460,7 +513,7 @@ export const processStockEntry = async (
 export const deleteProducts = async (productIds: string[]): Promise<void> => {
   if (!productIds.length) return;
   const supabase = getSupabaseServerClient();
-  
+
   // First, get the actual firestore_id and id for the products to be deleted
   const { data: productsToDelete, error: fetchError } = await supabase
     .from(PRODUCTS_TABLE)
@@ -525,7 +578,7 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
     throw new Error(`No se pudieron eliminar ${remainingCount} producto(s). Es posible que tengan dependencias como ventas o registros asociados.`);
   }
 
-  log.info(`Successfully deleted ${deletedCount} products`, { 
+  log.info(`Successfully deleted ${deletedCount} products`, {
     requestedIds: productIds,
     foundProducts: productsToDelete.map(p => ({ id: p.id, firestore_id: p.firestore_id, name: p.name }))
   });
@@ -608,7 +661,7 @@ export const bulkUpdateProducts = async (
 // ProductVariant functions
 export const getProductVariants = async (productId: string): Promise<ProductVariant[]> => {
   const supabase = getSupabaseServerClient();
-  
+
   const { data, error } = await supabase
     .from(PRODUCT_VARIANTS_TABLE)
     .select("*")
@@ -756,7 +809,7 @@ export const updateProductVariant = async (
 
 export const deleteProductVariant = async (variantId: string): Promise<void> => {
   const supabase = getSupabaseServerClient();
-  
+
   const { error } = await supabase
     .from(PRODUCT_VARIANTS_TABLE)
     .delete()
@@ -766,4 +819,33 @@ export const deleteProductVariant = async (variantId: string): Promise<void> => 
     log.error("Error deleting product variant", error);
     throw new Error("Failed to delete product variant.");
   }
+};
+
+
+export const uploadProductImage = async (formData: FormData): Promise<string> => {
+  const supabase = getSupabaseServerClient();
+  const file = formData.get('file') as File;
+
+  if (!file) {
+    throw new Error("No file provided");
+  }
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${uuidv4()}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('products')
+    .upload(filePath, file);
+
+  if (uploadError) {
+    log.error("Error uploading image to storage", uploadError);
+    throw new Error("Failed to upload image");
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('products')
+    .getPublicUrl(filePath);
+
+  return publicUrl;
 };

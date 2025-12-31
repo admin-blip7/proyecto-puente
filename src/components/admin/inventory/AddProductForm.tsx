@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
 import CategoryAttributes, { productCategories } from "./CategoryAttributes";
 import CurrencyInput from "@/components/ui/currency-input";
+import ProductImageManager from "./ProductImageManager";
 import { getLogger } from "@/lib/logger";
 const log = getLogger("AddProductForm");
 
@@ -29,6 +30,7 @@ interface AddProductFormProps {
 const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'compatibilityTags' | 'attributes'> & {
   compatibilityTags: string[];
   attributes: Record<string, any>;
+  imageUrls: string[];
 } = {
   name: '',
   sku: '',
@@ -43,6 +45,7 @@ const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'co
   compatibilityTags: [],
   category: '',
   attributes: {},
+  imageUrls: [],
 };
 
 export default function AddProductForm({ consignors, allProducts }: AddProductFormProps) {
@@ -53,21 +56,21 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
+
     let processedValue: string | number = value;
     if (type === 'number') {
-        processedValue = value === '' ? '' : Number(value);
+      processedValue = value === '' ? '' : Number(value);
     }
 
     setFormData(prevData => ({ ...prevData, [name]: processedValue }));
   };
-  
+
   const handleSelectChange = (name: keyof Product, value: string) => {
     const updatedFormData: any = { ...formData, [name]: value };
-     if (name === 'ownershipType' && value === 'Familiar') {
+    if (name === 'ownershipType' && value === 'Familiar') {
       updatedFormData.price = updatedFormData.cost;
     }
-     if (name === 'ownershipType' && value !== 'Consigna') {
+    if (name === 'ownershipType' && value !== 'Consigna') {
       updatedFormData.consignorId = undefined;
     }
     // Si cambia la categoría, limpiar los atributos
@@ -76,17 +79,17 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
     }
     setFormData(updatedFormData);
   };
-  
-   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newCost = Number(e.target.value);
     setFormData(prevData => {
-        const newData = { ...prevData, cost: newCost };
-        if (newData.ownershipType === 'Familiar') {
-            newData.price = newCost;
-        }
-        return newData;
+      const newData = { ...prevData, cost: newCost };
+      if (newData.ownershipType === 'Familiar') {
+        newData.price = newCost;
+      }
+      return newData;
     });
-   };
+  };
 
   const handleSaveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -95,13 +98,13 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
 
     try {
       await addProduct(formData);
-      
+
       log.info("¡Éxito! Producto creado.");
       toast({
         title: "Producto Agregado",
         description: `El producto "${formData.name}" ha sido creado exitosamente.`,
       });
-      
+
       router.push('/admin');
       router.refresh();
 
@@ -116,11 +119,11 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
       setIsLoading(false);
     }
   };
-  
+
   const formMethodsForSelector = {
     watch: (fieldName: keyof typeof initialFormData) => formData[fieldName],
     setValue: (fieldName: keyof typeof initialFormData, value: any) => {
-      setFormData(prev => ({...prev, [fieldName]: value}));
+      setFormData(prev => ({ ...prev, [fieldName]: value }));
     },
     getValues: (fieldName: keyof typeof initialFormData) => formData[fieldName],
   };
@@ -150,6 +153,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
           <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
           <TabsTrigger value="pricing" className="text-xs sm:text-sm">Precios</TabsTrigger>
           <TabsTrigger value="classification" className="text-xs sm:text-sm">Categoría</TabsTrigger>
+          <TabsTrigger value="images" className="text-xs sm:text-sm">Imágenes</TabsTrigger>
           <TabsTrigger value="relations" className="text-xs sm:text-sm">Combos</TabsTrigger>
         </TabsList>
 
@@ -160,7 +164,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
               <CardContent className="space-y-4 px-2 sm:px-6">
                 <div>
                   <Label htmlFor="name" className="text-sm sm:text-base">Nombre del Producto</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="text-base"/>
+                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="text-base" />
                 </div>
                 <div>
                   <Label htmlFor="sku" className="text-sm sm:text-base">SKU (Código de Barras)</Label>
@@ -178,23 +182,23 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                   <div>
                     <Label htmlFor="cost" className="text-sm sm:text-base">Costo de Compra</Label>
                     <CurrencyInput
-                       id="cost"
-                       name="cost"
-                       value={formData.cost}
-                       onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
-                       showCurrencyLabel={false}
-                     />
+                      id="cost"
+                      name="cost"
+                      value={formData.cost}
+                      onChange={(value: number) => setFormData(prev => ({ ...prev, cost: value }))}
+                      showCurrencyLabel={false}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="price" className="text-sm sm:text-base">Precio de Venta</Label>
                     <CurrencyInput
-                       id="price"
-                       name="price"
-                       value={formData.price}
-                       onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
-                       disabled={formData.ownershipType === 'Familiar'}
-                       showCurrencyLabel={false}
-                     />
+                      id="price"
+                      name="price"
+                      value={formData.price}
+                      onChange={(value: number) => setFormData(prev => ({ ...prev, price: value }))}
+                      disabled={formData.ownershipType === 'Familiar'}
+                      showCurrencyLabel={false}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -288,6 +292,22 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
             </Card>
           </TabsContent>
 
+          <TabsContent value="images">
+            <Card>
+              <CardHeader>
+                <CardTitle>Imágenes del Producto</CardTitle>
+                <CardDescription>Sube fotos o genera imágenes con IA</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProductImageManager
+                  imageUrls={formData.imageUrls || []}
+                  onChange={(urls) => setFormData(prev => ({ ...prev, imageUrls: urls }))}
+                  productName={formData.name}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="relations">
             <Card>
               <CardHeader>
@@ -295,7 +315,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                 <CardDescription>Relaciona este producto con otros y añade etiquetas de compatibilidad.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
+                <ComboProductSelector form={formMethodsForSelector as any} allProducts={allProducts} />
               </CardContent>
             </Card>
           </TabsContent>

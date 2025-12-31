@@ -1,4 +1,4 @@
-import type {Config} from 'tailwindcss';
+import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: ['class'],
@@ -24,7 +24,7 @@ export default {
           foreground: 'hsl(var(--popover-foreground))',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
+          DEFAULT: '#137fec', // Updated to FinanceFlow primary
           foreground: 'hsl(var(--primary-foreground))',
         },
         secondary: {
@@ -63,6 +63,8 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        "background-light": "#f8fafc",
+        "background-dark": "#101922",
       },
       borderRadius: {
         lg: 'var(--radius)',

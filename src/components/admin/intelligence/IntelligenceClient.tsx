@@ -7,6 +7,7 @@ import DemandForecast from "./DemandForecast";
 import { Separator } from "@/components/ui/separator";
 import ProductQualityAnalysis from "./ProductQualityAnalysis";
 import { getWarranties } from "@/lib/services/warrantyService";
+import AutoOrder from "./AutoOrder";
 
 interface IntelligenceClientProps {
     allProducts: Product[];
@@ -25,6 +26,7 @@ export default function IntelligenceClient({ allProducts, allSales }: Intelligen
             </div>
 
             <LowStockAlerts products={allProducts} />
+            <AutoOrder products={allProducts} sales={allSales} />
             <ProductABCAnalysis products={allProducts} sales={allSales} />
             <DemandForecast products={allProducts} sales={allSales} />
             <ProductQualityAnalysis allProducts={allProducts} allSales={allSales} />

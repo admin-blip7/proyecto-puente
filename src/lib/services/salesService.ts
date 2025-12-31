@@ -30,6 +30,8 @@ const mapSale = (row: any): Sale => ({
   cancelledAt: row?.cancelled_at ? toDate(row.cancelled_at) : undefined,
   cancelledBy: row?.cancelled_by ?? undefined,
   cancelReason: row?.cancel_reason ?? undefined,
+  amountPaid: row?.amount_paid ? Number(row.amount_paid) : undefined,
+  changeGiven: row?.change_given ? Number(row.change_given) : undefined,
 });
 
 export const getSales = async (includeStatus?: 'all' | 'completed' | 'cancelled'): Promise<Sale[]> => {
@@ -220,6 +222,8 @@ export const addSaleAndUpdateStock = async (
       customerPhone: sale.customerPhone,
       createdAt: sale.createdAt,
       status: 'completed',
+      amount_paid: sale.amountPaid,
+      change_given: sale.changeGiven,
     };
 
     log.info(`Sale record to insert:`, {
