@@ -2,6 +2,11 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Expose server-side environment variables to the runtime
+  env: {
+    GOOGLE_CSE_API_KEY: process.env.GOOGLE_CSE_API_KEY,
+    GOOGLE_CSE_CX: process.env.GOOGLE_CSE_CX,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
