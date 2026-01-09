@@ -27,13 +27,13 @@ async function safeFetch<T>(
     const startTime = Date.now();
     const result = await fn();
     const duration = Date.now() - startTime;
-    
+
     log.info(`[FinancePage] Successfully fetched ${operationName}`, {
       operation: operationName,
       duration: `${duration}ms`,
       itemCount: Array.isArray(result) ? result.length : 'N/A'
     });
-    
+
     return { data: result, error: null, success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -42,7 +42,7 @@ async function safeFetch<T>(
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
     });
-    
+
     return { data: fallback, error: errorMessage, success: false };
   }
 }
@@ -55,7 +55,10 @@ export default async function FinancePage() {
     // Fetch datos principales con manejo de errores individual
     const [expensesResult, salesResult, repairsResult, productsResult, consignorsResult, cashSessionsResult, accountsResult] = await Promise.allSettled([
       safeFetch(() => getExpenses(), [], "expenses"),
-      safeFetch(() => getSales(), [], "sales"),
+      safeFetch(async () => {
+        const result = await getSales('all', 0, 1000); // Get all sales for finance dashboard
+        return result.sales; // Extract sales array from result
+      }, [], "sales"),
       safeFetch(() => getRepairOrders(), [], "repairs"),
       safeFetch(() => getProducts(), [], "products"),
       safeFetch(() => getConsignors(), [], "consignors"),
