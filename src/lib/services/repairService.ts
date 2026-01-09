@@ -73,6 +73,27 @@ export const getReadyRepairs = async (): Promise<RepairOrder[]> => {
   }
 };
 
+export const getRepairsByClient = async (phone: string): Promise<RepairOrder[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    // Normalizar telefono si es necesario, o buscar por exact match
+    const { data, error } = await supabase
+      .from(REPAIRS_TABLE)
+      .select("*")
+      .eq("customerPhone", phone)
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapRepairOrder);
+  } catch (error) {
+    log.error("Error fetching client repairs", error);
+    return [];
+  }
+};
+
 const getNextOrderId = async (): Promise<string> => {
   const supabase = getSupabaseServerClient();
   const { count, error } = await supabase

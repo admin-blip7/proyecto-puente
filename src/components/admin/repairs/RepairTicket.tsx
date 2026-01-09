@@ -165,9 +165,8 @@ export const RepairTicket: FC<RepairTicketProps> = ({
         <div ref={ticketRef} className="bg-white p-6 rounded-lg shadow-sm">
           {/* Header */}
           <div className="text-center mb-6 pb-4 border-b-2 border-dashed">
-            <h2 className="text-xl font-bold mb-1">🔧 CELULARES EL CHINO 🔧</h2>
-            <p className="text-sm text-gray-600">Servicio Técnico Especializado</p>
-            <p className="text-xs text-gray-500">Tel: 5555-5555 | Ciudad</p>
+            <h2 className="text-xl font-bold mb-1">🔧 Servicio Técnico 🔧</h2>
+            <p className="text-sm text-gray-600">Especialistas en Reparación Móvil</p>
           </div>
 
           {/* Order Info */}

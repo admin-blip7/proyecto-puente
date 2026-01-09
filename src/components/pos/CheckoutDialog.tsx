@@ -17,7 +17,7 @@ import { Loader2, User, Search } from "lucide-react";
 import { formatCurrency } from '@/lib/utils';
 import SaleSummaryDialog from "./SaleSummaryDialog";
 import { addSaleAndUpdateStock } from "@/lib/services/salesService";
-import { getClientsWithCredit, createCreditSale } from "@/lib/services/creditService";
+
 import { getCRMClients } from "@/lib/services/crmClientService";
 import { ScrollArea } from "../ui/scroll-area";
 import { getLogger } from "@/lib/logger";
@@ -34,7 +34,7 @@ interface CheckoutDialogProps {
 }
 
 export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalAmount, onSuccessfulSale, activeSessionId }: CheckoutDialogProps) {
-    const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito' | 'Crédito'>('Efectivo');
+    const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito'>('Efectivo');
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -42,9 +42,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     const [loading, setLoading] = useState(false);
     const [lastSale, setLastSale] = useState<Sale | null>(null);
     const [isSummaryOpen, setSummaryOpen] = useState(false);
-    const [selectedClient, setSelectedClient] = useState<string>("");
-    const [clients, setClients] = useState<any[]>([]);
-    const [loadingClients, setLoadingClients] = useState(false);
+
     const [crmClients, setCrmClients] = useState<CRMClient[]>([]);
     const [loadingCRMClients, setLoadingCRMClients] = useState(false);
     const [selectedCRMClient, setSelectedCRMClient] = useState<string>("");
@@ -53,22 +51,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     const { userProfile } = useAuth();
     const { toast } = useToast();
 
-    const loadClients = useCallback(async () => {
-        setLoadingClients(true);
-        try {
-            const clientsData = await getClientsWithCredit();
-            setClients(clientsData);
-        } catch (error) {
-            log.error('Error loading clients:', error);
-            toast({
-                title: "Error",
-                description: "No se pudieron cargar los clientes",
-                variant: "destructive",
-            });
-        } finally {
-            setLoadingClients(false);
-        }
-    }, [toast]);
+
 
     const loadCRMClients = useCallback(async () => {
         setLoadingCRMClients(true);
@@ -91,11 +74,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         }
     }, [toast, crmClientSearch]);
 
-    useEffect(() => {
-        if (paymentMethod === 'Crédito') {
-            loadClients();
-        }
-    }, [paymentMethod, loadClients]);
+
 
     useEffect(() => {
         if (isOpen) {
@@ -153,14 +132,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             return;
         }
 
-        if (paymentMethod === 'Crédito' && !selectedClient) {
-            toast({
-                title: "Error",
-                description: "Debe seleccionar un cliente para la venta a crédito",
-                variant: "destructive",
-            });
-            return;
-        }
+
 
         setLoading(true);
 
@@ -192,44 +164,34 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
 
             console.log("Step 1: Sending sale data to the backend...", saleDataForDb);
 
-            if (paymentMethod === 'Crédito') {
-                newSale = await createCreditSale({
-                    items: cartItems,
-                    clientId: selectedClient,
-                    totalAmount,
-                    serials: Object.values(serials).flat(),
-                    userId: userProfile.uid,
-                    customerName: customerName || undefined,
-                    customerPhone: customerPhone || undefined,
-                });
-            } else {
-                // Usar API route para procesar la venta
-                const response = await fetch('/api/sales', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        saleData: saleDataForDb,
-                        cartItems: cartItems,
-                        crmClientId: selectedCRMClient || null
-                    })
-                });
 
-                const result = await response.json();
+            // Usar API route para procesar la venta
+            const response = await fetch('/api/sales', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    saleData: saleDataForDb,
+                    cartItems: cartItems,
+                    crmClientId: selectedCRMClient || null
+                })
+            });
 
-                if (!result.success) {
-                    throw new Error(result.details || result.error || 'Error al procesar la venta');
-                }
+            const result = await response.json();
 
-                newSale = result.sale;
+            if (!result.success) {
+                throw new Error(result.details || result.error || 'Error al procesar la venta');
             }
+
+            newSale = result.sale;
+
 
             setLastSale(newSale);
 
             toast({
                 title: "Venta Exitosa",
-                description: `Venta ${paymentMethod === 'Crédito' ? 'a crédito' : ''} completada exitosamente`,
+                description: "Venta completada exitosamente",
             });
 
             onSuccessfulSale();
@@ -239,7 +201,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             setCustomerPhone("");
             setAmountPaid(0);
             setSerials({});
-            setSelectedClient("");
+
             setSelectedCRMClient("");
             setCrmClientSearch("");
             setShowCRMClientDropdown(false);
@@ -454,7 +416,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                                 <span>Total a Pagar:</span>
                                 <span className="text-primary">{formatCurrency(totalAmount)}</span>
                             </div>
-                            <RadioGroup defaultValue="Efectivo" value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito' | 'Crédito')}>
+                            <RadioGroup defaultValue="Efectivo" value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito')}>
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="Efectivo" id="cash" />
                                     <Label htmlFor="cash">Efectivo</Label>
@@ -463,10 +425,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                                     <RadioGroupItem value="Tarjeta de Crédito" id="card" />
                                     <Label htmlFor="card">Tarjeta de Crédito</Label>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Crédito" id="credit" />
-                                    <Label htmlFor="credit">Crédito</Label>
-                                </div>
+
                             </RadioGroup>
 
                             {paymentMethod === 'Efectivo' && (
@@ -496,38 +455,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                                 </div>
                             )}
 
-                            {paymentMethod === 'Crédito' && (
-                                <div className="space-y-4 rounded-md border bg-muted/50 p-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="client-select">Seleccionar Cliente</Label>
-                                        {loadingClients ? (
-                                            <div className="flex items-center space-x-2">
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                <span>Cargando clientes...</span>
-                                            </div>
-                                        ) : (
-                                            <Select value={selectedClient} onValueChange={setSelectedClient}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Seleccione un cliente" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {clients.map((client) => (
-                                                        <SelectItem key={client.id} value={client.id}>
-                                                            {client.name} - Límite: ${client.creditAccount?.creditLimit || 0} - Disponible: ${(client.creditAccount?.creditLimit || 0) - (client.creditAccount?.currentBalance || 0)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    </div>
-                                    {selectedClient && (
-                                        <div className="text-sm text-muted-foreground">
-                                            <p>La venta se registrará como deuda del cliente seleccionado.</p>
-                                            <p>El monto se descontará automáticamente de su límite de crédito disponible.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+
                         </div>
                     </ScrollArea>
                     <DialogFooter>

@@ -9,7 +9,7 @@ const formSchema = z.object({
   customerPhone: z.string().min(1, "El teléfono es requerido."),
   deviceBrand: z.string().min(1, "La marca es requerida."),
   deviceModel: z.string().min(1, "El modelo es requerido."),
-  deviceSerialIMEI: z.string().min(1, "El IMEI o Serie es requerido."),
+  deviceSerialIMEI: z.string().optional().or(z.literal('')),
   reportedIssue: z.string().min(1, "La descripción del problema es requerida."),
   technicianNotes: z.string().optional(),
   partsUsed: z.array(z.object({
@@ -51,6 +51,7 @@ export async function createRepairOrder(formData: FormData) {
     // Create the repair order
     const newOrder = await addRepairOrder({
       ...validatedData,
+      deviceSerialIMEI: validatedData.deviceSerialIMEI || '',
       partsUsed: validatedData.partsUsed || []
     });
 

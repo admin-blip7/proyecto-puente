@@ -26,7 +26,6 @@ interface ShoppingCartProps {
   onSelectItem: (item: CartItem) => void;
   onAddToCart: (product: Product, quantity?: number) => void;
   onCloseSession: () => void;
-  onFinanceSale: () => void;
   onSuccessfulSale?: () => void | Promise<void>;
   activeSessionId?: string;
 }
@@ -40,7 +39,6 @@ export default function ShoppingCart({
   onSelectItem,
   onAddToCart,
   onCloseSession,
-  onFinanceSale,
   onSuccessfulSale,
   activeSessionId,
 }: ShoppingCartProps) {
@@ -119,10 +117,7 @@ export default function ShoppingCart({
     }
   }
 
-  const canFinanceSale = useMemo(() => {
-    if (cartItems.length !== 1) return false;
-    return cartItems[0].quantity === 1;
-  }, [cartItems]);
+
 
 
   const renderCartContent = () => (
@@ -211,10 +206,7 @@ export default function ShoppingCart({
             <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)} disabled={cartItems.length === 0}>
               Checkout
             </Button>
-            <Button className="w-full" variant="secondary" onClick={onFinanceSale} disabled={!canFinanceSale}>
-              <CreditCard className="mr-2" />
-              Vender a Crédito
-            </Button>
+
             <Button className="w-full" variant="outline" onClick={() => setExpenseOpen(true)}>
               <Receipt className="mr-2" />
               Registrar Gasto Rápido

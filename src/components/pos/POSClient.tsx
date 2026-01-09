@@ -8,7 +8,7 @@ import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode } from "lucide-react";
+import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode, Clock, Wrench } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import {
@@ -29,16 +29,18 @@ import { useToast } from "@/hooks/use-toast";
 import OpenSessionWizard from "./OpenSessionWizard";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
 import CashDepositVerificationDialog from "./CashDepositVerificationDialog";
+
+import { getSales } from "@/lib/services/salesService";
 import CashCloseTicket from "./CashCloseTicket";
 import { Skeleton } from "../ui/skeleton";
-import CreateFinancePlanDialog from "./CreateFinancePlanDialog";
-import { getClientsWithCredit } from "@/lib/services/creditService";
 import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 import { getProducts } from "@/lib/services/productService";
 import CodeScannerDialog from "./CodeScannerDialog";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { getReadyRepairs } from "@/lib/services/repairService";
+import { RepairOrder } from "@/types";
 
 
 interface POSClientProps {
@@ -47,7 +49,6 @@ interface POSClientProps {
 
 export default function POSClient({ initialProducts }: POSClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [allClients, setAllClients] = useState<ClientProfile[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
@@ -56,7 +57,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [isClosingDrawer, setClosingDrawer] = useState(false);
   const [showDepositVerification, setShowDepositVerification] = useState(false);
   const [closedSessionData, setClosedSessionData] = useState<CashSession | null>(null);
-  const [isFinancePlanOpen, setFinancePlanOpen] = useState(false);
   const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
@@ -131,7 +131,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   useEffect(() => {
     if (userProfile) {
       getCurrentOpenSession(userProfile.uid).then(setActiveSession);
-      getClientsWithCredit().then(setAllClients);
 
       // FORCE CLEAR any residual localStorage item that might be causing the dialog to pop up
       localStorage.removeItem('pendingDepositVerification');
@@ -296,6 +295,8 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja." })
     }
   }
+
+
 
   const handleDepositConfirmation = async (depositAmount: number) => {
     if (!closedSessionData) return;
@@ -724,23 +725,20 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               </Button>
             }
           />
-          <div className="mt-6 flex items-center justify-between">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Encuentra los mejores productos</h2>
+          <div className="mt-6 grid grid-cols-2 gap-3 pb-2">
             <Button
               onClick={() => setShowBuscadorCompatibilidad(true)}
-              variant="outline"
-              className="hidden md:flex items-center gap-2"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5 border-0"
             >
               <Search className="w-4 h-4" />
-              Buscar Micas
+              <span>Buscar Micas</span>
             </Button>
             <Button
               onClick={() => setShowRepairsDialog(true)}
-              variant="outline"
-              className="hidden md:flex items-center gap-2"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5 border-0 col-span-2 md:col-span-1"
             >
               <Wrench className="w-4 h-4" />
-              Reparaciones
+              <span>Reparaciones</span>
             </Button>
           </div>
           <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
@@ -763,7 +761,6 @@ export default function POSClient({ initialProducts }: POSClientProps) {
               onSelectItem={setSelectedCartItem}
               onAddToCart={addToCart}
               onCloseSession={() => setClosingDrawer(true)}
-              onFinanceSale={() => setFinancePlanOpen(true)}
               onSuccessfulSale={refreshProducts}
               activeSessionId={activeSession?.id}
             />
@@ -807,44 +804,44 @@ export default function POSClient({ initialProducts }: POSClientProps) {
                 onSelectItem={setSelectedCartItem}
                 onAddToCart={addToCart}
                 onCloseSession={() => setClosingDrawer(true)}
-                onFinanceSale={() => setFinancePlanOpen(true)}
                 onSuccessfulSale={refreshProducts}
                 activeSessionId={activeSession?.id}
               />
             </SheetContent>
           </Sheet>
         </div>
+
+
       </div>
+
       <CloseCashDrawerDialog
         isOpen={isClosingDrawer}
         onOpenChange={setClosingDrawer}
         session={activeSession}
         onConfirm={handleCloseDrawer}
       />
-      {closedSessionData && (
-        <CashDepositVerificationDialog
-          isOpen={showDepositVerification}
-          onOpenChange={setShowDepositVerification}
-          session={closedSessionData}
-          onConfirm={handleDepositConfirmation}
-          onSkip={handleSkipDeposit}
-        />
-      )}
-      <CreateFinancePlanDialog
-        isOpen={isFinancePlanOpen}
-        onOpenChange={setFinancePlanOpen}
-        allProducts={products}
-        allClients={allClients}
-        onSaleCreated={refreshProducts}
-      />
+      {
+        closedSessionData && (
+          <CashDepositVerificationDialog
+            isOpen={showDepositVerification}
+            onOpenChange={setShowDepositVerification}
+            session={closedSessionData}
+            onConfirm={handleDepositConfirmation}
+            onSkip={handleSkipDeposit}
+          />
+        )
+      }
+
 
       {/* Buscador de Compatibilidad */}
-      {showBuscadorCompatibilidad && (
-        <BuscadorCompatibilidad
-          onClose={() => setShowBuscadorCompatibilidad(false)}
-          onAddToCart={addToCart}
-        />
-      )}
+      {
+        showBuscadorCompatibilidad && (
+          <BuscadorCompatibilidad
+            onClose={() => setShowBuscadorCompatibilidad(false)}
+            onAddToCart={addToCart}
+          />
+        )
+      }
 
       {/* Scanner Dialog */}
       <CodeScannerDialog open={isScannerOpen} onOpenChange={setScannerOpen} onResult={handleScannedCode} />
@@ -857,21 +854,21 @@ export default function POSClient({ initialProducts }: POSClientProps) {
       />
 
       {/* Hidden ticket for printing */}
-      {printTicketSession && (
-        <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
-          <CashCloseTicket
-            id="cash-close-ticket"
-            session={printTicketSession}
-          />
-        </div>
-      )}
+      {
+        printTicketSession && (
+          <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
+            <CashCloseTicket
+              id="cash-close-ticket"
+              session={printTicketSession}
+            />
+          </div>
+        )
+      }
     </>
   );
 }
 
-import { getReadyRepairs } from "@/lib/services/repairService";
-import { RepairOrder } from "@/types";
-import { Wrench } from "lucide-react";
+
 
 function RepairsDialog({ isOpen, onOpenChange, onAddRepair }: { isOpen: boolean; onOpenChange: (open: boolean) => void; onAddRepair: (repair: RepairOrder) => void }) {
   const [repairs, setRepairs] = useState<RepairOrder[]>([]);

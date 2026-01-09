@@ -12,7 +12,7 @@ import { getProducts } from "@/lib/services/productService";
 
 const calculateDailySummary = (sales: Sale[], products: Product[]) => {
     const todaySales = sales.filter(sale => isToday(sale.createdAt));
-    
+
     const totalRevenue = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
 
     const totalCost = todaySales.reduce((sum, sale) => {
@@ -34,7 +34,7 @@ const calculateDailySummary = (sales: Sale[], products: Product[]) => {
 
 
 export default async function SalesPage() {
-    const initialSales = await getSales();
+    const { sales: initialSales } = await getSales('all', 0, 1000, "", "");
     const products = await getProducts();
     const { dailyCost, dailyProfit } = calculateDailySummary(initialSales, products);
 
@@ -43,21 +43,21 @@ export default async function SalesPage() {
             <div className="hidden md:flex">
                 <LeftSidebar />
             </div>
-             <div className="absolute top-4 left-4 z-50 md:hidden">
+            <div className="absolute top-4 left-4 z-50 md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <Menu className="h-6 w-6" />
-                    </Button>
+                        <Button variant="outline" size="icon">
+                            <Menu className="h-6 w-6" />
+                        </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
-                      <SheetTitle className="sr-only">Sales Menu</SheetTitle>
-                      <LeftSidebar />
+                        <SheetTitle className="sr-only">Sales Menu</SheetTitle>
+                        <LeftSidebar />
                     </SheetContent>
                 </Sheet>
             </div>
             <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
-                <SalesHistoryClient 
+                <SalesHistoryClient
                     initialSales={initialSales}
                     products={products}
                     dailyCost={dailyCost}

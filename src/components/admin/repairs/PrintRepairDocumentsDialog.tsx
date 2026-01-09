@@ -60,12 +60,37 @@ export default function PrintRepairDocumentsDialog({
 
   const generateLabelHTML = () => {
     const barcodeId = `barcode-${order.orderId}`;
+
+    // Extract a short failure summary (first line or short text)
+    const failureSummary = order.reportedIssue.split('\n')[0].substring(0, 30) + (order.reportedIssue.length > 30 ? '...' : '');
+
+    // Extract work summary from parts or services
+    const workSummary = order.partsUsed.map(p => p.name).join(', ').substring(0, 40) + (order.partsUsed.length > 0 ? '...' : '');
+
     return `
-        <div class="label" style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; overflow: hidden; font-size: ${labelSettings.fontSize}px;">
-            <div style="font-weight: bold; font-size: 1.2em;">${order.orderId}</div>
-            <svg id="${barcodeId}" style="width: 90%; height: ${labelSettings.barcodeHeight}px; margin: 4px 0;"></svg>
-            <div>${order.customerName}</div>
-            <div style="font-size: 0.9em;">${order.deviceModel}</div>
+        <div class="label" style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; font-family: sans-serif; font-size: 10px; line-height: 1.2;">
+            <div style="font-weight: 900; font-size: 14px; margin-bottom: 2px;">${order.orderId}</div>
+            <svg id="${barcodeId}" style="width: 95%; height: ${labelSettings.barcodeHeight}px; display: block; margin: 0 auto;"></svg>
+            
+            <div style="width: 100%; border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">
+              <div style="font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${order.customerName}</div>
+              <div style="font-size: 10px;">${order.customerPhone}</div>
+            </div>
+
+            <div style="width: 100%; margin-top: 2px;">
+              <div style="font-weight: bold; font-size: 11px;">${order.deviceBrand} ${order.deviceModel}</div>
+            </div>
+            
+            <div style="width: 100%; text-align: left; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 2px;">
+               <div style="display: flex; gap: 4px;">
+                  <strong style="min-width: 35px;">Falla:</strong> 
+                  <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${failureSummary || 'N/A'}</span>
+               </div>
+               <div style="display: flex; gap: 4px;">
+                  <strong style="min-width: 35px;">Realizar:</strong> 
+                  <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${workSummary || 'Revisión'}</span>
+               </div>
+            </div>
         </div>
     `;
   };

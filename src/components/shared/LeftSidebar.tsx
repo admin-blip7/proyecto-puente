@@ -28,7 +28,6 @@ const mainNavItems = [
     { href: '/admin/repairs', icon: Wrench, label: 'Reparaciones' },
     { href: '/admin/warranties', icon: ShieldCheck, label: 'Garantías' },
     { href: '/admin/consignors', icon: Users, label: 'Consignadores' },
-    { href: '/admin/credit', icon: Contact, label: 'Crédito y Cobranza' },
     { href: '/admin/crm', icon: UserCheck, label: 'CRM Clientes' },
     { href: '/admin/intelligence', icon: BrainCircuit, label: 'Inteligencia' },
 ];

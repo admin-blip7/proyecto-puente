@@ -951,24 +951,29 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                 <CardTitle>Lista de Ingreso</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {/* Desktop Enhanced Two-Row View */}
+                                {/* Desktop 2-Row Card View */}
                                 <div className="hidden md:block space-y-4">
                                     {entryList.length === 0 ? (
-                                        <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                                            La lista de ingreso está vacía.
+                                        <div className="border rounded-lg p-12 text-center text-muted-foreground bg-muted/10">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Package className="h-12 w-12 opacity-20" />
+                                                <p className="text-lg font-medium">La lista está vacía</p>
+                                                <p className="text-sm">Agrega productos usando el buscador o creando nuevos items.</p>
+                                            </div>
                                         </div>
                                     ) : (
                                         entryList.map(item => (
-                                            <div key={item.id} className="border rounded-lg p-4 space-y-4 bg-card hover:bg-accent/5 transition-colors">
-                                                {/* Primera fila: Información básica del producto */}
-                                                <div className="grid grid-cols-12 gap-4 items-center">
-                                                    <div className="col-span-12 md:col-span-1 flex justify-center md:block">
-                                                        <div className="flex items-center gap-2">
-                                                            <Checkbox
-                                                                checked={selectedItems.has(item.id)}
-                                                                onCheckedChange={() => toggleSelection(item.id)}
-                                                                className="h-5 w-5"
-                                                            />
+                                            <div key={item.id} className="group relative flex items-start gap-4 p-4 border rounded-xl bg-card hover:border-primary/50 transition-all shadow-sm">
+
+                                                <div className="flex flex-col items-center gap-3 pt-2 pl-2">
+                                                    <div className="relative">
+                                                        <Checkbox
+                                                            checked={selectedItems.has(item.id)}
+                                                            onCheckedChange={() => toggleSelection(item.id)}
+                                                            className="h-5 w-5 absolute -top-2 -left-2 z-10 bg-background shadow-sm rounded-full"
+                                                        />
+                                                        {/* Allow manager to determine size - no overflow clipping */}
+                                                        <div>
                                                             <StockItemImageManager
                                                                 itemName={item.name}
                                                                 itemCategory={item.category}
@@ -987,165 +992,168 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="col-span-6 md:col-span-2">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">SKU</Label>
-                                                        <div className="flex items-center gap-1">
-                                                            <Input
-                                                                id={`sku-input-${item.id}`}
-                                                                value={item.sku}
-                                                                readOnly={!item.isNew && scanningForSkuId !== item.id}
-                                                                onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)}
-                                                                onBlur={() => setScanningForSkuId(null)}
-                                                                className={cn(
-                                                                    !item.isNew && scanningForSkuId !== item.id && "bg-muted/50 text-xs",
-                                                                    "h-9",
-                                                                    scanningForSkuId === item.id && "border-2 border-yellow-500 ring-2 ring-yellow-500/20"
-                                                                )}
-                                                            />
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className={cn("h-8 w-8", scanningForSkuId === item.id ? "text-yellow-500 bg-yellow-100" : "text-muted-foreground")}
-                                                                onClick={() => setScanningForSkuId(item.id)}
-                                                                title="Escanear nuevo SKU"
-                                                            >
-                                                                <ScanLine className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="col-span-6 md:col-span-3">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre del Producto</Label>
-                                                        <Input
-                                                            value={item.name}
-                                                            onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
-                                                            className="h-9"
-                                                            placeholder="Ingrese el nombre del producto"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Categoría</Label>
-                                                        <Select value={item.category || 'none'} onValueChange={(value) => handleUpdateItem(item.id, 'category', value === 'none' ? '' : value)}>
-                                                            <SelectTrigger className="h-9">
-                                                                <SelectValue placeholder="Seleccionar..." />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">Sin categoría</SelectItem>
-                                                                {productCategories.map((cat, index) => (
-                                                                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Cantidad</Label>
-                                                        <Input
-                                                            type="number"
-                                                            value={item.quantity}
-                                                            onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
-                                                            onFocus={(e) => {
-                                                                if (e.target.value === '0') {
-                                                                    e.target.select();
-                                                                }
-                                                            }}
-                                                            className="text-right h-9"
-                                                            min="1"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-3">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Propiedad</Label>
-                                                        <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
-                                                            <SelectTrigger className="h-9">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="col-span-1 flex justify-end">
-                                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="h-9 w-9">
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
                                                 </div>
 
-                                                {/* Segunda fila: Información financiera y consignador */}
-                                                <div className="grid grid-cols-12 gap-4 items-center">
-                                                    <div className="col-span-3">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Costo Unitario</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={item.cost}
-                                                            onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)}
-                                                            onFocus={(e) => {
-                                                                if (e.target.value === '0') {
-                                                                    e.target.select();
-                                                                }
-                                                            }}
-                                                            className="text-right h-9"
-                                                            placeholder="0.00"
-                                                        />
+                                                {/* Middle: Inputs Grid */}
+                                                <div className="flex-1 space-y-3 pt-1">
+                                                    {/* Row 1: SKU, Product, Category, Qty */}
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-32 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">SKU</Label>
+                                                            <div className="relative">
+                                                                <Input
+                                                                    value={item.sku}
+                                                                    readOnly={!item.isNew && scanningForSkuId !== item.id}
+                                                                    onChange={(e) => handleUpdateItem(item.id, 'sku', e.target.value)}
+                                                                    onBlur={() => setScanningForSkuId(null)}
+                                                                    className={cn(
+                                                                        "font-mono text-sm h-10 transition-all",
+                                                                        !item.isNew && scanningForSkuId !== item.id && "bg-muted/30 border-transparent shadow-none px-2 text-muted-foreground",
+                                                                        scanningForSkuId === item.id && "border-2 border-yellow-500 ring-4 ring-yellow-500/10 bg-background"
+                                                                    )}
+                                                                    onClick={() => {
+                                                                        if (!item.isNew && scanningForSkuId !== item.id) setScanningForSkuId(item.id);
+                                                                    }}
+                                                                />
+                                                                {scanningForSkuId !== item.id && !item.isNew && (
+                                                                    <ScanLine className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground opacity-50 pointer-events-none" />
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex-1 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Producto</Label>
+                                                            <Input
+                                                                value={item.name}
+                                                                onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)}
+                                                                className="h-10 font-medium"
+                                                                placeholder="Nombre del producto..."
+                                                            />
+                                                        </div>
+
+                                                        <div className="w-40 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Categoría</Label>
+                                                            <Select value={item.category || 'none'} onValueChange={(value) => handleUpdateItem(item.id, 'category', value === 'none' ? '' : value)}>
+                                                                <SelectTrigger className="h-10 text-sm">
+                                                                    <SelectValue placeholder="Sin categoría" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">Sin categoría</SelectItem>
+                                                                    {productCategories.map((cat) => (
+                                                                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+
+                                                        <div className="w-24 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Cantidad</Label>
+                                                            <Input
+                                                                type="number"
+                                                                value={item.quantity}
+                                                                onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
+                                                                className="h-10 text-right font-bold text-base"
+                                                                min="1"
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div className="col-span-3">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Precio de Venta</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={item.price}
-                                                            onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)}
-                                                            onFocus={(e) => {
-                                                                if (e.target.value === '0') {
-                                                                    e.target.select();
-                                                                }
-                                                            }}
-                                                            disabled={item.ownershipType === 'Familiar'}
-                                                            className="text-right h-9"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-4">
-                                                        {item.ownershipType === 'Consigna' ? (
-                                                            <>
-                                                                <Label className="text-xs font-medium text-muted-foreground mb-1 block">Consignador</Label>
-                                                                <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
-                                                                    <SelectTrigger className="h-9">
-                                                                        <SelectValue placeholder="Seleccionar consignador..." />
+
+                                                    {/* Row 2: Cost, Price, Ownership, Total */}
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-32 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Costo U.</Label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                                                <Input
+                                                                    type="number"
+                                                                    value={item.cost}
+                                                                    onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value)}
+                                                                    className="h-10 text-right pl-6"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="w-32 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Precio V.</Label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                                                <Input
+                                                                    type="number"
+                                                                    value={item.price}
+                                                                    onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)}
+                                                                    disabled={item.ownershipType === 'Familiar'}
+                                                                    className="h-10 text-right pl-6"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="w-48 space-y-1">
+                                                            <Label className="text-xs font-medium text-muted-foreground">Propiedad</Label>
+                                                            <div className="flex gap-2">
+                                                                <Select value={item.ownershipType} onValueChange={(value: OwnershipType) => handleUpdateItem(item.id, 'ownershipType', value)}>
+                                                                    <SelectTrigger className="h-10 text-sm flex-1">
+                                                                        <SelectValue />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
-                                                                        {consignors.map((c, index) => <SelectItem key={`${c.id}-${index}`} value={c.id}>{c.name}</SelectItem>)}
+                                                                        {ownershipTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                                                                     </SelectContent>
                                                                 </Select>
-                                                            </>
-                                                        ) : (
-                                                            <div className="h-9 flex items-center">
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {item.ownershipType === 'Familiar' && 'Precio automático = Costo'}
-                                                                    {item.ownershipType === 'Propio' && 'Producto propio'}
-                                                                </span>
+                                                                {item.ownershipType === 'Consigna' && (
+                                                                    <Select value={item.consignorId} onValueChange={(value) => handleUpdateItem(item.id, 'consignorId', value)}>
+                                                                        <SelectTrigger className="h-10 text-xs w-24 border-yellow-200 bg-yellow-50 text-yellow-900">
+                                                                            <div className="truncate">{consignors.find(c => c.id === item.consignorId)?.name || 'Elegir...'}</div>
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {consignors.map((c, index) => <SelectItem key={`${c.id}-${index}`} value={c.id}>{c.name}</SelectItem>)}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Total</Label>
-                                                        <div className="h-9 flex items-center justify-end">
-                                                            <span className="text-sm font-medium">
+                                                        </div>
+
+                                                        {/* Spacing filler if needed or Attribute trigger */}
+                                                        <div className="flex-1 pt-1">
+                                                            {item.category && (
+                                                                <Popover>
+                                                                    <PopoverTrigger asChild>
+                                                                        <Button variant="ghost" size="sm" className="text-xs h-8 -ml-2 text-muted-foreground hover:text-primary">
+                                                                            <Grid className="w-3 h-3 mr-1" />
+                                                                            {Object.keys(item.attributes || {}).length} Atributos
+                                                                        </Button>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="w-80">
+                                                                        <div className="p-2">
+                                                                            <CategoryAttributes
+                                                                                category={item.category}
+                                                                                attributes={item.attributes || {}}
+                                                                                onChange={(attributes) => handleUpdateAttributes(item.id, attributes)}
+                                                                            />
+                                                                        </div>
+                                                                    </PopoverContent>
+                                                                </Popover>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="w-auto min-w-[100px] flex flex-col items-end justify-center h-10 rounded bg-muted/30 px-3 self-end">
+                                                            <Label className="text-[10px] text-muted-foreground mb-0">Total</Label>
+                                                            <span className="text-sm font-bold font-mono">
                                                                 ${((item.cost || 0) * (item.quantity || 0)).toFixed(2)}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Tercera fila: Atributos específicos de la categoría */}
-                                                {item.category && (
-                                                    <div className="border-t pt-4">
-                                                        <CategoryAttributes
-                                                            category={item.category}
-                                                            attributes={item.attributes || {}}
-                                                            onChange={(attributes) => handleUpdateAttributes(item.id, attributes)}
-                                                        />
-                                                    </div>
-                                                )}
+                                                {/* Right: Actions */}
+                                                <div className="flex flex-col gap-2 pt-8">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleRemoveItem(item.id)}
+                                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    >
+                                                        <Trash2 className="h-5 w-5" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))
                                     )}

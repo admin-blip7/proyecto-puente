@@ -389,7 +389,16 @@ export const generateLabelPdf = async (
   }
   const visualElements = visualLayoutData?.elements ?? [];
   if (visualElements.length === 0) {
-    throw new Error('No saved visual label layout was found.');
+    // throw new Error('No saved visual label layout was found.');
+    // Fallback to a default layout if none exists
+    const width = settings.width || 50;
+
+    visualElements.push(
+      { id: 'def-1', type: 'placeholder', placeholderKey: 'productName', x: 1, y: 2, width: width - 2, height: 5, fontSize: 8, textAlign: 'center', fontWeight: 'bold' },
+      { id: 'def-2', type: 'placeholder', placeholderKey: 'price', x: 1, y: 8, width: width - 2, height: 6, fontSize: 12, textAlign: 'center', fontWeight: 'bold' },
+      { id: 'def-3', type: 'placeholder', placeholderKey: 'barcode', x: 2, y: 15, width: width - 4, height: 8, fontSize: 10, textAlign: 'center', barcodeFormat: 'code128' },
+      { id: 'def-4', type: 'placeholder', placeholderKey: 'sku', x: 1, y: 24, width: width - 2, height: 3, fontSize: 6, textAlign: 'center', fontWeight: 'normal' }
+    );
   }
 
   const now = new Date();
@@ -547,7 +556,17 @@ export const previewLabelsPdf = async (
   const visualElements = visualLayoutData?.elements ?? [];
 
   if (visualElements.length === 0) {
-    throw new Error('No saved visual label layout was found.');
+    // throw new Error('No saved visual label layout was found.');
+    // Fallback to a default layout if none exists
+    const width = settings.width || 50;
+    const height = settings.height || 25;
+
+    visualElements.push(
+      { id: 'def-1', type: 'placeholder', placeholderKey: 'productName', x: 1, y: 2, width: width - 2, height: 5, fontSize: 8, textAlign: 'center', fontWeight: 'bold' },
+      { id: 'def-2', type: 'placeholder', placeholderKey: 'price', x: 1, y: 8, width: width - 2, height: 6, fontSize: 12, textAlign: 'center', fontWeight: 'bold' },
+      { id: 'def-3', type: 'placeholder', placeholderKey: 'barcode', x: 2, y: 15, width: width - 4, height: 8, fontSize: 10, textAlign: 'center', barcodeFormat: 'code128' },
+      { id: 'def-4', type: 'placeholder', placeholderKey: 'sku', x: 1, y: 24, width: width - 2, height: 3, fontSize: 6, textAlign: 'center', fontWeight: 'normal' }
+    );
   }
 
   return generateLabelsHtml(limitedItems, visualElements, settings);

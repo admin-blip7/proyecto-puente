@@ -61,12 +61,12 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
     setEditDialogOpen(false);
     setSelectedOrder(null);
   };
-  
+
   const handleOpenEditDialog = (order: RepairOrder) => {
     setSelectedOrder(order);
     setEditDialogOpen(true);
   }
-  
+
   const handlePrint = (order: RepairOrder, type: 'ticket' | 'label') => {
     const isLabel = type === 'label';
 
@@ -75,9 +75,9 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
       alert("El navegador bloqueó la ventana de impresión.");
       return;
     }
-    
+
     printWindow.document.write('<html><head><title>Imprimir</title>');
-    
+
     let content = '';
     if (isLabel) {
       printWindow.document.write(`
@@ -86,17 +86,39 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
               body { margin: 0; padding: 0; }
           </style>
       `);
+      // Extract a short failure summary (first line or short text)
+      const failureSummary = order.reportedIssue.split('\n')[0].substring(0, 30) + (order.reportedIssue.length > 30 ? '...' : '');
+      const workSummary = order.partsUsed.map(p => p.name).join(', ').substring(0, 40) + (order.partsUsed.length > 0 ? '...' : '');
+
       content = `
-        <div style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; overflow: hidden; font-size: ${labelSettings.fontSize}px;">
-            <div style="font-weight: bold; font-size: 1.2em;">${order.orderId}</div>
-            <svg id="barcode-${order.orderId}" style="width: 90%; height: ${labelSettings.barcodeHeight}px; margin: 4px 0;"></svg>
-            <div>${order.customerName}</div>
-            <div style="font-size: 0.9em;">${order.deviceModel}</div>
-        </div>
+          <div class="label" style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; font-family: sans-serif; font-size: 10px; line-height: 1.2;">
+              <div style="font-weight: 900; font-size: 14px; margin-bottom: 2px;">${order.orderId}</div>
+              <svg id="barcode-${order.orderId}" style="width: 95%; height: ${labelSettings.barcodeHeight}px; display: block; margin: 0 auto;"></svg>
+              
+              <div style="width: 100%; border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">
+                <div style="font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${order.customerName}</div>
+                <div style="font-size: 10px;">${order.customerPhone}</div>
+              </div>
+
+              <div style="width: 100%; margin-top: 2px;">
+                <div style="font-weight: bold; font-size: 11px;">${order.deviceBrand} ${order.deviceModel}</div>
+              </div>
+              
+              <div style="width: 100%; text-align: left; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 2px;">
+                 <div style="display: flex; gap: 4px;">
+                    <strong style="min-width: 35px;">Falla:</strong> 
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${failureSummary || 'N/A'}</span>
+                 </div>
+                 <div style="display: flex; gap: 4px;">
+                    <strong style="min-width: 35px;">Realizar:</strong> 
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${workSummary || 'Revisión'}</span>
+                 </div>
+              </div>
+          </div>
       `;
     } else {
-        const { header, body, footer } = ticketSettings;
-        content = `
+      const { header, body, footer } = ticketSettings;
+      content = `
             <div style="width: 80mm; font-family: 'Courier New', Courier, monospace; color: black; padding: 3mm; font-size: ${body.fontSize === 'xs' ? '10px' : body.fontSize === 'sm' ? '12px' : '14px'};">
                 <div style="text-align: center; margin-bottom: 1rem;">
                 ${header.showLogo && header.logoUrl ? `<img src="${header.logoUrl}" alt="Logo" style="max-width: 60px; max-height: 60px; margin: 0 auto;"/>` : ''}
@@ -128,19 +150,19 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
     printWindow.document.write('</body></html>');
 
     if (isLabel) {
-        try {
-             JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
-                format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
-            });
-        } catch(e) { console.error(e); }
+      try {
+        JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
+          format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
+        });
+      } catch (e) { console.error(e); }
     }
 
     printWindow.document.close();
     printWindow.focus();
-    
+
     setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
+      printWindow.print();
+      printWindow.close();
     }, 250);
   };
 
@@ -161,9 +183,9 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
         <CardContent>
           <ScrollArea className="h-[calc(100vh-250px)] w-full">
             <div className="relative w-full overflow-auto">
-                <Table>
+              <Table>
                 <TableHeader>
-                    <TableRow>
+                  <TableRow>
                     <TableHead>ID Orden</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Dispositivo</TableHead>
@@ -171,61 +193,61 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {orders.map((order) => (
+                  {orders.map((order) => (
                     <TableRow key={order.id}>
-                        <TableCell className="font-mono">{order.orderId}</TableCell>
-                        <TableCell>
-                            <p className="font-medium">{order.customerName}</p>
-                            <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
-                        </TableCell>
-                        <TableCell>
-                            <p className="font-medium">{order.deviceBrand} {order.deviceModel}</p>
-                            <p className="text-sm text-muted-foreground font-mono">{order.deviceSerialIMEI}</p>
-                        </TableCell>
-                        <TableCell>{format(order.createdAt, "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell>
-                            <Badge variant={getStatusVariant(order.status)}>
-                                {order.status}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(order.totalPrice)}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => handleOpenEditDialog(order)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar Orden
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  Imprimir
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent>
-                                  <DropdownMenuItem onClick={() => handlePrint(order, 'ticket')}>
-                                    Reimprimir Ticket de Cliente
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handlePrint(order, 'label')}>
-                                    Reimprimir Etiqueta
-                                  </DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                      <TableCell className="font-mono">{order.orderId}</TableCell>
+                      <TableCell>
+                        <p className="font-medium">{order.customerName}</p>
+                        <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-medium">{order.deviceBrand} {order.deviceModel}</p>
+                        <p className="text-sm text-muted-foreground font-mono">{order.deviceSerialIMEI}</p>
+                      </TableCell>
+                      <TableCell>{format(order.createdAt, "dd MMM yyyy", { locale: es })}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{formatCurrency(order.totalPrice)}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleOpenEditDialog(order)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar Orden
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuItem onClick={() => handlePrint(order, 'ticket')}>
+                                  Reimprimir Ticket de Cliente
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePrint(order, 'label')}>
+                                  Reimprimir Etiqueta
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
-                    ))}
+                  ))}
                 </TableBody>
-                </Table>
+              </Table>
             </div>
           </ScrollArea>
         </CardContent>

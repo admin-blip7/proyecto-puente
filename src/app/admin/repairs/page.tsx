@@ -16,7 +16,7 @@ export default async function RepairsPage() {
         getTicketSettings(),
         getLabelSettings()
     ]);
-    
+
     return (
         <div className="flex h-screen w-full flex-row">
             <div className="hidden md:flex">
@@ -25,9 +25,9 @@ export default async function RepairsPage() {
             <div className="absolute top-4 left-4 z-50 md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <Menu className="h-6 w-6" />
-                    </Button>
+                        <Button variant="outline" size="icon">
+                            <Menu className="h-6 w-6" />
+                        </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
                         <SheetTitle className="sr-only">Repairs Menu</SheetTitle>
@@ -35,13 +35,13 @@ export default async function RepairsPage() {
                     </SheetContent>
                 </Sheet>
             </div>
-            <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
-               <RepairDashboard
-                initialOrders={initialOrders}
-                allSpareParts={spareParts.filter(p => p.type === 'Refacción')}
-                ticketSettings={ticketSettings}
-                labelSettings={labelSettings}
-               />
+            <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
+                <RepairDashboard
+                    initialOrders={initialOrders}
+                    allSpareParts={spareParts.filter(p => p.type === 'Refacción')}
+                    ticketSettings={ticketSettings}
+                    labelSettings={labelSettings}
+                />
             </main>
         </div>
     )

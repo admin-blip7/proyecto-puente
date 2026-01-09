@@ -43,7 +43,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const [selectedLabelType, setSelectedLabelType] = useState<LabelType>(
     (initialSettings.labelType as LabelType) || "product"
   );
-  const [existingLabels, setExistingLabels] = useState<Array<{id: string, name: string, type: LabelType}>>([]);
+  const [existingLabels, setExistingLabels] = useState<Array<{ id: string, name: string, type: LabelType }>>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -73,7 +73,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         setExistingLabels([]);
       }
     };
-    
+
     loadExistingLabels();
   }, []);
 
@@ -88,14 +88,14 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         console.error('Error loading label settings:', error);
       }
     };
-    
+
     loadSettingsForLabelType();
   }, [selectedLabelType, form]);
 
   const handleLayoutChange = useCallback((layout: VisualEditorData) => {
     const newValue = JSON.stringify(layout);
     const currentValue = form.getValues("visualLayout");
-    
+
     // Only update if the value actually changed to prevent unnecessary re-renders
     if (newValue !== currentValue) {
       // Use a timeout to batch updates and prevent rapid successive calls
@@ -108,7 +108,10 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const handleLabelTypeChange = useCallback(async (newLabelType: LabelType) => {
     setSelectedLabelType(newLabelType);
     setSelectedLabelId(null); // Reset specific label selection
-    
+    if (newLabelType === 'repair') {
+      setMode('simple');
+    }
+
     try {
       // Load the settings for the selected label type
       const settings = await getLabelSettings(newLabelType);
@@ -118,8 +121,8 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       // If there's an error, create default settings for this type
       const defaultSettings = {
         labelType: newLabelType,
-        width: 51, 
-        height: 102, 
+        width: 51,
+        height: 102,
         orientation: 'vertical' as const,
         fontSize: 9,
         barcodeHeight: 30,
@@ -127,10 +130,10 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         logoUrl: "",
         storeName: "Nombre de tu Tienda",
         content: {
-            showProductName: true,
-            showSku: true,
-            showPrice: true,
-            showStoreName: false,
+          showProductName: true,
+          showSku: true,
+          showPrice: true,
+          showStoreName: false,
         },
         visualLayout: null,
       };
@@ -141,10 +144,10 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const handleSpecificLabelSelect = useCallback(async (labelId: string) => {
     setSelectedLabelId(labelId);
     const selectedLabel = existingLabels.find(label => label.id === labelId);
-    
+
     if (selectedLabel) {
       setSelectedLabelType(selectedLabel.type);
-      
+
       try {
         const settings = await getLabelSettings(selectedLabel.type);
         form.reset(settings);
@@ -160,7 +163,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   }, [existingLabels, form, toast]);
 
   const watchedSettings = form.watch();
-  
+
 
 
   const uploadDataUrlIfNeeded = useCallback(async (dataUrl?: string | null) => {
@@ -256,50 +259,50 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const onSubmit = async (values: LabelSettings) => {
     setLoading(true);
     try {
-        const processedLayout = await prepareVisualLayoutForSave(values.visualLayout);
-        const payload: LabelSettings = {
-            ...values,
-            visualLayout: processedLayout ?? undefined,
-        };
-        const layoutSize = payload.visualLayout ? payload.visualLayout.length : 0;
-        if (layoutSize > 1000000) {
-            toast({
-                variant: "destructive",
-                title: "Diseño demasiado grande",
-                description: "Reduce el tamaño de las imágenes o elimina elementos para poder guardar el diseño.",
-            });
-            return;
-        }
-        await saveLabelSettings(payload);
-        form.reset(payload);
+      const processedLayout = await prepareVisualLayoutForSave(values.visualLayout);
+      const payload: LabelSettings = {
+        ...values,
+        visualLayout: processedLayout ?? undefined,
+      };
+      const layoutSize = payload.visualLayout ? payload.visualLayout.length : 0;
+      if (layoutSize > 1000000) {
         toast({
-            title: "Diseño Guardado",
-            description: "La configuración de tus etiquetas ha sido guardada."
-        })
+          variant: "destructive",
+          title: "Diseño demasiado grande",
+          description: "Reduce el tamaño de las imágenes o elimina elementos para poder guardar el diseño.",
+        });
+        return;
+      }
+      await saveLabelSettings(payload);
+      form.reset(payload);
+      toast({
+        title: "Diseño Guardado",
+        description: "La configuración de tus etiquetas ha sido guardada."
+      })
     } catch (error) {
-        console.error("Error saving settings:", error);
-        toast({
-            variant: "destructive",
-            title: "Error",
-            description: "No se pudo guardar la configuración."
-        })
+      console.error("Error saving settings:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo guardar la configuración."
+      })
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const parsedLayout = useMemo(() => {
     const sourceLayout = watchedSettings.visualLayout ?? initialSettings.visualLayout;
-    
+
     if (!sourceLayout) {
       return undefined;
     }
-    
+
     try {
-      const parsed = typeof sourceLayout === 'string' 
+      const parsed = typeof sourceLayout === 'string'
         ? JSON.parse(sourceLayout)
         : sourceLayout;
-      
+
       return normalizeVisualEditorData(parsed);
     } catch (error) {
       console.error("Invalid visual layout JSON", error);
@@ -318,18 +321,18 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
     <>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
         <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {selectedLabelId 
-                ? `Editando: ${existingLabels.find(l => l.id === selectedLabelId)?.name || 'Etiqueta'}` 
-                : 'Diseñador de Etiquetas'
-              }
-            </h1>
-            <p className="text-muted-foreground">
-              {selectedLabelId 
-                ? 'Modifica el diseño de esta etiqueta existente y guarda los cambios.'
-                : 'Selecciona una etiqueta existente o crea una nueva para productos y reparaciones.'
-              }
-            </p>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {selectedLabelId
+              ? `Editando: ${existingLabels.find(l => l.id === selectedLabelId)?.name || 'Etiqueta'}`
+              : 'Diseñador de Etiquetas'
+            }
+          </h1>
+          <p className="text-muted-foreground">
+            {selectedLabelId
+              ? 'Modifica el diseño de esta etiqueta existente y guarda los cambios.'
+              : 'Selecciona una etiqueta existente o crea una nueva para productos y reparaciones.'
+            }
+          </p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex flex-col space-y-2">
@@ -348,7 +351,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
               </SelectContent>
             </Select>
           </div>
-          
+
           {!selectedLabelId && (
             <div className="flex items-center space-x-2">
               <Label htmlFor="label-type">Tipo de Nueva Etiqueta</Label>
@@ -363,11 +366,11 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
               </Select>
             </div>
           )}
-          
+
           <div className="flex items-center space-x-2">
             <Label htmlFor="label-orientation">Orientación</Label>
-            <Select 
-              value={form.watch("orientation") || "horizontal"} 
+            <Select
+              value={form.watch("orientation") || "horizontal"}
               onValueChange={(value: LabelOrientation) => {
                 form.setValue("orientation", value, { shouldDirty: true });
               }}
@@ -381,15 +384,21 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
               </SelectContent>
             </Select>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="visual-mode-label">Modo Visual</Label>
-            <Switch id="visual-mode-label" onCheckedChange={(checked) => setMode(checked ? "visual" : "simple")} />
-          </div>
+
+          {selectedLabelType === 'product' && (
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="visual-mode-label">Modo Visual</Label>
+              <Switch
+                id="visual-mode-label"
+                checked={mode === "visual"}
+                onCheckedChange={(checked) => setMode(checked ? "visual" : "simple")}
+              />
+            </div>
+          )}
         </div>
         <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isDirty}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar Diseño
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Guardar Diseño
         </Button>
       </div>
 
@@ -398,7 +407,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
           <TabsTrigger value="design">Diseño</TabsTrigger>
           <TabsTrigger value="preview">Previsualización PDF</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="design" className="space-y-4">
           {mode === "simple" ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -406,32 +415,32 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
                 <h3 className="font-semibold text-lg mb-2">Opciones de Personalización</h3>
                 <Form {...form}>
                   <form>
-                      <Accordion type="multiple" defaultValue={['layout', 'content']} className="w-full">
-                          <LabelLayoutSettings />
-                          <LabelContentSettings />
-                      </Accordion>
+                    <Accordion type="multiple" defaultValue={['layout', 'content']} className="w-full">
+                      <LabelLayoutSettings />
+                      <LabelContentSettings />
+                    </Accordion>
                   </form>
                 </Form>
               </div>
               <div className="lg:col-span-2">
-                 <h3 className="font-semibold text-lg mb-2">Vista Previa en Vivo</h3>
-                 <div className="bg-muted p-4 rounded-lg flex justify-center">
-                   <LabelPreview settings={watchedSettings} />
-                 </div>
+                <h3 className="font-semibold text-lg mb-2">Vista Previa en Vivo</h3>
+                <div className="bg-muted p-4 rounded-lg flex justify-center">
+                  <LabelPreview settings={watchedSettings} labelType={selectedLabelType} />
+                </div>
               </div>
             </div>
           ) : (
-            <VisualEditor 
-                key={visualEditorKey}
-                initialLayout={parsedLayout}
-                onLayoutChange={handleLayoutChange}
-                widthMm={watchedSettings.width}
-                heightMm={watchedSettings.height}
-                orientation={watchedSettings.orientation || 'horizontal'}
+            <VisualEditor
+              key={visualEditorKey}
+              initialLayout={parsedLayout}
+              onLayoutChange={handleLayoutChange}
+              widthMm={watchedSettings.width}
+              heightMm={watchedSettings.height}
+              orientation={watchedSettings.orientation || 'horizontal'}
             />
           )}
         </TabsContent>
-        
+
         <TabsContent value="preview">
           <PrintPreview settings={watchedSettings} />
         </TabsContent>

@@ -16,9 +16,10 @@ import { getSuppliers } from "@/lib/services/supplierService";
 interface PrintPreviewProps {
   settings: LabelSettings;
   onOpenChange?: (open: boolean) => void;
+  labelType?: 'product' | 'repair';
 }
 
-export default function PrintPreview({ settings, onOpenChange }: PrintPreviewProps) {
+export default function PrintPreview({ settings, onOpenChange, labelType = 'product' }: PrintPreviewProps) {
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -92,7 +93,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
         const printItems: LabelPrintItem[] = selectedProducts.map(product => {
           const supplierName = resolveSupplierName(product);
           const consignorName = product.consignorId ? consignorMap.get(product.consignorId) : undefined;
-          
+
           return {
             product: {
               id: product.id,
@@ -154,7 +155,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
       const printItems: LabelPrintItem[] = selectedProducts.map(product => {
         const supplierName = resolveSupplierName(product);
         const consignorName = product.consignorId ? consignorMap.get(product.consignorId) : undefined;
-        
+
         return {
           product: {
             id: product.id,
@@ -190,7 +191,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
       const printItems: LabelPrintItem[] = selectedProducts.map(product => {
         const supplierName = resolveSupplierName(product);
         const consignorName = product.consignorId ? consignorMap.get(product.consignorId) : undefined;
-        
+
         return {
           product: {
             id: product.id,
@@ -210,11 +211,11 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
       });
 
       const pdfBlob = await generateLabelPdf(printItems, settings, { returnBlob: true }) as Blob;
-      
+
       // Create object URL and open in new window for printing
       const url = URL.createObjectURL(pdfBlob);
       const printWindow = window.open(url, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-      
+
       if (printWindow) {
         // Wait for the window to fully load before attempting to print
         const checkLoaded = () => {
@@ -239,7 +240,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
             }, 1000);
           }
         };
-        
+
         // Start checking after a short delay to ensure window is initialized
         setTimeout(checkLoaded, 500);
       } else {
@@ -253,7 +254,7 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(downloadUrl);
-        
+
         alert('No se pudo abrir la ventana de impresión. El PDF se ha descargado automáticamente.');
       }
     } catch (error) {
@@ -263,6 +264,113 @@ export default function PrintPreview({ settings, onOpenChange }: PrintPreviewPro
       setGeneratingPdf(false);
     }
   };
+
+  const handleRepairTestPrint = () => {
+    const printWindow = window.open('', 'PRINT', 'height=600,width=800');
+    if (!printWindow) {
+      alert("El navegador bloqueó la ventana de impresión.");
+      return;
+    }
+
+    // Use sample data for test print
+    const sampleOrder = {
+      orderId: "REP-0014",
+      customerName: "Juan Pérez",
+      customerPhone: "555-123-4567",
+      deviceModel: "iPhone 13",
+      deviceBrand: "Apple",
+      reportedIssue: "Pantalla rota, no da imagen.\nEl touch no responde.",
+      partsUsed: [{ name: "Pantalla OLED" }, { name: "Adhesivo Display" }]
+    };
+
+    const failureSummary = sampleOrder.reportedIssue.split('\n')[0].substring(0, 30) + (sampleOrder.reportedIssue.length > 30 ? '...' : '');
+    const workSummary = sampleOrder.partsUsed.map(p => p.name).join(', ').substring(0, 40) + (sampleOrder.partsUsed.length > 0 ? '...' : '');
+
+    const content = `
+        <div class="label" style="width: ${settings.width}mm; height: ${settings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; font-family: sans-serif; font-size: 10px; line-height: 1.2;">
+            <div style="font-weight: 900; font-size: 14px; margin-bottom: 2px;">${sampleOrder.orderId}</div>
+            <svg id="barcode-test" style="width: 95%; height: ${settings.barcodeHeight}px; display: block; margin: 0 auto;"></svg>
+            
+            <div style="width: 100%; border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">
+              <div style="font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sampleOrder.customerName}</div>
+              <div style="font-size: 10px;">${sampleOrder.customerPhone}</div>
+            </div>
+
+            <div style="width: 100%; margin-top: 2px;">
+              <div style="font-weight: bold; font-size: 11px;">${sampleOrder.deviceBrand} ${sampleOrder.deviceModel}</div>
+            </div>
+            
+            <div style="width: 100%; text-align: left; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 2px;">
+               <div style="display: flex; gap: 4px;">
+                  <strong style="min-width: 35px;">Falla:</strong> 
+                  <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${failureSummary}</span>
+               </div>
+               <div style="display: flex; gap: 4px;">
+                  <strong style="min-width: 35px;">Realizar:</strong> 
+                  <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${workSummary}</span>
+               </div>
+            </div>
+        </div>
+    `;
+
+    printWindow.document.write('<html><head><title>Imprimir Prueba</title>');
+    printWindow.document.write(`
+        <style>
+            @page { size: ${settings.width}mm ${settings.height}mm; margin: 0; }
+            body { margin: 0; padding: 0; }
+        </style>
+    `);
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(content);
+    // Inject JsBarcode
+    printWindow.document.write('<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>');
+    printWindow.document.write(`
+      <script>
+        window.onload = function() {
+            try {
+                JsBarcode("#barcode-test", "${sampleOrder.orderId}", {
+                  format: 'CODE128', displayValue: false, height: ${settings.barcodeHeight}, width: 1.5, margin: 0
+                });
+                setTimeout(function() { window.print(); window.close(); }, 500);
+            } catch(e) { console.error(e); }
+        };
+      </script>
+    `);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+  };
+
+  if (labelType === 'repair') {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5" />
+              Prueba de Impresión (Reparación)
+            </CardTitle>
+            <CardDescription>
+              Las etiquetas de reparación tienen un diseño fijo optimizado para incluir información del cliente y falla.
+              Puedes probar la impresión con datos de ejemplo aquí.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-center p-8 bg-gray-50 border rounded-lg mb-4">
+              <div className="text-center text-muted-foreground">
+                Utiliza la pestaña "Diseño" para ver una vista previa en vivo.
+                <br />
+                Haz clic en "Imprimir Prueba" para verificar la salida en tu impresora.
+              </div>
+            </div>
+            <Button onClick={handleRepairTestPrint} className="w-full sm:w-auto">
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir Etiqueta de Prueba
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

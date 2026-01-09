@@ -117,6 +117,24 @@ export interface Sale {
   changeGiven?: number;
 }
 
+export interface SalesChange {
+  id: string;
+  saleId: string;
+  originalProductId: string;
+  originalProductName: string;
+  originalPrice: number;
+  originalQuantity: number;
+  newProductId: string;
+  newProductName: string;
+  newPrice: number;
+  newQuantity: number;
+  priceDifference: number; // positivo = cobrar, negativo = devolver
+  changeReason: string;
+  performedBy: string;
+  performedByName: string;
+  createdAt: Date;
+}
+
 export interface Warranty {
   id: string;
   saleId: string;

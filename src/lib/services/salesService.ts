@@ -34,49 +34,87 @@ const mapSale = (row: any): Sale => ({
   changeGiven: row?.change_given ? Number(row.change_given) : undefined,
 });
 
-export const getSales = async (includeStatus?: 'all' | 'completed' | 'cancelled'): Promise<Sale[]> => {
+export const getSales = async (
+  includeStatus: 'all' | 'completed' | 'cancelled' = 'completed',
+  page: number = 0,
+  limit: number = 50,
+  searchQuery: string = "",
+  date: string = "" // YYYY-MM-DD
+): Promise<{ sales: Sale[], total: number }> => {
   try {
     const supabase = getSupabaseServerClient();
-    let query = supabase
-      .from(SALES_TABLE)
-      .select("*");
 
-    // Filter by status unless 'all' is specified
-    if (includeStatus === 'cancelled') {
-      query = query.eq('status', 'cancelled');
-    } else if (includeStatus !== 'all') {
-      // Default: only return completed (non-cancelled) sales
-      query = query.or('status.is.null,status.eq.completed');
-    }
-
-    const { data, error } = await query.order("createdAt", { ascending: false });
+    // Use RPC for robust searching (including product names in JSON) and date filtering
+    const { data, error } = await supabase.rpc('get_pos_sales', {
+      p_search_query: searchQuery,
+      p_date: date || null,
+      p_page: page,
+      p_limit: limit,
+      p_status: includeStatus
+    });
 
     if (error) {
-      log.error("Database error fetching sales", error);
-      throw error;
+      log.warn("RPC get_pos_sales failed or missing. Falling back to legacy query (Advanced filters disabled).", error.message);
+
+      let query = supabase
+        .from(SALES_TABLE)
+        .select("*", { count: 'exact' });
+
+      // Filter by status unless 'all' is specified
+      if (includeStatus === 'cancelled') {
+        query = query.eq('status', 'cancelled');
+      } else if (includeStatus !== 'all') {
+        query = query.or('status.is.null,status.eq.completed');
+      }
+
+      // NOTE: Search AND Date filter disabled in fallback mode due to non-standard column types.
+      // Run the schema.sql migration to enable full search/filter functionality.
+
+      const from = page * limit;
+      const to = from + limit - 1;
+
+      const { data: fallbackData, error: fallbackError, count } = await query
+        .order("createdAt", { ascending: false })
+        .range(from, to);
+
+      if (fallbackError) {
+        throw fallbackError;
+      }
+
+      const sales = (fallbackData || []).map(mapSale);
+      return {
+        sales,
+        total: count || 0
+      };
     }
 
-    const sales = (data || []).map(mapSale);
+    // Map RPC result
+    // The RPC returns rows with total_count in each row. 
+    // If no rows, total is 0.
+    const total = data && data.length > 0 ? Number(data[0].total_count) : 0;
 
-    // Debug: Log para verificar si la venta SALE-731410C0 está en los resultados
-    const targetSale = sales.find(s => s.saleId === 'SALE-731410C0');
-    if (targetSale) {
-      log.info('Found SALE-731410C0 in getSales:', {
-        saleId: targetSale.saleId,
-        createdAt: targetSale.createdAt,
-        totalAmount: targetSale.totalAmount
-      });
-    } else {
-      log.warn('SALE-731410C0 not found in getSales results');
-      log.info('Available saleIds (first 10):', sales.slice(0, 10).map(s => s.saleId));
-    }
+    // Map to Sale type
+    const sales = (data || []).map((row: any) => mapSale(row));
 
-    return sales;
+    return {
+      sales,
+      total
+    };
+
+    /* Old logic removed in favor of RPC */
+    /*
+    let query = supabase
+      .from(SALES_TABLE)
+      .select("*", { count: 'exact' });
+    ...
+    */
+
   } catch (error) {
     log.error("Error in getSales", error);
     throw error;
   }
 };
+
 
 export const getSalesBySession = async (
   sessionId: string,

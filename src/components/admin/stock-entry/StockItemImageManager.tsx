@@ -40,12 +40,19 @@ export function StockItemImageManager({
 
     // Crear preview local cuando hay archivo
     useEffect(() => {
-        if (imageFile && !previewUrl) {
-            const url = URL.createObjectURL(imageFile);
-            setPreviewUrl(url);
-            return () => URL.revokeObjectURL(url);
+        if (!imageFile) {
+            setPreviewUrl(null);
+            return;
         }
-    }, [imageFile, previewUrl]);
+
+        const url = URL.createObjectURL(imageFile);
+        setPreviewUrl(url);
+
+        // Cleanup function to revoke the URL when component unmounts or imageFile changes
+        return () => {
+            URL.revokeObjectURL(url);
+        };
+    }, [imageFile]);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -220,17 +227,17 @@ export function StockItemImageManager({
             </div>
 
             {/* Botones de acción */}
-            <div className="flex gap-1">
+            <div className="flex gap-2 mt-2">
                 {/* Subir imagen */}
                 <Button
                     size="icon"
-                    variant="outline"
-                    className="h-7 w-7 sm:h-8 sm:w-8"
+                    variant="secondary"
+                    className="h-8 w-8 bg-muted hover:bg-muted/80 border shadow-sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isImageProcessing}
                     title="Subir foto"
                 >
-                    <Upload className="h-3 w-3" />
+                    <Upload className="h-4 w-4" />
                 </Button>
                 <input
                     ref={fileInputRef}
@@ -244,39 +251,39 @@ export function StockItemImageManager({
                 {/* Generar con IA */}
                 <Button
                     size="icon"
-                    variant="outline"
-                    className="h-7 w-7 sm:h-8 sm:w-8"
+                    variant="secondary"
+                    className="h-8 w-8 bg-muted hover:bg-muted/80 border shadow-sm"
                     onClick={handleGenerateWithAI}
                     disabled={isImageProcessing || !itemName}
                     title="Generar con IA"
                 >
-                    <Wand2 className="h-3 w-3 text-purple-500" />
+                    <Wand2 className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                 </Button>
 
                 {/* Buscar en Google */}
                 <Button
                     type="button"
                     size="icon"
-                    variant="outline"
-                    className="h-7 w-7 sm:h-8 sm:w-8"
+                    variant="secondary"
+                    className="h-8 w-8 bg-muted hover:bg-muted/80 border shadow-sm"
                     onClick={onSearchClick}
                     disabled={isImageProcessing || !itemName}
                     title="Buscar en Google"
                 >
-                    <Search className="h-3 w-3 text-blue-500" />
+                    <Search className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                 </Button>
 
                 {/* Mejorar imagen */}
                 {imageFile && !hasOptimizedImage && (
                     <Button
                         size="icon"
-                        variant="outline"
-                        className="h-7 w-7 sm:h-8 sm:w-8"
+                        variant="secondary"
+                        className="h-8 w-8 bg-muted hover:bg-muted/80 border shadow-sm"
                         onClick={handleOptimizeImage}
                         disabled={isImageProcessing}
                         title="Mejorar fondo"
                     >
-                        <Sparkles className="h-3 w-3 text-yellow-500" />
+                        <Sparkles className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
                     </Button>
                 )}
             </div>

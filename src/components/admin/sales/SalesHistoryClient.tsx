@@ -20,6 +20,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Button } from "@/components/ui/button";
 import CreateWarrantyDialog from "../warranties/CreateWarrantyDialog";
 import SaleSummaryDialog from "@/components/pos/SaleSummaryDialog";
+import ChangeProductDialog from "@/components/pos/ChangeProductDialog";
+import { createProductChange } from "@/lib/services/salesChangeService";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -71,6 +73,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isWarrantyDialogOpen, setWarrantyDialogOpen] = useState(false);
   const [saleToReprint, setSaleToReprint] = useState<Sale | null>(null);
+  const [saleToExchange, setSaleToExchange] = useState<Sale | null>(null);
   const [isReprintDialogOpen, setIsReprintDialogOpen] = useState(false);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
   const [excludeFamiliar, setExcludeFamiliar] = useState(false);
@@ -101,6 +104,21 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const handleReprintTicket = (sale: Sale) => {
     setSaleToReprint(sale);
     setIsReprintDialogOpen(true);
+  };
+
+  const handleChangeProduct = (sale: Sale) => {
+    setSaleToExchange(sale);
+  }
+
+  const handleProcessChange = async (params: any) => {
+    const result = await createProductChange(params);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    toast({ title: "Éxito", description: "Cambio registrado correctamente." });
+    setSaleToExchange(null);
+    // Ideally reload sales here, but for now we rely on page refresh or optimistic update if needed
+    router.refresh();
   };
 
   const toggleCollapsible = (saleId: string) => {
@@ -589,6 +607,13 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                                   <Printer className="mr-2 h-4 w-4" />
                                   <span>Reimprimir Ticket</span>
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={sale.status === 'cancelled'}
+                                  onClick={(e) => { e.stopPropagation(); handleChangeProduct(sale); }}
+                                >
+                                  <TrendingUp className="mr-2 h-4 w-4" />
+                                  <span>Cambiar Producto</span>
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -697,6 +722,16 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
           isOpen={isReprintDialogOpen}
           onOpenChange={setIsReprintDialogOpen}
           sale={saleToReprint}
+        />
+      )}
+
+      {saleToExchange && (
+        <ChangeProductDialog
+          sale={saleToExchange}
+          isOpen={!!saleToExchange}
+          onOpenChange={(open) => !open && setSaleToExchange(null)}
+          products={products}
+          onProcessChange={handleProcessChange}
         />
       )}
     </>
