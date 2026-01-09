@@ -5,9 +5,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Empty turbopack config to silence warnings in Next.js 16
+  turbopack: {},
   async rewrites() {
     return [
       {
