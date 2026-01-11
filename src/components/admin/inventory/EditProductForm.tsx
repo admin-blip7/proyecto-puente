@@ -16,7 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
-import CategoryAttributes, { productCategories } from "./CategoryAttributes";
+import CategoryAttributes from "./CategoryAttributes";
+import { getProductCategories, ProductCategory } from "@/lib/services/categoryService";
 import CurrencyInput from "@/components/ui/currency-input";
 import ProductImageManager from "./ProductImageManager";
 import { getLogger } from "@/lib/logger";
@@ -29,6 +30,7 @@ interface EditProductFormProps {
 }
 
 export default function EditProductForm({ product, consignors, allProducts }: EditProductFormProps) {
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [formData, setFormData] = useState<Product>({
     ...product,
     attributes: product.attributes || {},
@@ -40,6 +42,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
   const router = useRouter();
 
   useEffect(() => {
+    getProductCategories().then(setCategories);
     setFormData({
       ...product,
       attributes: product.attributes || {},
@@ -224,7 +227,7 @@ export default function EditProductForm({ product, consignors, allProducts }: Ed
                       <SelectValue placeholder="Seleccionar categoría..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {productCategories.map(cat => (
+                      {categories.map(cat => (
                         <SelectItem key={cat.value} value={cat.value}>
                           {cat.label}
                         </SelectItem>

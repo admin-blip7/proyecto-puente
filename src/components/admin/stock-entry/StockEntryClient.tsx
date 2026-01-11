@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from "react";
 import { useRouter } from "next/navigation";
 import { Product, StockEntryItem, Consignor, ownershipTypes, OwnershipType, LabelSettings } from "@/types";
 import { v4 as uuidv4 } from 'uuid';
@@ -26,7 +26,8 @@ import { generateAndPrintLabels } from "@/lib/printing/labelPrinter";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { productCategories } from "@/components/admin/inventory/CategoryAttributes";
+// import { productCategories } from "@/components/admin/inventory/CategoryAttributes";
+import { getProductCategories, ProductCategory } from "@/lib/services/categoryService";
 import CategoryAttributes from "@/components/admin/inventory/CategoryAttributes";
 import { StockItemImageManager } from "./StockItemImageManager";
 import { uploadStockEntryImage } from "@/lib/services/stockImageService";
@@ -57,6 +58,12 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     const { toast } = useToast();
     const router = useRouter();
 
+    const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+
+    useEffect(() => {
+        getProductCategories().then(setProductCategories);
+    }, []);
+
     // Quick Update Mode State
     const [isQuickUpdateMode, setIsQuickUpdateMode] = useState(false);
     const [quickUpdateSearch, setQuickUpdateSearch] = useState('');
@@ -65,6 +72,10 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     const [isSearchingQuick, setIsSearchingQuick] = useState(false);
 
     const [quickUpdatePopoverOpen, setQuickUpdatePopoverOpen] = useState(false);
+    const [quickUpdateScrollTop, setQuickUpdateScrollTop] = useState(0);
+    const [quickUpdateViewportHeight, setQuickUpdateViewportHeight] = useState(600);
+    const quickUpdateListRef = useRef<HTMLDivElement>(null);
+    const quickUpdateScrollRafRef = useRef<number | null>(null);
 
     // Image Search State
     const [showImageSearch, setShowImageSearch] = useState(false);
@@ -130,7 +141,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             // Update all selected products efficiently
             // We'll run them in parallel
             const updatePromises = Array.from(selectedItems).map(async (id) => {
-                const product = quickUpdateResults.find(p => p.id === id);
+                const product = quickUpdateById.get(id);
                 if (!product) return;
 
                 const currentImages = product.imageUrls || [];
@@ -161,6 +172,40 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         }
     };
 
+    const handleBulkCategoryUpdate = async (categoryValue: string) => {
+        if (selectedItems.size === 0) return;
+
+        const finalCategory = categoryValue === "none" ? "" : categoryValue;
+        setIsLoading(true);
+        toast({ title: "Procesando...", description: `Asignando categoría a ${selectedItems.size} productos...` });
+
+        try {
+            // Optimistic update
+            setQuickUpdateResults(prev => prev.map(p => {
+                if (selectedItems.has(p.id)) {
+                    return { ...p, category: finalCategory, attributes: {} };
+                }
+                return p;
+            }));
+
+            // Update in parallel
+            const updatePromises = Array.from(selectedItems).map(async (id) => {
+                await updateProduct(id, { category: finalCategory, attributes: {} });
+            });
+
+            await Promise.all(updatePromises);
+
+            toast({ title: "Completado", description: `Categoría asignada a ${selectedItems.size} productos.` });
+            setSelectedItems(new Set());
+        } catch (error) {
+            console.error("Bulk category update error", error);
+            toast({ variant: "destructive", title: "Error", description: "Hubo un problema al asignar la categoría." });
+            // Could implement revert here but for simplicity just show error
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Initialize quick update results with all products
     useEffect(() => {
         if (isQuickUpdateMode && quickUpdateResults.length === 0 && initialProducts.length > 0) {
@@ -168,32 +213,83 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         }
     }, [isQuickUpdateMode, initialProducts, quickUpdateResults.length]);
 
-    // Quick Search Effect - CLIENT SIDE FILTERING
+    const deferredQuickUpdateSearch = useDeferredValue(quickUpdateSearch);
+    const quickUpdateById = useMemo(() => {
+        const map = new Map<string, Product>();
+        for (const product of quickUpdateResults) {
+            map.set(product.id, product);
+        }
+        return map;
+    }, [quickUpdateResults]);
+    const filteredQuickUpdateResults = useMemo(() => {
+        if (!isQuickUpdateMode) return quickUpdateResults;
+        const query = deferredQuickUpdateSearch.trim().toLowerCase();
+        if (!query) return quickUpdateResults;
+
+        return quickUpdateResults.filter(p =>
+            p.name.toLowerCase().includes(query) ||
+            p.sku.toLowerCase().includes(query) ||
+            (p.category && p.category.toLowerCase().includes(query))
+        );
+    }, [deferredQuickUpdateSearch, isQuickUpdateMode, quickUpdateResults]);
+
+    const QUICK_UPDATE_ROW_HEIGHT = 120;
+    const QUICK_UPDATE_OVERSCAN = 8;
+    const quickUpdateTotalRows = filteredQuickUpdateResults.length;
+    const quickUpdateTotalHeight = quickUpdateTotalRows * QUICK_UPDATE_ROW_HEIGHT;
+    const quickUpdateStartIndex = Math.max(
+        0,
+        Math.floor(quickUpdateScrollTop / QUICK_UPDATE_ROW_HEIGHT) - QUICK_UPDATE_OVERSCAN
+    );
+    const quickUpdateEndIndex = Math.min(
+        quickUpdateTotalRows,
+        Math.ceil((quickUpdateScrollTop + quickUpdateViewportHeight) / QUICK_UPDATE_ROW_HEIGHT) + QUICK_UPDATE_OVERSCAN
+    );
+    const quickUpdateVisibleItems = filteredQuickUpdateResults.slice(quickUpdateStartIndex, quickUpdateEndIndex);
+    const quickUpdateTopPadding = quickUpdateStartIndex * QUICK_UPDATE_ROW_HEIGHT;
+    const quickUpdateBottomPadding = Math.max(
+        0,
+        quickUpdateTotalHeight - quickUpdateTopPadding - quickUpdateVisibleItems.length * QUICK_UPDATE_ROW_HEIGHT
+    );
+
+    const handleQuickUpdateScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+        const target = event.currentTarget;
+        if (quickUpdateScrollRafRef.current !== null) return;
+        quickUpdateScrollRafRef.current = window.requestAnimationFrame(() => {
+            setQuickUpdateScrollTop(target.scrollTop);
+            quickUpdateScrollRafRef.current = null;
+        });
+    }, []);
+
     useEffect(() => {
-        const searchQuick = () => {
-            // If not in quick mode, do nothing
-            if (!isQuickUpdateMode) return;
-
-            // If empty search, show ALL products
-            if (!quickUpdateSearch || quickUpdateSearch.trim() === '') {
-                setQuickUpdateResults(initialProducts);
-                return;
+        const container = quickUpdateListRef.current;
+        if (!container) return;
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setQuickUpdateViewportHeight(entry.contentRect.height);
             }
+        });
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, []);
 
-            const query = quickUpdateSearch.toLowerCase();
-            const filtered = initialProducts.filter(p =>
-                p.name.toLowerCase().includes(query) ||
-                p.sku.toLowerCase().includes(query) ||
-                (p.category && p.category.toLowerCase().includes(query))
-            );
+    useEffect(() => {
+        if (!isQuickUpdateMode) return;
+        const container = quickUpdateListRef.current;
+        if (container) {
+            container.scrollTop = 0;
+        }
+        setQuickUpdateScrollTop(0);
+    }, [deferredQuickUpdateSearch, isQuickUpdateMode]);
 
-            setQuickUpdateResults(filtered);
+    useEffect(() => {
+        return () => {
+            if (quickUpdateScrollRafRef.current !== null) {
+                cancelAnimationFrame(quickUpdateScrollRafRef.current);
+            }
         };
-
-        // Instant filter, no debounce needed for client side unless huge
-        searchQuick();
-
-    }, [quickUpdateSearch, isQuickUpdateMode, initialProducts]);
+    }, []);
 
     // Scanner Detection
     useEffect(() => {
@@ -488,13 +584,15 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     };
 
     const toggleSelection = (id: string) => {
-        const newSelected = new Set(selectedItems);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
-        } else {
-            newSelected.add(id);
-        }
-        setSelectedItems(newSelected);
+        setSelectedItems(prev => {
+            const newSelected = new Set(prev);
+            if (newSelected.has(id)) {
+                newSelected.delete(id);
+            } else {
+                newSelected.add(id);
+            }
+            return newSelected;
+        });
     };
 
     const toggleAll = () => {
@@ -513,7 +611,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             if (isBulkImageMode) {
                 handleBulkDirectImageUpdate(file);
             } else if (currentItemForImage) {
-                const product = quickUpdateResults.find(p => p.id === currentItemForImage);
+                const product = quickUpdateById.get(currentItemForImage);
                 if (product) handleQuickUpdateImage(product, file);
             }
         } else {
@@ -587,8 +685,8 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                 }}
                 productName={
                     isBulkImageMode
-                        ? (selectedItems.size === 1 ? (isQuickUpdateMode ? quickUpdateResults : entryList).find(i => i.id === Array.from(selectedItems)[0])?.name || '' : '')
-                        : ((isQuickUpdateMode ? quickUpdateResults : entryList).find(i => i.id === currentItemForImage)?.name || '')
+                        ? (selectedItems.size === 1 ? (isQuickUpdateMode ? quickUpdateById.get(Array.from(selectedItems)[0])?.name : entryList.find(i => i.id === Array.from(selectedItems)[0])?.name) || '' : '')
+                        : ((isQuickUpdateMode ? quickUpdateById.get(currentItemForImage || '')?.name : entryList.find(i => i.id === currentItemForImage)?.name) || '')
                 }
                 onImageSelect={handleBulkImageSelect}
             />
@@ -642,6 +740,22 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                 <ImageIcon className="h-4 w-4" />
                                 Asignar Imagen
                             </Button>
+                            <div className="h-4 w-px bg-primary-foreground/30" />
+                            <Select
+                                onValueChange={(value) => handleBulkCategoryUpdate(value)}
+                            >
+                                <SelectTrigger className="w-[180px] bg-secondary text-secondary-foreground h-9">
+                                    <SelectValue placeholder="Asignar Categoría" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Sin categoría</SelectItem>
+                                    {productCategories.map(cat => (
+                                        <SelectItem key={cat.value} value={cat.value}>
+                                            {cat.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => setSelectedItems(new Set())} className="hover:bg-primary-foreground/10 text-primary-foreground">
                             <XCircle className="mr-2 h-4 w-4" />
@@ -681,18 +795,19 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                         <TableRow>
                                             <TableHead className="w-[50px] text-center">
                                                 <Checkbox
-                                                    checked={quickUpdateResults.length > 0 && selectedItems.size === quickUpdateResults.length}
+                                                    checked={filteredQuickUpdateResults.length > 0 && selectedItems.size === filteredQuickUpdateResults.length}
                                                     onCheckedChange={() => {
-                                                        if (selectedItems.size === quickUpdateResults.length) {
+                                                        if (selectedItems.size === filteredQuickUpdateResults.length) {
                                                             setSelectedItems(new Set());
                                                         } else {
-                                                            setSelectedItems(new Set(quickUpdateResults.map(i => i.id)));
+                                                            setSelectedItems(new Set(filteredQuickUpdateResults.map(i => i.id)));
                                                         }
                                                     }}
                                                 />
                                             </TableHead>
                                             <TableHead className="w-[100px]">Imagen</TableHead>
                                             <TableHead className="w-[180px]">SKU</TableHead>
+                                            <TableHead className="w-[150px]">Categoría</TableHead>
                                             <TableHead>Nombre</TableHead>
                                             <TableHead className="w-[120px]">Precio</TableHead>
                                             <TableHead className="w-[100px]">Stock</TableHead>
@@ -702,18 +817,28 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                             </div>
 
                             {/* Table Body - Scrollable */}
-                            <div className="overflow-y-auto flex-1">
+                            <div
+                                className="overflow-y-auto flex-1"
+                                ref={quickUpdateListRef}
+                                onScroll={handleQuickUpdateScroll}
+                            >
                                 <Table>
                                     <TableBody>
-                                        {quickUpdateResults.length === 0 ? (
+                                        {filteredQuickUpdateResults.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                                     No se encontraron productos.
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            quickUpdateResults.map((item) => (
-                                                <TableRow key={item.id} className="hover:bg-accent/50 transition-colors">
+                                            <>
+                                                {quickUpdateTopPadding > 0 && (
+                                                    <TableRow className="pointer-events-none">
+                                                        <TableCell colSpan={7} style={{ height: quickUpdateTopPadding, padding: 0 }} />
+                                                    </TableRow>
+                                                )}
+                                                {quickUpdateVisibleItems.map((item) => (
+                                                <TableRow key={item.id} className="hover:bg-accent/50 transition-colors h-[120px]">
                                                     <TableCell className="w-[50px] text-center">
                                                         <Checkbox
                                                             checked={selectedItems.has(item.id)}
@@ -780,6 +905,33 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                             </Button>
                                                         </div>
                                                     </TableCell>
+                                                    <TableCell className="w-[150px]">
+                                                        <Select
+                                                            value={item.category || ""}
+                                                            onValueChange={(value) => {
+                                                                // If value is "none", we treat it as empty string
+                                                                const finalValue = value === "none" ? "" : value;
+                                                                handleDirectUpdate(item, {
+                                                                    category: finalValue,
+                                                                    attributes: {} // Clear attributes when category changes
+                                                                });
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="h-8 w-full">
+                                                                <SelectValue placeholder="Sin cat." />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="none" className="text-muted-foreground italic">
+                                                                    Sin categoría
+                                                                </SelectItem>
+                                                                {productCategories.map((cat) => (
+                                                                    <SelectItem key={cat.value} value={cat.value}>
+                                                                        {cat.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </TableCell>
                                                     <TableCell className="font-medium">
                                                         {item.name}
                                                     </TableCell>
@@ -792,13 +944,19 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
+                                                ))}
+                                                {quickUpdateBottomPadding > 0 && (
+                                                    <TableRow className="pointer-events-none">
+                                                        <TableCell colSpan={7} style={{ height: quickUpdateBottomPadding, padding: 0 }} />
+                                                    </TableRow>
+                                                )}
+                                            </>
                                         )}
                                     </TableBody>
                                 </Table>
                             </div>
                             <div className="bg-muted/30 p-2 text-xs text-center text-muted-foreground border-t">
-                                Mostrando {quickUpdateResults.length} productos
+                                Mostrando {filteredQuickUpdateResults.length} productos
                             </div>
                         </div>
                     </div>
@@ -1477,6 +1635,3 @@ function QuickUpdatePanel({ product, onUpdateSku, onUpdateImage, onDone, onGener
         </Card>
     );
 }
-
-
-

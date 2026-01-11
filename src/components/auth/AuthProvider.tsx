@@ -58,12 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         log.error("Error fetching session", error);
-        
+
         // Si hay error de refresh token, limpiar la sesión
         if (error.message?.includes("Invalid Refresh Token") || error.message?.includes("Refresh Token Not Found")) {
           await supabase.auth.signOut({ scope: "local" });
         }
-        
+
         setUser(null);
         setUserProfile(null);
         setLoading(false);
@@ -80,9 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
 
       if (supabaseUser && pathname === "/login") {
-        router.push("/");
+        router.push("/pos");
       }
-      if (!supabaseUser && pathname !== "/login" && pathname !== "/reset-password") {
+      if (!supabaseUser && pathname !== "/login" && pathname !== "/reset-password" && pathname !== "/" && !pathname.startsWith("/products/")) {
         router.push("/login");
       }
     };
@@ -107,9 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (supabaseUser) {
         if (pathname === "/login") {
-          router.push("/");
+          router.push("/pos");
         }
-      } else if (pathname !== "/login" && pathname !== "/reset-password") {
+      } else if (pathname !== "/login" && pathname !== "/reset-password" && pathname !== "/" && !pathname.startsWith("/products/")) {
         router.push("/login");
       }
     });

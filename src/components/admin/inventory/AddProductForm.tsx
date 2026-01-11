@@ -16,7 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import ComboProductSelector from "./ComboProductSelector";
-import CategoryAttributes, { productCategories } from "./CategoryAttributes";
+import CategoryAttributes from "./CategoryAttributes";
+import { getProductCategories, ProductCategory } from "@/lib/services/categoryService";
+import { useEffect } from "react";
 import CurrencyInput from "@/components/ui/currency-input";
 import ProductImageManager from "./ProductImageManager";
 import { getLogger } from "@/lib/logger";
@@ -50,7 +52,12 @@ const initialFormData: Omit<Product, 'id' | 'createdAt' | 'searchKeywords' | 'co
 
 export default function AddProductForm({ consignors, allProducts }: AddProductFormProps) {
   const [formData, setFormData] = useState(initialFormData);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    getProductCategories().then(setCategories);
+  }, []);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -230,7 +237,7 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
                       <SelectValue placeholder="Seleccionar categoría..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {productCategories.map(cat => (
+                      {categories.map(cat => (
                         <SelectItem key={cat.value} value={cat.value}>
                           {cat.label}
                         </SelectItem>

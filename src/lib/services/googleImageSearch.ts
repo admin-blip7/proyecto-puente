@@ -148,11 +148,45 @@ export async function downloadAndStandardizeImage(
     productName: string
 ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
 
-    // Fetch the image
-    const response = await fetch(imageUrl);
+    // Fetch with timeout and retry logic
+    const MAX_RETRIES = 3;
+    const TIMEOUT_MS = 10000; // 10 seconds
 
-    if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.statusText}`);
+    let lastError: Error | null = null;
+    let response: Response | null = null;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+            response = await fetch(imageUrl, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                break; // Success, exit retry loop
+            }
+
+            lastError = new Error(`Failed to download image: ${response.statusText}`);
+        } catch (error: any) {
+            lastError = error;
+            console.warn(`Image download attempt ${attempt}/${MAX_RETRIES} failed:`, error.message);
+
+            if (attempt < MAX_RETRIES) {
+                // Wait before retry (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+        }
+    }
+
+    if (!response || !response.ok) {
+        throw lastError || new Error('Failed to download image after retries');
     }
 
     const arrayBuffer = await response.arrayBuffer();

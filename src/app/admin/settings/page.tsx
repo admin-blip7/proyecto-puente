@@ -6,11 +6,18 @@ import TicketDesignerClient from "@/components/admin/settings/TicketDesignerClie
 import { getTicketSettings, getLabelSettings } from "@/lib/services/settingsService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LabelDesignerClient from "@/components/admin/settings/LabelDesignerClient";
+import CategoryManagerClient from '@/components/admin/settings/CategoryManagerClient';
 
-export default async function SettingsPage() {
-    const [initialTicketSettings, initialLabelSettings] = await Promise.all([
+export default async function SettingsPage(props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+    const searchParams = await props.searchParams;
+    const tab = typeof searchParams.tab === 'string' ? searchParams.tab : 'tickets';
+
+    const [initialTicketSettings, initialLabelSettings, initialCategories] = await Promise.all([
         getTicketSettings(),
         getLabelSettings("product"), // Load product settings by default
+        import("@/lib/services/categoryService").then(m => m.getProductCategories()),
     ]);
 
     return (
@@ -32,16 +39,20 @@ export default async function SettingsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-                <Tabs defaultValue="tickets" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                <Tabs defaultValue={tab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="tickets">Diseño de Tickets</TabsTrigger>
                         <TabsTrigger value="labels">Diseño de Etiquetas</TabsTrigger>
+                        <TabsTrigger value="categories">Categorías</TabsTrigger>
                     </TabsList>
                     <TabsContent value="tickets" className="mt-6">
                         <TicketDesignerClient initialSettings={initialTicketSettings} />
                     </TabsContent>
                     <TabsContent value="labels" className="mt-6">
                         <LabelDesignerClient initialSettings={initialLabelSettings} />
+                    </TabsContent>
+                    <TabsContent value="categories" className="mt-6">
+                        <CategoryManagerClient initialCategories={initialCategories} />
                     </TabsContent>
                 </Tabs>
             </main>

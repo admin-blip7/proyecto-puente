@@ -7,7 +7,7 @@ import { Inter } from 'next/font/google'
 import ErrorSuppressionScript from '@/components/shared/ErrorSuppressionScript';
 
 export const metadata: Metadata = {
-  title: 'Storefront Swift',
+  title: '22 Electronic Group',
   description: 'Modern Point of Sale System',
 };
 
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${inter.variable} antialiased`}>
+      <body className={`font-sans ${inter.variable} antialiased`} suppressHydrationWarning>
         <ErrorSuppressionScript />
         <AuthProvider>
           {children}

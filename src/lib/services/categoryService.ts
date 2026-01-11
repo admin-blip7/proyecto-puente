@@ -1,74 +1,70 @@
-"use server";
+'use server';
 
-import { v4 as uuidv4 } from "uuid";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
-import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("categoryService");
+const TABLE_NAME = "product_categories";
 
-export interface Category {
+export interface ProductCategory {
   id: string;
-  name: string;
-  createdAt: Date;
+  value: string;
+  label: string;
+  created_at?: string;
 }
 
-const CATEGORIES_TABLE = "categories";
-
-const mapCategory = (row: any): Category => ({
-  id: row?.firestore_id ?? row?.id ?? "",
-  name: row?.name ?? "",
-  createdAt: toDate(row?.createdAt),
-});
-
-export async function searchCategories(searchTerm: string): Promise<Category[]> {
+export async function getProductCategories(): Promise<ProductCategory[]> {
+  const supabase = getSupabaseServerClient();
   try {
-    const supabase = getSupabaseServerClient();
-    const normalizedTerm = searchTerm?.trim();
-    if (!normalizedTerm) {
-      return [];
-    }
-
     const { data, error } = await supabase
-      .from(CATEGORIES_TABLE)
-      .select("*")
-      .ilike("name", `${normalizedTerm}%`)
-      .order("name", { ascending: true })
-      .limit(10);
+      .from(TABLE_NAME)
+      .select('*')
+      .order('label', { ascending: true });
 
-    if (error) {
-      throw error;
-    }
-
-    return (data ?? []).map(mapCategory);
+    if (error) throw error;
+    return data || [];
   } catch (error) {
-    log.error("Error searching categories", error);
+    log.error("Error fetching categories:", error);
     return [];
   }
 }
 
-export async function createCategory(name: string): Promise<string> {
+export async function createProductCategory(label: string): Promise<ProductCategory> {
+  const supabase = getSupabaseServerClient();
+
+  // Simple slug generator
+  const value = label.toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
   try {
-    if (!name?.trim()) {
-      throw new Error("El nombre de la categoría es obligatorio.");
-    }
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .insert({ label, value })
+      .select()
+      .single();
 
-    const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
-    const payload = {
-      firestore_id: firestoreId,
-      name: name.trim(),
-      createdAt: nowIso(),
-    };
-
-    const { error } = await supabase.from(CATEGORIES_TABLE).insert(payload);
-    if (error) {
-      throw error;
-    }
-
-    return firestoreId;
+    if (error) throw error;
+    return data;
   } catch (error) {
-    log.error("Error creating category", error);
-    throw error;
+    log.error("Error creating category:", error);
+    throw new Error("Failed to create category");
+  }
+}
+
+export async function deleteProductCategory(id: string): Promise<void> {
+  const supabase = getSupabaseServerClient();
+  try {
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  } catch (error) {
+    log.error("Error deleting category:", error);
+    throw new Error("Failed to delete category");
   }
 }

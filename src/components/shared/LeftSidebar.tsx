@@ -1,6 +1,6 @@
 "use client";
 import Link from 'next/link';
-import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette, Printer, Contact, Zap, ShoppingCart, Truck, Search, Menu, LogOut, UserCheck, Receipt } from 'lucide-react';
+import { Home, Settings, PieChart, ShieldCheck, Wrench, PackagePlus, Users, Landmark, BrainCircuit, Banknote, Building, Scale, Package, ChevronRight, CreditCard, Palette, Printer, Contact, Zap, ShoppingCart, Truck, Search, Menu, LogOut, UserCheck, Receipt, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,7 @@ const financeNavItems = [
 
 const settingsNavItems = [
     { href: '/admin/settings', icon: Settings, label: 'Diseño de Tickets y Etiquetas' },
+    { href: '/admin/settings?tab=categories', icon: Tag, label: 'Categorías' },
     { href: '/admin/labels', icon: Printer, label: 'Imprimir Etiquetas' },
 ];
 
