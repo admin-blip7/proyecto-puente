@@ -2,8 +2,9 @@ import '@/lib/polyfill-storage';
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from '@/components/ui/toaster';
-import { Inter } from 'next/font/google'
+import { Public_Sans } from 'next/font/google'
 import ErrorSuppressionScript from '@/components/shared/ErrorSuppressionScript';
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   description: 'Modern Point of Sale System',
 };
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
+const publicSans = Public_Sans({ subsets: ['latin'], variable: '--font-sans' })
 
 export default function RootLayout({
   children,
@@ -20,11 +21,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${inter.variable} antialiased`} suppressHydrationWarning>
+      <body className={`font-sans ${publicSans.variable} antialiased`} suppressHydrationWarning>
         <ErrorSuppressionScript />
         <AuthProvider>
-          {children}
-          <Toaster />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster />
+          </ThemeProvider>
         </AuthProvider>
         <div id="portal-root" />
       </body>

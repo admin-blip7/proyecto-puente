@@ -2,24 +2,26 @@
 
 import { CartItem, Product } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MinusCircle, PlusCircle, Receipt, Package, LogOut, CreditCard } from "lucide-react";
+import { MoreHorizontal, Plus, Minus, ScanBarcode, User, Package, X, Loader2 } from "lucide-react";
 import { formatCurrency } from '@/lib/utils';
 import CheckoutDialog from "./CheckoutDialog";
-import { useState, useMemo } from "react";
-import { Separator } from "../ui/separator";
+import { useState } from "react";
 import QuickExpenseDialog from "./QuickExpenseDialog";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/lib/hooks";
 import { addExpense } from "@/lib/services/financeService";
+import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { validateDiscountCode } from "@/lib/services/settingsService";
+import { Pencil } from "lucide-react";
 
 interface ShoppingCartProps {
   cartItems: CartItem[];
   onUpdateQuantity: (productId: string, quantity: number) => void;
+  onUpdatePrice?: (productId: string, newPrice: number) => void;
   onClearCart: () => void;
   isSheet?: boolean;
   selectedCartItem: CartItem | null;
@@ -33,31 +35,94 @@ interface ShoppingCartProps {
 export default function ShoppingCart({
   cartItems,
   onUpdateQuantity,
+  onUpdatePrice,
   onClearCart,
-  isSheet = false,
-  selectedCartItem,
-  onSelectItem,
-  onAddToCart,
   onCloseSession,
   onSuccessfulSale,
   activeSessionId,
 }: ShoppingCartProps) {
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isExpenseOpen, setExpenseOpen] = useState(false);
+  const [discountPopoverOpen, setDiscountPopoverOpen] = useState(false);
+  const [discountCodeInput, setDiscountCodeInput] = useState("");
+  const [validatingDiscount, setValidatingDiscount] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string, percentage: number } | null>(null);
+  // Price editing state
+  const [editingPriceItemId, setEditingPriceItemId] = useState<string | null>(null);
+  const [editingPriceValue, setEditingPriceValue] = useState<string>("");
   const { toast } = useToast();
   const { userProfile } = useAuth();
-  const isMobile = useIsMobile();
 
-
-
+  // Calculate totals with dynamic discount (prices already include IVA)
   const itemsTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const discount = 0; // Placeholder for future discount logic
-  const totalAmount = itemsTotal - discount;
+  const discountRate = appliedDiscount ? appliedDiscount.percentage / 100 : 0;
+  const discountAmount = itemsTotal * discountRate;
+  const totalAmount = itemsTotal - discountAmount; // No tax added - prices already include IVA
+
+  const handleApplyDiscountCode = async () => {
+    if (!discountCodeInput.trim()) {
+      toast({ variant: "destructive", title: "Error", description: "Ingresa un código de descuento" });
+      return;
+    }
+    setValidatingDiscount(true);
+    try {
+      const result = await validateDiscountCode(discountCodeInput);
+      if (result.valid && result.discount) {
+        setAppliedDiscount({
+          code: result.discount.discountCode,
+          percentage: result.discount.discountPercentage
+        });
+        setDiscountPopoverOpen(false);
+        setDiscountCodeInput("");
+        toast({ title: "Descuento aplicado", description: `${result.discount.discountPercentage}% de descuento aplicado` });
+      } else {
+        toast({ variant: "destructive", title: "Código inválido", description: result.error });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Error al validar el código" });
+    } finally {
+      setValidatingDiscount(false);
+    }
+  };
+
+  const handleRemoveDiscount = () => {
+    setAppliedDiscount(null);
+    toast({ title: "Descuento eliminado" });
+  };
+
+  // Handle price edit
+  const handleStartPriceEdit = (item: CartItem) => {
+    setEditingPriceItemId(item.id);
+    setEditingPriceValue(item.price.toString());
+  };
+
+  const handleSavePriceEdit = (itemId: string, originalPrice: number) => {
+    const newPrice = parseFloat(editingPriceValue);
+    if (isNaN(newPrice) || newPrice < 0) {
+      toast({ variant: "destructive", title: "Error", description: "Precio inválido" });
+      return;
+    }
+    if (onUpdatePrice) {
+      onUpdatePrice(itemId, newPrice);
+      if (newPrice < originalPrice) {
+        toast({ title: "Descuento aplicado", description: `Precio modificado de ${formatCurrency(originalPrice)} a ${formatCurrency(newPrice)}` });
+      } else {
+        toast({ title: "Precio actualizado" });
+      }
+    }
+    setEditingPriceItemId(null);
+    setEditingPriceValue("");
+  };
+
+  const handleCancelPriceEdit = () => {
+    setEditingPriceItemId(null);
+    setEditingPriceValue("");
+  };
 
   const handleSuccessfulSale = () => {
     onClearCart();
+    setAppliedDiscount(null); // Clear discount after successful sale
     setCheckoutOpen(false);
-    // Call the product refresh callback if provided
     if (onSuccessfulSale) {
       onSuccessfulSale();
     }
@@ -66,154 +131,260 @@ export default function ShoppingCart({
   const handleExpenseAdded = async (description: string, amount: number, category: string) => {
     if (!userProfile) return;
     try {
-      // Try to find a cash account to use as the source for the expense
+      // ... (existing logic for expenses)
       const { getAccounts, addAccount } = await import("@/lib/services/accountService");
       const accounts = await getAccounts();
-
-      // Look for a cash drawer account (one that contains "caja" or "cash" in the name)
       let cashAccount = accounts.find(acc =>
         acc.name.toLowerCase().includes('caja') ||
         acc.name.toLowerCase().includes('cash') ||
         acc.name.toLowerCase().includes('drawer')
       );
-
-      // If no cash account found, use the first available account as fallback
-      if (!cashAccount && accounts.length > 0) {
-        cashAccount = accounts[0];
-      }
-
-      // If no accounts exist, create a default cash account
+      if (!cashAccount && accounts.length > 0) cashAccount = accounts[0];
       if (!cashAccount) {
-        cashAccount = await addAccount({
-          name: 'Caja Principal',
-          type: 'Efectivo',
-          currentBalance: 0
-        });
-        toast({
-          title: "Cuenta Creada",
-          description: "Se creó una cuenta de caja principal para registrar el gasto."
-        });
+        cashAccount = await addAccount({ name: 'Caja Principal', type: 'Efectivo', currentBalance: 0 });
       }
-
-      await addExpense({
-        description,
-        amount,
-        category,
-        paidFromAccountId: cashAccount.id
-      }, undefined, userProfile.uid);
-
-      toast({
-        title: "Gasto Registrado",
-        description: `El gasto ha sido registrado exitosamente desde ${cashAccount.name}.`
-      });
+      await addExpense({ description, amount, category, paidFromAccountId: cashAccount.id }, undefined, userProfile.uid);
       setExpenseOpen(false);
+      toast({ title: "Gasto Registrado", description: "Gasto registrado exitosamente." });
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: "Error",
-        description: "No se pudo registrar el gasto. Intente recargar la página."
-      });
+      toast({ variant: 'destructive', title: "Error", description: "No se pudo registrar el gasto." });
     }
   }
 
+  return (
+    <div className="flex flex-col h-full bg-white dark:bg-card">
+      {/* Header */}
+      <div className="p-6 pb-2 flex-shrink-0">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Order Details</h2>
+          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-900 dark:hover:text-white" onClick={onCloseSession} title="Cerrar Turno / Opciones">
+            <MoreHorizontal className="w-6 h-6" />
+          </Button>
+        </div>
 
-
-
-  const renderCartContent = () => (
-    <ScrollArea className="h-full">
-      <div className="px-6">
-        {cartItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <p className="text-muted-foreground">Tu carrito está vacío.</p>
+        {/* Customer Selector (Mocked for now based on UI) */}
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Customer Name</span>
+            <button className="text-primary text-xs font-semibold hover:underline">+ Add New</button>
           </div>
-        ) : (
-          <div className="divide-y">
-            {cartItems.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex items-center gap-4 py-4 cursor-pointer rounded-lg -mx-2 px-2",
-                  selectedCartItem?.id === item.id && "bg-primary/10"
+          <div className="flex items-center gap-3 bg-white dark:bg-card p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:border-primary/50 transition-colors">
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs uppercase">
+              Inv
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Invitado General</div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400">Cliente Mostrador</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cart Items List */}
+      <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4 custom-scrollbar">
+        {cartItems.map((item) => (
+          <div className="flex gap-4" key={item.id}>
+            <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center p-2 flex-shrink-0 border border-gray-100 dark:border-gray-700 overflow-hidden">
+              {item.imageUrls && item.imageUrls[0] ? (
+                <Image
+                  src={item.imageUrls[0]}
+                  alt={item.name}
+                  width={60}
+                  height={60}
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                />
+              ) : (
+                <Package className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+              )}
+            </div>
+            <div className="flex-1 flex flex-col justify-between py-1">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white line-clamp-2">{item.name}</h4>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                {/* Editable Price */}
+                {onUpdatePrice ? (
+                  <Popover
+                    open={editingPriceItemId === item.id}
+                    onOpenChange={(open) => {
+                      if (open) handleStartPriceEdit(item);
+                      else handleCancelPriceEdit();
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 group">
+                        <span className="text-base font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
+                          {formatCurrency(item.price)}
+                        </span>
+                        <Pencil className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-3" align="start">
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground">Modificar Precio</div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editingPriceValue}
+                          onChange={(e) => setEditingPriceValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              // Get original price from products if available
+                              handleSavePriceEdit(item.id, item.cost || item.price);
+                            } else if (e.key === "Escape") {
+                              handleCancelPriceEdit();
+                            }
+                          }}
+                          className="h-8"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => handleSavePriceEdit(item.id, item.cost || item.price)}
+                          >
+                            Aplicar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={handleCancelPriceEdit}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
                 )}
-                onClick={() => onSelectItem(item)}
-              >
-                <div className="flex-1 space-y-1">
-                  <p className="font-semibold leading-tight">{item.name}</p>
-                  <p className="font-bold text-primary">{formatCurrency(item.price)}</p>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={(e) => { e.stopPropagation(); onUpdateQuantity(item.id, item.quantity - 1); }}>
-                    <MinusCircle className="w-5 h-5" />
-                  </Button>
-                  <span className="font-bold w-4 text-center">{item.quantity}</span>
-                  <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full" onClick={(e) => { e.stopPropagation(); onUpdateQuantity(item.id, item.quantity + 1); }}>
-                    <PlusCircle className="w-5 h-5" />
-                  </Button>
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
+                  <button
+                    className="w-6 h-6 flex items-center justify-center bg-white dark:bg-card rounded shadow-sm text-gray-600 dark:text-gray-300 hover:text-primary transition-colors text-xs"
+                    onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className="text-xs font-semibold w-4 text-center text-gray-900 dark:text-white">{item.quantity}</span>
+                  <button
+                    className="w-6 h-6 flex items-center justify-center bg-white dark:bg-card rounded shadow-sm text-gray-600 dark:text-gray-300 hover:text-primary transition-colors text-xs"
+                    onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+          </div>
+        ))}
+        {cartItems.length === 0 && (
+          <div className="text-center text-gray-400 py-10 italic">
+            Carrito vacío
           </div>
         )}
       </div>
-    </ScrollArea>
-  );
 
-
-  return (
-    <>
-      <Card className="flex flex-col h-full border-0 shadow-none rounded-none">
-        <CardHeader className="p-6 flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl font-bold tracking-tight">Mi Pedido</CardTitle>
-          <Button variant="outline" size="sm" onClick={onCloseSession}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Hacer Corte
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0 flex-1 min-h-0">
-          {isMobile ? (
-            <Tabs defaultValue="cart" className="w-full h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-1 mx-auto sticky top-0 px-6">
-                <TabsTrigger value="cart">Mi Pedido</TabsTrigger>
-              </TabsList>
-              <TabsContent value="cart" className="flex-1 overflow-y-auto">{renderCartContent()}</TabsContent>
-            </Tabs>
-          ) : (
-            renderCartContent()
-          )}
-        </CardContent>
-
-        <CardFooter className="flex-col gap-4 p-6 border-t mt-auto">
-          {cartItems.length > 0 && (
-            <>
-              <div className="w-full flex justify-between text-muted-foreground">
-                <span>Items</span>
-                <span>{formatCurrency(itemsTotal)}</span>
-              </div>
-              <div className="w-full flex justify-between text-muted-foreground">
-                <span>Discount</span>
-                <span>-{formatCurrency(discount)}</span>
-              </div>
-              <Separator />
-              <div className="w-full flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span>{formatCurrency(totalAmount)}</span>
-              </div>
-            </>
-          )}
-
-          <div className="w-full grid grid-cols-1 gap-2">
-            <Button className="w-full" size="lg" onClick={() => setCheckoutOpen(true)} disabled={cartItems.length === 0}>
-              Checkout
-            </Button>
-
-            <Button className="w-full" variant="outline" onClick={() => setExpenseOpen(true)}>
-              <Receipt className="mr-2" />
-              Registrar Gasto Rápido
-            </Button>
+      {/* Footer / Totals */}
+      <div className="p-6 bg-white dark:bg-card border-t border-border-light dark:border-border shadow-[0_-4px_15px_-3px_rgba(0,0,0,0.05)] z-10 flex-shrink-0">
+        {/* Promo / Discount Section */}
+        <div className={cn(
+          "flex items-center justify-between border border-dashed rounded-xl p-3 mb-4",
+          appliedDiscount
+            ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"
+            : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+        )}>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+              appliedDiscount ? "bg-green-100 text-green-600" : "bg-purple-100 text-purple-600"
+            )}>%</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {appliedDiscount ? `${appliedDiscount.code} (-${appliedDiscount.percentage}%)` : "Sin descuento"}
+            </span>
           </div>
-        </CardFooter>
-      </Card>
+          <div className="flex items-center gap-2">
+            {appliedDiscount ? (
+              <button
+                onClick={handleRemoveDiscount}
+                className="text-xs font-semibold text-red-500 bg-white dark:bg-card border border-red-200 dark:border-red-700 px-3 py-1 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1"
+              >
+                <X className="h-3 w-3" /> Quitar
+              </button>
+            ) : (
+              <Popover open={discountPopoverOpen} onOpenChange={setDiscountPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 px-3 py-1 rounded-lg hover:text-primary hover:border-primary transition-colors">
+                    Aplicar Código
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-4" align="end">
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium">Código de Descuento</div>
+                    <Input
+                      placeholder="Ingresa el código"
+                      value={discountCodeInput}
+                      onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
+                      className="uppercase"
+                      onKeyDown={(e) => e.key === "Enter" && handleApplyDiscountCode()}
+                    />
+                    <Button
+                      onClick={handleApplyDiscountCode}
+                      disabled={validatingDiscount || !discountCodeInput.trim()}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {validatingDiscount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Aplicar
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3 mb-6">
+          <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+            <span>Subtotal (IVA incluido)</span>
+            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(itemsTotal)}</span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+              <span>Descuento</span>
+              <span className="font-medium text-red-500">-{formatCurrency(discountAmount)}</span>
+            </div>
+          )}
+          <div className="h-px bg-gray-100 dark:bg-gray-700 my-2"></div>
+          <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white">
+            <span>Total a Pagar</span>
+            <span className="text-xl">{formatCurrency(totalAmount)}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCheckoutOpen(true)}
+            disabled={cartItems.length === 0}
+            className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-base tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Process Transactions
+          </button>
+          {/* Expense Button - Matching style but secondary */}
+          {/* <button className="..." onClick={() => setExpenseOpen(true)} title="Registrar Gasto">
+                 <Receipt ... />
+             </button> */}
+        </div>
+
+        <div className="mt-2 text-center">
+          <button onClick={() => setExpenseOpen(true)} className="text-xs text-gray-400 hover:text-primary hover:underline transition-colors">
+            Registrar Gasto Rápido
+          </button>
+        </div>
+      </div>
 
       <CheckoutDialog
         isOpen={isCheckoutOpen}
@@ -222,6 +393,9 @@ export default function ShoppingCart({
         totalAmount={totalAmount}
         onSuccessfulSale={handleSuccessfulSale}
         activeSessionId={activeSessionId}
+        appliedDiscount={appliedDiscount}
+        subtotal={itemsTotal}
+        discountAmount={discountAmount}
       />
 
       <QuickExpenseDialog
@@ -229,6 +403,6 @@ export default function ShoppingCart({
         onOpenChange={setExpenseOpen}
         onExpenseAdded={handleExpenseAdded}
       />
-    </>
+    </div>
   );
 }

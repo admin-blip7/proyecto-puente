@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Product, Sale } from "@/types";
+import { subDays } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,10 +14,15 @@ interface ProductABCAnalysisProps {
     sales: Sale[];
 }
 
-interface ProductRevenue {
+interface ProductProfitData {
     productId: string;
     name: string;
     totalRevenue: number;
+    totalProfit: number;
+    profitPercentage?: number;
+    cumulativePercentage?: number;
+    stock: number;
+    suggestedStock: number;
 }
 
 type ABCCategory = 'A' | 'B' | 'C';
@@ -34,38 +40,99 @@ const getCategoryBadge = (category: ABCCategory) => {
 
 
 export default function ProductABCAnalysis({ products, sales }: ProductABCAnalysisProps) {
-    
-    const classifiedProducts = useMemo(() => {
-        const revenueMap = new Map<string, number>();
 
+    const classifiedProducts = useMemo(() => {
+        const productDataMap = new Map<string, { revenue: number; profit: number }>();
+        const productCostMap = new Map<string, number>();
+
+        // Create a map of product costs for quick lookup
+        products.forEach(product => {
+            productCostMap.set(product.id, product.cost || 0);
+        });
+
+        // Calculate revenue and profit for each product
         sales.forEach(sale => {
             sale.items.forEach(item => {
-                const currentRevenue = revenueMap.get(item.productId) || 0;
-                revenueMap.set(item.productId, currentRevenue + (item.priceAtSale * item.quantity));
+                const current = productDataMap.get(item.productId) || { revenue: 0, profit: 0 };
+                const itemRevenue = item.priceAtSale * item.quantity;
+                const itemCost = (productCostMap.get(item.productId) || 0) * item.quantity;
+                const itemProfit = itemRevenue - itemCost;
+
+                productDataMap.set(item.productId, {
+                    revenue: current.revenue + itemRevenue,
+                    profit: current.profit + itemProfit
+                });
             });
         });
 
-        const productRevenues: ProductRevenue[] = products.map(product => ({
-            productId: product.id,
-            name: product.name,
-            totalRevenue: revenueMap.get(product.id) || 0,
-        })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+        // Calculate sales velocity (last 30 days)
+        const cutoffDate = subDays(new Date(), 30);
+        const salesVelocityMap = new Map<string, number>();
 
-        const totalRevenueSum = productRevenues.reduce((sum, p) => sum + p.totalRevenue, 0);
-        
-        const countA = Math.ceil(productRevenues.length * 0.20);
-        const countB = Math.ceil(productRevenues.length * 0.30);
-        
-        return productRevenues.map((p, index) => {
+        sales.forEach(sale => {
+            const saleDate = new Date(sale.createdAt);
+            if (saleDate >= cutoffDate) {
+                sale.items.forEach(item => {
+                    const current = salesVelocityMap.get(item.productId) || 0;
+                    salesVelocityMap.set(item.productId, current + item.quantity);
+                });
+            }
+        });
+
+        const productProfitData: ProductProfitData[] = products.map(product => {
+            const data = productDataMap.get(product.id) || { revenue: 0, profit: 0 };
+            const salesLast30Days = salesVelocityMap.get(product.id) || 0;
+            const dailyVelocity = salesLast30Days / 30;
+
+            return {
+                productId: product.id,
+                name: product.name,
+                totalRevenue: data.revenue,
+                totalProfit: data.profit,
+                stock: product.stock || 0,
+                suggestedStock: 0, // Will be calculated after ABC classification
+            };
+        }).sort((a, b) => b.totalProfit - a.totalProfit); // Sort by profit, not revenue
+
+        const totalProfitSum = productProfitData.reduce((sum, p) => sum + p.totalProfit, 0);
+
+        // Apply proper ABC analysis using cumulative PROFIT percentage
+        // A: Products that contribute to 80% of profit (30 days coverage)
+        // B: Products that contribute to next 15% of profit (21 days coverage)  
+        // C: Products that contribute to remaining 5% of profit (14 days coverage)
+        let cumulativeProfit = 0;
+
+        return productProfitData.map((p) => {
+            cumulativeProfit += p.totalProfit;
+            const cumulativePercentage = totalProfitSum > 0 ? (cumulativeProfit / totalProfitSum) * 100 : 0;
+
             let category: ABCCategory;
-            if (index < countA) {
+            let targetDays: number;
+            if (cumulativePercentage <= 80) {
                 category = 'A';
-            } else if (index < countA + countB) {
+                targetDays = 30; // 30 days coverage for A products
+            } else if (cumulativePercentage <= 95) {
                 category = 'B';
+                targetDays = 21; // 21 days coverage for B products
             } else {
                 category = 'C';
+                targetDays = 14; // 14 days coverage for C products
             }
-            return { ...p, category };
+
+            const profitPercentage = totalProfitSum > 0 ? (p.totalProfit / totalProfitSum) * 100 : 0;
+
+            // Calculate suggested stock based on sales velocity
+            const salesLast30Days = salesVelocityMap.get(p.productId) || 0;
+            const dailyVelocity = salesLast30Days / 30;
+            const suggestedStock = Math.ceil(dailyVelocity * targetDays);
+
+            return {
+                ...p,
+                category,
+                profitPercentage,
+                cumulativePercentage,
+                suggestedStock
+            };
         });
 
     }, [products, sales]);
@@ -76,7 +143,7 @@ export default function ProductABCAnalysis({ products, sales }: ProductABCAnalys
             <CardHeader>
                 <CardTitle>Análisis ABC de Productos</CardTitle>
                 <CardDescription>
-                    Clasificación de productos basada en su contribución a los ingresos totales para una gestión de inventario más inteligente.
+                    Clasificación basada en el Principio de Pareto por ganancia: Clase A (80% ganancia), Clase B (15% ganancia), Clase C (5% ganancia).
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -85,15 +152,29 @@ export default function ProductABCAnalysis({ products, sales }: ProductABCAnalys
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Producto</TableHead>
-                                <TableHead className="text-right">Ingresos Totales</TableHead>
-                                <TableHead className="text-center">Categoría ABC</TableHead>
+                                <TableHead className="text-right">Stock</TableHead>
+                                <TableHead className="text-right">Stock Sugerido</TableHead>
+                                <TableHead className="text-right">Ingresos</TableHead>
+                                <TableHead className="text-right">Ganancia</TableHead>
+                                <TableHead className="text-right">% Ganancia</TableHead>
+                                <TableHead className="text-right">% Acumulado</TableHead>
+                                <TableHead className="text-center">Categoría</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {classifiedProducts.map(product => (
                                 <TableRow key={product.productId}>
                                     <TableCell className="font-medium">{product.name}</TableCell>
-                                    <TableCell className="text-right font-semibold">${product.totalRevenue.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-mono">{product.stock}</TableCell>
+                                    <TableCell className="text-right font-mono font-semibold text-blue-600">{product.suggestedStock}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">${product.totalRevenue.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-semibold text-green-600">${product.totalProfit.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground">
+                                        {product.profitPercentage?.toFixed(2) || '0.00'}%
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm">
+                                        {product.cumulativePercentage?.toFixed(1) || '0.0'}%
+                                    </TableCell>
                                     <TableCell className="text-center">{getCategoryBadge(product.category)}</TableCell>
                                 </TableRow>
                             ))}

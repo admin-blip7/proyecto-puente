@@ -32,6 +32,10 @@ const mapSale = (row: any): Sale => ({
   cancelReason: row?.cancel_reason ?? undefined,
   amountPaid: row?.amount_paid ? Number(row.amount_paid) : undefined,
   changeGiven: row?.change_given ? Number(row.change_given) : undefined,
+  // Discount fields
+  discountCode: row?.discount_code ?? undefined,
+  discountAmount: row?.discount_amount ? Number(row.discount_amount) : undefined,
+  discountPercentage: row?.discount_percentage ? Number(row.discount_percentage) : undefined,
 });
 
 export const getSales = async (
@@ -262,6 +266,10 @@ export const addSaleAndUpdateStock = async (
       status: 'completed',
       amount_paid: sale.amountPaid,
       change_given: sale.changeGiven,
+      // Discount fields
+      discount_code: (saleData as any).discountCode || null,
+      discount_amount: (saleData as any).discountAmount || null,
+      discount_percentage: (saleData as any).discountPercentage || null,
     };
 
     log.info(`Sale record to insert:`, {

@@ -42,6 +42,7 @@ const mapSession = (row: any): CashSession => ({
   expectedCashInDrawer: Number(row?.expectedCashInDrawer ?? 0),
   actualCashCount: row?.actualCashCount !== null ? Number(row.actualCashCount) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
+  isBalanced: row?.is_balanced ?? row?.isBalanced ?? false,
   bagsStartAmounts: row?.bags_start_amounts ?? {},
   bagsSalesAmounts: row?.bags_sales_amounts ?? {},
   bagsEndAmounts: row?.bags_end_amounts ?? {},
@@ -255,7 +256,8 @@ export const closeCashSession = async (
   userId: string,
   userName: string,
   actualCashCount: number,
-  bagsSalesAmounts: Record<string, number> = {}
+  bagsSalesAmounts: Record<string, number> = {},
+  bagsActualEndAmounts: Record<string, number> = {}
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
 
@@ -279,7 +281,20 @@ export const closeCashSession = async (
 
   const expectedCashInDrawer = enrichedSession.startingFloat + enrichedSession.totalCashSales - enrichedSession.totalCashPayouts;
   const difference = actualCashCount - expectedCashInDrawer;
+  const isBalanced = difference === 0;
   const closedAt = nowIso();
+
+  // Calculate expected end amounts for bags (start - sales)
+  const bagsExpectedEndAmounts = calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts);
+
+  // Use actual amounts entered by user, or expected if not provided
+  const finalBagsEndAmounts: Record<string, number> = {};
+  for (const key of ['recargas', 'mimovil', 'servicios']) {
+    // If user entered a value, use it; otherwise use calculated expected
+    finalBagsEndAmounts[key] = bagsActualEndAmounts[key] !== undefined && bagsActualEndAmounts[key] !== 0
+      ? bagsActualEndAmounts[key]
+      : bagsExpectedEndAmounts[key] || 0;
+  }
 
   const { error } = await supabase
     .from(CASH_SESSIONS_TABLE)
@@ -291,11 +306,13 @@ export const closeCashSession = async (
       actualCashCount,
       expectedCashInDrawer,
       difference,
+      is_balanced: isBalanced,
       // Also update the calculated totals in DB so they are correct for history
       totalCashSales: enrichedSession.totalCashSales,
       totalCardSales: enrichedSession.totalCardSales,
       bags_sales_amounts: bagsSalesAmounts,
-      bags_end_amounts: calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts)
+      bags_end_amounts: finalBagsEndAmounts,
+      bags_expected_end_amounts: bagsExpectedEndAmounts
     })
     .eq("firestore_id", session.id);
 
@@ -323,6 +340,8 @@ export const closeCashSession = async (
     actualCashCount,
     expectedCashInDrawer,
     difference,
+    isBalanced,
+    bagsEndAmounts: finalBagsEndAmounts,
   };
 };
 

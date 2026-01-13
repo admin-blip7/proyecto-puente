@@ -10,6 +10,7 @@ import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode, Clock, Wrench } from "lucide-react";
 import { Badge } from "../ui/badge";
+import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import {
   Dialog,
@@ -211,6 +212,17 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     });
   };
 
+  // Update item price (for manual discounts)
+  const updateItemPrice = (productId: string, newPrice: number) => {
+    setCart((prevCart) => {
+      return prevCart.map((item) =>
+        item.id === productId
+          ? { ...item, price: Math.max(0, newPrice) }
+          : item
+      );
+    });
+  };
+
   const clearCart = () => {
     setCart([]);
     setSelectedCartItem(null);
@@ -260,18 +272,17 @@ export default function POSClient({ initialProducts }: POSClientProps) {
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}) => {
+  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}) => {
     if (!userProfile || !activeSession) return;
 
-    // Log param to satisfy linter if unused, or use it
-    console.log('Bag Sales:', bagsSalesAmounts);
-
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
+    console.log('🔄 [SESSION] Bag Sales:', bagsSalesAmounts);
+    console.log('🔄 [SESSION] Bag Actual Ends:', bagsActualEndAmounts);
     console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts);
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -714,106 +725,157 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
   return (
     <>
-      <div className="grid h-full grid-cols-1 lg:grid-cols-12">
-        <div className="lg:col-span-7 flex flex-col h-full bg-background px-4 sm:px-6 pt-6 overflow-hidden">
-          <Header
-            searchQuery={searchQuery}
-            onSearchQueryChange={setSearchQuery}
-            actionSlot={
-              <Button variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Abrir escáner">
-                <QrCode className="h-5 w-5" />
-              </Button>
-            }
-          />
-          <div className="mt-6 grid grid-cols-2 gap-3 pb-2">
-            <Button
-              onClick={() => setShowBuscadorCompatibilidad(true)}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5 border-0"
-            >
-              <Search className="w-4 h-4" />
-              <span>Buscar Micas</span>
-            </Button>
-            <Button
-              onClick={() => setShowRepairsDialog(true)}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5 border-0 col-span-2 md:col-span-1"
-            >
-              <Wrench className="w-4 h-4" />
-              <span>Reparaciones</span>
-            </Button>
+      <div className="flex h-full bg-background-light dark:bg-background-dark overflow-hidden relative font-sans text-text-light dark:text-text-light">
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
+          {/* Header */}
+          <div className="flex-shrink-0 px-8 py-6 bg-surface-light dark:bg-sidebar-bg border-b border-border-light dark:border-border flex justify-between items-center z-10 transition-colors">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Checkout Order</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            <div className="flex items-center gap-6">
+              {/* Optional: Add header actions here if needed */}
+              <div className="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col text-right hidden sm:flex">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{userProfile?.name || 'Usuario'}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{userProfile?.role || 'Staff'}</span>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white dark:border-gray-700 shadow-sm">
+                  {/* User Avatar Placeholder */}
+                  <div className="w-full h-full bg-slate-300 flex items-center justify-center text-slate-500 font-bold">
+                    {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <ScrollArea className="flex-1 -mx-4 sm:-mx-6 mt-4">
-            <div className="p-4 sm:p-6 grid gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+
+          {/* Filter & Search Bar */}
+          <div className="px-8 pt-6 pb-2">
+            <div className="flex gap-4 items-center mb-6 overflow-x-auto no-scrollbar pb-2">
+              <button
+                onClick={() => setSearchQuery("")}
+                className={cn(
+                  "px-5 py-2 rounded-full font-medium text-sm flex items-center gap-2 shadow-lg shadow-gray-200 dark:shadow-none whitespace-nowrap transition-all",
+                  !searchQuery ? "bg-gray-900 text-white dark:bg-primary" : "bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                )}
+              >
+                All Items <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-1", !searchQuery ? "bg-gray-700 dark:bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400")}>{products.length}</span>
+              </button>
+              {/* Placeholder Categories - Logic for filtering could be added here */}
+              <button className="px-5 py-2 rounded-full bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap flex items-center gap-2">
+                Microsoldadura <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full ml-1">12</span>
+              </button>
+              <button className="px-5 py-2 rounded-full bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap flex items-center gap-2">
+                Accesorios <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full ml-1">45</span>
+              </button>
+
+              <div className="ml-auto relative hidden sm:block">
+                <span className="absolute left-3 top-2.5 text-gray-400">
+                  <Search className="w-5 h-5" />
+                </span>
+                <input
+                  className="w-64 bg-white dark:bg-card border border-gray-200 dark:border-gray-700 rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-400 shadow-sm"
+                  placeholder="Buscar productos..."
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="sm:hidden ml-auto">
+                <Button variant="ghost" size="icon" onClick={() => setShowBuscadorCompatibilidad(true)}>
+                  <Search className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Product Grid */}
+          <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
               {filteredProducts.map((product, index) => (
                 <ProductCard key={`${product.id}-${index}`} product={product} onAddToCart={() => addToCart(product)} />
               ))}
             </div>
-          </ScrollArea>
-        </div>
-        <div className="hidden lg:flex lg:col-span-5 flex-row h-full">
-
-
-          <div className="flex-1 flex flex-col h-full bg-card shadow-inner border-l">
-            <ShoppingCart
-              cartItems={cart}
-              onUpdateQuantity={updateQuantity}
-              onClearCart={clearCart}
-              selectedCartItem={selectedCartItem}
-              onSelectItem={setSelectedCartItem}
-              onAddToCart={addToCart}
-              onCloseSession={() => setClosingDrawer(true)}
-              onSuccessfulSale={refreshProducts}
-              activeSessionId={activeSession?.id}
-            />
           </div>
-        </div>
+        </main>
 
-        {/* Mobile Buttons */}
-        <div className="lg:hidden fixed bottom-4 right-4 z-50 flex gap-2">
-          {/* Buscador de Micas flotante */}
-          <Button
-            onClick={() => setShowBuscadorCompatibilidad(true)}
-            size="icon"
-            className="w-14 h-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700"
-          >
-            <Package className="h-6 w-6" />
-          </Button>
+        {/* Right Sidebar - Shopping Cart */}
+        <aside className="hidden lg:flex w-[380px] flex-shrink-0 flex-col bg-white dark:bg-card border-l border-border-light dark:border-border z-20 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] h-full overflow-hidden">
+          <ShoppingCart
+            cartItems={cart}
+            onUpdateQuantity={updateQuantity}
+            onUpdatePrice={updateItemPrice}
+            onClearCart={clearCart}
+            selectedCartItem={selectedCartItem}
+            onSelectItem={setSelectedCartItem}
+            onAddToCart={addToCart}
+            onCloseSession={() => setClosingDrawer(true)}
+            onSuccessfulSale={refreshProducts}
+            activeSessionId={activeSession?.id}
+          />
+        </aside>
 
-          {/* Mobile Cart Sheet */}
+        {/* Mobile Cart Sheet Button */}
+        <div className="lg:hidden fixed bottom-4 right-4 z-50">
           <Sheet>
             <SheetTrigger asChild>
-              <Button size="icon" className="w-16 h-16 rounded-full shadow-2xl">
+              <Button size="icon" className="w-16 h-16 rounded-full shadow-2xl bg-primary hover:bg-primary/90 text-white">
                 <ShoppingCartIcon className="h-7 w-7" />
                 {totalCartItems > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="absolute top-0 right-0 -translate-x-1 translate-y-1 rounded-full px-2"
-                  >
+                  <Badge variant="destructive" className="absolute top-0 right-0 -translate-x-1 translate-y-1 rounded-full px-2">
                     {totalCartItems}
                   </Badge>
                 )}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="p-0 flex flex-col w-full sm:max-w-md">
-              <SheetTitle className="sr-only">Mi Pedido</SheetTitle>
+            <SheetContent side="right" className="p-0 w-full sm:max-w-md">
               <ShoppingCart
                 cartItems={cart}
                 onUpdateQuantity={updateQuantity}
+                onUpdatePrice={updateItemPrice}
                 onClearCart={clearCart}
-                isSheet
                 selectedCartItem={selectedCartItem}
                 onSelectItem={setSelectedCartItem}
                 onAddToCart={addToCart}
                 onCloseSession={() => setClosingDrawer(true)}
                 onSuccessfulSale={refreshProducts}
                 activeSessionId={activeSession?.id}
+                isSheet={true}
               />
             </SheetContent>
           </Sheet>
         </div>
-
-
       </div>
 
+      {/* All the Dialogs and Modals */}
+      <OpenSessionWizard
+        isOpen={isOpeningDrawer}
+        onOpenChange={setOpeningDrawer}
+        onConfirm={handleOpenDrawer}
+        lastClosedSession={lastClosedSession}
+      />
+      {closedSessionData && (
+        <CashDepositVerificationDialog
+          isOpen={showDepositVerification}
+          onOpenChange={setShowDepositVerification}
+          session={closedSessionData}
+          onConfirm={handleDepositConfirmation}
+          onSkip={handleSkipDeposit}
+        />
+      )}
+      {showBuscadorCompatibilidad && (
+        <BuscadorCompatibilidad
+          onClose={() => setShowBuscadorCompatibilidad(false)}
+          onAddToCart={addToCart}
+        />
+      )}
+      <CodeScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setScannerOpen}
+        onResult={handleScannedCode}
+      />
       <CloseCashDrawerDialog
         isOpen={isClosingDrawer}
         onOpenChange={setClosingDrawer}
@@ -821,38 +883,20 @@ export default function POSClient({ initialProducts }: POSClientProps) {
         onConfirm={handleCloseDrawer}
       />
       {
-        closedSessionData && (
-          <CashDepositVerificationDialog
-            isOpen={showDepositVerification}
-            onOpenChange={setShowDepositVerification}
-            session={closedSessionData}
-            onConfirm={handleDepositConfirmation}
-            onSkip={handleSkipDeposit}
-          />
+        printTicketSession && (
+          <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
+            <CashCloseTicket
+              id="cash-close-ticket"
+              session={printTicketSession}
+            />
+          </div>
         )
       }
-
-
-      {/* Buscador de Compatibilidad */}
-      {
-        showBuscadorCompatibilidad && (
-          <BuscadorCompatibilidad
-            onClose={() => setShowBuscadorCompatibilidad(false)}
-            onAddToCart={addToCart}
-          />
-        )
-      }
-
-      {/* Scanner Dialog */}
-      <CodeScannerDialog open={isScannerOpen} onOpenChange={setScannerOpen} onResult={handleScannedCode} />
-
-      {/* Repairs Dialog */}
       <RepairsDialog
         isOpen={showRepairsDialog}
         onOpenChange={setShowRepairsDialog}
         onAddRepair={handleAddRepairToCart}
       />
-
       {/* Hidden ticket for printing */}
       {
         printTicketSession && (

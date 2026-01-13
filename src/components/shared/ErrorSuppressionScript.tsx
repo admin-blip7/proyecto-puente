@@ -5,13 +5,19 @@ import { getLogger } from '@/lib/logger';
 
 const log = getLogger("ErrorSuppressionScript");
 
+// Track DialogTitle errors to prevent infinite loops
+let dialogTitleErrorCount = 0;
+let dialogTitleErrorTimer: NodeJS.Timeout | null = null;
+const MAX_DIALOG_TITLE_ERRORS = 3;
+const DIALOG_TITLE_ERROR_RESET_MS = 5000;
+
 export default function ErrorSuppressionScript() {
   useEffect(() => {
     // Only run in development
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       const originalError = console.error;
       const originalWarn = console.warn;
-      
+
       // Enhanced error logging with better context
       console.error = (...args: any[]) => {
         try {
@@ -21,6 +27,30 @@ export default function ErrorSuppressionScript() {
             if (arg && typeof arg === 'object' && arg.message) return arg.message;
             return String(arg || '');
           }).join(' ');
+
+          // Check for DialogTitle errors - throttle to prevent infinite loops
+          if (message.includes('DialogContent') && message.includes('DialogTitle')) {
+            dialogTitleErrorCount++;
+
+            // Reset counter after timeout
+            if (dialogTitleErrorTimer) clearTimeout(dialogTitleErrorTimer);
+            dialogTitleErrorTimer = setTimeout(() => {
+              dialogTitleErrorCount = 0;
+            }, DIALOG_TITLE_ERROR_RESET_MS);
+
+            // Only log first few occurrences, suppress the rest
+            if (dialogTitleErrorCount <= MAX_DIALOG_TITLE_ERRORS) {
+              log.error('[DialogTitleError]', {
+                message: 'DialogContent missing DialogTitle - see console for details',
+                count: dialogTitleErrorCount,
+                timestamp: new Date().toISOString()
+              });
+              originalError.apply(console, args);
+            } else if (dialogTitleErrorCount === MAX_DIALOG_TITLE_ERRORS + 1) {
+              log.warn('[DialogTitleError] Suppressing further errors. Fix the Dialog components that are missing DialogTitle.');
+            }
+            return;
+          }
 
           // Check for payment service specific errors
           if (message.includes('paymentService') || message.includes('consignor payments')) {
@@ -67,11 +97,7 @@ export default function ErrorSuppressionScript() {
             'Error querying consignor payments',
             'Error fetching products',
             'Failed to fetch open session',
-            'Error fetching open session',
-            'DialogContent requires a DialogTitle',
-            'DialogTitle',
-            'component to be accessible for screen reader users',
-            'VisuallyHidden component'
+            'Error fetching open session'
           ];
           const isCritical = criticalPatterns.some(pattern =>
             message.toLowerCase().includes(pattern)
@@ -84,15 +110,6 @@ export default function ErrorSuppressionScript() {
 
           // Log other errors normally
           originalError.apply(console, args);
-
-          // Extra logging for DialogTitle issues to help debug
-          if (message.includes('DialogContent') && message.includes('DialogTitle')) {
-            log.error('[DialogTitleError]', {
-              message,
-              stack: new Error().stack,
-              timestamp: new Date().toISOString()
-            });
-          }
         } catch (e) {
           // Fallback to original console.error if anything fails
           originalError.apply(console, args);
@@ -127,6 +144,7 @@ export default function ErrorSuppressionScript() {
         try {
           console.error = originalError;
           console.warn = originalWarn;
+          if (dialogTitleErrorTimer) clearTimeout(dialogTitleErrorTimer);
         } catch (e) {
           // Ignore cleanup errors
         }

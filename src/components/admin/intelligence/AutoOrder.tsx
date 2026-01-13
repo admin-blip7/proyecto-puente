@@ -37,7 +37,7 @@ interface ProductAnalysis {
     coverageDays: number; // How many days of stock we currently have
 }
 
-export default function AutoOrder({ products, sales }: AutoOrderProps) {
+export default function AutoOrder({ products, sales = [] }: AutoOrderProps) {
     const [showMagic, setShowMagic] = useState(false);
 
     const suggestions = useMemo(() => {
@@ -45,7 +45,11 @@ export default function AutoOrder({ products, sales }: AutoOrderProps) {
         const daysToAnalyze = 30;
         const cutoffDate = subDays(new Date(), daysToAnalyze);
 
-        const recentSales = sales.filter(s => isAfter(new Date(s.createdAt), cutoffDate));
+        // Include sales from cutoffDate onwards (inclusive)
+        const recentSales = sales.filter(s => {
+            const saleDate = new Date(s.createdAt);
+            return saleDate >= cutoffDate;
+        });
 
         const salesMap = new Map<string, { revenue: number; units: number }>();
 

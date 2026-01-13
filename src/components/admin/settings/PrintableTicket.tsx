@@ -40,120 +40,190 @@ const getCalculatedTotals = (items: Sale['items']) => {
 export default function PrintableTicket({ settings, sale }: PrintableTicketProps) {
   const { header, body, footer } = settings;
   const displaySale = sale || sampleSale;
-  const { subtotal, tax, total } = getCalculatedTotals(displaySale.items);
+  const { subtotal, tax } = getCalculatedTotals(displaySale.items);
 
 
   const fontSizeClass = `text-${body.fontSize}`;
-  const isBold = settings.fontStyle?.bold;
   const isItalic = settings.fontStyle?.italic;
+  const storeInitials = header.storeName
+    ?.split(" ")
+    .filter(Boolean)
+    .map(word => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const wrapperStyle = {
     width: `${settings.paperWidth || 80}mm`,
     fontFamily: "'Courier New', Courier, monospace",
-    fontWeight: 'bold', // User requested all text to be bold
+    fontWeight: 'bold',
     fontStyle: isItalic ? 'italic' : 'normal',
   };
 
   return (
-    <div
-      className={`ticket-preview bg-white text-black font-mono shadow-lg p-3 ${fontSizeClass}`}
-      style={wrapperStyle}
-    >
-      {/* Header */}
-      <div className="text-center space-y-1 mb-4">
-        {header.showLogo && header.logoUrl && (
-          <div className="flex justify-center">
-            <Image src={header.logoUrl} alt="Logo" width={60} height={60} className="object-contain" />
+    <div className="flex flex-col items-center">
+      <div
+        className={`ticket-preview bg-white text-black font-mono shadow-lg ${fontSizeClass}`}
+        style={wrapperStyle}
+      >
+        <div
+          className="h-2 w-full"
+          style={{
+            backgroundImage: "linear-gradient(135deg, #111 25%, transparent 25%), linear-gradient(225deg, #111 25%, transparent 25%)",
+            backgroundSize: "12px 12px",
+          }}
+        />
+        <div className="px-4 pb-4 pt-3">
+          {/* Header */}
+          <div className="flex flex-col items-center text-center space-y-1">
+            {header.showLogo && (
+              <div className="flex justify-center">
+                <div className="h-10 w-10 rounded-lg bg-black text-white flex items-center justify-center text-base font-bold">
+                  {header.showLogo && header.logoUrl ? (
+                    <Image src={header.logoUrl} alt="Logo" width={28} height={28} className="object-contain" />
+                  ) : (
+                    storeInitials || "PS"
+                  )}
+                </div>
+              </div>
+            )}
+            {header.show.storeName && (
+              <h1 className="text-base tracking-[0.2em] font-bold uppercase">
+                {header.storeName}
+              </h1>
+            )}
+            <div className="h-px w-14 bg-black/80" />
+            {header.show.address && <p className="text-[10px] uppercase tracking-widest">{header.address}</p>}
+            {header.show.phone && <p className="text-[10px] uppercase tracking-widest">Tel: {header.phone}</p>}
+            {header.show.rfc && <p className="text-[10px] uppercase tracking-widest">RFC: {header.rfc}</p>}
+            {header.show.website && <p className="text-[10px] uppercase tracking-widest">{header.website}</p>}
           </div>
-        )}
-        {header.show.storeName && <h1 className="text-lg font-bold">{header.storeName}</h1>}
-        {header.show.address && <p>{header.address}</p>}
-        {header.show.phone && <p>Tel: {header.phone}</p>}
-        {header.show.rfc && <p>RFC: {header.rfc}</p>}
-        {header.show.website && <p>{header.website}</p>}
-      </div>
 
-      <div className="text-xs space-y-1">
-        <p>Folio: {displaySale.saleId}</p>
-        <p>Fecha: {format(displaySale.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
-        <p>Cajero: {displaySale.cashierName}</p>
-        {displaySale.customerName && <p>Cliente: {displaySale.customerName}</p>}
-      </div>
-
-      <hr className="border-dashed border-black my-2" />
-
-      {/* Body */}
-      <div>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-dashed border-black">
-              {body.showQuantity && <th className="text-left pb-1">CANT</th>}
-              <th className="text-left pb-1">DESC</th>
-              {body.showUnitPrice && <th className="text-right pb-1">P.U.</th>}
-              {body.showTotal && <th className="text-right pb-1">IMPORTE</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {displaySale.items.map((item, index) => (
-              <tr key={index}>
-                {body.showQuantity && <td className="align-top pr-1">{item.quantity}</td>}
-                <td className="align-top">{item.name}</td>
-                {body.showUnitPrice && <td className="align-top text-right px-1">{formatCurrency(item.priceAtSale ?? 0)}</td>}
-                {body.showTotal && <td className="align-top text-right pl-1">{formatCurrency((item.priceAtSale ?? 0) * (item.quantity ?? 0))}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <hr className="border-dashed border-black my-2" />
-
-      {/* Footer */}
-      <div className="space-y-1">
-        {footer.showSubtotal && (
-          <div className="flex justify-between">
-            <span>SUBTOTAL:</span>
-            <span>{formatCurrency(subtotal ?? 0)}</span>
+          <div className="mt-4 text-[10px] uppercase tracking-widest">
+            <div className="flex justify-between">
+              <span className="text-black/60">Folio:</span>
+              <span className="font-bold">{displaySale.saleId}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black/60">Fecha:</span>
+              <span className="font-bold">{format(displaySale.createdAt, "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-black/60">Cajero:</span>
+              <span className="font-bold">{displaySale.cashierName}</span>
+            </div>
+            {displaySale.customerName && (
+              <div className="flex justify-between">
+                <span className="text-black/60">Cliente:</span>
+                <span className="font-bold">{displaySale.customerName}</span>
+              </div>
+            )}
           </div>
-        )}
-        {footer.showTaxes && (
-          <div className="flex justify-between">
-            <span>IVA:</span>
-            <span>{formatCurrency(tax ?? 0)}</span>
+
+          <div className="border-t border-dashed border-black/30 my-3" />
+
+          {/* Body */}
+          <div>
+            <div className="flex justify-between text-[10px] uppercase tracking-widest border-b border-dashed border-black/40 pb-1">
+              <span>Descripción</span>
+              <span>Total</span>
+            </div>
+            <div className="space-y-2 mt-2">
+              {displaySale.items.map((item, index) => (
+                <div key={index} className="flex justify-between items-start">
+                  <div className="flex gap-2">
+                    {body.showQuantity && (
+                      <span className="w-4 text-right font-bold">{item.quantity}</span>
+                    )}
+                    <div>
+                      <div className="text-sm font-semibold leading-tight">{item.name}</div>
+                      {body.showUnitPrice && (
+                        <div className="text-[10px] text-black/60">
+                          P.U. {formatCurrency(item.priceAtSale ?? 0)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {body.showTotal && (
+                    <div className="text-sm font-semibold tabular-nums">
+                      {formatCurrency((item.priceAtSale ?? 0) * (item.quantity ?? 0))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-        {footer.showDiscounts && (
-          <div className="flex justify-between">
-            <span>DESCUENTOS:</span>
-            <span>$0.00</span>
+
+          <div className="border-t border-dashed border-black/30 my-3" />
+
+          {/* Footer */}
+          <div className="space-y-1 text-[11px]">
+            {footer.showSubtotal && (
+              <div className="flex justify-between text-black/70">
+                <span>Subtotal:</span>
+                <span className="tabular-nums">{formatCurrency(subtotal ?? 0)}</span>
+              </div>
+            )}
+            {footer.showTaxes && (
+              <div className="flex justify-between text-black/70">
+                <span>IVA (16%):</span>
+                <span className="tabular-nums">{formatCurrency(tax ?? 0)}</span>
+              </div>
+            )}
+            {footer.showDiscounts && (
+              <div className="flex justify-between text-black/70">
+                <span>Descuentos:</span>
+                <span className="tabular-nums">$0.00</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-lg border-t border-black/80 pt-2">
+              <span>TOTAL</span>
+              <span className="tabular-nums">{formatCurrency(displaySale.totalAmount ?? 0)}</span>
+            </div>
+            {(displaySale.amountPaid !== undefined || displaySale.changeGiven !== undefined) && (
+              <div className="mt-3 rounded-lg bg-black/5 px-3 py-2 text-[11px]">
+                {displaySale.amountPaid !== undefined && (
+                  <div className="flex justify-between font-semibold">
+                    <span>Efectivo / Entregado:</span>
+                    <span className="tabular-nums">{formatCurrency(displaySale.amountPaid)}</span>
+                  </div>
+                )}
+                {displaySale.changeGiven !== undefined && (
+                  <div className="flex justify-between font-semibold">
+                    <span>Cambio:</span>
+                    <span className="tabular-nums">{formatCurrency(displaySale.changeGiven)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        )}
-        <div className="flex justify-between font-bold text-lg border-t border-dashed border-black pt-1">
-          <span>TOTAL:</span>
-          <span>{formatCurrency(displaySale.totalAmount ?? 0)}</span>
+
+          <div className="text-center mt-4 space-y-2">
+            {footer.showQrCode && footer.qrCodeUrl ? (
+              <div className="flex justify-center pt-2">
+                <QRCode value={footer.qrCodeUrl} size={80} quietZone={0} />
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <div
+                  className="h-6 w-24 opacity-60"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(90deg, #111 0 2px, transparent 2px 4px)",
+                  }}
+                />
+              </div>
+            )}
+            {footer.thankYouMessage && <p className="font-semibold">{footer.thankYouMessage}</p>}
+            {footer.additionalInfo && <p className="text-[10px] text-black/70">{footer.additionalInfo}</p>}
+          </div>
         </div>
-        {displaySale.amountPaid !== undefined && (
-          <div className="flex justify-between border-dashed border-black pt-1">
-            <span>RECIBIDO:</span>
-            <span>{formatCurrency(displaySale.amountPaid)}</span>
-          </div>
-        )}
-        {displaySale.changeGiven !== undefined && (
-          <div className="flex justify-between border-dashed border-black pt-1">
-            <span>CAMBIO:</span>
-            <span>{formatCurrency(displaySale.changeGiven)}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="text-center mt-4 space-y-2">
-        {footer.thankYouMessage && <p>{footer.thankYouMessage}</p>}
-        {footer.additionalInfo && <p className="text-xs">{footer.additionalInfo}</p>}
-        {footer.showQrCode && footer.qrCodeUrl && (
-          <div className="flex justify-center pt-2">
-            <QRCode value={footer.qrCodeUrl} size={80} quietZone={0} />
-          </div>
-        )}
+        <div
+          className="h-2 w-full"
+          style={{
+            backgroundImage: "linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%)",
+            backgroundSize: "12px 12px",
+          }}
+        />
       </div>
     </div>
   );

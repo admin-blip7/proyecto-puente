@@ -12,9 +12,28 @@ export default {
       fontFamily: {
         sans: ['var(--font-sans)', 'sans-serif'],
       },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+        xl: "1rem",
+        '2xl': "1.5rem",
+        full: "9999px"
+      },
+      boxShadow: {
+        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+        'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+        'glow': '0 0 15px rgba(14, 165, 233, 0.3)'
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        // Metallic Blue Custom Colors
+        "primary-dark": "#0284C7",
+        "sidebar-bg": "#0F172A",
+        "sidebar-hover": "#1E293B",
+        "accent-blue": "#38BDF8",
+
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
@@ -24,7 +43,7 @@ export default {
           foreground: 'hsl(var(--popover-foreground))',
         },
         primary: {
-          DEFAULT: '#137fec', // Updated to FinanceFlow primary
+          DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },
         secondary: {
@@ -63,13 +82,14 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
-        "background-light": "#f8fafc",
-        "background-dark": "#101922",
-      },
-      borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        "background-light": "#f8f9fa",
+        "background-dark": "#0f172a",
+        "surface-light": "#ffffff",
+        "surface-dark": "#1e293b",
+        "text-light": "#1f2937",
+        "text-dark": "#f3f4f6",
+        "muted-light": "#6b7280",
+        "muted-dark": "#9ca3af",
       },
       keyframes: {
         'accordion-down': {

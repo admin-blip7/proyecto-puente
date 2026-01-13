@@ -1,11 +1,8 @@
 import { Product } from "@/types";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { formatCurrency } from '@/lib/utils';
+import { Package } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;
@@ -14,94 +11,63 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
+  const isLowStock = product.stock > 0 && product.stock < 10; // Example threshold
 
-  const getStockColor = () => {
-    if (isOutOfStock) return "text-destructive";
-    if (product.reorderPoint && product.stock <= product.reorderPoint) return "text-yellow-600";
-    return "text-foreground";
+  // Determine stock badge style based on quantity
+  let stockBadgeClass = "bg-emerald-50 text-emerald-700";
+  let stockText = `In Stock: ${product.stock}`;
+
+  if (isOutOfStock) {
+    stockBadgeClass = "bg-red-50 text-red-700";
+    stockText = "Out of Stock";
+  } else if (isLowStock) {
+    stockBadgeClass = "bg-amber-50 text-amber-700";
+    stockText = `Low Stock: ${product.stock}`;
   }
 
-  // Check if product has attributes and get display-worthy ones
-  const getDisplayAttributes = () => {
-    if (!product.attributes) return [];
-
-    const attrs: Array<{ label: string; value: string }> = [];
-
-    // Filter out empty/null/undefined values
-    Object.entries(product.attributes).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        // Format the key for display (color -> Color, memoria -> Memoria, etc.)
-        const label = key.charAt(0).toUpperCase() + key.slice(1);
-        attrs.push({ label, value: String(value) });
-      }
-    });
-
-    return attrs;
-  };
-
-  const displayAttributes = getDisplayAttributes();
-  const hasAttributes = displayAttributes.length > 0;
-
   return (
-    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg rounded-lg group">
-      <CardContent className="p-3 text-center flex flex-col flex-1 justify-center">
-        {/* Product Image */}
+    <div className="bg-white rounded-2xl p-4 flex flex-col gap-4 shadow-card hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 group border border-transparent hover:border-blue-100 h-full">
+      <div className="aspect-[4/3] bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center p-4 relative">
         {product.imageUrls && product.imageUrls.length > 0 ? (
-          <div className="relative aspect-square mb-3 overflow-hidden rounded-md bg-muted w-full">
-            <Image
-              src={product.imageUrls[0]}
-              alt={product.name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 200px"
-            />
-          </div>
+          <Image
+            src={product.imageUrls[0]}
+            alt={product.name}
+            fill
+            className="object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
+            sizes="(max-width: 768px) 100vw, 300px"
+          />
         ) : (
-          <div className="aspect-square mb-3 flex items-center justify-center rounded-md bg-muted w-full">
-            <Package className="w-12 h-12 text-muted-foreground" />
-          </div>
+          <Package className="w-16 h-16 text-gray-300" />
         )}
+      </div>
 
-        <h3 className="text-sm font-semibold tracking-tight leading-tight flex-1 mb-2">{product.name}</h3>
+      <div className="flex-1 flex flex-col">
+        <h3 className="font-semibold text-base text-gray-900 leading-tight mb-2 line-clamp-1" title={product.name}>
+          {product.name}
+        </h3>
+        <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">
+          {product.description || "No description available."}
+        </p>
 
-        {/* Conditionally render attributes if they exist */}
-        {hasAttributes && (
-          <div className="flex flex-wrap gap-1 justify-center mb-2">
-            {displayAttributes.map((attr, index) => (
-              <Badge
-                key={index}
-                variant="secondary"
-                className="text-[10px] px-1.5 py-0.5 font-normal"
-              >
-                {attr.label}: {attr.value}
-              </Badge>
-            ))}
+        <div className="mt-auto">
+          <span className={cn("inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium mb-4", stockBadgeClass)}>
+            {stockText}
+          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xl font-bold text-gray-900">{formatCurrency(product.price)}</span>
+            <button
+              onClick={() => onAddToCart(product)}
+              disabled={isOutOfStock}
+              className={cn(
+                "bg-white border border-gray-200 hover:border-primary hover:bg-blue-50 text-gray-900 hover:text-primary px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm whitespace-nowrap",
+                isOutOfStock && "opacity-50 cursor-not-allowed hover:bg-white hover:border-gray-200 hover:text-gray-900"
+              )}
+            >
+              {isOutOfStock ? "Agotado" : "Add To Cart"}
+            </button>
           </div>
-        )}
-
-        <div className={cn("flex items-center justify-center gap-1 mt-1 font-medium", getStockColor())}>
-          <Package className="w-3 h-3" />
-          <span className="text-xs">{product.stock} en Stock</span>
         </div>
-      </CardContent>
-      <CardFooter className="p-2 flex flex-col items-stretch mt-auto">
-        <p className="text-lg font-bold text-primary mb-2">{formatCurrency(product.price)}</p>
-        <Button
-          size="sm"
-          className="rounded-md w-full text-xs"
-          onClick={() => onAddToCart(product)}
-          disabled={isOutOfStock}
-        >
-          {isOutOfStock ? (
-            "Agotado"
-          ) : (
-            <>
-              <PlusCircle className="mr-1 h-3 w-3" />
-              Agregar
-            </>
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

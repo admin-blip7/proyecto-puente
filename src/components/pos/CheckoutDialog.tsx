@@ -1,26 +1,20 @@
-"use client";
-
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { CartItem, Sale, SaleItem, UserProfile, ClientProfile, CRMClient } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CartItem, Sale, SaleItem, CRMClient } from "@/types";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Search } from "lucide-react";
+import { X } from "lucide-react";
 import { formatCurrency } from '@/lib/utils';
 import SaleSummaryDialog from "./SaleSummaryDialog";
-import { addSaleAndUpdateStock } from "@/lib/services/salesService";
-
 import { getCRMClients } from "@/lib/services/crmClientService";
 import { ScrollArea } from "../ui/scroll-area";
 import { getLogger } from "@/lib/logger";
+
+// Sub-components
+import { CustomerSection } from "./checkout/CustomerSection";
+import { ProductList } from "./checkout/ProductList";
+import { PaymentMethodSection } from "./checkout/PaymentMethodSection";
+import { CheckoutFooter } from "./checkout/CheckoutFooter";
 
 const log = getLogger("CheckoutDialog");
 
@@ -31,10 +25,24 @@ interface CheckoutDialogProps {
     totalAmount: number;
     onSuccessfulSale: () => void;
     activeSessionId?: string;
+    appliedDiscount?: { code: string; percentage: number } | null;
+    subtotal?: number;
+    discountAmount?: number;
 }
 
-export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalAmount, onSuccessfulSale, activeSessionId }: CheckoutDialogProps) {
-    const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito'>('Efectivo');
+export default function CheckoutDialog({
+    isOpen,
+    onOpenChange,
+    cartItems,
+    totalAmount,
+    onSuccessfulSale,
+    activeSessionId,
+    appliedDiscount,
+    subtotal,
+    discountAmount
+}: CheckoutDialogProps) {
+    const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta de Crédito' | 'Transferencia/QR'>('Efectivo');
+    const [customerMode, setCustomerMode] = useState<'existente' | 'nuevo'>('existente');
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -51,15 +59,13 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     const { userProfile } = useAuth();
     const { toast } = useToast();
 
-
-
-    const loadCRMClients = useCallback(async () => {
+    const loadCRMClients = useCallback(async (search?: string) => {
         setLoadingCRMClients(true);
         try {
             const clientsData = await getCRMClients({
-                search: crmClientSearch || undefined,
+                search: search || undefined,
                 clientStatus: 'active' as any,
-                limit: 50
+                limit: 20 // Reduced limit for performance
             });
             setCrmClients(clientsData);
         } catch (error) {
@@ -72,15 +78,25 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         } finally {
             setLoadingCRMClients(false);
         }
-    }, [toast, crmClientSearch]);
+    }, [toast]);
 
-
-
+    // Initial load and Search Debounce
     useEffect(() => {
-        if (isOpen) {
+        if (!isOpen) return;
+
+        if (crmClientSearch === "") {
             loadCRMClients();
+            return;
         }
-    }, [isOpen, loadCRMClients]);
+
+        const timer = setTimeout(() => {
+            if (crmClientSearch.length >= 2) {
+                loadCRMClients(crmClientSearch);
+            }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [isOpen, crmClientSearch, loadCRMClients]);
 
     const change = useMemo(() => {
         if (paymentMethod === 'Efectivo' && amountPaid > 0) {
@@ -88,6 +104,10 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         }
         return 0;
     }, [paymentMethod, amountPaid, totalAmount]);
+
+    const totalUnits = useMemo(() => {
+        return cartItems.reduce((acc, item) => acc + item.quantity, 0);
+    }, [cartItems]);
 
     const handleSerialChange = (productId: string, index: number, value: string) => {
         setSerials(prev => {
@@ -110,9 +130,6 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
 
     const handleCRMClientSearch = (value: string) => {
         setCrmClientSearch(value);
-        if (value.length >= 2 || value.length === 0) {
-            loadCRMClients();
-        }
     };
 
     const clearCRMClientSelection = () => {
@@ -127,12 +144,24 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             return;
         }
 
+        // Validate customer is selected
+        const hasCustomer = customerMode === 'existente'
+            ? !!selectedCRMClient
+            : !!customerName.trim();
+
+        if (!hasCustomer) {
+            toast({
+                variant: "destructive",
+                title: "Cliente Requerido",
+                description: "Debe seleccionar o ingresar un cliente antes de completar la venta."
+            });
+            return;
+        }
+
         if (paymentMethod === 'Efectivo' && amountPaid < totalAmount) {
             toast({ variant: "destructive", title: "Pago Insuficiente", description: "El monto pagado es menor al total de la venta." });
             return;
         }
-
-
 
         setLoading(true);
 
@@ -147,7 +176,7 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
         const saleDataForDb = {
             items: saleItems,
             totalAmount,
-            paymentMethod,
+            paymentMethod: paymentMethod === 'Transferencia/QR' ? 'QR/Transferencia' : paymentMethod,
             cashierId: userProfile.uid,
             cashierName: userProfile.name,
             customerName: customerName || null,
@@ -157,20 +186,15 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
             cashSessionId: activeSessionId || null,
             amountPaid: paymentMethod === 'Efectivo' ? amountPaid : totalAmount,
             changeGiven: paymentMethod === 'Efectivo' ? (change > 0 ? change : 0) : 0,
+            discountCode: appliedDiscount?.code || null,
+            discountAmount: discountAmount || null,
+            discountPercentage: appliedDiscount?.percentage || null,
         }
 
         try {
-            let newSale: Sale;
-
-            console.log("Step 1: Sending sale data to the backend...", saleDataForDb);
-
-
-            // Usar API route para procesar la venta
             const response = await fetch('/api/sales', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     saleData: saleDataForDb,
                     cartItems: cartItems,
@@ -184,24 +208,17 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
                 throw new Error(result.details || result.error || 'Error al procesar la venta');
             }
 
-            newSale = result.sale;
-
-
-            setLastSale(newSale);
-
-            toast({
-                title: "Venta Exitosa",
-                description: "Venta completada exitosamente",
-            });
-
+            setLastSale(result.sale);
+            toast({ title: "Venta Exitosa", description: "Venta completada exitosamente" });
             onSuccessfulSale();
             onOpenChange(false);
             setSummaryOpen(true);
+
+            // Reset state
             setCustomerName("");
             setCustomerPhone("");
             setAmountPaid(0);
             setSerials({});
-
             setSelectedCRMClient("");
             setCrmClientSearch("");
             setShowCRMClientDropdown(false);
@@ -221,252 +238,78 @@ export default function CheckoutDialog({ isOpen, onOpenChange, cartItems, totalA
     return (
         <>
             <Dialog open={isOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="font-bold tracking-tight">Finalizar Venta</DialogTitle>
-                        <DialogDescription>
-                            Seleccione el método de pago y complete los datos para cerrar la transacción.
-                        </DialogDescription>
+                <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl bg-white dark:bg-zinc-950">
+                    {/* Hidden title for accessibility */}
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Finalizar Venta</DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[60vh]">
-                        <div className="space-y-4 py-4 pr-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="crm-client-select">Cliente del CRM</Label>
-                                <Popover open={showCRMClientDropdown} onOpenChange={setShowCRMClientDropdown} modal={true}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            className="w-full justify-between text-left h-auto p-3"
-                                        >
-                                            <div className="flex flex-col items-start">
-                                                {selectedCRMClient ? (
-                                                    <>
-                                                        <div className="flex items-center gap-2">
-                                                            <User className="h-4 w-4" />
-                                                            <span className="font-medium">
-                                                                {crmClients.find(c => c.id === selectedCRMClient)?.firstName} {crmClients.find(c => c.id === selectedCRMClient)?.lastName}
-                                                            </span>
-                                                        </div>
-                                                        {crmClients.find(c => c.id === selectedCRMClient)?.phone && (
-                                                            <span className="text-sm text-muted-foreground">
-                                                                {crmClients.find(c => c.id === selectedCRMClient)?.phone}
-                                                            </span>
-                                                        )}
-                                                        {crmClients.find(c => c.id === selectedCRMClient)?.companyName && (
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                {crmClients.find(c => c.id === selectedCRMClient)?.companyName}
-                                                            </Badge>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <User className="h-4 w-4" />
-                                                        <span>Seleccionar cliente existente o buscar...</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[300px] p-0 z-[100]" align="start">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center border-b px-3">
-                                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                                <input
-                                                    className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                                                    placeholder="Buscar cliente por nombre, teléfono o cédula..."
-                                                    value={crmClientSearch}
-                                                    onChange={(e) => handleCRMClientSearch(e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1">
-                                                {loadingCRMClients ? (
-                                                    <div className="flex items-center justify-center py-4">
-                                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                        <span className="text-sm">Buscando clientes...</span>
-                                                    </div>
-                                                ) : crmClients.length === 0 ? (
-                                                    <div className="text-center py-4">
-                                                        <p className="text-sm text-muted-foreground">No se encontraron clientes</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            Puedes crear un nuevo cliente desde el módulo de CRM
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-1">
-                                                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                                                            Clientes Activos
-                                                        </div>
-                                                        {crmClients.map((client) => (
-                                                            <div
-                                                                key={client.id}
-                                                                onClick={() => handleCRMClientSelect(client.id)}
-                                                                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                                                            >
-                                                                <div className="flex items-center gap-3 w-full">
-                                                                    <User className="h-4 w-4 text-muted-foreground" />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="font-medium truncate">
-                                                                                {client.firstName} {client.lastName}
-                                                                            </span>
-                                                                            {client.companyName && (
-                                                                                <Badge variant="outline" className="text-xs">
-                                                                                    {client.companyName}
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 mt-1">
-                                                                            {client.phone && (
-                                                                                <span className="text-sm text-muted-foreground">
-                                                                                    {client.phone}
-                                                                                </span>
-                                                                            )}
-                                                                            {client.phone && client.identificationNumber && (
-                                                                                <span className="text-muted-foreground">•</span>
-                                                                            )}
-                                                                            {client.identificationNumber && (
-                                                                                <span className="text-sm text-muted-foreground">
-                                                                                    {client.identificationType}: {client.identificationNumber}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        {client.totalPurchases > 0 && (
-                                                                            <div className="text-xs text-muted-foreground mt-1">
-                                                                                Compras totales: {formatCurrency(client.totalPurchases)}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-
-                                {selectedCRMClient && (
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={clearCRMClientSelection}
-                                            className="text-muted-foreground hover:text-foreground"
-                                        >
-                                            <User className="h-3 w-3 mr-1" />
-                                            Limpiar selección
-                                        </Button>
-                                    </div>
-                                )}
-
-                                <div className="text-xs text-muted-foreground mt-2">
-                                    Si el cliente no existe en el CRM, puedes ingresarlo manualmente abajo o crearlo desde el módulo de CRM.
-                                </div>
+                    <div className="flex flex-col h-full max-h-[90vh]">
+                        {/* Header Section */}
+                        <div className="p-8 pb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <h2 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">Finalizar Venta</h2>
+                                <button
+                                    onClick={() => onOpenChange(false)}
+                                    className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                >
+                                    <X className="h-6 w-6 text-zinc-500" />
+                                </button>
                             </div>
-
-                            {!selectedCRMClient && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="customer-name">Nombre del Cliente (Opcional)</Label>
-                                        <Input
-                                            id="customer-name"
-                                            placeholder="Ej: Juan Pérez"
-                                            value={customerName}
-                                            onChange={(e) => setCustomerName(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="customer-phone">Teléfono del Cliente (Opcional)</Label>
-                                        <Input
-                                            id="customer-phone"
-                                            placeholder="Ej: 555-123-4567"
-                                            value={customerPhone}
-                                            onChange={(e) => setCustomerPhone(e.target.value)}
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            <div>
-                                <Label>Números de Serie/IMEI (Opcional)</Label>
-                                <div className="space-y-3 mt-2 rounded-md border p-4">
-                                    {cartItems.map(item => (
-                                        <div key={item.id}>
-                                            <p className="font-semibold text-sm">{item.name}</p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-                                                {Array.from({ length: item.quantity }).map((_, index) => (
-                                                    <Input
-                                                        key={`${item.id}-${index}`}
-                                                        placeholder={`Serie/IMEI #${index + 1}`}
-                                                        value={serials[item.id]?.[index] || ''}
-                                                        onChange={(e) => handleSerialChange(item.id, index, e.target.value)}
-                                                        className="text-xs h-8"
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="text-2xl font-bold flex justify-between">
-                                <span>Total a Pagar:</span>
-                                <span className="text-primary">{formatCurrency(totalAmount)}</span>
-                            </div>
-                            <RadioGroup defaultValue="Efectivo" value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'Efectivo' | 'Tarjeta de Crédito')}>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Efectivo" id="cash" />
-                                    <Label htmlFor="cash">Efectivo</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Tarjeta de Crédito" id="card" />
-                                    <Label htmlFor="card">Tarjeta de Crédito</Label>
-                                </div>
-
-                            </RadioGroup>
-
-                            {paymentMethod === 'Efectivo' && (
-                                <div className="space-y-4 rounded-md border bg-muted/50 p-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="amount-paid">Monto Pagado por el Cliente</Label>
-                                        <Input
-                                            id="amount-paid"
-                                            type="number"
-                                            placeholder="0.00"
-                                            value={amountPaid || ''}
-                                            onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    {change > 0 && (
-                                        <div className="text-lg font-bold flex justify-between items-center text-green-600">
-                                            <span>Cambio a Devolver:</span>
-                                            <span>{formatCurrency(change)}</span>
-                                        </div>
-                                    )}
-                                    {change < 0 && (
-                                        <div className="text-sm font-bold flex justify-between items-center text-destructive">
-                                            <span>Faltante:</span>
-                                            <span>{formatCurrency(Math.abs(change))}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-
+                            <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+                                Complete los detalles del cliente y seleccione el método de pago para cerrar la transacción.
+                            </p>
                         </div>
-                    </ScrollArea>
-                    <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleProcessSale} disabled={loading || (paymentMethod === 'Efectivo' && amountPaid < totalAmount)}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirmar Venta
-                        </Button>
-                    </DialogFooter>
+
+                        <ScrollArea className="flex-1 px-8 py-2">
+                            <div className="space-y-8 pb-8">
+                                <CustomerSection
+                                    customerMode={customerMode}
+                                    setCustomerMode={setCustomerMode}
+                                    selectedCRMClient={selectedCRMClient}
+                                    customerName={customerName}
+                                    customerPhone={customerPhone}
+                                    setCustomerName={setCustomerName}
+                                    setCustomerPhone={setCustomerPhone}
+                                    showCRMClientDropdown={showCRMClientDropdown}
+                                    setShowCRMClientDropdown={setShowCRMClientDropdown}
+                                    crmClientSearch={crmClientSearch}
+                                    handleCRMClientSearch={handleCRMClientSearch}
+                                    loadingCRMClients={loadingCRMClients}
+                                    crmClients={crmClients}
+                                    handleCRMClientSelect={handleCRMClientSelect}
+                                    clearCRMClientSelection={clearCRMClientSelection}
+                                />
+
+                                <ProductList
+                                    cartItems={cartItems}
+                                    serials={serials}
+                                    handleSerialChange={handleSerialChange}
+                                />
+
+                                <PaymentMethodSection
+                                    paymentMethod={paymentMethod}
+                                    setPaymentMethod={setPaymentMethod}
+                                    amountPaid={amountPaid}
+                                    setAmountPaid={setAmountPaid}
+                                    change={change}
+                                />
+                            </div>
+                        </ScrollArea>
+
+                        <CheckoutFooter
+                            totalAmount={totalAmount}
+                            totalUnits={totalUnits}
+                            appliedDiscount={appliedDiscount}
+                            loading={loading}
+                            onCancel={() => onOpenChange(false)}
+                            onConfirm={handleProcessSale}
+                            canConfirm={
+                                (paymentMethod !== 'Efectivo' || amountPaid >= totalAmount) &&
+                                (customerMode === 'existente' ? !!selectedCRMClient : !!customerName.trim())
+                            }
+                            missingCustomer={customerMode === 'existente' ? !selectedCRMClient : !customerName.trim()}
+                        />
+                    </div>
                 </DialogContent>
             </Dialog>
 

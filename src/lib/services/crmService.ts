@@ -35,47 +35,49 @@ const STORAGE_DOCUMENTS_PATH = "crm_documents";
 const mapCRMClient = (row: any): CRMClient => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
-    clientCode: row?.clientcode ?? row?.clientCode ?? "",
-    identificationType: (row?.identificationtype ?? row?.identificationType ?? "cedula") as IdentificationType,
-    identificationNumber: row?.identificationnumber ?? row?.identificationNumber ?? "",
-    firstName: row?.firstname ?? row?.firstName ?? "",
-    lastName: row?.lastname ?? row?.lastName ?? "",
-    companyName: row?.companyname ?? row?.companyName ?? undefined,
+    clientCode: row?.client_code ?? row?.clientCode ?? row?.clientcode ?? "",
+    identificationType: (row?.identification_type ?? row?.identificationType ?? row?.identificationtype ?? "cedula") as IdentificationType,
+    identificationNumber: row?.identification_number ?? row?.identificationNumber ?? row?.identificationnumber ?? "",
+    firstName: row?.first_name ?? row?.firstName ?? row?.firstname ?? "",
+    lastName: row?.last_name ?? row?.lastName ?? row?.lastname ?? "",
+    companyName: row?.company_name ?? row?.companyName ?? row?.companyname ?? undefined,
     email: row?.email ?? undefined,
     phone: row?.phone ?? undefined,
-    secondaryPhone: row?.secondaryphone ?? row?.secondaryPhone ?? undefined,
+    secondaryPhone: row?.secondary_phone ?? row?.secondaryPhone ?? row?.secondaryphone ?? undefined,
     address: row?.address ?? undefined,
     city: row?.city ?? undefined,
     province: row?.province ?? undefined,
-    clientType: (row?.clienttype ?? row?.clientType ?? "particular") as ClientType,
-    clientStatus: (row?.clientstatus ?? row?.clientStatus ?? "active") as CRMClientStatus,
-    registrationDate: toDate(row?.registrationdate ?? row?.registrationDate),
-    lastContactDate: row?.lastcontactdate || row?.lastContactDate ? toDate(row?.lastcontactdate ?? row?.lastContactDate) : undefined,
-    totalPurchases: Number(row?.totalpurchases ?? row?.totalPurchases ?? 0),
-    outstandingBalance: Number(row?.outstandingbalance ?? row?.outstandingBalance ?? 0),
-    creditLimit: Number(row?.creditlimit ?? row?.creditLimit ?? 0),
+    clientType: (row?.client_type ?? row?.clientType ?? row?.clienttype ?? "particular") as ClientType,
+    clientStatus: (row?.client_status ?? row?.clientStatus ?? row?.clientstatus ?? "active") as CRMClientStatus,
+    registrationDate: toDate(row?.registration_date ?? row?.registrationDate ?? row?.registrationdate),
+    lastContactDate: row?.last_contact_date || row?.lastContactDate || row?.lastcontactdate
+        ? toDate(row?.last_contact_date ?? row?.lastContactDate ?? row?.lastcontactdate)
+        : undefined,
+    totalPurchases: Number(row?.total_purchases ?? row?.totalPurchases ?? row?.totalpurchases ?? 0),
+    outstandingBalance: Number(row?.outstanding_balance ?? row?.outstandingBalance ?? row?.outstandingbalance ?? 0),
+    creditLimit: Number(row?.credit_limit ?? row?.creditLimit ?? row?.creditlimit ?? 0),
     tags: row?.tags ?? [],
     notes: row?.notes ?? undefined,
-    createdBy: row?.createdby ?? row?.createdBy ?? undefined,
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
-    updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+    createdBy: row?.created_by ?? row?.createdBy ?? row?.createdby ?? undefined,
+    createdAt: toDate(row?.created_at ?? row?.createdAt ?? row?.createdat),
+    updatedAt: toDate(row?.updated_at ?? row?.updatedAt ?? row?.updatedat),
 });
 
 const mapCRMInteraction = (row: any): CRMInteraction => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
-    clientId: row?.clientid ?? row?.clientId ?? "",
-    interactionType: (row?.interactiontype ?? row?.interactionType ?? "contact") as InteractionType,
-    relatedId: row?.relatedid ?? row?.relatedId ?? undefined,
-    relatedTable: row?.relatedtable ?? row?.relatedTable ?? undefined,
-    interactionDate: toDate(row?.interactiondate ?? row?.interactionDate),
+    clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
+    interactionType: (row?.interaction_type ?? row?.interactionType ?? row?.interactiontype ?? "contact") as InteractionType,
+    relatedId: row?.related_id ?? row?.relatedId ?? row?.relatedid ?? undefined,
+    relatedTable: row?.related_table ?? row?.relatedTable ?? row?.relatedtable ?? undefined,
+    interactionDate: toDate(row?.interaction_date ?? row?.interactionDate ?? row?.interactiondate),
     description: row?.description ?? undefined,
     amount: row?.amount ? Number(row.amount) : undefined,
     status: row?.status ?? undefined,
-    employeeId: row?.employeeid ?? row?.employeeId ?? undefined,
+    employeeId: row?.employee_id ?? row?.employeeId ?? row?.employeeid ?? undefined,
     metadata: row?.metadata ?? {},
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
-    updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+    createdAt: toDate(row?.created_at ?? row?.createdAt ?? row?.createdat),
+    updatedAt: toDate(row?.updated_at ?? row?.updatedAt ?? row?.updatedat),
 });
 
 const mapCRMTag = (row: any): CRMTag => ({
@@ -84,39 +86,41 @@ const mapCRMTag = (row: any): CRMTag => ({
     name: row?.name ?? "",
     color: row?.color ?? "#6B7280",
     description: row?.description ?? undefined,
-    isActive: row?.isactive ?? row?.isActive ?? true,
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
-    updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+    isActive: row?.is_active ?? row?.isActive ?? row?.isactive ?? true,
+    createdAt: toDate(row?.created_at ?? row?.createdAt ?? row?.createdat),
+    updatedAt: toDate(row?.updated_at ?? row?.updatedAt ?? row?.updatedat),
 });
 
 const mapCRMTask = (row: any): CRMTask => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
-    clientId: row?.clientid ?? row?.clientId ?? "",
+    clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
     title: row?.title ?? "",
     description: row?.description ?? undefined,
-    dueDate: row?.duedate || row?.dueDate ? toDate(row?.duedate ?? row?.dueDate) : undefined,
+    dueDate: row?.due_date || row?.dueDate || row?.duedate ? toDate(row?.due_date ?? row?.dueDate ?? row?.duedate) : undefined,
     status: (row?.status ?? "pending") as TaskStatus,
     priority: (row?.priority ?? "medium") as TaskPriority,
-    assignedTo: row?.assignedto ?? row?.assignedTo ?? undefined,
-    completedAt: row?.completedat || row?.completedAt ? toDate(row?.completedat ?? row?.completedAt) : undefined,
-    completionNotes: row?.completionnotes ?? row?.completionNotes ?? undefined,
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
-    updatedAt: toDate(row?.updatedat ?? row?.updatedAt),
+    assignedTo: row?.assigned_to ?? row?.assignedTo ?? row?.assignedto ?? undefined,
+    completedAt: row?.completed_at || row?.completedAt || row?.completedat
+        ? toDate(row?.completed_at ?? row?.completedAt ?? row?.completedat)
+        : undefined,
+    completionNotes: row?.completion_notes ?? row?.completionNotes ?? row?.completionnotes ?? undefined,
+    createdAt: toDate(row?.created_at ?? row?.createdAt ?? row?.createdat),
+    updatedAt: toDate(row?.updated_at ?? row?.updatedAt ?? row?.updatedat),
 });
 
 const mapCRMDocument = (row: any): CRMDocument => ({
     id: row?.firestore_id ?? row?.id ?? "",
     firestore_id: row?.firestore_id ?? row?.id ?? "",
-    clientId: row?.clientid ?? row?.clientId ?? "",
-    documentType: (row?.documenttype ?? row?.documentType ?? "other") as DocumentType,
-    documentName: row?.documentname ?? row?.documentName ?? "",
-    fileUrl: row?.fileurl ?? row?.fileUrl ?? "",
-    fileSize: row?.filesize || row?.fileSize ? Number(row?.filesize ?? row?.fileSize) : undefined,
-    mimeType: row?.mimetype ?? row?.mimeType ?? undefined,
-    uploadDate: toDate(row?.uploaddate ?? row?.uploadDate),
-    uploadedBy: row?.uploadedby ?? row?.uploadedBy ?? undefined,
-    createdAt: toDate(row?.createdat ?? row?.createdAt),
+    clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
+    documentType: (row?.document_type ?? row?.documentType ?? row?.documenttype ?? "other") as DocumentType,
+    documentName: row?.document_name ?? row?.documentName ?? row?.documentname ?? "",
+    fileUrl: row?.file_url ?? row?.fileUrl ?? row?.fileurl ?? "",
+    fileSize: row?.file_size || row?.fileSize || row?.filesize ? Number(row?.file_size ?? row?.fileSize ?? row?.filesize) : undefined,
+    mimeType: row?.mime_type ?? row?.mimeType ?? row?.mimetype ?? undefined,
+    uploadDate: toDate(row?.upload_date ?? row?.uploadDate ?? row?.uploaddate),
+    uploadedBy: row?.uploaded_by ?? row?.uploadedBy ?? row?.uploadedby ?? undefined,
+    createdAt: toDate(row?.created_at ?? row?.createdAt ?? row?.createdat),
 });
 
 // Generate client code
@@ -128,9 +132,9 @@ const generateClientCode = async (): Promise<string> => {
     try {
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
-            .select("clientcode")
-            .like("clientcode", `${prefix}%`)
-            .order("clientcode", { ascending: false })
+            .select("client_code")
+            .like("client_code", `${prefix}%`)
+            .order("client_code", { ascending: false })
             .limit(1);
 
         if (error) throw error;
@@ -139,7 +143,7 @@ const generateClientCode = async (): Promise<string> => {
             return `${prefix}-0001`;
         }
 
-        const lastCode = data[0].clientcode;
+        const lastCode = data[0].client_code ?? data[0].clientcode;
         const lastNumber = parseInt(lastCode.split("-")[2] || "0");
         const nextNumber = lastNumber + 1;
 
@@ -163,30 +167,30 @@ export const createCRMClient = async (
 
         const payload = {
             firestore_id: firestoreId,
-            clientcode: clientCode,
-            identificationtype: clientData.identificationType,
-            identificationnumber: clientData.identificationNumber,
-            firstname: clientData.firstName,
-            lastname: clientData.lastName,
-            companyname: clientData.companyName || null,
+            client_code: clientCode,
+            identification_type: clientData.identificationType,
+            identification_number: clientData.identificationNumber,
+            first_name: clientData.firstName,
+            last_name: clientData.lastName,
+            company_name: clientData.companyName || null,
             email: clientData.email || null,
             phone: clientData.phone || null,
-            secondaryphone: clientData.secondaryPhone || null,
+            secondary_phone: clientData.secondaryPhone || null,
             address: clientData.address || null,
             city: clientData.city || null,
             province: clientData.province || null,
-            clienttype: clientData.clientType,
-            clientstatus: clientData.clientStatus,
-            registrationdate: clientData.registrationDate,
-            lastcontactdate: clientData.lastContactDate || null,
-            totalpurchases: 0,
-            outstandingbalance: 0,
-            creditlimit: clientData.creditLimit || 0,
+            client_type: clientData.clientType,
+            client_status: clientData.clientStatus,
+            registration_date: clientData.registrationDate,
+            last_contact_date: clientData.lastContactDate || null,
+            total_purchases: 0,
+            outstanding_balance: 0,
+            credit_limit: clientData.creditLimit || 0,
             tags: clientData.tags || [],
             notes: clientData.notes || null,
-            createdby: clientData.createdBy || null,
-            createdat: now,
-            updatedat: now,
+            created_by: clientData.createdBy || null,
+            created_at: now,
+            updated_at: now,
         };
 
         const { data, error } = await supabase
@@ -220,28 +224,28 @@ export const getCRMClients = async (
         let query = supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .order("registrationdate", { ascending: false });
+            .order("registration_date", { ascending: false });
 
         // Apply filters
         if (filters?.search) {
             const searchTerm = `%${filters.search}%`;
             query = query.or(`
-                firstname.ilike.${searchTerm},
-                lastname.ilike.${searchTerm},
-                companyname.ilike.${searchTerm},
+                first_name.ilike.${searchTerm},
+                last_name.ilike.${searchTerm},
+                company_name.ilike.${searchTerm},
                 email.ilike.${searchTerm},
                 phone.ilike.${searchTerm},
-                identificationnumber.ilike.${searchTerm},
-                clientcode.ilike.${searchTerm}
+                identification_number.ilike.${searchTerm},
+                client_code.ilike.${searchTerm}
             `);
         }
 
         if (filters?.clientType) {
-            query = query.eq("clienttype", filters.clientType);
+            query = query.eq("client_type", filters.clientType);
         }
 
         if (filters?.clientStatus) {
-            query = query.eq("clientstatus", filters.clientStatus);
+            query = query.eq("client_status", filters.clientStatus);
         }
 
         if (filters?.tags && filters.tags.length > 0) {
@@ -299,8 +303,8 @@ export const getCRMClientByIdentification = async (
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .eq("identificationtype", identificationType)
-            .eq("identificationnumber", identificationNumber)
+            .eq("identification_type", identificationType)
+            .eq("identification_number", identificationNumber)
             .single();
 
         if (error) {
@@ -323,26 +327,26 @@ export const updateCRMClient = async (
 
     try {
         const payload: any = {
-            updatedat: nowIso(),
+            updated_at: nowIso(),
         };
 
-        if (updates.identificationType !== undefined) payload.identificationtype = updates.identificationType;
-        if (updates.identificationNumber !== undefined) payload.identificationnumber = updates.identificationNumber;
-        if (updates.firstName !== undefined) payload.firstname = updates.firstName;
-        if (updates.lastName !== undefined) payload.lastname = updates.lastName;
-        if (updates.companyName !== undefined) payload.companyname = updates.companyName || null;
+        if (updates.identificationType !== undefined) payload.identification_type = updates.identificationType;
+        if (updates.identificationNumber !== undefined) payload.identification_number = updates.identificationNumber;
+        if (updates.firstName !== undefined) payload.first_name = updates.firstName;
+        if (updates.lastName !== undefined) payload.last_name = updates.lastName;
+        if (updates.companyName !== undefined) payload.company_name = updates.companyName || null;
         if (updates.email !== undefined) payload.email = updates.email || null;
         if (updates.phone !== undefined) payload.phone = updates.phone || null;
-        if (updates.secondaryPhone !== undefined) payload.secondaryphone = updates.secondaryPhone || null;
+        if (updates.secondaryPhone !== undefined) payload.secondary_phone = updates.secondaryPhone || null;
         if (updates.address !== undefined) payload.address = updates.address || null;
         if (updates.city !== undefined) payload.city = updates.city || null;
         if (updates.province !== undefined) payload.province = updates.province || null;
-        if (updates.clientType !== undefined) payload.clienttype = updates.clientType;
-        if (updates.clientStatus !== undefined) payload.clientstatus = updates.clientStatus;
-        if (updates.lastContactDate !== undefined) payload.lastcontactdate = updates.lastContactDate || null;
-        if (updates.totalPurchases !== undefined) payload.totalpurchases = updates.totalPurchases;
-        if (updates.outstandingBalance !== undefined) payload.outstandingbalance = updates.outstandingBalance;
-        if (updates.creditLimit !== undefined) payload.creditlimit = updates.creditLimit;
+        if (updates.clientType !== undefined) payload.client_type = updates.clientType;
+        if (updates.clientStatus !== undefined) payload.client_status = updates.clientStatus;
+        if (updates.lastContactDate !== undefined) payload.last_contact_date = updates.lastContactDate || null;
+        if (updates.totalPurchases !== undefined) payload.total_purchases = updates.totalPurchases;
+        if (updates.outstandingBalance !== undefined) payload.outstanding_balance = updates.outstandingBalance;
+        if (updates.creditLimit !== undefined) payload.credit_limit = updates.creditLimit;
         if (updates.tags !== undefined) payload.tags = updates.tags;
         if (updates.notes !== undefined) payload.notes = updates.notes || null;
 
@@ -395,17 +399,17 @@ export const createCRMInteraction = async (
         const payload = {
             firestore_id: firestoreId,
             client_id: parseInt(client.id),
-            interactiontype: interactionData.interactionType,
+            interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
             related_table: interactionData.relatedTable || null,
-            interactiondate: interactionData.interactionDate,
+            interaction_date: interactionData.interactionDate,
             description: interactionData.description || null,
             amount: interactionData.amount || null,
             status: interactionData.status || null,
             employee_id: interactionData.employeeId || null,
             metadata: interactionData.metadata || {},
-            createdat: now,
-            updatedat: now,
+            created_at: now,
+            updated_at: now,
         };
 
         const { data, error } = await supabase
@@ -443,7 +447,7 @@ export const getCRMInteractions = async (
             .from(CRM_INTERACTIONS_TABLE)
             .select("*")
             .eq("client_id", parseInt(client.id))
-            .order("interactiondate", { ascending: false })
+            .order("interaction_date", { ascending: false })
             .limit(limit);
 
         if (error) throw error;
@@ -480,8 +484,8 @@ export const createCRMTask = async (
             assigned_to: taskData.assignedTo || null,
             completed_at: taskData.completedAt || null,
             completion_notes: taskData.completionNotes || null,
-            createdat: now,
-            updatedat: now,
+            created_at: now,
+            updated_at: now,
         };
 
         const { data, error } = await supabase
@@ -507,7 +511,7 @@ export const updateCRMTask = async (
 
     try {
         const payload: any = {
-            updatedat: nowIso(),
+            updated_at: nowIso(),
         };
 
         if (updates.title !== undefined) payload.title = updates.title;
@@ -554,7 +558,7 @@ export const getCRMTasks = async (
         let query = supabase
             .from(CRM_TASKS_TABLE)
             .select("*")
-            .order("createdat", { ascending: false });
+            .order("created_at", { ascending: false });
 
         if (filters?.clientId) {
             const client = await getCRMClientById(filters.clientId);
@@ -627,8 +631,8 @@ export const createCRMTag = async (
             color: tagData.color || "#6B7280",
             description: tagData.description || null,
             is_active: true,
-            createdat: now,
-            updatedat: now,
+            created_at: now,
+            updated_at: now,
         };
 
         const { data, error } = await supabase
@@ -680,14 +684,14 @@ export const uploadCRMDocument = async (
         const payload = {
             firestore_id: firestoreId,
             client_id: parseInt(client.id),
-            documenttype: documentType,
-            documentname: file.name,
-            fileurl: fileUrl,
-            filesize: file.size,
-            mimetype: file.type,
-            uploaddate: now,
-            uploadedby: uploadedBy || null,
-            createdat: now,
+            document_type: documentType,
+            document_name: file.name,
+            file_url: fileUrl,
+            file_size: file.size,
+            mime_type: file.type,
+            upload_date: now,
+            uploaded_by: uploadedBy || null,
+            created_at: now,
         };
 
         const { data, error } = await supabase
@@ -717,7 +721,7 @@ export const getCRMDocuments = async (clientId: string): Promise<CRMDocument[]> 
             .from(CRM_DOCUMENTS_TABLE)
             .select("*")
             .eq("client_id", parseInt(client.id))
-            .order("uploaddate", { ascending: false });
+            .order("upload_date", { ascending: false });
 
         if (error) throw error;
 
@@ -745,26 +749,26 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
         const { count: activeClients } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*", { count: "exact", head: true })
-            .eq("clientstatus", "active");
+            .eq("client_status", "active");
 
         // Get new clients this month
         const { count: newClientsThisMonth } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*", { count: "exact", head: true })
-            .gte("registrationdate", firstDayOfMonth.toISOString());
+            .gte("registration_date", firstDayOfMonth.toISOString());
 
         // Get total purchases
         const { data: purchasesData } = await supabase
             .from(CRM_CLIENTS_TABLE)
-            .select("totalpurchases");
+            .select("total_purchases");
 
-        const totalPurchases = purchasesData?.reduce((sum, client) => sum + Number(client.totalpurchases || 0), 0) || 0;
+        const totalPurchases = purchasesData?.reduce((sum, client) => sum + Number(client.total_purchases || 0), 0) || 0;
 
         // Get top clients
         const { data: topClientsData } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .order("totalpurchases", { ascending: false })
+            .order("total_purchases", { ascending: false })
             .limit(5);
 
         const topClients = (topClientsData || []).map(mapCRMClient);
@@ -773,7 +777,7 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
         const { data: recentInteractionsData } = await supabase
             .from(CRM_INTERACTIONS_TABLE)
             .select("*")
-            .order("interactiondate", { ascending: false })
+            .order("interaction_date", { ascending: false })
             .limit(10);
 
         const recentInteractions = (recentInteractionsData || []).map(mapCRMInteraction);

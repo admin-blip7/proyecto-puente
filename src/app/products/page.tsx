@@ -6,7 +6,7 @@ import {
     ShoppingCart01,
     ChevronLeft,
     ChevronRight,
-    FilterHorizontal
+    MoreHorizontal,
 } from 'react-coolicons';
 import { getProducts } from '@/lib/services/productService';
 import ProductCard from '@/components/products/ProductCard';
@@ -86,7 +86,7 @@ export default async function CatalogPage(props: { searchParams: Promise<{ q?: s
                     <div className="w-full md:w-64 flex-shrink-0 space-y-8">
                         <div>
                             <div className="flex items-center space-x-2 mb-4">
-                                <FilterHorizontal className="w-5 h-5 text-gray-500" />
+                                <MoreHorizontal className="w-5 h-5 text-gray-500" />
                                 <h3 className="font-bold text-gray-900 dark:text-white">Categories</h3>
                             </div>
                             <div className="space-y-2">

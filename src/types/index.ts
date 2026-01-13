@@ -115,6 +115,10 @@ export interface Sale {
   cancelReason?: string;
   amountPaid?: number;
   changeGiven?: number;
+  // Discount fields
+  discountCode?: string;
+  discountAmount?: number;
+  discountPercentage?: number;
 }
 
 export interface SalesChange {
@@ -163,6 +167,30 @@ export interface InventoryLog {
     repairOrderId?: string;
     cost?: number;
   };
+}
+
+export type KardexMovementType = 'INGRESO' | 'SALIDA';
+
+export interface KardexEntry {
+  id: string;
+  productoId: string;
+  tipo: KardexMovementType;
+  concepto: string;
+  cantidad: number;
+  stockAnterior: number;
+  stockNuevo: number;
+  precioUnitario?: number | null;
+  valorTotal?: number | null;
+  referencia?: string | null;
+  usuarioId?: string | null;
+  notas?: string | null;
+  createdAt: Date;
+}
+
+export interface KardexStockActual {
+  productoId: string;
+  stockActual: number;
+  ultimaActualizacion: Date;
 }
 
 export interface UserProfile {
@@ -339,6 +367,7 @@ export interface CashSession {
   expectedCashInDrawer: number;
   actualCashCount?: number;
   difference?: number;
+  isBalanced?: boolean;
   bagsStartAmounts?: Record<string, number>;
   bagsSalesAmounts?: Record<string, number>;
   bagsEndAmounts?: Record<string, number>;

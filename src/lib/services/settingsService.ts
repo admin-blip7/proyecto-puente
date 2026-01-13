@@ -9,6 +9,13 @@ import {
   ContractTemplateSchema,
   LabelType,
 } from "@/types";
+import {
+  DiscountSettings,
+  DiscountSettingsSchema,
+  DiscountSetting,
+  isDiscountValid,
+  DiscountValidationResult,
+} from "@/types/discount";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
@@ -19,42 +26,43 @@ const SETTINGS_TABLE = "settings";
 const TICKET_SETTINGS_DOC_ID = "ticket_design";
 const LABEL_SETTINGS_DOC_ID_BASE = "label_design";
 const CONTRACT_TEMPLATE_DOC_ID = "contract_template";
+const DISCOUNT_SETTINGS_DOC_ID = "discount_settings";
 
 
 // --- TICKET SETTINGS ---
 
 const defaultTicketSettings: TicketSettings = {
-    header: {
-        showLogo: true,
-        logoUrl: "",
-        show: {
-            storeName: true,
-            address: true,
-            phone: true,
-            rfc: false,
-            website: false,
-        },
-        storeName: "Nombre de tu Tienda",
-        address: "Dirección de tu Tienda",
-        phone: "123-456-7890",
-        rfc: "",
-        website: "",
+  header: {
+    showLogo: true,
+    logoUrl: "",
+    show: {
+      storeName: true,
+      address: true,
+      phone: true,
+      rfc: false,
+      website: false,
     },
-    body: {
-        showQuantity: true,
-        showUnitPrice: false,
-        showTotal: true,
-        fontSize: "sm",
-    },
-    footer: {
-        showSubtotal: true,
-        showTaxes: true,
-        showDiscounts: true,
-        thankYouMessage: "¡Gracias por tu compra!",
-        additionalInfo: "Políticas de devolución: 30 días con ticket.",
-        showQrCode: false,
-        qrCodeUrl: "",
-    }
+    storeName: "Nombre de tu Tienda",
+    address: "Dirección de tu Tienda",
+    phone: "123-456-7890",
+    rfc: "",
+    website: "",
+  },
+  body: {
+    showQuantity: true,
+    showUnitPrice: false,
+    showTotal: true,
+    fontSize: "sm",
+  },
+  footer: {
+    showSubtotal: true,
+    showTaxes: true,
+    showDiscounts: true,
+    thankYouMessage: "¡Gracias por tu compra!",
+    additionalInfo: "Políticas de devolución: 30 días con ticket.",
+    showQrCode: false,
+    qrCodeUrl: "",
+  }
 }
 
 const stripMeta = (row: any) => {
@@ -69,7 +77,7 @@ const stripMeta = (row: any) => {
     data,
     ...rest
   } = row;
-  
+
   // Si los datos vienen en formato JSON en la columna 'data'
   if (data && typeof data === 'object') {
     const result = {
@@ -86,7 +94,7 @@ const stripMeta = (row: any) => {
     }
     return result;
   }
-  
+
   // Si los datos vienen directamente en el row (formato antiguo)
   if (lastUpdated || last_updated) {
     rest.lastUpdated = lastUpdated || last_updated;
@@ -103,7 +111,7 @@ const stripMeta = (row: any) => {
 
 const fetchSettingsDoc = async (docId: string) => {
   const supabase = getSupabaseServerClient();
-  
+
   const { data, error } = await supabase
     .from(SETTINGS_TABLE)
     .select("*")
@@ -115,7 +123,7 @@ const fetchSettingsDoc = async (docId: string) => {
     log.error("Error fetching settings", { error: error.message, docId });
     throw error;
   }
-  
+
   // Adaptar la estructura de datos para compatibilidad
   if (data && data.data) {
     // Si los datos están en formato JSON en la columna 'data'
@@ -126,7 +134,7 @@ const fetchSettingsDoc = async (docId: string) => {
     };
     return { row: adaptedRow, supabase };
   }
-  
+
   return data ? { row: data, supabase } : { row: null, supabase };
 };
 
@@ -134,7 +142,7 @@ const upsertSettingsDoc = async (docId: string, payload: Record<string, unknown>
   try {
     const { row, supabase } = await fetchSettingsDoc(docId);
     const timestamp = nowIso();
-    
+
     // Adaptar la estructura de datos para la tabla settings
     const data = {
       id: docId,
@@ -200,20 +208,20 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
 // --- LABEL SETTINGS ---
 
 const createDefaultLabelSettings = (): Omit<LabelSettings, 'labelType'> => ({
-    width: 51, 
-    height: 102,
-    orientation: 'vertical',
-    fontSize: 9,
-    barcodeHeight: 30,
-    includeLogo: false,
-    logoUrl: "",
-    storeName: "Nombre de tu Tienda",
-    content: {
-        showProductName: true,
-        showSku: true,
-        showPrice: true,
-        showStoreName: false,
-    },
+  width: 51,
+  height: 102,
+  orientation: 'vertical',
+  fontSize: 9,
+  barcodeHeight: 30,
+  includeLogo: false,
+  logoUrl: "",
+  storeName: "Nombre de tu Tienda",
+  content: {
+    showProductName: true,
+    showSku: true,
+    showPrice: true,
+    showStoreName: false,
+  },
 });
 
 const defaultLabelSettings = createDefaultLabelSettings();
@@ -231,7 +239,7 @@ export const getLabelSettings = async (labelType: LabelType = "product"): Promis
           labelType,
         };
       }
-      
+
       log.warn("Invalid label settings in Supabase, returning defaults.", parsed.error);
     } else {
       await upsertSettingsDoc(docId, createDefaultLabelSettings());
@@ -253,25 +261,25 @@ export const saveLabelSettings = async (settings: LabelSettings): Promise<void> 
       ...settingsToSave,
       orientation: settingsToSave.orientation || 'horizontal',
     };
-    
+
     log.info("Attempting to save label settings", { labelType, dataToValidate });
-    
+
     const validated = LabelSettingsSchema.parse(dataToValidate);
     const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
-    
+
     log.info("Validation successful, saving to database", { docId });
-    
+
     await upsertSettingsDoc(docId, validated);
-    
+
     log.info("Label settings saved successfully", { docId });
   } catch (error) {
-    log.error("Error saving label settings", { 
+    log.error("Error saving label settings", {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       settings: JSON.stringify(settings, null, 2),
       errorType: error?.constructor?.name
     });
-    
+
     // Check if it's a Zod validation error
     if (error?.constructor?.name === 'ZodError') {
       const zodError = error as any;
@@ -291,7 +299,7 @@ export const saveLabelSettings = async (settings: LabelSettings): Promise<void> 
 // --- CONTRACT TEMPLATE SETTINGS ---
 
 const defaultContractTemplateSettings: ContractTemplateSettings = {
-    content: `CONTRATO DE CRÉDITO
+  content: `CONTRATO DE CRÉDITO
 
 En la ciudad de {{STORE_CITY}} a {{CURRENT_DATE}}, se celebra el presente contrato de crédito entre:
 - El ACREEDOR: {{STORE_NAME}}
@@ -328,4 +336,68 @@ export const getContractTemplate = async (): Promise<ContractTemplateSettings> =
 export const saveContractTemplate = async (settings: ContractTemplateSettings): Promise<void> => {
   const validated = ContractTemplateSchema.parse(settings);
   await upsertSettingsDoc(CONTRACT_TEMPLATE_DOC_ID, validated);
+};
+
+
+// --- DISCOUNT SETTINGS ---
+
+const defaultDiscountSettings: DiscountSettings = {
+  discounts: [],
+};
+
+export const getDiscountSettings = async (): Promise<DiscountSettings> => {
+  try {
+    const { row } = await fetchSettingsDoc(DISCOUNT_SETTINGS_DOC_ID);
+    if (row) {
+      const parsed = DiscountSettingsSchema.safeParse(stripMeta(row));
+      if (parsed.success) {
+        return parsed.data;
+      }
+      log.warn("Invalid discount settings in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(DISCOUNT_SETTINGS_DOC_ID, defaultDiscountSettings);
+    }
+  } catch (error) {
+    log.error("Error fetching discount settings", error);
+  }
+  return defaultDiscountSettings;
+};
+
+export const saveDiscountSettings = async (settings: DiscountSettings): Promise<void> => {
+  try {
+    const validated = DiscountSettingsSchema.parse(settings);
+    await upsertSettingsDoc(DISCOUNT_SETTINGS_DOC_ID, validated);
+    log.info("Discount settings saved successfully");
+  } catch (error) {
+    log.error("Error saving discount settings", error);
+    throw new Error("Failed to save discount settings.");
+  }
+};
+
+export const validateDiscountCode = async (code: string): Promise<DiscountValidationResult> => {
+  try {
+    const settings = await getDiscountSettings();
+    const normalizedCode = code.trim().toUpperCase();
+
+    const discount = settings.discounts.find(
+      d => d.discountCode.toUpperCase() === normalizedCode
+    );
+
+    if (!discount) {
+      return { valid: false, error: "Código de descuento no encontrado" };
+    }
+
+    if (!discount.isActive) {
+      return { valid: false, error: "Este código de descuento está inactivo" };
+    }
+
+    if (!isDiscountValid(discount)) {
+      return { valid: false, error: "Este código de descuento ha expirado o aún no es válido" };
+    }
+
+    return { valid: true, discount };
+  } catch (error) {
+    log.error("Error validating discount code", error);
+    return { valid: false, error: "Error al validar el código de descuento" };
+  }
 };

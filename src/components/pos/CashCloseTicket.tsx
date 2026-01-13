@@ -155,13 +155,26 @@ export default function CashCloseTicket({
         {['recargas', 'mimovil', 'servicios'].map(key => {
           const start = (session.bagsStartAmounts as any)?.[key] || 0;
           const sale = (session.bagsSalesAmounts as any)?.[key] || 0;
-          const end = (session.bagsEndAmounts as any)?.[key] || (start - sale);
+          const expectedEnd = start - sale;
+          const actualEnd = (session.bagsEndAmounts as any)?.[key] ?? expectedEnd;
+          const diff = actualEnd - expectedEnd;
           return (
-            <div key={key} className="flex justify-between text-xs">
-              <span className="capitalize">{key}:</span>
-              <span>
-                {formatCurrency(start)} - {formatCurrency(sale)} = <strong>{formatCurrency(end)}</strong>
-              </span>
+            <div key={key}>
+              <div className="flex justify-between text-xs">
+                <span className="capitalize">{key}:</span>
+                <span>
+                  Ini: {formatCurrency(start)} - Vta: {formatCurrency(sale)}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs pl-2">
+                <span>Esperado: {formatCurrency(expectedEnd)}</span>
+                <span>Saldo: <strong>{formatCurrency(actualEnd)}</strong></span>
+              </div>
+              {diff !== 0 && (
+                <div className={`text-xs pl-2 font-bold ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  Diferencia: {diff > 0 ? '+' : ''}{formatCurrency(diff)}
+                </div>
+              )}
             </div>
           );
         })}

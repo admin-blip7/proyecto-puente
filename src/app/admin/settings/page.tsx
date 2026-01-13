@@ -3,10 +3,11 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import TicketDesignerClient from "@/components/admin/settings/TicketDesignerClient";
-import { getTicketSettings, getLabelSettings } from "@/lib/services/settingsService";
+import { getTicketSettings, getLabelSettings, getDiscountSettings } from "@/lib/services/settingsService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LabelDesignerClient from "@/components/admin/settings/LabelDesignerClient";
 import CategoryManagerClient from '@/components/admin/settings/CategoryManagerClient';
+import DiscountSettingsClient from "@/components/admin/settings/DiscountSettingsClient";
 
 export default async function SettingsPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -14,10 +15,11 @@ export default async function SettingsPage(props: {
     const searchParams = await props.searchParams;
     const tab = typeof searchParams.tab === 'string' ? searchParams.tab : 'tickets';
 
-    const [initialTicketSettings, initialLabelSettings, initialCategories] = await Promise.all([
+    const [initialTicketSettings, initialLabelSettings, initialCategories, initialDiscountSettings] = await Promise.all([
         getTicketSettings(),
         getLabelSettings("product"), // Load product settings by default
         import("@/lib/services/categoryService").then(m => m.getProductCategories()),
+        getDiscountSettings(),
     ]);
 
     return (
@@ -40,10 +42,11 @@ export default async function SettingsPage(props: {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
                 <Tabs defaultValue={tab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="tickets">Diseño de Tickets</TabsTrigger>
                         <TabsTrigger value="labels">Diseño de Etiquetas</TabsTrigger>
                         <TabsTrigger value="categories">Categorías</TabsTrigger>
+                        <TabsTrigger value="discounts">Descuentos</TabsTrigger>
                     </TabsList>
                     <TabsContent value="tickets" className="mt-6">
                         <TicketDesignerClient initialSettings={initialTicketSettings} />
@@ -54,8 +57,12 @@ export default async function SettingsPage(props: {
                     <TabsContent value="categories" className="mt-6">
                         <CategoryManagerClient initialCategories={initialCategories} />
                     </TabsContent>
+                    <TabsContent value="discounts" className="mt-6">
+                        <DiscountSettingsClient initialSettings={initialDiscountSettings} />
+                    </TabsContent>
                 </Tabs>
             </main>
         </div>
     )
 }
+
