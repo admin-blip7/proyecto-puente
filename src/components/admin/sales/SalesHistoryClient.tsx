@@ -41,6 +41,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { getCurrentUser } from "@/lib/supabaseClientWithAuth";
+import { DateRange } from "react-day-picker";
+import { DatePickerWithRange } from "@/components/ui/date-range-picker";
+import { getSales } from "@/lib/services/salesService";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Search, ShoppingBag, Receipt } from "lucide-react";
 
 
 interface SalesHistoryClientProps {
@@ -79,6 +85,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const [excludeFamiliar, setExcludeFamiliar] = useState(false);
   const [sortField, setSortField] = useState<keyof Sale | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   // Selection state
@@ -141,6 +150,40 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   const getProduct = useCallback((productId: string) => {
     return products.find(p => p.id === productId);
   }, [products]);
+
+  const handleFilterByDate = async () => {
+    // Determine status filter based on current tab if we had tabs, but here we assume 'all' or standard.
+    // However, existing getSales use in page.tsx uses 'all'.
+    setIsFiltering(true);
+    try {
+      const startStr = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : "";
+      const endStr = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : "";
+
+      // We probably want to fetch 'all' statuses to match initial load
+      const { sales: newSales } = await getSales('all', 0, 2000, "", startStr, endStr);
+      setSales(newSales);
+      toast({ title: "Filtro aplicado", description: `Se encontraron ${newSales.length} ventas.` });
+    } catch (error) {
+      console.error("Error filtering sales:", error);
+      toast({ title: "Error", description: "No se pudieron filtrar las ventas.", variant: "destructive" });
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+  const clearDateFilter = async () => {
+    setDateRange(undefined);
+    setIsFiltering(true);
+    try {
+      // Reset to default load (last 1000)
+      const { sales: newSales } = await getSales('all', 0, 1000, "", "", "");
+      setSales(newSales);
+    } catch (error) {
+      toast({ title: "Error", description: "Error al restablecer ventas.", variant: "destructive" });
+    } finally {
+      setIsFiltering(false);
+    }
+  };
 
   // Component for sortable header
   const SortableHeader: React.FC<{
@@ -231,15 +274,88 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
   }, [deduplicatedSales, sortField, sortDirection]);
 
   const filteredSales = useMemo(() => {
-    if (!excludeFamiliar) return sortedSales;
-    // Filter out sales that consist ENTIRELY of 'Familiar' products
-    return sortedSales.filter(sale => {
-      return sale.items.some(item => {
+    let result = sortedSales;
+
+    // Filter by "Familiar" ownership if enabled
+    if (excludeFamiliar) {
+      result = result.filter(sale => {
+        return sale.items.some(item => {
+          const product = getProduct(item.productId);
+          return product?.ownershipType !== 'Familiar';
+        });
+      });
+    }
+
+    // Filter by Search Query (Name, Price, Quantity)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(sale => {
+        // Search in Sale ID
+        if (sale.saleId.toLowerCase().includes(query)) return true;
+        // Search in Customer Name
+        if (sale.customerName?.toLowerCase().includes(query)) return true;
+
+        // Search in Items (Name, Price, Quantity)
+        return sale.items.some(item => {
+          return (
+            item.name.toLowerCase().includes(query) ||
+            item.priceAtSale.toString().includes(query) ||
+            item.quantity.toString().includes(query)
+          );
+        });
+      });
+    }
+
+    return result;
+  }, [sortedSales, excludeFamiliar, getProduct, searchQuery]);
+
+  // Calculate Summary Metrics based on FILTERED sales
+  const { periodCost, periodProfit, totalItemsSold, averageTicket, periodRevenue } = useMemo(() => {
+    let cost = 0;
+    let profit = 0;
+    let revenue = 0;
+    let itemsCount = 0;
+
+    filteredSales.forEach(sale => {
+      // If "excludeFamiliar" is active, we only count non-Familiar items for metrics 
+      // (although filteredSales might already exclude the SALE if it was purely familiar, 
+      // mixed sales might still need item-level check if we want strict accuracy)
+
+      let saleRevenue = 0; // Track revenue for this sale to ensure average ticket is correct relative to what's counted
+
+      sale.items.forEach(item => {
         const product = getProduct(item.productId);
-        return product?.ownershipType !== 'Familiar';
+        // Strict check: If excludeFamiliar is ON, ignore familiar items even in mixed sales
+        if (excludeFamiliar && product?.ownershipType === 'Familiar') {
+          return;
+        }
+
+        const itemCost = product?.cost || 0;
+        cost += itemCost * item.quantity;
+        const itemProfit = (item.priceAtSale - itemCost) * item.quantity;
+        // If product is Familiar (and we are here, means excludeFamiliar is FALSE), profit is 0 usually? 
+        // Logic in original code: "profit = product?.ownershipType === 'Familiar' ? 0 : ..."
+        // We replicate that logic:
+        const realProfit = product?.ownershipType === 'Familiar' ? 0 : itemProfit;
+
+        profit += realProfit;
+        revenue += item.priceAtSale * item.quantity;
+        saleRevenue += item.priceAtSale * item.quantity;
+        itemsCount += item.quantity;
       });
     });
-  }, [sortedSales, excludeFamiliar, getProduct]);
+
+    const avgTicket = filteredSales.length > 0 ? revenue / filteredSales.length : 0;
+
+    return {
+      periodCost: cost,
+      periodProfit: profit,
+      totalItemsSold: itemsCount,
+      averageTicket: avgTicket,
+      periodRevenue: revenue
+    };
+
+  }, [filteredSales, excludeFamiliar, getProduct]);
 
   // Calculate select all checkbox state
   const selectAllState = useMemo(() => {
@@ -399,27 +515,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     }
   }, [sales.length, initialSales.length]);
 
-  const { dailyCost: filteredDailyCost, dailyProfit: filteredDailyProfit } = useMemo(() => {
-    const today = new Date();
-    const todaySales = sortedSales.filter(sale => format(sale.createdAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
 
-    let dailyCost = 0;
-    let dailyProfit = 0;
-
-    todaySales.forEach(sale => {
-      sale.items.forEach(item => {
-        const product = getProduct(item.productId);
-        if (product && (!excludeFamiliar || product.ownershipType !== 'Familiar')) {
-          const cost = product.cost || 0;
-          dailyCost += cost * item.quantity;
-          dailyProfit += (item.priceAtSale - cost) * item.quantity;
-        }
-      });
-    });
-
-    return { dailyCost, dailyProfit };
-
-  }, [sortedSales, excludeFamiliar, getProduct]);
 
   const renderSerials = (item: SaleItem, saleId: string) => {
     if (!item.serials || item.serials.length === 0) {
@@ -458,58 +554,130 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         </div>
       </div>
 
-      {/* Bulk action toolbar */}
-      {selectedSaleIds.size > 0 && (
-        <Card className="mb-4 border-destructive">
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-base px-3 py-1">
-                  {selectedSaleIds.size} {selectedSaleIds.size === 1 ? 'venta seleccionada' : 'ventas seleccionadas'}
-                </Badge>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={() => setIsCancelDialogOpen(true)}
-                disabled={isCancelling}
-                className="gap-2"
-              >
-                {isCancelling ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Cancelando...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" />
-                    Cancelar ventas
-                  </>
-                )}
+      <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 border rounded-lg bg-card text-card-foreground shadow-sm">
+        <div className="flex flex-col gap-2">
+          <Label>Rango de Fechas</Label>
+          <div className="flex gap-2">
+            <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+            <Button onClick={handleFilterByDate} disabled={isFiltering || !dateRange?.from}>
+              {isFiltering ? <Loader2 className="h-4 w-4 animate-spin" /> : "Filtrar"}
+            </Button>
+            {dateRange && (
+              <Button variant="ghost" onClick={clearDateFilter} size="icon">
+                <Trash2 className="h-4 w-4" />
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            )}
+          </div>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+        <div className="flex flex-col gap-2">
+          <Label>Ordenar Por</Label>
+          <Select onValueChange={(val) => {
+            const [field, dir] = val.split('-');
+            setSortField(field as keyof Sale);
+            setSortDirection(dir as 'asc' | 'desc');
+          }}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Seleccionar orden..." />
+            </SelectTrigger>
+            <SelectContent>
+
+              <SelectItem value="createdAt-desc">Fecha: Más recientes</SelectItem>
+              <SelectItem value="createdAt-asc">Fecha: Más antiguas</SelectItem>
+              <SelectItem value="totalAmount-desc">Monto: Mayor a menor</SelectItem>
+              <SelectItem value="totalAmount-asc">Monto: Menor a mayor</SelectItem>
+              <SelectItem value="customerName-asc">Cliente: A-Z</SelectItem>
+              <SelectItem value="customerName-desc">Cliente: Z-A</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="mb-6 relative">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por artículo, precio, cantidad, ID de venta o cliente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+      {/* Bulk action toolbar */}
+      {
+        selectedSaleIds.size > 0 && (
+          <Card className="mb-4 border-destructive">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-base px-3 py-1">
+                    {selectedSaleIds.size} {selectedSaleIds.size === 1 ? 'venta seleccionada' : 'ventas seleccionadas'}
+                  </Badge>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => setIsCancelDialogOpen(true)}
+                  disabled={isCancelling}
+                  className="gap-2"
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cancelando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Cancelar ventas
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      }
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Costo Total del Día</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(filteredDailyCost)}</div>
-            <p className="text-xs text-muted-foreground">Costo de los productos vendidos hoy</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ganancia del Día</CardTitle>
+            <CardTitle className="text-sm font-medium">Ganancia del Periodo</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(filteredDailyProfit)}</div>
-            <p className="text-xs text-muted-foreground">Ganancia total de las ventas de hoy</p>
+            <div className="text-2xl font-bold">{formatCurrency(periodProfit)}</div>
+            <p className="text-xs text-muted-foreground">Ganancia en ventas filtradas</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Costo del Periodo</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(periodCost)}</div>
+            <p className="text-xs text-muted-foreground">Costo de productos vendidos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Artículos Vendidos</CardTitle>
+            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalItemsSold}</div>
+            <p className="text-xs text-muted-foreground">Cantidad total de productos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ticket Promedio</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(averageTicket)}</div>
+            <p className="text-xs text-muted-foreground">Promedio de venta por transacción</p>
           </CardContent>
         </Card>
       </div>
@@ -708,32 +876,38 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         </AlertDialogContent>
       </AlertDialog>
 
-      {selectedSale && (
-        <CreateWarrantyDialog
-          isOpen={isWarrantyDialogOpen}
-          onOpenChange={setWarrantyDialogOpen}
-          sale={selectedSale}
-          onWarrantyCreated={handleWarrantyCreated}
-        />
-      )}
+      {
+        selectedSale && (
+          <CreateWarrantyDialog
+            isOpen={isWarrantyDialogOpen}
+            onOpenChange={setWarrantyDialogOpen}
+            sale={selectedSale!}
+            onWarrantyCreated={handleWarrantyCreated}
+          />
+        )
+      }
 
-      {saleToReprint && (
-        <SaleSummaryDialog
-          isOpen={isReprintDialogOpen}
-          onOpenChange={setIsReprintDialogOpen}
-          sale={saleToReprint}
-        />
-      )}
+      {
+        saleToReprint && (
+          <SaleSummaryDialog
+            isOpen={isReprintDialogOpen}
+            onOpenChange={setIsReprintDialogOpen}
+            sale={saleToReprint!}
+          />
+        )
+      }
 
-      {saleToExchange && (
-        <ChangeProductDialog
-          sale={saleToExchange}
-          isOpen={!!saleToExchange}
-          onOpenChange={(open) => !open && setSaleToExchange(null)}
-          products={products}
-          onProcessChange={handleProcessChange}
-        />
-      )}
+      {
+        saleToExchange && (
+          <ChangeProductDialog
+            sale={saleToExchange!}
+            isOpen={!!saleToExchange}
+            onOpenChange={(open) => !open && setSaleToExchange(null)}
+            products={products}
+            onProcessChange={handleProcessChange}
+          />
+        )
+      }
     </>
   );
 }

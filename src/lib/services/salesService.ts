@@ -43,75 +43,85 @@ export const getSales = async (
   page: number = 0,
   limit: number = 50,
   searchQuery: string = "",
-  date: string = "" // YYYY-MM-DD
+  startDate: string = "", // YYYY-MM-DD
+  endDate: string = ""    // YYYY-MM-DD
 ): Promise<{ sales: Sale[], total: number }> => {
   try {
     const supabase = getSupabaseServerClient();
 
-    // Use RPC for robust searching (including product names in JSON) and date filtering
-    const { data, error } = await supabase.rpc('get_pos_sales', {
-      p_search_query: searchQuery,
-      p_date: date || null,
-      p_page: page,
-      p_limit: limit,
-      p_status: includeStatus
-    });
+    // Note: createdAt is stored as JSON (Firestore timestamp format), not as PostgreSQL timestamp.
+    // We need to fetch all sales and filter dates in JavaScript, similar to financeService.ts.
 
-    if (error) {
-      log.warn("RPC get_pos_sales failed or missing. Falling back to legacy query (Advanced filters disabled).", error.message);
-
-      let query = supabase
-        .from(SALES_TABLE)
-        .select("*", { count: 'exact' });
-
-      // Filter by status unless 'all' is specified
-      if (includeStatus === 'cancelled') {
-        query = query.eq('status', 'cancelled');
-      } else if (includeStatus !== 'all') {
-        query = query.or('status.is.null,status.eq.completed');
-      }
-
-      // NOTE: Search AND Date filter disabled in fallback mode due to non-standard column types.
-      // Run the schema.sql migration to enable full search/filter functionality.
-
-      const from = page * limit;
-      const to = from + limit - 1;
-
-      const { data: fallbackData, error: fallbackError, count } = await query
-        .order("createdAt", { ascending: false })
-        .range(from, to);
-
-      if (fallbackError) {
-        throw fallbackError;
-      }
-
-      const sales = (fallbackData || []).map(mapSale);
-      return {
-        sales,
-        total: count || 0
-      };
-    }
-
-    // Map RPC result
-    // The RPC returns rows with total_count in each row. 
-    // If no rows, total is 0.
-    const total = data && data.length > 0 ? Number(data[0].total_count) : 0;
-
-    // Map to Sale type
-    const sales = (data || []).map((row: any) => mapSale(row));
-
-    return {
-      sales,
-      total
-    };
-
-    /* Old logic removed in favor of RPC */
-    /*
+    // Fetch all sales with status filter only (we'll filter by date and search in JavaScript)
     let query = supabase
       .from(SALES_TABLE)
       .select("*", { count: 'exact' });
-    ...
-    */
+
+    // Status Filter
+    if (includeStatus === 'cancelled') {
+      query = query.eq('status', 'cancelled');
+    } else if (includeStatus !== 'all') {
+      query = query.or('status.is.null,status.eq.completed');
+    }
+
+    // Fetch all data (we'll paginate after filtering)
+    const { data: allData, error, count } = await query
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      log.error("Error fetching sales with filters:", error);
+      throw error;
+    }
+
+    // Map to Sale objects
+    let sales = (allData || []).map(mapSale);
+
+    // Date Range Filter (JavaScript-side)
+    if (startDate || endDate) {
+      sales = sales.filter(sale => {
+        if (!sale.createdAt) return false;
+
+        // Handle Firestore timestamp format {_seconds, _nanoseconds}
+        let saleDate: Date;
+        if ((sale.createdAt as any)._seconds) {
+          saleDate = new Date((sale.createdAt as any)._seconds * 1000);
+        } else {
+          saleDate = new Date(sale.createdAt);
+        }
+
+        // Apply date filters
+        if (startDate) {
+          const startOfDay = new Date(`${startDate}T00:00:00`);
+          if (saleDate < startOfDay) return false;
+        }
+        if (endDate) {
+          const endOfDay = new Date(`${endDate}T23:59:59`);
+          if (saleDate > endOfDay) return false;
+        }
+
+        return true;
+      });
+    }
+
+    // Search Filter (JavaScript-side)
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      sales = sales.filter(sale =>
+        sale.saleId.toLowerCase().includes(lowerQuery) ||
+        (sale.customerName && sale.customerName.toLowerCase().includes(lowerQuery))
+      );
+    }
+
+    // Apply pagination after filtering
+    const total = sales.length;
+    const from = page * limit;
+    const to = from + limit;
+    const paginatedSales = sales.slice(from, to);
+
+    return {
+      sales: paginatedSales,
+      total
+    };
 
   } catch (error) {
     log.error("Error in getSales", error);

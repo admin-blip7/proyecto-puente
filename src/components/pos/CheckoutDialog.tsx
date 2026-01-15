@@ -67,7 +67,12 @@ export default function CheckoutDialog({
                 clientStatus: 'active' as any,
                 limit: 20 // Reduced limit for performance
             });
-            setCrmClients(clientsData);
+            const uniqueClients = clientsData.filter((client, index, self) =>
+                index === self.findIndex((c) => (
+                    c.id === client.id || (client.phone && c.phone && c.phone === client.phone)
+                ))
+            );
+            setCrmClients(uniqueClients);
         } catch (error) {
             log.error('Error loading CRM clients:', error);
             toast({
@@ -156,6 +161,41 @@ export default function CheckoutDialog({
                 description: "Debe seleccionar o ingresar un cliente antes de completar la venta."
             });
             return;
+        }
+
+        // Validate if customer already exists when creating a new one
+        if (customerMode === 'nuevo' && (customerPhone || customerName)) {
+            const searchTerm = customerPhone || customerName;
+            try {
+                // Determine if we search by phone (more accurate) or name
+                // If phone is present, search by it. Otherwise search by exact name might be too broad but we'll try.
+                // ideally getCRMClients fuzzy searches, we can check the results.
+                const existingClients = await getCRMClients({
+                    search: searchTerm,
+                    limit: 5,
+                    clientStatus: 'active' as any
+                });
+
+                // Check for exact phone match or very close name match
+                const duplicate = existingClients.find(c =>
+                    (customerPhone && c.phone?.trim() === customerPhone.trim()) ||
+                    (c.firstName + " " + c.lastName).toLowerCase() === customerName.toLowerCase()
+                );
+
+                if (duplicate) {
+                    toast({
+                        variant: "destructive",
+                        title: "Cliente Existente",
+                        description: `El cliente ${duplicate.firstName} ${duplicate.lastName} ya existe con estos datos. Por favor seleccione "Existente" y búsquelo.`,
+                    });
+                    // Switch mode for user convenience? Or just return. Returning is safer.
+                    return;
+                }
+            } catch (error) {
+                log.error("Error checking for duplicate client:", error);
+                // Continue with sale if check fails? Better to be safe and warn but allow or block? 
+                // We'll block to be safe as per "prevent future duplicates".
+            }
         }
 
         if (paymentMethod === 'Efectivo' && amountPaid < totalAmount) {

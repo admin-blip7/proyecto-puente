@@ -110,7 +110,7 @@ export function CustomerSection({
                                         autoFocus
                                     />
                                 </div>
-                                <ScrollArea className="max-h-[300px]">
+                                <div className="max-h-[300px] overflow-y-auto">
                                     <div className="p-2">
                                         {loadingCRMClients ? (
                                             <div className="flex items-center justify-center py-8">
@@ -143,7 +143,7 @@ export function CustomerSection({
                                             </div>
                                         )}
                                     </div>
-                                </ScrollArea>
+                                </div>
                             </div>
                         </PopoverContent>
                     </Popover>

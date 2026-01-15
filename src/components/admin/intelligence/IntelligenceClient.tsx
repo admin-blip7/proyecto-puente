@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import ProductQualityAnalysis from "./ProductQualityAnalysis";
 import { getWarranties } from "@/lib/services/warrantyService";
 import AutoOrder from "./AutoOrder";
+import PerpetualInventoryMonitor from "./PerpetualInventoryMonitor";
+import AgingStockAlerts from "./AgingStockAlerts";
 
 interface IntelligenceClientProps {
     allProducts: Product[];
@@ -25,7 +27,14 @@ export default function IntelligenceClient({ allProducts, allSales }: Intelligen
                 </div>
             </div>
 
-            <LowStockAlerts products={allProducts} />
+
+            <PerpetualInventoryMonitor products={allProducts} />
+
+            <div className="grid gap-6 md:grid-cols-2">
+                <LowStockAlerts products={allProducts} />
+                <AgingStockAlerts products={allProducts} sales={allSales} />
+            </div>
+
             <AutoOrder products={allProducts} sales={allSales} />
             <ProductABCAnalysis products={allProducts} sales={allSales} />
             <DemandForecast products={allProducts} sales={allSales} />

@@ -58,14 +58,21 @@ const enrichSessionWithTotals = async (session: CashSession): Promise<CashSessio
     // Fetch all sales for this session (using fallback logic for robustness)
     log.info(`Enriching session ${session.sessionId} with totals. Date range: ${session.openedAt} - ${session.closedAt || 'now'}`);
 
-    const sales = await getSalesBySession(
-      session.sessionId,
-      session.openedBy,
-      session.openedAt,
-      session.closedAt || new Date()
-    );
-
-    log.info(`Found ${sales.length} sales for session ${session.sessionId}`);
+    // Wrap the sales fetch in a sub-try/catch because it calls another service
+    let sales: any[] = [];
+    try {
+      sales = await getSalesBySession(
+        session.sessionId,
+        session.openedBy,
+        session.openedAt,
+        session.closedAt || new Date()
+      );
+      log.info(`Found ${sales.length} sales for session ${session.sessionId}`);
+    } catch (salesError) {
+      log.error(`Critical error fetching sales for session ${session.sessionId}:`, salesError);
+      // Continue with empty sales to avoid crashing the whole process
+      sales = [];
+    }
 
     // Calculate totals
     let totalCashSales = 0;
@@ -95,7 +102,8 @@ const enrichSessionWithTotals = async (session: CashSession): Promise<CashSessio
     };
   } catch (error) {
     log.error("Error enriching session with totals", error);
-    return session; // Return original session on error
+    // Return original session on error to be safe
+    return session;
   }
 };
 
@@ -259,46 +267,56 @@ export const closeCashSession = async (
   bagsSalesAmounts: Record<string, number> = {},
   bagsActualEndAmounts: Record<string, number> = {}
 ): Promise<CashSession> => {
+  console.log(`[closeCashSession] Starting for session ${session.sessionId}`);
   const supabase = getSupabaseServerClient();
 
-  // Fetch the latest session data to ensure we have up-to-date totals
-  // The session object passed from client might be stale
-  const { data: freshSessionData, error: fetchError } = await supabase
-    .from(CASH_SESSIONS_TABLE)
-    .select("*")
-    .eq("firestore_id", session.id)
-    .single();
+  try {
+    // 1. Fetch Fresh Session
+    console.log(`[closeCashSession] Fetching fresh session data...`);
+    const { data: freshSessionData, error: fetchError } = await supabase
+      .from(CASH_SESSIONS_TABLE)
+      .select("*")
+      .eq("firestore_id", session.id)
+      .single();
 
-  if (fetchError || !freshSessionData) {
-    log.error("Error fetching fresh session data for closing", fetchError);
-    throw new Error("Failed to fetch latest session data.");
-  }
+    if (fetchError || !freshSessionData) {
+      console.error(`[closeCashSession] Error fetching fresh data: ${fetchError?.message}`);
+      log.error("Error fetching fresh session data for closing", fetchError);
+      throw new Error("Failed to fetch latest session data.");
+    }
 
-  const freshSession = mapSession(freshSessionData);
+    const freshSession = mapSession(freshSessionData);
+    console.log(`[closeCashSession] Fresh session fetched. Status: ${freshSession.status}`);
 
-  // Recalculate totals one last time to be sure
-  const enrichedSession = await enrichSessionWithTotals(freshSession);
+    // 2. Recalculate Totals
+    console.log(`[closeCashSession] Enriching session with totals...`);
+    let enrichedSession;
+    try {
+      enrichedSession = await enrichSessionWithTotals(freshSession);
+      console.log(`[closeCashSession] Enrichment complete. Totals: Cash=${enrichedSession.totalCashSales}, Card=${enrichedSession.totalCardSales}`);
+    } catch (enrichError) {
+      console.error(`[closeCashSession] Enrichment failed completely, using fresh session:`, enrichError);
+      enrichedSession = freshSession;
+    }
 
-  const expectedCashInDrawer = enrichedSession.startingFloat + enrichedSession.totalCashSales - enrichedSession.totalCashPayouts;
-  const difference = actualCashCount - expectedCashInDrawer;
-  const isBalanced = difference === 0;
-  const closedAt = nowIso();
+    const expectedCashInDrawer = enrichedSession.startingFloat + enrichedSession.totalCashSales - enrichedSession.totalCashPayouts;
+    const difference = actualCashCount - expectedCashInDrawer;
+    const isBalanced = difference === 0;
+    const closedAt = nowIso();
 
-  // Calculate expected end amounts for bags (start - sales)
-  const bagsExpectedEndAmounts = calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts);
+    // 3. Calculate Bag End Amounts
+    console.log(`[closeCashSession] Calculating bag amounts...`);
+    const bagsExpectedEndAmounts = calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts);
+    const finalBagsEndAmounts: Record<string, number> = {};
+    for (const key of ['recargas', 'mimovil', 'servicios']) {
+      finalBagsEndAmounts[key] = bagsActualEndAmounts[key] !== undefined && bagsActualEndAmounts[key] !== 0
+        ? bagsActualEndAmounts[key]
+        : bagsExpectedEndAmounts[key] || 0;
+    }
 
-  // Use actual amounts entered by user, or expected if not provided
-  const finalBagsEndAmounts: Record<string, number> = {};
-  for (const key of ['recargas', 'mimovil', 'servicios']) {
-    // If user entered a value, use it; otherwise use calculated expected
-    finalBagsEndAmounts[key] = bagsActualEndAmounts[key] !== undefined && bagsActualEndAmounts[key] !== 0
-      ? bagsActualEndAmounts[key]
-      : bagsExpectedEndAmounts[key] || 0;
-  }
-
-  const { error } = await supabase
-    .from(CASH_SESSIONS_TABLE)
-    .update({
+    // 4. Update Database
+    console.log(`[closeCashSession] Updating database...`);
+    const updatePayload = {
       status: "Cerrado",
       closedBy: userId,
       closedByName: userName,
@@ -307,42 +325,71 @@ export const closeCashSession = async (
       expectedCashInDrawer,
       difference,
       is_balanced: isBalanced,
-      // Also update the calculated totals in DB so they are correct for history
       totalCashSales: enrichedSession.totalCashSales,
       totalCardSales: enrichedSession.totalCardSales,
       bags_sales_amounts: bagsSalesAmounts,
       bags_end_amounts: finalBagsEndAmounts,
-      bags_expected_end_amounts: bagsExpectedEndAmounts
-    })
-    .eq("firestore_id", session.id);
+    };
 
-  if (error) {
-    log.error("Error closing cash session", error);
-    throw new Error("Failed to close cash session.");
+    const { data: updatedData, error } = await supabase
+      .from(CASH_SESSIONS_TABLE)
+      .update(updatePayload)
+      .eq("firestore_id", session.id)
+      .select();
+
+    if (error) {
+      console.error(`[closeCashSession] Database update failed: ${error.message}`);
+      log.error("Error closing cash session (DB Update)", error);
+      throw new Error("Failed to close cash session.");
+    }
+
+    if (!updatedData || updatedData.length === 0) {
+      console.warn(`[closeCashSession] No rows updated with firestore_id, trying sessionId fallback...`);
+      const { data: retryData, error: retryError } = await supabase
+        .from(CASH_SESSIONS_TABLE)
+        .update({ status: "Cerrado", closedAt })
+        .eq("sessionId", session.sessionId)
+        .select();
+
+      if (retryError || !retryData || retryData.length === 0) {
+        console.error(`[closeCashSession] Fallback update also failed.`);
+        throw new Error("Failed to close session: No rows updated.");
+      }
+      console.log(`[closeCashSession] Fallback update successful.`);
+    } else {
+      console.log(`[closeCashSession] Database update successful.`);
+    }
+
+    // 5. Deposit to Caja Chica
+    console.log(`[closeCashSession] Attempting deposit to Caja Chica...`);
+    try {
+      await depositToCajaChica(session.sessionId, actualCashCount);
+      console.log(`[closeCashSession] Deposit successful.`);
+    } catch (depositError) {
+      console.error(`[closeCashSession] Deposit failed (non-fatal):`, depositError);
+      log.error("Error depositing to Caja Chica during session close", depositError);
+    }
+
+    console.log(`[closeCashSession] Session close process completed successfully.`);
+
+    return {
+      ...enrichedSession,
+      status: "Cerrado",
+      closedBy: userId,
+      closedByName: userName,
+      closedAt: new Date(closedAt),
+      actualCashCount,
+      expectedCashInDrawer,
+      difference,
+      isBalanced,
+      bagsEndAmounts: finalBagsEndAmounts,
+    };
+
+  } catch (fatalError: any) {
+    console.error(`[closeCashSession] FATAL ERROR:`, fatalError);
+    log.error("Fatal error in closeCashSession", fatalError);
+    throw fatalError;
   }
-
-  // Automatically deposit the actual cash count to Caja Chica
-  try {
-    await depositToCajaChica(session.sessionId, actualCashCount);
-  } catch (depositError) {
-    log.error("Error depositing to Caja Chica during session close", depositError);
-    // We don't throw here to avoid rolling back the session close, 
-    // but we should probably alert the user or log it prominently.
-    // For now, the session is closed, but the money might not be in Caja Chica.
-  }
-
-  return {
-    ...enrichedSession,
-    status: "Cerrado",
-    closedBy: userId,
-    closedByName: userName,
-    closedAt: new Date(closedAt),
-    actualCashCount,
-    expectedCashInDrawer,
-    difference,
-    isBalanced,
-    bagsEndAmounts: finalBagsEndAmounts,
-  };
 };
 
 /**

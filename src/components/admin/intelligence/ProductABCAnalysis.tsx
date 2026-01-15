@@ -30,11 +30,11 @@ type ABCCategory = 'A' | 'B' | 'C';
 const getCategoryBadge = (category: ABCCategory) => {
     switch (category) {
         case 'A':
-            return <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white"><Star className="h-3 w-3 mr-1" /> Estrella</Badge>;
+            return <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white"><Star className="h-3 w-3 mr-1" /> Clase A (Alta Prioridad)</Badge>;
         case 'B':
-            return <Badge variant="secondary"><ThumbsUp className="h-3 w-3 mr-1" /> Promedio</Badge>;
+            return <Badge variant="secondary"><ThumbsUp className="h-3 w-3 mr-1" /> Clase B (Promedio)</Badge>;
         case 'C':
-            return <Badge variant="outline"><Snail className="h-3 w-3 mr-1" /> Baja Rotación</Badge>;
+            return <Badge variant="outline"><Snail className="h-3 w-3 mr-1" /> Clase C (Baja Prioridad)</Badge>;
     }
 }
 
@@ -143,7 +143,12 @@ export default function ProductABCAnalysis({ products, sales }: ProductABCAnalys
             <CardHeader>
                 <CardTitle>Análisis ABC de Productos</CardTitle>
                 <CardDescription>
-                    Clasificación basada en el Principio de Pareto por ganancia: Clase A (80% ganancia), Clase B (15% ganancia), Clase C (5% ganancia).
+                    Clasificación basada en el Principio de Pareto por ganancia.
+                    <span className="block mt-1 text-sm text-muted-foreground">
+                        • <strong>Clase A (Celulares/Top)</strong>: 80% de tu ganancia. Vitales, nunca deben faltar.
+                        <br />
+                        • <strong>Clase C (Accesorios)</strong>: Solo 5% de ganancia. Gestión más relajada.
+                    </span>
                 </CardDescription>
             </CardHeader>
             <CardContent>

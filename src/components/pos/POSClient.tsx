@@ -8,7 +8,8 @@ import ShoppingCart from "./ShoppingCart";
 import { Button } from "../ui/button";
 import { Header } from "../shared/Header";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode, Clock, Wrench } from "lucide-react";
+import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode, Clock, Wrench, Smartphone, Headphones, Zap, Grid, Speaker, Battery, Wifi, Monitor, Laptop, Keyboard } from "lucide-react";
+
 import { Badge } from "../ui/badge";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
@@ -44,14 +45,36 @@ import { getReadyRepairs } from "@/lib/services/repairService";
 import { RepairOrder } from "@/types";
 
 
+// Helper for category icons
+const getCategoryIcon = (category: string) => {
+  const lower = category.toLowerCase();
+  if (lower.includes('celular') || lower.includes('phone') || lower.includes('iphone')) return <Smartphone className="w-4 h-4" />;
+  if (lower.includes('audio') || lower.includes('audifono') || lower.includes('bocina')) return <Headphones className="w-4 h-4" />;
+  if (lower.includes('carga') || lower.includes('cargador') || lower.includes('cable') || lower.includes('magsafe')) return <Zap className="w-4 h-4" />;
+  if (lower.includes('reparacion') || lower.includes('servicio') || lower.includes('microsoldadura')) return <Wrench className="w-4 h-4" />;
+  if (lower.includes('funda') || lower.includes('case') || lower.includes('protector')) return <Grid className="w-4 h-4" />;
+  if (lower.includes('bateria') || lower.includes('pila')) return <Battery className="w-4 h-4" />;
+  if (lower.includes('internet') || lower.includes('wifi')) return <Wifi className="w-4 h-4" />;
+  if (lower.includes('computo') || lower.includes('laptop')) return <Laptop className="w-4 h-4" />;
+  if (lower.includes('pantalla') || lower.includes('display')) return <Monitor className="w-4 h-4" />;
+  if (lower.includes('accesorios')) return <Zap className="w-4 h-4" />;
+
+  return <Package className="w-4 h-4" />;
+};
+
+import { ProductCategory } from "@/lib/services/categoryService";
+// ... other imports
+
 interface POSClientProps {
   initialProducts: Product[];
+  initialCategories?: ProductCategory[];
 }
 
-export default function POSClient({ initialProducts }: POSClientProps) {
+export default function POSClient({ initialProducts, initialCategories = [] }: POSClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
   const [activeSession, setActiveSession] = useState<CashSession | null | undefined>(undefined); // undefined means loading
   const [isOpeningDrawer, setOpeningDrawer] = useState(false);
@@ -68,6 +91,77 @@ export default function POSClient({ initialProducts }: POSClientProps) {
   const [ticketSales, setTicketSales] = useState<Sale[]>([]);
   const [ticketReady, setTicketReady] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
+
+  // Derive unique categories with counts
+  const categories = useMemo(() => {
+    // If we have initialCategories from DB, use them as base
+    if (initialCategories && initialCategories.length > 0) {
+      const categoryCounts = new Map<string, number>();
+
+      // Initialize counts for known categories
+      initialCategories.forEach(cat => {
+        categoryCounts.set(cat.label, 0);
+      });
+      categoryCounts.set('Otros', 0); // Always have 'Otros'
+
+      // Count products
+      products.forEach(p => {
+        // Match product category to available categories (case insensitive)
+        const pCatName = p.categoryName || (p.categoryId ? p.categoryId : '');
+        const pCategory = p.category || '';
+
+        let matched = false;
+
+        // Try precise match with label
+        if (categoryCounts.has(pCategory)) {
+          categoryCounts.set(pCategory, (categoryCounts.get(pCategory) || 0) + 1);
+          matched = true;
+        }
+        // Try match with categoryName
+        else if (categoryCounts.has(pCatName)) {
+          categoryCounts.set(pCatName, (categoryCounts.get(pCatName) || 0) + 1);
+          matched = true;
+        }
+        // Try finding case-insensitive match
+        else {
+          const lowerName = (pCategory || pCatName).toLowerCase();
+          for (const knownCat of initialCategories) {
+            if (knownCat.label.toLowerCase() === lowerName || knownCat.value.toLowerCase() === lowerName) {
+              categoryCounts.set(knownCat.label, (categoryCounts.get(knownCat.label) || 0) + 1);
+              matched = true;
+              break;
+            }
+          }
+        }
+
+        if (!matched) {
+          categoryCounts.set('Otros', (categoryCounts.get('Otros') || 0) + 1);
+        }
+      });
+
+      // Convert to array and filter out empty categories if configured to do so (optional, generally good to show all available)
+      // For now, let's show all categories that have products OR are in the initial list.
+      // But user likely wants to see buttons for defined categories.
+
+      return Array.from(categoryCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .filter(c => c.count > 0 || c.name !== 'Otros') // Show categories even if count is 0? Maybe better to hide empty ones to save space
+        .sort((a, b) => {
+          if (a.name === 'Otros') return 1;
+          if (b.name === 'Otros') return -1;
+          return b.count - a.count;
+        });
+
+    } else {
+      // Fallback to extracting from products if no categories provided
+      const categoryMap = new Map<string, number>();
+      products.forEach(p => {
+        const cat = p.categoryName || (p.categoryId ? p.categoryId.charAt(0).toUpperCase() + p.categoryId.slice(1) : 'Otros');
+        categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
+      });
+      return Array.from(categoryMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    }
+  }, [products, initialCategories]);
 
   const handleAddRepairToCart = (repair: RepairOrder) => {
     const repairProduct: Product = {
@@ -230,12 +324,59 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
   const filteredProducts = useMemo(() => {
     return products.filter(
-      (product) =>
-        (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.sku.toLowerCase().includes(searchQuery.toLowerCase())) &&
-        product.type === 'Venta'
+      (product) => {
+        const matchesSearch = (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        // Determine product category label consistent with 'categories' useMemo
+        let pCat = 'Otros';
+
+        if (initialCategories && initialCategories.length > 0) {
+          const pCatName = product.categoryName || (product.categoryId ? product.categoryId : '');
+          const pCategory = product.category || '';
+          const lowerName = (pCategory || pCatName).toLowerCase();
+
+          // Try precise match with category field
+          const exactMatch = initialCategories.find(c => c.label === pCategory);
+          if (exactMatch) {
+            pCat = exactMatch.label;
+          } else {
+            // Try loose match
+            const found = initialCategories.find(c => c.label.toLowerCase() === lowerName || c.value.toLowerCase() === lowerName);
+            if (found) {
+              pCat = found.label;
+            } else if (pCategory) {
+              // If we have a category string but it didn't match known ones, use it as is? 
+              // No, the 'categories' useMemo logic falls back to 'Otros' if not matched in initialCategories.
+              // But we used categoryCounts.has(pCategory) there.
+              // Actually, looking at my 'categories' logic:
+              // 1. Initialize counts for known categories.
+              // 2. Check if product category is in map.
+              // So if product.category is "Foo" and initialCategories doesn't have "Foo", it goes to 'Otros' UNLESS I explicitly add it.
+              // In 'categories' useMemo, I only initialized map with known categories (and 'Otros').
+              // So if it's not known, it goes to 'Otros'.
+              pCat = 'Otros';
+            }
+          }
+
+          // If product has a categoryName that effectively matches one of our labels, use it
+          if (pCat === 'Otros') {
+            // Check if pCatName matches a label directly?
+            const foundByName = initialCategories.find(c => c.label === pCatName);
+            if (foundByName) pCat = foundByName.label;
+          }
+
+        } else {
+          // Fallback logic
+          pCat = product.categoryName || (product.categoryId ? product.categoryId.charAt(0).toUpperCase() + product.categoryId.slice(1) : 'Otros');
+        }
+
+        const matchesCategory = selectedCategory === "all" || pCat === selectedCategory;
+
+        return matchesSearch && matchesCategory && product.type === 'Venta';
+      }
     );
-  }, [products, searchQuery]);
+  }, [products, searchQuery, selectedCategory, initialCategories]);
 
   const selectedProductDetails = useMemo(() => {
     if (!selectedCartItem) return null;
@@ -752,24 +893,32 @@ export default function POSClient({ initialProducts }: POSClientProps) {
           </div>
 
           {/* Filter & Search Bar */}
-          <div className="px-8 pt-6 pb-2">
-            <div className="flex gap-4 items-center mb-6 overflow-x-auto no-scrollbar pb-2">
+          <div className="px-8 pt-6 pb-0">
+            <div className="flex gap-4 items-center mb-2 overflow-x-auto no-scrollbar pb-2">
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => { setSearchQuery(""); setSelectedCategory("all"); }}
                 className={cn(
                   "px-5 py-2 rounded-full font-medium text-sm flex items-center gap-2 shadow-lg shadow-gray-200 dark:shadow-none whitespace-nowrap transition-all",
-                  !searchQuery ? "bg-gray-900 text-white dark:bg-primary" : "bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  !searchQuery && selectedCategory === "all" ? "bg-gray-900 text-white dark:bg-primary" : "bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 )}
               >
-                All Items <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-1", !searchQuery ? "bg-gray-700 dark:bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400")}>{products.length}</span>
+                All Items <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-1", !searchQuery && selectedCategory === "all" ? "bg-gray-700 dark:bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400")}>{products.length}</span>
               </button>
-              {/* Placeholder Categories - Logic for filtering could be added here */}
-              <button className="px-5 py-2 rounded-full bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap flex items-center gap-2">
-                Microsoldadura <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full ml-1">12</span>
-              </button>
-              <button className="px-5 py-2 rounded-full bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap flex items-center gap-2">
-                Accesorios <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full ml-1">45</span>
-              </button>
+
+              {categories.map((cat) => (
+                <button
+                  key={cat.name}
+                  onClick={() => { setSearchQuery(""); setSelectedCategory(cat.name); }}
+                  className={cn(
+                    "px-5 py-2 rounded-full font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap flex items-center gap-2",
+                    selectedCategory === cat.name && !searchQuery
+                      ? "bg-gray-900 text-white dark:bg-primary shadow-lg shadow-gray-200 dark:shadow-none"
+                      : "bg-white dark:bg-card border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+                  )}
+                >
+                  {cat.name} <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full ml-1", selectedCategory === cat.name && !searchQuery ? "bg-gray-700 dark:bg-white/20 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400")}>{cat.count}</span>
+                </button>
+              ))}
 
               <div className="ml-auto relative hidden sm:block">
                 <span className="absolute left-3 top-2.5 text-gray-400">
@@ -793,7 +942,7 @@ export default function POSClient({ initialProducts }: POSClientProps) {
 
           {/* Product Grid */}
           <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
               {filteredProducts.map((product, index) => (
                 <ProductCard key={`${product.id}-${index}`} product={product} onAddToCart={() => addToCart(product)} />
               ))}
