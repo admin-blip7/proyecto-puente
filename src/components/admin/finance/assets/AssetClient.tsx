@@ -18,7 +18,7 @@ import AddAssetDialog from "./AddAssetDialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { runAnnualDepreciation } from "@/lib/services/assetService";
+import { runAnnualDepreciation, getAssets } from "@/lib/services/assetService";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { formatMXNAmount } from "@/lib/validation/currencyValidation";
@@ -44,7 +44,7 @@ export default function AssetClient({ initialAssets, inventoryValue, historyData
     setIsDepreciating(true);
     try {
       const count = await runAnnualDepreciation();
-      const updatedAssets = await import('@/lib/services/assetService').then(s => s.getAssets());
+      const updatedAssets = await getAssets();
       setAssets(updatedAssets);
       toast({
         title: "Depreciación Completada",
