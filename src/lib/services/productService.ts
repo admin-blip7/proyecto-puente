@@ -7,6 +7,11 @@ import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 
+interface InventoryHistoryPoint {
+  date: string;
+  value: number;
+}
+
 const log = getLogger("productService");
 
 const PRODUCTS_TABLE = "products";
@@ -691,6 +696,125 @@ export const getProductVariants = async (productId: string): Promise<ProductVari
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
   }));
+};
+
+export const getInventoryValueHistory = async (days: number = 30): Promise<InventoryHistoryPoint[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // 1. Get current products and calculate current value (Propio only)
+    const products = await getProducts();
+    const currentInventoryValue = products
+      .filter(p => p.ownershipType === 'Propio')
+      .reduce((total, p) => total + (p.stock * p.cost), 0);
+
+    // 2. Fetch inventory logs for the period
+    const { data: logs, error } = await supabase
+      .from(INVENTORY_LOGS_TABLE)
+      .select("*")
+      .gte("created_at", startDate.toISOString())
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // 3. Reconstruct history backwards
+    const history: InventoryHistoryPoint[] = [];
+    let runningValue = currentInventoryValue;
+
+    // Add today's point
+    history.push({
+      date: endDate.toISOString().split('T')[0],
+      value: runningValue
+    });
+
+    const logsByDate = new Map<string, any[]>();
+    (logs ?? []).forEach((log: any) => {
+      const date = new Date(log.created_at).toISOString().split('T')[0];
+      if (!logsByDate.has(date)) logsByDate.set(date, []);
+      logsByDate.get(date)?.push(log);
+    });
+
+    // Iterate backwards from yesterday to startDate
+    for (let d = 1; d < days; d++) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() - d);
+      const dateStr = targetDate.toISOString().split('T')[0];
+
+      // We are moving BACKWARDS in time.
+      // If we are at day T, and want value at T-1:
+      // Value(T-1) = Value(T) - (Changes at T)
+      // Actually, since logs are timestamps, any log AFTER T-1 end of day contributed to T value.
+      // But we have logs grouped by date.
+      // If we are calculated Value at end of T-1, we need to subtract changes that happened on day T.
+      // Wait, let's look at it this way:
+      // We have Value NOW (End of Today).
+      // To get Value at End of Yesterday, we reverse all transactions that happened TODAY.
+
+      // So looking at loop: we start with current value (End of D).
+      // We want value at End of D-1.
+      // We find all logs that happened on D.
+      // And reverse them.
+
+      // I need to reverse logs date by date. The loop `d` corresponds to "days ago".
+      // d=0 is today (already pushed).
+      // when d=1 (yesterday), we need to process logs from d=0 (today) to undo them? No.
+      // We want to show the value *at the end of that day*.
+
+      // Let's iterate forward or backward? Backward is easier from current state.
+      // Current Value = Value at NOW.
+      // Value(Yesterday End) = Value(NOW) - Changes(Today)
+
+      // So loop d from 0 to days-1.
+      // The date being processed is date(today - d).
+      // The logs on that date are changes that happened *during* that date.
+      // So Value(Start of Date) = Value(End of Date) - Changes(Date).
+      // And Value(Start of Date) is roughly Value(End of Previous Day).
+
+      // Ideally we plot "Value at end of day".
+      // history[0] = Today, Value = Current.
+      // history[1] = Yesterday, Value = Current - Changes(Today).
+
+      // Let's do that.
+      const previousDayFunc = new Date();
+      previousDayFunc.setDate(previousDayFunc.getDate() - d + 1); // This corresponds to the "future" day relative to target
+      const previousDayStr = previousDayFunc.toISOString().split('T')[0];
+
+      // Find logs for previousDayStr (which is "Today" in the first iteration, "Yesterday" in second, etc relative to the step)
+      // Actually simpler: 
+      // Current Value is End of Today.
+      // To get End of Yesterday: Undo Today's logs.
+
+      // Date to UNDO logs for:
+      const dateToUndo = new Date();
+      dateToUndo.setDate(dateToUndo.getDate() - (d - 1));
+      const dateToUndoStr = dateToUndo.toISOString().split('T')[0];
+
+      const dayLogs = logsByDate.get(dateToUndoStr) || [];
+
+      for (const log of dayLogs) {
+        // Only consider Propio products. 
+        // We need to know cost and if it was 'Propio'.
+        // Metadata usually stores this.
+        if (log.metadata?.ownershipType === 'Propio') {
+          const changeAmount = Number(log.change) * Number(log.metadata?.cost || 0);
+          runningValue -= changeAmount;
+        }
+      }
+
+      history.push({
+        date: dateStr,
+        value: runningValue
+      });
+    }
+
+    return history.reverse(); // Return oldest to newest
+  } catch (error) {
+    log.error("Error fetching inventory history", error);
+    return [];
+  }
 };
 
 export const addProductVariant = async (

@@ -6,9 +6,19 @@ import AssetClient from "@/components/admin/finance/assets/AssetClient";
 import { getAssets } from "@/lib/services/assetService";
 
 
+
+import { getProducts, getInventoryValueHistory } from "@/lib/services/productService";
+
 export default async function AssetsPage() {
     const initialAssets = await getAssets();
-   
+    const products = await getProducts();
+    const historyData = await getInventoryValueHistory(30);
+
+    // Calcular valor de inventario solo de productos propios
+    const inventoryValue = products
+        .filter(p => p.ownershipType === 'Propio')
+        .reduce((total, p) => total + (p.stock * p.cost), 0);
+
     return (
         <div className="flex h-screen w-full flex-row">
             <div className="hidden md:flex">
@@ -17,9 +27,9 @@ export default async function AssetsPage() {
             <div className="absolute top-4 left-4 z-50 md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <Menu className="h-6 w-6" />
-                    </Button>
+                        <Button variant="outline" size="icon">
+                            <Menu className="h-6 w-6" />
+                        </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-24">
                         <SheetTitle className="sr-only">Finance Menu</SheetTitle>
@@ -28,7 +38,11 @@ export default async function AssetsPage() {
                 </Sheet>
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
-              <AssetClient initialAssets={initialAssets} />
+                <AssetClient
+                    initialAssets={initialAssets}
+                    inventoryValue={inventoryValue}
+                    historyData={historyData}
+                />
             </main>
         </div>
     )
