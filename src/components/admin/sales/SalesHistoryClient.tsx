@@ -160,7 +160,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       const endStr = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : "";
 
       // We probably want to fetch 'all' statuses to match initial load
-      const { sales: newSales } = await getSales('all', 0, 2000, "", startStr, endStr);
+      const { sales: newSales } = await getSales('completed', 0, 2000, "", startStr, endStr);
       setSales(newSales);
       toast({ title: "Filtro aplicado", description: `Se encontraron ${newSales.length} ventas.` });
     } catch (error) {
@@ -176,7 +176,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     setIsFiltering(true);
     try {
       // Reset to default load (last 1000)
-      const { sales: newSales } = await getSales('all', 0, 1000, "", "", "");
+      const { sales: newSales } = await getSales('completed', 0, 1000, "", "", "");
       setSales(newSales);
     } catch (error) {
       toast({ title: "Error", description: "Error al restablecer ventas.", variant: "destructive" });

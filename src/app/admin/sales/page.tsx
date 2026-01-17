@@ -35,7 +35,7 @@ const calculateDailySummary = (sales: Sale[], products: Product[]) => {
 
 export default async function SalesPage() {
     // Initial load: no date filter, showing last 1000 sales
-    const { sales: initialSales } = await getSales('all', 0, 1000, "", "", "");
+    const { sales: initialSales } = await getSales('completed', 0, 1000, "", "", "");
     const products = await getProducts();
     const { dailyCost, dailyProfit } = calculateDailySummary(initialSales, products);
 

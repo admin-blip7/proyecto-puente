@@ -21,19 +21,15 @@ import { Card } from "@/components/ui/card";
 interface SalesHistoryDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    // Previously we passed 'sales' as a prop, but now we should probably fetch them internally or controlled by parent.
-    // For this refactor, I'll keep the prop signature compatible but maybe unused if I fetch inside,
-    // OR better: update POSClient to pass the fetcher or remove 'sales' prop and fetch inside.
-    // Given POSClient usage: <SalesHistoryDialog sales={salesHistory} ... />
-    // I will switch to fetching INSIDE this component for pagination, so removing 'sales' prop is cleaner,
-    // but to avoid breaking POSClient immediately, I'll keep it as optional or ignore it.
-    allProducts: Product[]; // Needed for the change dialog
+    allProducts: Product[];
+    initialDate?: string; // Format: YYYY-MM-DD
 }
 
 export default function SalesHistoryDialog({
     isOpen,
     onOpenChange,
-    allProducts
+    allProducts,
+    initialDate
 }: SalesHistoryDialogProps) {
     const [data, setData] = useState<{ sales: Sale[], total: number }>({ sales: [], total: 0 });
     const [loading, setLoading] = useState(false);
@@ -41,6 +37,17 @@ export default function SalesHistoryDialog({
     const [page, setPage] = useState(0);
     const [selectedDate, setSelectedDate] = useState<string>("");
     const limit = 20;
+
+    // Reset or set initial date when dialog opens
+    useEffect(() => {
+        if (isOpen && initialDate) {
+            setSelectedDate(initialDate);
+        } else if (isOpen && !selectedDate && !initialDate) {
+            // Optional: if we wanted to clear it when opening without initialDate, 
+            // but keeping state might be desired if user closes and reopens. 
+            // For now, only override if initialDate is provided.
+        }
+    }, [isOpen, initialDate]);
 
     const [changeDialogSale, setChangeDialogSale] = useState<Sale | null>(null);
 
