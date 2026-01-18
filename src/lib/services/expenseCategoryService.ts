@@ -13,6 +13,7 @@ const mapCategory = (row: any): ExpenseCategory => ({
   id: row?.firestore_id ?? row?.id ?? "",
   name: row?.name ?? "",
   isActive: Boolean(row?.isActive ?? false),
+  icon: row?.icon ?? "",
 });
 
 export const getExpenseCategories = async (): Promise<ExpenseCategory[]> => {
@@ -51,6 +52,7 @@ export const addExpenseCategory = async (
       firestore_id: firestoreId,
       name: categoryData.name,
       isActive: categoryData.isActive ?? true,
+      icon: categoryData.icon ?? null,
     };
 
     const { data, error } = await supabase

@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
+import { IconPicker } from "@/components/shared/IconPicker";
 
 interface AddAssetDialogProps {
   isOpen: boolean;
@@ -48,14 +49,15 @@ interface AddAssetDialogProps {
 const formSchema = z.object({
   name: z.string().min(3, "La descripción es requerida."),
   category: z.enum(assetCategories, { required_error: "Debe seleccionar una categoría." }),
-  purchaseDate: z.date({ required_error: "La fecha de compra es requerida."}),
+  purchaseDate: z.date({ required_error: "La fecha de compra es requerida." }),
   purchaseCost: z.coerce.number().positive("El costo debe ser mayor a cero."),
   usefulLifeYrs: z.coerce.number().int().positive("La vida útil debe ser al menos 1 año."),
   salvageValue: z.coerce.number().min(0, "El valor de rescate no puede ser negativo."),
   depreciationMethod: z.enum(depreciationMethods, { required_error: "Debe seleccionar un método." }),
+  custom_icon: z.string().optional(),
 }).refine(data => data.purchaseCost > data.salvageValue, {
-    message: "El costo de compra debe ser mayor que el valor de rescate.",
-    path: ["salvageValue"],
+  message: "El costo de compra debe ser mayor que el valor de rescate.",
+  path: ["salvageValue"],
 });
 
 
@@ -76,6 +78,7 @@ export default function AddAssetDialog({
       usefulLifeYrs: 3,
       salvageValue: 0,
       depreciationMethod: "Lineal",
+      custom_icon: "briefcase.png",
     },
   });
 
@@ -119,42 +122,59 @@ export default function AddAssetDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
-             <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Nombre del Activo</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Ej: Laptop Dell XPS 15" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre del Activo</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Laptop Dell XPS 15" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
             <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
+              control={form.control}
+              name="custom_icon"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Categoría</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>Icono del Activo</FormLabel>
+                  <FormControl>
+                    <IconPicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Elige un icono..."
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                    <SelectTrigger>
+                      <SelectTrigger>
                         <SelectValue placeholder="Seleccione..." />
-                    </SelectTrigger>
+                      </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                    {assetCategories.map((category) => (
+                      {assetCategories.map((category) => (
                         <SelectItem key={category} value={category}>
-                        {category}
+                          {category}
                         </SelectItem>
-                    ))}
+                      ))}
                     </SelectContent>
-                </Select>
-                <FormMessage />
+                  </Select>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
             <FormField
               control={form.control}
@@ -198,79 +218,79 @@ export default function AddAssetDialog({
               )}
             />
             <div className="grid grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="purchaseCost"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Costo de Compra</FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="salvageValue"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Valor de Rescate</FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
+              <FormField
+                control={form.control}
+                name="purchaseCost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Costo de Compra</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="salvageValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor de Rescate</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
-                <FormField
-                        control={form.control}
-                        name="usefulLifeYrs"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Vida Útil (Años)</FormLabel>
-                            <FormControl>
-                                <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="depreciationMethod"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Método Depreciación</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue/>
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            {depreciationMethods.map((method) => (
-                                <SelectItem key={method} value={method}>
-                                {method}
-                                </SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
+              <FormField
+                control={form.control}
+                name="usefulLifeYrs"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vida Útil (Años)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="depreciationMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método Depreciación</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {depreciationMethods.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            
+
             <DialogFooter className="pt-4">
               <Button type="button" variant="secondary" onClick={() => handleDialogClose(false)} disabled={loading}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? <><Loader2 className="animate-spin mr-2"/> Registrando...</> : "Agregar Activo"}
+                {loading ? <><Loader2 className="animate-spin mr-2" /> Registrando...</> : "Agregar Activo"}
               </Button>
             </DialogFooter>
           </form>

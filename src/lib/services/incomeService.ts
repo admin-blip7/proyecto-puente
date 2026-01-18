@@ -15,23 +15,33 @@ const ACCOUNTS_TABLE = "accounts";
 const CASH_SESSIONS_TABLE = "cash_sessions";
 const STORAGE_RECEIPTS_PATH = "income_receipts";
 
-const mapIncome = (row: any): Income => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    incomeId: row?.incomeId ?? "",
-    description: row?.description ?? "",
-    category: row?.category ?? "",
-    amount: Number(row?.amount ?? 0),
-    destinationAccountId: row?.destinationAccountId ?? "",
-    source: row?.source ?? "",
-    paymentDate: toDate(row?.paymentDate),
-    receiptUrl: row?.receiptUrl ?? undefined,
-    sessionId: row?.sessionId ?? undefined,
-});
+const mapIncome = (row: any): Income => {
+    // Use firestore_id, then id, then incomeId, then a hash of description + amount + date
+    const id = row?.firestore_id ??
+        row?.id ??
+        row?.incomeId ??
+        `fallback-${row?.description}-${row?.amount}-${row?.paymentDate}`;
+
+    return {
+        id: String(id),
+        incomeId: row?.incomeId ?? "",
+        description: row?.description ?? "",
+        category: row?.category ?? "",
+        amount: Number(row?.amount ?? 0),
+        destinationAccountId: row?.destinationAccountId ?? "",
+        source: row?.source ?? "",
+        paymentDate: toDate(row?.paymentDate),
+        receiptUrl: row?.receiptUrl ?? undefined,
+        sessionId: row?.sessionId ?? undefined,
+        icon: row?.icon ?? "",
+    };
+};
 
 const mapCategory = (row: any): IncomeCategory => ({
     id: row?.firestore_id ?? row?.id ?? "",
     name: row?.name ?? "",
     isActive: Boolean(row?.isActive ?? false),
+    icon: row?.icon ?? "",
 });
 
 export const getIncomes = async (startDate?: Date, endDate?: Date): Promise<Income[]> => {
@@ -111,6 +121,7 @@ export const addIncomeCategory = async (
             firestore_id: firestoreId,
             name: categoryData.name,
             isActive: categoryData.isActive ?? true,
+            icon: categoryData.icon ?? null,
         };
 
         const { data, error } = await supabase
@@ -192,6 +203,7 @@ export const addIncome = async (
         paymentDate,
         receiptUrl: receiptUrl ?? null,
         sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (incomeData.sessionId || null),
+        icon: incomeData.icon ?? null,
     };
 
     const { data: insertedIncome, error: insertError } = await supabase

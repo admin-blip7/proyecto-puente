@@ -17,17 +17,25 @@ const PAYMENT_PLANS_TABLE = "paymentPlans";
 const CONTRACTS_TABLE = "contracts";
 const STORAGE_RECEIPTS_PATH = "receipts";
 
-const mapExpense = (row: any): Expense => ({
-  id: row?.firestore_id ?? row?.id ?? "",
-  expenseId: row?.expenseId ?? "",
-  description: row?.description ?? "",
-  category: row?.category ?? "",
-  amount: Number(row?.amount ?? 0),
-  paidFromAccountId: row?.paidFromAccountId ?? "",
-  paymentDate: toDate(row?.paymentDate),
-  receiptUrl: row?.receiptUrl ?? undefined,
-  sessionId: row?.sessionId ?? undefined,
-});
+const mapExpense = (row: any): Expense => {
+  // Use firestore_id, then id, then expenseId, then a hash of description + amount + date
+  const id = row?.firestore_id ??
+    row?.id ??
+    row?.expenseId ??
+    `fallback-${row?.description}-${row?.amount}-${row?.paymentDate}`;
+
+  return {
+    id: String(id),
+    expenseId: row?.expenseId ?? "",
+    description: row?.description ?? "",
+    category: row?.category ?? "",
+    amount: Number(row?.amount ?? 0),
+    paidFromAccountId: row?.paidFromAccountId ?? "",
+    paymentDate: toDate(row?.paymentDate),
+    receiptUrl: row?.receiptUrl ?? undefined,
+    sessionId: row?.sessionId ?? undefined,
+  };
+};
 
 export const getExpenses = async (): Promise<Expense[]> => {
   try {

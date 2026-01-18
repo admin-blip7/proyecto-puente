@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FixedAsset } from "@/types";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, TrendingDown } from "lucide-react";
+import { PlusCircle, TrendingDown, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -23,6 +23,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { formatMXNAmount } from "@/lib/validation/currencyValidation";
 import InventoryHistoryChart from "./InventoryHistoryChart";
+import Image from "next/image";
+
+const SUPABASE_STORAGE_URL = "https://aaftjwktzpnyjwklroww.supabase.co/storage/v1/object/public/icons/";
 
 interface AssetClientProps {
   initialAssets: FixedAsset[];
@@ -108,7 +111,25 @@ export default function AssetClient({ initialAssets, inventoryValue, historyData
                     const annualDepreciation = (asset.purchaseCost - asset.salvageValue) / asset.usefulLifeYrs;
                     return (
                       <TableRow key={asset.id}>
-                        <TableCell className="font-medium">{asset.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {asset.custom_icon ? (
+                              <div className="relative w-8 h-8 shrink-0">
+                                <Image
+                                  src={`${SUPABASE_STORAGE_URL}${asset.custom_icon}${asset.custom_icon.endsWith('.png') ? '' : '.png'}`}
+                                  alt={asset.name}
+                                  fill
+                                  className="object-contain"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                                <Info className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            {asset.name}
+                          </div>
+                        </TableCell>
                         <TableCell><Badge variant="secondary">{asset.category}</Badge></TableCell>
                         <TableCell>{format(asset.purchaseDate, "dd MMM yyyy", { locale: es })}</TableCell>
                         <TableCell className="text-right font-semibold">{formatMXNAmount(asset.purchaseCost ?? 0)}</TableCell>

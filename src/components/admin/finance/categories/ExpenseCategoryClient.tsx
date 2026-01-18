@@ -9,19 +9,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PlusCircle, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger,
-  DialogClose
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+    DialogTrigger,
+    DialogClose
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
+import { IconPicker } from "@/components/shared/IconPicker";
+import Image from "next/image";
+
+const SUPABASE_STORAGE_URL = "https://aaftjwktzpnyjwklroww.supabase.co/storage/v1/object/public/icons/";
 
 export default function ExpenseCategoryClient() {
     const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -29,6 +33,7 @@ export default function ExpenseCategoryClient() {
     const [isSaving, setIsSaving] = useState(false);
     const [editCategory, setEditCategory] = useState<ExpenseCategory | null>(null);
     const [newCategoryName, setNewCategoryName] = useState("");
+    const [newCategoryIcon, setNewCategoryIcon] = useState("briefcase.png");
     const { toast } = useToast();
 
     const loadCategories = useCallback(async () => {
@@ -46,7 +51,7 @@ export default function ExpenseCategoryClient() {
     useEffect(() => {
         loadCategories();
     }, [loadCategories]);
-    
+
     const handleAddNewCategory = async () => {
         if (!newCategoryName.trim()) {
             toast({ variant: "destructive", title: "Error", description: "El nombre no puede estar vacío." });
@@ -54,9 +59,14 @@ export default function ExpenseCategoryClient() {
         }
         setIsSaving(true);
         try {
-            const newCategory = await addExpenseCategory({ name: newCategoryName, isActive: true });
-            setCategories(prev => [...prev, newCategory].sort((a,b) => a.name.localeCompare(b.name)));
+            const newCategory = await addExpenseCategory({
+                name: newCategoryName,
+                isActive: true,
+                icon: newCategoryIcon
+            });
+            setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
             setNewCategoryName("");
+            setNewCategoryIcon("briefcase.png");
             toast({ title: "Categoría Agregada" });
         } catch (error) {
             toast({ variant: 'destructive', title: "Error", description: "No se pudo agregar la categoría." });
@@ -69,7 +79,11 @@ export default function ExpenseCategoryClient() {
         if (!editCategory) return;
         setIsSaving(true);
         try {
-            await updateExpenseCategory(editCategory.id, { name: editCategory.name, isActive: editCategory.isActive });
+            await updateExpenseCategory(editCategory.id, {
+                name: editCategory.name,
+                isActive: editCategory.isActive,
+                icon: editCategory.icon
+            });
             setCategories(prev => prev.map(c => c.id === editCategory.id ? editCategory : c));
             setEditCategory(null);
             toast({ title: "Categoría Actualizada" });
@@ -89,7 +103,7 @@ export default function ExpenseCategoryClient() {
                     <p className="text-muted-foreground">Administra las categorías para organizar tus gastos operativos.</p>
                 </div>
             </div>
-            
+
             <Card>
                 <CardHeader>
                     <CardTitle>Nueva Categoría</CardTitle>
@@ -97,11 +111,17 @@ export default function ExpenseCategoryClient() {
                 </CardHeader>
                 <CardContent>
                     <div className="flex w-full max-w-sm items-center space-x-2">
-                        <Input 
+                        <Input
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
-                            placeholder="Ej: Viáticos" 
+                            placeholder="Ej: Viáticos"
                         />
+                        <div className="w-[200px]">
+                            <IconPicker
+                                value={newCategoryIcon}
+                                onChange={setNewCategoryIcon}
+                            />
+                        </div>
                         <Button type="button" onClick={handleAddNewCategory} disabled={isSaving}>
                             {isSaving ? <Loader2 className="animate-spin" /> : <PlusCircle />}
                             <span className="ml-2 hidden sm:inline">Agregar</span>
@@ -130,7 +150,25 @@ export default function ExpenseCategoryClient() {
                                 ) : (
                                     categories.map((cat) => (
                                         <TableRow key={cat.id}>
-                                            <TableCell className="font-medium">{cat.name}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {cat.icon ? (
+                                                        <div className="relative w-8 h-8 shrink-0">
+                                                            <Image
+                                                                src={`${SUPABASE_STORAGE_URL}${cat.icon}${cat.icon.endsWith('.png') ? '' : '.png'}`}
+                                                                alt={cat.name}
+                                                                fill
+                                                                className="object-contain"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                                                            <Info className="w-4 h-4 text-muted-foreground" />
+                                                        </div>
+                                                    )}
+                                                    {cat.name}
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="text-center">{cat.isActive ? "Activa" : "Inactiva"}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button variant="ghost" size="icon" onClick={() => setEditCategory(cat)}>
@@ -156,18 +194,27 @@ export default function ExpenseCategoryClient() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nombre</Label>
                                 <Input
-                                id="name"
-                                value={editCategory.name}
-                                onChange={(e) => setEditCategory({...editCategory, name: e.target.value})}
-                                className="col-span-3"
+                                    id="name"
+                                    value={editCategory.name}
+                                    onChange={(e) => setEditCategory({ ...editCategory, name: e.target.value })}
+                                    className="col-span-3"
                                 />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="icon" className="text-right">Icono</Label>
+                                <div className="col-span-3">
+                                    <IconPicker
+                                        value={editCategory.icon}
+                                        onChange={(icon) => setEditCategory({ ...editCategory, icon })}
+                                    />
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="status" className="text-right">Estado</Label>
                                 <Switch
                                     id="status"
                                     checked={editCategory.isActive}
-                                    onCheckedChange={(checked) => setEditCategory({...editCategory, isActive: checked})}
+                                    onCheckedChange={(checked) => setEditCategory({ ...editCategory, isActive: checked })}
                                 />
                                 <span className="col-span-2 text-sm text-muted-foreground">{editCategory.isActive ? "Activa" : "Inactiva"}</span>
                             </div>

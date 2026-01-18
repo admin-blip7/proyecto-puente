@@ -296,6 +296,7 @@ export interface ExpenseCategory {
   id: string;
   name: string;
   isActive: boolean;
+  icon?: string;
 }
 
 export interface Expense {
@@ -308,6 +309,7 @@ export interface Expense {
   paymentDate: Date;
   receiptUrl?: string;
   sessionId?: string;
+  icon?: string;
 }
 
 export const assetCategories = [
@@ -335,6 +337,7 @@ export interface FixedAsset {
   currentValue: number;
   depreciationMethod: DepreciationMethod;
   lastDepreciationDate: Date;
+  custom_icon?: string;
 }
 
 export interface BulkUpdateData {
@@ -682,6 +685,7 @@ export interface IncomeCategory {
   id: string;
   name: string;
   isActive: boolean;
+  icon?: string;
 }
 
 export interface Income {
@@ -695,6 +699,7 @@ export interface Income {
   paymentDate: Date;
   receiptUrl?: string;
   sessionId?: string;
+  icon?: string;
 }
 
 // Transfer Types

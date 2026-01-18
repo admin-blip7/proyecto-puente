@@ -406,7 +406,7 @@ export default function FinanceManagerClient({
                                             </tr>
                                         ) : (
                                             recentTransactions.map((tx, idx) => (
-                                                <tr key={`${tx.type}-${tx.id}`} className="group hover:bg-muted/50 transition-colors">
+                                                <tr key={`${tx.type}-${tx.id}-${idx}`} className="group hover:bg-muted/50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-4">
                                                             <div className={cn("size-10 rounded-full flex items-center justify-center shrink-0",
