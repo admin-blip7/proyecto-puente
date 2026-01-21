@@ -13,6 +13,7 @@ import { ShoppingCartIcon, PlusCircle, Package, Lock, Unlock, Search, QrCode, Cl
 import { Badge } from "../ui/badge";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
+import RecargasDialog from "./RecargasDialog";
 import {
   Dialog,
   DialogContent,
@@ -92,6 +93,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
   const [ticketSales, setTicketSales] = useState<Sale[]>([]);
   const [ticketReady, setTicketReady] = useState(false);
   const [showDailySales, setShowDailySales] = useState(false);
+  const [showRecargasDialog, setShowRecargasDialog] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
 
   // Derive unique categories with counts
@@ -877,6 +879,10 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
         allProducts={products}
         initialDate={todayDate}
       />
+      <RecargasDialog
+        isOpen={showRecargasDialog}
+        onOpenChange={setShowRecargasDialog}
+      />
       <div className="flex h-full bg-background-light dark:bg-background-dark overflow-hidden relative font-sans text-text-light dark:text-text-light">
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark overflow-hidden relative">
@@ -896,6 +902,15 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
               >
                 <Clock className="w-4 h-4" />
                 Ventas del Día
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:flex items-center gap-2"
+                onClick={() => setShowRecargasDialog(true)}
+              >
+                <Smartphone className="w-4 h-4" />
+                Activar Chip Telcel
               </Button>
               <div className="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-gray-700">
                 <div className="flex flex-col text-right hidden sm:flex">
