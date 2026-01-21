@@ -2,11 +2,7 @@ export const toDate = (value: unknown): Date => {
   if (!value) return new Date();
   if (value instanceof Date) return value;
 
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-
+  // Handle Firestore timestamp format {_seconds, _nanoseconds}
   if (typeof value === "object" && value !== null) {
     const maybe = value as { _seconds?: number; _nanoseconds?: number };
     if (typeof maybe._seconds === "number") {
@@ -15,6 +11,21 @@ export const toDate = (value: unknown): Date => {
     }
   }
 
+  // Handle string values (potentially with extra quotes from JSONB)
+  if (typeof value === "string") {
+    let cleanValue = value.trim();
+    if (cleanValue.startsWith('"') && cleanValue.endsWith('"')) {
+      try {
+        cleanValue = JSON.parse(cleanValue);
+      } catch (e) {
+        cleanValue = cleanValue.slice(1, -1);
+      }
+    }
+    const parsed = new Date(cleanValue);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  // Fallback to current date but log warning if possible
   return new Date();
 };
 

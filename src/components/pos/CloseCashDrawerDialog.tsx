@@ -21,8 +21,18 @@ interface CloseCashDrawerDialogProps {
   onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>) => Promise<void>;
 }
 
-const formSchema = z.object({
-  actualCashCount: z.coerce.number().min(0, "El conteo no puede ser negativo."),
+// Schema dinámico que valida según las ventas de la sesión
+const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.object({
+  actualCashCount: z.coerce.number()
+    .min(0, "El conteo no puede ser negativo.")
+    .refine(
+      (val) => !hasCashSales || val > 0,
+      { message: "Debes ingresar el conteo real de efectivo antes de cerrar." }
+    )
+    .refine(
+      (val) => !hasCashSales || Math.abs(val - expectedCash) <= expectedCash * 0.5,
+      { message: `El conteo parece incorrecto. Se esperan aproximadamente ${expectedCash.toFixed(2)}` }
+    ),
   bagRecargasSale: z.coerce.number().min(0),
   bagMimovilSale: z.coerce.number().min(0),
   bagServiciosSale: z.coerce.number().min(0),
@@ -34,7 +44,14 @@ const formSchema = z.object({
 export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, onConfirm }: CloseCashDrawerDialogProps) {
   const [loading, setLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  // Calcular si hay ventas en efectivo y el efectivo esperado
+  const hasCashSales = (session.totalCashSales ?? 0) > 0;
+  const expectedCash = (session.startingFloat ?? 0) + (session.totalCashSales ?? 0) - (session.totalCashPayouts ?? 0);
+
+  // Crear schema dinámico basado en las ventas de la sesión
+  const formSchema = useMemo(() => createFormSchema(hasCashSales, expectedCash), [hasCashSales, expectedCash]);
+
+  const form = useForm<z.infer<ReturnType<typeof createFormSchema>>>({
     resolver: zodResolver(formSchema),
   });
 

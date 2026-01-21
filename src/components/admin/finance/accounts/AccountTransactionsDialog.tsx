@@ -67,8 +67,8 @@ export default function AccountTransactionsDialog({ isOpen, onOpenChange, accoun
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {transactions.map((tx) => (
-                                        <TableRow key={tx.id}>
+                                    {transactions.map((tx, index) => (
+                                        <TableRow key={tx.id || `tx-${index}-${tx.date}`}>
                                             <TableCell className="whitespace-nowrap">
                                                 {format(new Date(tx.date), "dd MMM yyyy", { locale: es })}
                                             </TableCell>

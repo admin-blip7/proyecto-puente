@@ -44,6 +44,7 @@ import { getCurrentUser } from "@/lib/supabaseClientWithAuth";
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { getSales } from "@/lib/services/salesService";
+import { toDate } from "@/lib/supabase/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Search, ShoppingBag, Receipt } from "lucide-react";
@@ -57,20 +58,23 @@ interface SalesHistoryClientProps {
 }
 
 export default function SalesHistoryClient({ initialSales, products, dailyCost, dailyProfit }: SalesHistoryClientProps) {
-  const [sales, setSales] = useState<Sale[]>(() => initialSales);
+  const [sales, setSales] = useState<Sale[]>(() =>
+    initialSales.map(s => ({ ...s, createdAt: toDate(s.createdAt) }))
+  );
   const router = useRouter();
 
   // Sync sales state with initialSales prop if it changes
   React.useEffect(() => {
     setSales(prevSales => {
+      const normalizedInitial = initialSales.map(s => ({ ...s, createdAt: toDate(s.createdAt) }));
       // Only update if the sales arrays are different
-      if (prevSales.length !== initialSales.length) {
-        return initialSales;
+      if (prevSales.length !== normalizedInitial.length) {
+        return normalizedInitial;
       }
       // Check if any sale has changed
-      for (let i = 0; i < initialSales.length; i++) {
-        if (prevSales[i]?.id !== initialSales[i]?.id || prevSales[i]?.saleId !== initialSales[i]?.saleId) {
-          return initialSales;
+      for (let i = 0; i < normalizedInitial.length; i++) {
+        if (prevSales[i]?.id !== normalizedInitial[i]?.id || prevSales[i]?.saleId !== normalizedInitial[i]?.saleId) {
+          return normalizedInitial;
         }
       }
       return prevSales; // Return the same array to avoid unnecessary re-renders
@@ -161,7 +165,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
       // We probably want to fetch 'all' statuses to match initial load
       const { sales: newSales } = await getSales('completed', 0, 2000, "", startStr, endStr);
-      setSales(newSales);
+      const normalizedSales = newSales.map(s => ({ ...s, createdAt: toDate(s.createdAt) }));
+      setSales(normalizedSales);
       toast({ title: "Filtro aplicado", description: `Se encontraron ${newSales.length} ventas.` });
     } catch (error) {
       console.error("Error filtering sales:", error);
@@ -177,7 +182,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     try {
       // Reset to default load (last 1000)
       const { sales: newSales } = await getSales('completed', 0, 1000, "", "", "");
-      setSales(newSales);
+      const normalizedSales = newSales.map(s => ({ ...s, createdAt: toDate(s.createdAt) }));
+      setSales(normalizedSales);
     } catch (error) {
       toast({ title: "Error", description: "Error al restablecer ventas.", variant: "destructive" });
     } finally {
@@ -216,25 +222,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     );
   };
 
-  // Deduplicate sales based on saleId to avoid React key warnings
-  const deduplicatedSales = useMemo(() => {
-    const seenIds = new Set();
-    const uniqueSales = [];
-
-    for (const sale of sales) {
-      const id = sale.id || sale.saleId;
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        uniqueSales.push(sale);
-      }
-    }
-
-    if (seenIds.size !== sales.length) {
-      console.warn(`Removed ${sales.length - uniqueSales.length} duplicate sales entries`);
-    }
-
-    return uniqueSales;
-  }, [sales]);
+  // No splitting or deduplicating unless absolutely necessary
+  // We trust the server sorting and unique keys in mapping
+  const deduplicatedSales = sales;
 
   const sortedSales = useMemo(() => {
     if (!sortField) {
@@ -437,6 +427,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
       setSales(prevSales =>
         prevSales.filter(sale => !successfulIds.includes(sale.saleId))
+          .map(s => ({ ...s, createdAt: toDate(s.createdAt) }))
       );
 
       // Clear selection
@@ -492,20 +483,20 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
         console.warn('Duplicate saleIds found:', [...new Set(duplicateIds)]);
       }
 
-      console.log('Total sales loaded:', sales.length);
+      console.log('Total sales state length:', sales.length);
+      console.log('Filtered sales length:', filteredSales.length);
 
-      // Debug: Check for the specific sale SALE-731410C0
-      const targetSale = sales.find(s => s.saleId === 'SALE-731410C0');
+      // Debug: Check specifically for SALE-950C941D
+      const targetSale = filteredSales.find(s => s.saleId === 'SALE-950C941D');
       if (targetSale) {
-        console.log('Found SALE-731410C0:', targetSale);
-        console.log('Sale createdAt:', targetSale.createdAt);
-        console.log('Sale createdAt type:', typeof targetSale.createdAt);
+        console.log('DEBUG: SALE-950C941D is present in filteredSales:', targetSale);
       } else {
-        console.warn('SALE-731410C0 not found in sales list');
-        console.log('Available saleIds:', sales.map(s => s.saleId).slice(0, 10));
+        console.warn('DEBUG: SALE-950C941D is MISSING from filteredSales. Check filters.');
       }
+
+      console.log('Current filtered saleIds:', filteredSales.map(s => s.saleId));
     }
-  }, [sales]);
+  }, [sales, filteredSales]);
 
   // Reset sort when sales data changes significantly
   React.useEffect(() => {
@@ -683,48 +674,50 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Transacciones Recientes</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Transacciones Recientes ({filteredSales.length})</CardTitle>
+          <div className="text-sm text-muted-foreground italic">
+            Mostrando {filteredSales.length} de {sales.length} cargadas
+          </div>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[calc(100vh-370px)]">
-            <div className="relative w-full overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]">
-                      <Checkbox
-                        checked={selectAllState.indeterminate ? "indeterminate" : selectAllState.checked}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Seleccionar todas las ventas"
-                      />
-                    </TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>
-                      <SortableHeader field="saleId">ID Venta</SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader field="createdAt">Fecha</SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader field="customerName">Cliente</SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader field="cashierName">Cajero</SortableHeader>
-                    </TableHead>
-                    <TableHead>
-                      <SortableHeader field="paymentMethod">Método de Pago</SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader field="totalAmount" className="justify-end">Monto Total</SortableHeader>
-                    </TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+        <CardContent className="p-0">
+          <div className="border rounded-md m-4 overflow-y-auto" style={{ height: '300px' }}>
+            <Table>
+              <TableHeader className="sticky top-0 bg-background shadow-sm z-10">
+                <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={selectAllState.indeterminate ? "indeterminate" : selectAllState.checked}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Seleccionar todas las ventas"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead>
+                    <SortableHeader field="saleId">ID Venta</SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader field="createdAt">Fecha</SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader field="customerName">Cliente</SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader field="cashierName">Cajero</SortableHeader>
+                  </TableHead>
+                  <TableHead>
+                    <SortableHeader field="paymentMethod">Método de Pago</SortableHeader>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <SortableHeader field="totalAmount" className="justify-end">Monto Total</SortableHeader>
+                  </TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                   {filteredSales.map((sale, index) => {
-                    // Create a unique key that combines sale id, saleId, timestamp and index to ensure uniqueness
-                    const uniqueKey = `${sale.id || sale.saleId}-${sale.createdAt.getTime()}-${index}`;
+                    // Create a robust unique key
+                    const uniqueKey = `sale-${sale.saleId}-${sale.id || index}`;
                     const collapsibleKey = uniqueKey;
 
                     return (
@@ -832,9 +825,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableBody>
               </Table>
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {/* Confirmation dialog for canceling sales */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>

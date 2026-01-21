@@ -64,9 +64,10 @@ export const getSales = async (
       query = query.or('status.is.null,status.eq.completed');
     }
 
-    // Fetch all data (we'll paginate after filtering)
-    const { data: allData, error, count } = await query
-      .order("createdAt", { ascending: false });
+    // Fetch all data (we'll sort and paginate after filtering)
+    // Note: Can't order by createdAt here because it's stored as JSON (Firestore timestamp format)
+    // not as PostgreSQL timestamp, so server-side ordering doesn't work correctly
+    const { data: allData, error, count } = await query;
 
     if (error) {
       log.error("Error fetching sales with filters:", error);
@@ -81,23 +82,18 @@ export const getSales = async (
       sales = sales.filter(sale => {
         if (!sale.createdAt) return false;
 
-        // Handle Firestore timestamp format {_seconds, _nanoseconds}
-        let saleDate: Date;
-        if ((sale.createdAt as any)._seconds) {
-          saleDate = new Date((sale.createdAt as any)._seconds * 1000);
-        } else {
-          saleDate = new Date(sale.createdAt);
-        }
+        // Use robust toDate utility
+        const saleDate = toDate(sale.createdAt);
 
-        // Apply date filters
-        if (startDate) {
-          const startOfDay = new Date(`${startDate}T00:00:00`);
-          if (saleDate < startOfDay) return false;
-        }
-        if (endDate) {
-          const endOfDay = new Date(`${endDate}T23:59:59`);
-          if (saleDate > endOfDay) return false;
-        }
+        // Get the date portion in Mexico timezone (YYYY-MM-DD)
+        // This ensures filtering matches the user's local view
+        const saleDateStr = saleDate.toLocaleDateString('en-CA', {
+          timeZone: 'America/Mexico_City'
+        });
+
+        // Apply date filters using string comparison for dates
+        if (startDate && saleDateStr < startDate) return false;
+        if (endDate && saleDateStr > endDate) return false;
 
         return true;
       });
