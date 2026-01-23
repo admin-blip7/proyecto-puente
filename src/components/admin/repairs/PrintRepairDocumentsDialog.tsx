@@ -7,7 +7,8 @@ import { Printer, Tag } from "lucide-react";
 import { RepairOrder, TicketSettings, LabelSettings } from "@/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import JsBarcode from 'jsbarcode';
+import { DynamicRepairLabel } from "./DynamicRepairLabel";
+import { createRoot } from "react-dom/client";
 
 
 interface PrintRepairDocumentsDialogProps {
@@ -95,7 +96,7 @@ export default function PrintRepairDocumentsDialog({
     `;
   };
 
-  const handlePrint = (contentGenerator: () => string, isLabel: boolean) => {
+  const handlePrintTicket = (contentGenerator: () => string) => {
     const printWindow = window.open('', 'PRINT', 'height=600,width=800');
     if (!printWindow) {
       alert("El navegador bloqueó la ventana de impresión. Por favor, habilita las ventanas emergentes.");
@@ -104,39 +105,50 @@ export default function PrintRepairDocumentsDialog({
 
     const content = contentGenerator();
 
-    printWindow.document.write('<html><head><title>Imprimir</title>');
-    if (isLabel) {
-      printWindow.document.write(`
-            <style>
-                @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
-                body { margin: 0; padding: 0; }
-            </style>
-        `);
-    }
+    printWindow.document.write('<html><head><title>Imprimir Ticket</title>');
     printWindow.document.write('</head><body>');
     printWindow.document.write(content);
     printWindow.document.write('</body></html>');
 
-    if (isLabel) {
-      try {
-        JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
-          format: 'CODE128',
-          displayValue: false,
-          height: labelSettings.barcodeHeight,
-          width: 1.5,
-          margin: 0,
-        });
-      } catch (e) { console.error(e); }
-    }
-
     printWindow.document.close();
     printWindow.focus();
 
-    // Auto-print disabled
-    // setTimeout(() => {
-    //     printWindow.print();
-    //     printWindow.close();
-    // }, 250);
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handlePrintLabel = () => {
+    const printWindow = window.open("", "_blank", "width=400,height=300");
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Etiqueta - ${order.orderId}</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #fff; }
+              @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
+            </style>
+          </head>
+          <body>
+            <div id="root"></div>
+          </body>
+        </html>
+      `);
+
+      const container = printWindow.document.getElementById("root");
+      if (container) {
+        const root = createRoot(container);
+        root.render(<DynamicRepairLabel repair={order} settings={labelSettings} />);
+
+        setTimeout(() => {
+          printWindow.print();
+          // printWindow.close(); 
+        }, 500);
+      }
+    }
   };
 
   return (
@@ -149,11 +161,11 @@ export default function PrintRepairDocumentsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-4 py-4">
-          <Button size="lg" onClick={() => handlePrint(generateTicketHTML, false)}>
+          <Button size="lg" onClick={() => handlePrintTicket(generateTicketHTML)}>
             <Printer className="mr-2 h-5 w-5" />
             Imprimir Ticket de Cliente
           </Button>
-          <Button size="lg" variant="secondary" onClick={() => handlePrint(generateLabelHTML, true)}>
+          <Button size="lg" variant="secondary" onClick={handlePrintLabel}>
             <Tag className="mr-2 h-5 w-5" />
             Imprimir Etiqueta para Dispositivo
           </Button>

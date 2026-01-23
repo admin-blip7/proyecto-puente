@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient';
 import { nanoid } from 'nanoid';
 import { Loader2, ChevronUp, ChevronDown, RotateCw } from 'lucide-react';
+import { LabelType } from '@/types';
 
 interface PropertiesPanelProps {
   selectedElement: VisualElement | null;
@@ -19,6 +20,7 @@ interface PropertiesPanelProps {
   onSendToBack?: (id: string) => void;
   onUpdateGlobalStyles?: (styles: { backgroundImageUrl?: string; backgroundColor?: string }) => void;
   initialLayout?: { globalStyles?: { backgroundImageUrl?: string; backgroundColor?: string } };
+  labelType?: LabelType;
 }
 
 const textElementTypes: VisualElement['type'][] = ['text', 'placeholder'];
@@ -37,6 +39,10 @@ const FONT_OPTIONS = [
   'Lato',
   'Courier New',
   'Georgia',
+  'Outfit',
+  'Outfit Light',
+  'Outfit Medium',
+  'Outfit Bold',
 ];
 
 const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -45,7 +51,8 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onBringToFront,
   onSendToBack,
   onUpdateGlobalStyles,
-  initialLayout
+  initialLayout,
+  labelType = 'product'
 }) => {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -53,6 +60,11 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const [draftHeight, setDraftHeight] = useState('');
   const [draftFontSize, setDraftFontSize] = useState('');
   const [draftRotation, setDraftRotation] = useState('');
+
+  // Filter placeholders based on labelType
+  const filteredPlaceholders = useMemo(() => {
+    return LABEL_PLACEHOLDERS.filter(p => !p.scope || p.scope === 'both' || p.scope === labelType);
+  }, [labelType]);
 
   const placeholderMeta = useMemo(() => {
     if (!selectedElement?.placeholderKey) return undefined;
@@ -179,7 +191,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       <div className="space-y-4 text-sm">
         <div className="space-y-2">
           <h3 className="font-semibold">Propiedades del Lienzo</h3>
-          
+
           {/* Background Image Upload */}
           <div className="space-y-2">
             <Label>Imagen de Fondo</Label>
@@ -216,13 +228,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                     const { data } = supabase.storage.from('label-assets').getPublicUrl(filePath);
                     const downloadUrl = data.publicUrl;
-                    
+
                     console.log('Background image uploaded:', {
                       filePath,
                       downloadUrl,
                       exists: !!downloadUrl,
                     });
-                    
+
                     onUpdateGlobalStyles?.({
                       backgroundImageUrl: downloadUrl,
                     });
@@ -243,7 +255,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 'Subir Imagen de Fondo'
               )}
             </Button>
-            
+
             {initialLayout?.globalStyles?.backgroundImageUrl && (
               <div className="space-y-2">
                 <div className="relative w-full h-24 border rounded-md overflow-hidden bg-gray-50">
@@ -252,11 +264,11 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     alt="Vista previa del fondo"
                     className="w-full h-full object-contain"
                     onError={(e) => {
-                      console.error('Error loading background image:', initialLayout.globalStyles.backgroundImageUrl);
+                      console.error('Error loading background image:', initialLayout?.globalStyles?.backgroundImageUrl);
                       e.currentTarget.style.background = 'repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 10px, #e0e0e0 10px, #e0e0e0 20px)';
                     }}
                     onLoad={() => {
-                      console.log('Background image loaded successfully:', initialLayout.globalStyles.backgroundImageUrl);
+                      console.log('Background image loaded successfully:', initialLayout?.globalStyles?.backgroundImageUrl);
                     }}
                   />
                 </div>
@@ -301,7 +313,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </div>
           </div>
         </div>
-        
+
         <p className="text-xs text-muted-foreground">
           Selecciona un elemento para editar sus propiedades individuales.
         </p>
@@ -464,7 +476,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {LABEL_PLACEHOLDERS.map((placeholder) => (
+            {filteredPlaceholders.map((placeholder) => (
               <Button
                 key={placeholder.key}
                 type="button"
@@ -624,7 +636,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LABEL_PLACEHOLDERS.map((placeholder) => (
+              {filteredPlaceholders.map((placeholder) => (
                 <SelectItem key={placeholder.key} value={placeholder.key}>
                   {placeholder.token}
                 </SelectItem>

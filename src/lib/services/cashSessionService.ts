@@ -265,7 +265,8 @@ export const closeCashSession = async (
   userName: string,
   actualCashCount: number,
   bagsSalesAmounts: Record<string, number> = {},
-  bagsActualEndAmounts: Record<string, number> = {}
+  bagsActualEndAmounts: Record<string, number> = {},
+  depositAccountId?: string
 ): Promise<CashSession> => {
   console.log(`[closeCashSession] Starting for session ${session.sessionId}`);
   const supabase = getSupabaseServerClient();
@@ -360,14 +361,18 @@ export const closeCashSession = async (
       console.log(`[closeCashSession] Database update successful.`);
     }
 
-    // 5. Deposit to Caja Chica
-    console.log(`[closeCashSession] Attempting deposit to Caja Chica...`);
-    try {
-      await depositToCajaChica(session.sessionId, actualCashCount);
-      console.log(`[closeCashSession] Deposit successful.`);
-    } catch (depositError) {
-      console.error(`[closeCashSession] Deposit failed (non-fatal):`, depositError);
-      log.error("Error depositing to Caja Chica during session close", depositError);
+    // 5. Deposit to Account (if specified)
+    if (depositAccountId) {
+      console.log(`[closeCashSession] Attempting deposit to account ${depositAccountId}...`);
+      try {
+        await depositToAccount(session.sessionId, depositAccountId, actualCashCount);
+        console.log(`[closeCashSession] Deposit successful.`);
+      } catch (depositError) {
+        console.error(`[closeCashSession] Deposit failed (non-fatal):`, depositError);
+        log.error("Error depositing to account during session close", depositError);
+      }
+    } else {
+      console.log(`[closeCashSession] No deposit account specified, skipping deposit.`);
     }
 
     console.log(`[closeCashSession] Session close process completed successfully.`);
@@ -445,6 +450,60 @@ export const depositToCajaChica = async (
     log.info(`Successfully deposited ${depositAmount} to Caja Chica for session ${sessionId}`);
   } catch (error) {
     log.error("Error in depositToCajaChica", error);
+    throw error;
+  }
+};
+
+export const depositToAccount = async (
+  sessionId: string,
+  accountId: string,
+  depositAmount: number,
+  notes?: string
+): Promise<void> => {
+  if (depositAmount < 0) {
+    throw new Error("Deposit amount cannot be negative.");
+  }
+
+  if (depositAmount === 0) {
+    log.info(`No deposit made for session ${sessionId} - amount is 0`);
+    return;
+  }
+
+  const supabase = getSupabaseServerClient();
+
+  try {
+    // Check if account exists
+    const { data: account, error: findError } = await supabase
+      .from(ACCOUNTS_TABLE)
+      .select("id,firestore_id,name")
+      .or(`id.eq.${accountId},firestore_id.eq.${accountId}`)
+      .maybeSingle();
+
+    if (findError) {
+      log.error("Error finding account", findError);
+      throw new Error("Failed to find account.");
+    }
+
+    if (!account) {
+      log.error("Account not found");
+      throw new Error("Account does not exist.");
+    }
+
+    const targetAccountId = account.firestore_id || account.id;
+
+    // Use addIncome to record the transaction and update balance
+    await addIncome({
+      description: `Depósito de Corte de Caja (Sesión: ${sessionId}) ${notes ? `- ${notes}` : ''}`,
+      category: "Corte de Caja",
+      amount: depositAmount,
+      destinationAccountId: targetAccountId,
+      source: "Caja",
+      sessionId: sessionId
+    });
+
+    log.info(`Successfully deposited ${depositAmount} to account ${account.name} for session ${sessionId}`);
+  } catch (error) {
+    log.error("Error in depositToAccount", error);
     throw error;
   }
 };

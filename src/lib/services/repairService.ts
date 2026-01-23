@@ -21,6 +21,7 @@ const mapRepairOrder = (row: any): RepairOrder => ({
   deviceBrand: row?.deviceBrand ?? "",
   deviceModel: row?.deviceModel ?? "",
   deviceSerialIMEI: row?.deviceSerialIMEI ?? "",
+  devicePassword: row?.device_password ?? "",
   reportedIssue: row?.reportedIssue ?? "",
   technicianNotes: row?.technicianNotes ?? undefined,
   partsUsed: Array.isArray(row?.partsUsed) ? row.partsUsed : [],
@@ -28,6 +29,7 @@ const mapRepairOrder = (row: any): RepairOrder => ({
   totalCost: Number(row?.totalCost ?? 0),
   totalPrice: Number(row?.totalPrice ?? 0),
   profit: Number(row?.profit ?? 0),
+  deposit: Number(row?.deposit ?? 0),
   createdAt: toDate(row?.createdAt),
   completedAt: row?.completedAt ? toDate(row.completedAt) : undefined,
 });
@@ -126,6 +128,7 @@ export const addRepairOrder = async (
       deviceBrand: orderData.deviceBrand,
       deviceModel: orderData.deviceModel,
       deviceSerialIMEI: orderData.deviceSerialIMEI,
+      device_password: orderData.devicePassword,
       reportedIssue: orderData.reportedIssue,
       technicianNotes: orderData.technicianNotes ?? null,
       partsUsed: orderData.partsUsed ?? [],
@@ -133,6 +136,7 @@ export const addRepairOrder = async (
       totalCost: orderData.totalCost ?? 0,
       totalPrice: orderData.totalPrice ?? 0,
       profit: orderData.profit ?? 0,
+      deposit: orderData.deposit ?? 0,
       createdAt,
       completedAt: null,
     };

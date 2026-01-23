@@ -13,12 +13,15 @@ import { CashSession } from "@/types";
 import { Separator } from "../ui/separator";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils";
+import { getAccounts } from "@/lib/services/accountService";
+import { Account } from "@/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CloseCashDrawerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   session: CashSession;
-  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>) => Promise<void>;
+  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string) => Promise<void>;
 }
 
 // Schema dinámico que valida según las ventas de la sesión
@@ -39,10 +42,32 @@ const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.obje
   bagRecargasActualEnd: z.coerce.number().min(0).optional(),
   bagMimovilActualEnd: z.coerce.number().min(0).optional(),
   bagServiciosActualEnd: z.coerce.number().min(0).optional(),
+  depositAccountId: z.string().optional(),
+}).refine((data) => {
+  // If there is cash to deposit (count > 0), account is required
+  if (data.actualCashCount > 0 && !data.depositAccountId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Debes seleccionar una cuenta para el depósito.",
+  path: ["depositAccountId"],
 });
 
 export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, onConfirm }: CloseCashDrawerDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingAccounts(true);
+      getAccounts()
+        .then(setAccounts)
+        .catch(console.error)
+        .finally(() => setLoadingAccounts(false));
+    }
+  }, [isOpen]);
 
   // Calcular si hay ventas en efectivo y el efectivo esperado
   const hasCashSales = (session.totalCashSales ?? 0) > 0;
@@ -67,7 +92,8 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         bagServiciosSale: 0,
         bagRecargasActualEnd: 0,
         bagMimovilActualEnd: 0,
-        bagServiciosActualEnd: 0
+        bagServiciosActualEnd: 0,
+        depositAccountId: "",
       });
     }
   }, [isOpen, reset]);
@@ -94,7 +120,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         'mimovil': values.bagMimovilActualEnd || 0,
         'servicios': values.bagServiciosActualEnd || 0
       };
-      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts);
+      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId);
     } finally {
       setLoading(false);
     }
@@ -180,6 +206,36 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                   </FormItem>
                 )}
               />
+
+              {actualCashCount > 0 && (
+                <FormField
+                  control={form.control}
+                  name="depositAccountId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cuenta de Depósito</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona una cuenta..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="text-[10px] text-muted-foreground">
+                        El efectivo contado se depositará en esta cuenta.
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">

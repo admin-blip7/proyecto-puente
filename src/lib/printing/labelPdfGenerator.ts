@@ -82,6 +82,22 @@ const formatPlaceholderValue = (
     case 'attribute':
       // This is handled by the {attr:...} pattern in replaceTokensInContent
       return '';
+    case 'orderId':
+      return (item.product as any).orderId || '';
+    case 'customerName':
+      return (item.product as any).customerName || item.product.consignorName || '';
+    case 'customerPhone':
+      return (item.product as any).customerPhone || '';
+    case 'deviceBrand':
+      return (item.product as any).deviceBrand || '';
+    case 'deviceModel':
+      return (item.product as any).deviceModel || '';
+    case 'deviceSerial':
+      return (item.product as any).deviceSerialIMEI || '';
+    case 'devicePassword':
+      return (item.product as any).devicePassword || '';
+    case 'status':
+      return (item.product as any).status || '';
     default:
       return '';
   }
@@ -268,9 +284,33 @@ const getDocumentStyles = (origin: string = '') => `
 `;
 
 const generateAndInjectScripts = async (container: HTMLElement) => {
-  log.info('Generating barcodes and QR codes...');
+  log.info('Generating barcodes and QR codes and auto-scaling text...');
 
-  // Generate barcodes
+  // 1. Auto-scale text elements
+  const textElements = container.querySelectorAll('.label-element');
+  for (const el of Array.from(textElements)) {
+    const htmlEl = el as HTMLElement;
+    // Only scale if it's not a barcode or qrcode (simple check by children)
+    if (htmlEl.querySelector('svg, canvas, img')) continue;
+
+    const maxWidth = htmlEl.offsetWidth;
+    const maxHeight = htmlEl.offsetHeight;
+    if (maxWidth === 0 || maxHeight === 0) continue;
+
+    let fontSize = parseFloat(window.getComputedStyle(htmlEl).fontSize);
+    const minFontSize = 4;
+
+    // Iterate to fit
+    while (
+      (htmlEl.scrollWidth > maxWidth + 1 || htmlEl.scrollHeight > maxHeight + 1) &&
+      fontSize > minFontSize
+    ) {
+      fontSize -= 0.5;
+      htmlEl.style.fontSize = `${fontSize}px`;
+    }
+  }
+
+  // 2. Generate barcodes
   const barcodeElements = container.querySelectorAll('svg[data-barcode-value]');
   log.info(`Found ${barcodeElements.length} barcode elements`);
 
@@ -312,7 +352,7 @@ const generateAndInjectScripts = async (container: HTMLElement) => {
     }
   }
 
-  // Generate QR codes
+  // 3. Generate QR codes
   const qrElements = container.querySelectorAll('canvas[data-qr-value]');
   log.info(`Found ${qrElements.length} QR elements`);
 

@@ -36,6 +36,7 @@ const formSchema = z.object({
   deviceBrand: z.string().min(1, "La marca es requerida."),
   deviceModel: z.string().min(1, "El modelo es requerido."),
   deviceSerialIMEI: z.string().optional(),
+  devicePassword: z.string().optional(),
   reportedIssue: z.string().optional(),
   technicianNotes: z.string().optional(),
   isDraft: z.boolean().default(false),
@@ -76,6 +77,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
   const [customProblemPrice, setCustomProblemPrice] = useState("");
   const [customPart, setCustomPart] = useState("");
   const [customPartPrice, setCustomPartPrice] = useState("");
+  const [deposit, setDeposit] = useState("");
 
   // Images
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -101,6 +103,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
       deviceBrand: "",
       deviceModel: "",
       deviceSerialIMEI: "",
+      devicePassword: "",
       reportedIssue: "",
       technicianNotes: "",
       isDraft: false,
@@ -137,6 +140,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
           form: form.getValues(),
           selectedProblems,
           selectedParts,
+          deposit,
           step
         };
         localStorage.setItem('repair_draft', JSON.stringify(draft));
@@ -168,6 +172,8 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
   const totalLaborCost = totalProblems;
   const totalCost = totalPartsCost + totalLaborCost;
   const totalPrice = totalPartsRevenue + totalLaborCost;
+  const depositAmount = parseFloat(deposit) || 0;
+  const remainingBalance = Math.max(0, totalPrice - depositAmount);
   const totalProfit = totalPrice - totalCost;
 
   // Handlers
@@ -193,6 +199,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
     form.setValue("deviceBrand", repair.deviceBrand);
     form.setValue("deviceModel", repair.deviceModel);
     form.setValue("deviceSerialIMEI", repair.deviceSerialIMEI);
+    form.setValue("devicePassword", repair.devicePassword || "");
     toast({ title: "Datos copiados", description: "Se copiaron los datos del dispositivo de la reparación anterior." });
   };
 
@@ -322,10 +329,12 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
       formData.append('deviceBrand', values.deviceBrand);
       formData.append('deviceModel', values.deviceModel);
       formData.append('deviceSerialIMEI', values.deviceSerialIMEI || '');
+      formData.append('devicePassword', values.devicePassword || '');
       formData.append('reportedIssue', fullReportedIssue);
       formData.append('technicianNotes', values.technicianNotes || '');
       formData.append('partsUsed', JSON.stringify(partsUsedForBackend));
       formData.append('totalPrice', totalPrice.toString());
+      formData.append('deposit', depositAmount.toString());
       formData.append('laborCost', totalLaborCost.toString());
       formData.append('totalCost', totalCost.toString());
       formData.append('profit', totalProfit.toString());
@@ -356,6 +365,7 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
     setSelectedProblems([]);
     setSelectedParts([]);
     setStep(1);
+    setDeposit("");
     setPreviousRepairs([]);
   };
 
@@ -428,48 +438,44 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
                         render={({ field }) => (
                           <FormItem className="flex flex-col">
                             <FormLabel>Nombre del Cliente</FormLabel>
-                            <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <div className="relative">
-                                    <Input
-                                      placeholder="Buscar o escribir nombre..."
-                                      {...field}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        setClientQuery(e.target.value);
-                                        setClientSearchOpen(true);
-                                      }}
-                                      autoComplete="off"
-                                    />
-                                    {searchingClient && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
-                                  </div>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0" align="start">
-                                <Command>
-                                  <CommandList>
-                                    {clientResults.length > 0 ? (
-                                      <CommandGroup heading="Clientes Encontrados">
-                                        {clientResults.map(client => (
-                                          <CommandItem key={client.id} onSelect={() => handleClientSelect(client)} className="cursor-pointer">
-                                            <User className="mr-2 h-4 w-4" />
-                                            <div className="flex flex-col">
-                                              <span>{client.firstName} {client.lastName}</span>
-                                              <span className="text-xs text-muted-foreground">{client.phone}</span>
-                                            </div>
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    ) : (
-                                      <div className="py-6 text-center text-sm text-muted-foreground">
-                                        {clientQuery.length < 2 ? "Escribe para buscar..." : "No se encontraron clientes. Se creará uno nuevo."}
+                            <div className="relative">
+                              <Input
+                                placeholder="Buscar o escribir nombre..."
+                                {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setClientQuery(e.target.value);
+                                  setClientSearchOpen(true);
+                                }}
+                                onFocus={() => setClientSearchOpen(true)}
+                                autoComplete="off"
+                              />
+                              {searchingClient && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+
+                              {clientSearchOpen && clientResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-[200px] overflow-y-auto">
+                                  {clientResults.map(client => (
+                                    <div
+                                      key={client.id}
+                                      onClick={() => handleClientSelect(client)}
+                                      className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground text-sm flex flex-col"
+                                    >
+                                      <div className="flex items-center font-medium">
+                                        <User className="mr-2 h-3.5 w-3.5" />
+                                        {client.firstName} {client.lastName}
                                       </div>
-                                    )}
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
+                                      <span className="text-xs text-muted-foreground ml-5.5">{client.phone}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {clientSearchOpen && clientQuery.length >= 2 && clientResults.length === 0 && !searchingClient && (
+                                <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md p-4 text-center text-sm text-muted-foreground">
+                                  No se encontraron clientes. Se creará uno nuevo.
+                                </div>
+                              )}
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -584,10 +590,23 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
                       control={form.control}
                       name="deviceSerialIMEI"
                       render={({ field }) => (
-                        <FormItem className="md:col-span-2">
+                        <FormItem>
                           <FormLabel>IMEI / Serie (Opcional)</FormLabel>
                           <FormControl>
                             <Input placeholder="Escáner o manual..." {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="devicePassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contraseña / Patrón</FormLabel>
+                          <FormControl>
+                            <Input placeholder="PIN o descripción de patrón..." {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -726,6 +745,9 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
                       <p className="text-muted-foreground font-medium">Dispositivo</p>
                       <p className="text-lg font-bold">{form.getValues('deviceBrand')} {form.getValues('deviceModel')}</p>
                       <p className="text-muted-foreground">{form.getValues('deviceSerialIMEI') || 'Sin IMEI'}</p>
+                      {form.getValues('devicePassword') && (
+                        <p className="text-xs font-mono bg-muted p-1 rounded mt-1 inline-block">Pass: {form.getValues('devicePassword')}</p>
+                      )}
                     </div>
                   </div>
 
@@ -745,8 +767,27 @@ export default function AddRepairDialog({ isOpen, onOpenChange, onOrderAdded }: 
                         </div>
                       ))}
                       <div className="border-t pt-2 mt-2 flex justify-between text-xl font-bold">
-                        <span>Total</span>
                         <span className="text-primary">${totalPrice.toFixed(2)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <span className="font-semibold text-muted-foreground">Abono Inicial</span>
+                        <div className="w-32">
+                          <Input
+                            type="number"
+                            value={deposit}
+                            onChange={(e) => setDeposit(e.target.value)}
+                            placeholder="0.00"
+                            className="text-right h-8"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
+                        <span>Restante</span>
+                        <span className={remainingBalance > 0 ? "text-red-500" : "text-green-600"}>
+                          ${remainingBalance.toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </div>

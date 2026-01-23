@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
@@ -20,7 +20,9 @@ import { normalizeVisualEditorData } from '@/lib/printing/visualLayoutTypes';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Eye, EyeOff } from 'lucide-react';
+import { LabelType } from '@/types';
+import { replacePlaceholdersWithSampleData } from './utils';
 
 interface VisualEditorProps {
   initialLayout?: VisualEditorData;
@@ -28,6 +30,7 @@ interface VisualEditorProps {
   widthMm: number;
   heightMm: number;
   orientation?: 'horizontal' | 'vertical';
+  labelType?: LabelType;
 }
 
 interface DropPayload {
@@ -37,7 +40,7 @@ interface DropPayload {
 
 const MIN_DIMENSION_MM = 5;
 
-const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChange, widthMm, heightMm, orientation = 'horizontal' }) => {
+const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChange, widthMm, heightMm, orientation = 'horizontal', labelType = 'product' }) => {
   const normalizedInitial = useMemo(() => {
     if (!initialLayout) {
       return { elements: [], globalStyles: { backgroundColor: '#ffffff' } };
@@ -50,10 +53,33 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     selectedElementId: null,
   });
   const [showGrid, setShowGrid] = useState(true);
-  const [globalStyles, setGlobalStyles] = useState({
+  const [globalStyles, setGlobalStyles] = useState<{ backgroundImageUrl?: string; backgroundColor?: string }>({
     backgroundImageUrl: initialLayout?.globalStyles?.backgroundImageUrl || '',
     backgroundColor: initialLayout?.globalStyles?.backgroundColor || '#ffffff',
   });
+
+  const [previewMode, setPreviewMode] = useState(false);
+
+  // Transform elements for Canvas based on previewMode
+  const canvasElements = useMemo(() => {
+    if (!previewMode) return editorState.elements;
+
+    return editorState.elements.map(el => {
+      // Only transform text content
+      if (typeof el.content === 'string' && (el.type === 'text' || el.type === 'placeholder')) {
+        return {
+          ...el,
+          content: replacePlaceholdersWithSampleData(el.content, labelType)
+        };
+      }
+      return el;
+    });
+  }, [editorState.elements, previewMode, labelType]);
+
+  // Filter placeholders based on labelType
+  const filteredPlaceholders = useMemo(() => {
+    return LABEL_PLACEHOLDERS.filter(p => !p.scope || p.scope === 'both' || p.scope === labelType);
+  }, [labelType]);
 
   // Sync globalStyles when initialLayout changes
   useEffect(() => {
@@ -62,12 +88,12 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
       backgroundColor: initialLayout?.globalStyles?.backgroundColor || '#ffffff',
     });
   }, [initialLayout?.globalStyles?.backgroundImageUrl, initialLayout?.globalStyles?.backgroundColor]);
-  
+
   // Calculate actual dimensions based on orientation
   const currentWidth = useMemo(() => {
     return orientation === 'vertical' ? heightMm : widthMm;
   }, [orientation, widthMm, heightMm]);
-  
+
   const currentHeight = useMemo(() => {
     return orientation === 'vertical' ? widthMm : heightMm;
   }, [orientation, widthMm, heightMm]);
@@ -76,11 +102,11 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
     // No scaling limits - show actual label dimensions in visual editor
     const widthPx = mmToPixels(Math.max(currentWidth, MIN_DIMENSION_MM));
     const heightPx = mmToPixels(Math.max(currentHeight, MIN_DIMENSION_MM));
-    
+
     // Only limit scaling for extremely large labels to prevent viewport overflow
     const maxViewportWidth = 1200; // Much larger than before
     const maxViewportHeight = 800; // Much larger than before
-    
+
     const computed = Math.min(1, maxViewportWidth / widthPx, maxViewportHeight / heightPx);
     return Number.isFinite(computed) && computed > 0 ? computed : 1;
   }, [currentWidth, currentHeight]);
@@ -99,6 +125,13 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             width: clamp(Math.min(currentWidth * 0.8, currentWidth - 4), MIN_DIMENSION_MM, currentWidth),
             height: clamp(Math.min(currentHeight * 0.4, 18), MIN_DIMENSION_MM, currentHeight),
             fontSize: 11,
+          };
+        }
+        if (placeholder.key === 'patternGrid') {
+          return {
+            width: clamp(Math.min(currentWidth * 0.3, 25), MIN_DIMENSION_MM, currentWidth),
+            height: clamp(Math.min(currentWidth * 0.3, 25), MIN_DIMENSION_MM, currentHeight),
+            fontSize: 10,
           };
         }
         return {
@@ -130,12 +163,12 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
 
   const clampElementToCanvas = useCallback(
     (element: VisualElement): VisualElement => {
-    const placeholder = findPlaceholder(element.placeholderKey);
-    const coercedType = element.type === 'placeholder' ? 'text' : element.type;
-    const defaults = getDefaultConfig(element.type, placeholder);
+      const placeholder = findPlaceholder(element.placeholderKey);
+      const coercedType = element.type === 'placeholder' ? 'text' : element.type;
+      const defaults = getDefaultConfig(element.type, placeholder);
 
-    const width = clamp(element.width ?? defaults.width, MIN_DIMENSION_MM, currentWidth);
-    const height = element.height ?? defaults.height; // No clamp on height
+      const width = clamp(element.width ?? defaults.width, MIN_DIMENSION_MM, currentWidth);
+      const height = element.height ?? defaults.height; // No clamp on height
       const maxX = Math.max(0, currentWidth - width);
       // No maxY constraint, allow overflow
       const x = roundTo(clamp(element.x ?? 0, 0, maxX), 2);
@@ -173,22 +206,22 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
   const onLayoutChangeRef = useRef(onLayoutChange);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastLayoutRef = useRef<string>('');
-  
+
   useEffect(() => {
     onLayoutChangeRef.current = onLayoutChange;
   }, [onLayoutChange]);
-  
+
   useEffect(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    
+
     timeoutRef.current = setTimeout(() => {
       const currentLayout = JSON.stringify({
         elements: editorState.elements,
         globalStyles,
       });
-      
+
       // Only call onLayoutChange if the layout actually changed
       if (currentLayout !== lastLayoutRef.current) {
         lastLayoutRef.current = currentLayout;
@@ -198,7 +231,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         });
       }
     }, 300); // Increased debounce time to reduce frequency
-    
+
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -211,7 +244,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
   const handleCreateElement = useCallback(
     (item: DropPayload, position: { x: number; y: number }) => {
       console.log('handleCreateElement called with:', { item, position });
-      
+
       const placeholder = findPlaceholder(item.placeholderKey);
       const elementType: VisualElement['type'] = item.type === 'placeholder' ? 'text' : (item.type as VisualElement['type']);
       const defaults = getDefaultConfig(elementType, placeholder);
@@ -230,11 +263,11 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             ? placeholder?.token ?? 'Nuevo Texto'
             : elementType === 'barcode'
               ? 'Código de Barras'
-            : elementType === 'image'
-              ? 'Imagen'
-              : elementType === 'qrcode'
-                ? 'Código QR'
-              : 'Componente',
+              : elementType === 'image'
+                ? 'Imagen'
+                : elementType === 'qrcode'
+                  ? 'Código QR'
+                  : 'Componente',
         width,
         height,
         x,
@@ -346,7 +379,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
           <div>
             <h3 className="font-semibold mb-3">Añadir Campos Dinámicos</h3>
             <div className="flex flex-wrap gap-2">
-              {LABEL_PLACEHOLDERS.map((placeholder) => (
+              {filteredPlaceholders.map((placeholder) => (
                 <ToolbarItem
                   key={placeholder.key}
                   type="placeholder"
@@ -361,14 +394,24 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
         </div>
 
         <div className="flex-1 relative p-4">
-          <div className="absolute top-2 right-2 z-10 bg-background border rounded-md p-2">
+          <div className="absolute top-2 right-2 z-10 bg-background border rounded-md p-2 flex items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="preview-mode" className="text-sm flex items-center gap-1 cursor-pointer select-none">
+                {previewMode ? <Eye className="w-4 h-4 text-primary" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                Prev.
+              </Label>
+              <Switch id="preview-mode" checked={previewMode} onCheckedChange={setPreviewMode} />
+            </div>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
             <div className="flex items-center space-x-2">
               <Label htmlFor="show-grid" className="text-sm">Cuadrícula</Label>
               <Switch id="show-grid" checked={showGrid} onCheckedChange={setShowGrid} />
             </div>
           </div>
           <Canvas
-            elements={editorState.elements}
+            elements={canvasElements}
             labelWidthMm={currentWidth}
             labelHeightMm={currentHeight}
             scale={scale}
@@ -404,6 +447,7 @@ const VisualEditor: React.FC<VisualEditorProps> = ({ initialLayout, onLayoutChan
             onSendToBack={handleSendToBack}
             onUpdateGlobalStyles={handleUpdateGlobalStyles}
             initialLayout={{ globalStyles }}
+            labelType={labelType}
           />
         </div>
       </div>

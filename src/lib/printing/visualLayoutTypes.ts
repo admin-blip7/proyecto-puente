@@ -30,6 +30,8 @@ export interface VisualEditorData {
   elements: VisualElement[];
   globalStyles?: {
     fontFamily?: string;
+    backgroundImageUrl?: string;
+    backgroundColor?: string;
   };
 }
 

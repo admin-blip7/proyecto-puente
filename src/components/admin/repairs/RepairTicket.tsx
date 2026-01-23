@@ -16,6 +16,10 @@ interface RepairTicketProps {
   repairOrder: RepairOrder;
 }
 
+// Import RepairLabel dynamically or directly if client-side
+import { RepairLabel } from "./RepairLabel";
+import { createRoot } from "react-dom/client";
+
 export const RepairTicket: FC<RepairTicketProps> = ({
   isOpen,
   onClose,
@@ -133,6 +137,44 @@ export const RepairTicket: FC<RepairTicketProps> = ({
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+    }
+  };
+
+  const handlePrintLabel = () => {
+    const printWindow = window.open("", "_blank", "width=400,height=300");
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Etiqueta - ${repairOrder.orderId}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
+              @page { size: 50mm 25mm; margin: 0; }
+              @media print { 
+                body { background: white; } 
+                #label-container { transform: scale(0.8); transform-origin: center; }
+              }
+            </style>
+          </head>
+          <body>
+            <div id="root"></div>
+          </body>
+        </html>
+      `);
+
+      const container = printWindow.document.getElementById("root");
+      if (container) {
+        const root = createRoot(container);
+        root.render(<RepairLabel repair={repairOrder} />);
+
+        // Wait for render/styles then print
+        setTimeout(() => {
+          printWindow.print();
+          // printWindow.close(); // Optional: keep open for debug
+        }, 500);
+      }
     }
   };
 
@@ -287,6 +329,20 @@ export const RepairTicket: FC<RepairTicketProps> = ({
                 ${repairOrder?.totalPrice?.toFixed(2) || "0.00"}
               </span>
             </div>
+            {(repairOrder.deposit ?? 0) > 0 && (
+              <>
+                <div className="flex justify-between items-center text-sm font-medium mt-1 text-gray-600">
+                  <span>Abono:</span>
+                  <span>- ${(repairOrder.deposit ?? 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg font-bold mt-2 pt-2 border-t border-gray-200">
+                  <span>RESTANTE:</span>
+                  <span className={(repairOrder.totalPrice - (repairOrder.deposit ?? 0)) > 0 ? "text-red-600" : "text-green-600"}>
+                    ${(repairOrder.totalPrice - (repairOrder.deposit ?? 0)).toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Notes */}
@@ -318,6 +374,10 @@ export const RepairTicket: FC<RepairTicketProps> = ({
           <Button onClick={handleDownload} variant="outline" className="flex-1" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Descargar
+          </Button>
+          <Button onClick={handlePrintLabel} variant="secondary" className="flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200" size="sm">
+            <Printer className="h-4 w-4 mr-2" />
+            Etiqueta
           </Button>
         </div>
       </DialogContent>

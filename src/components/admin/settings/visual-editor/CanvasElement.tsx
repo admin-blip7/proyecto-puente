@@ -6,6 +6,8 @@ import { useDrag } from 'react-dnd';
 import { LABEL_PLACEHOLDERS, VisualElement } from './types';
 import { QRCode } from 'react-qrcode-logo';
 
+import { AutoFitText } from './AutoFitText';
+
 interface CanvasElementProps {
   element: VisualElement;
   onSelect: (id: string | null) => void;
@@ -57,9 +59,12 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
       }
 
       return (
-        <span className="text-slate-700 font-medium truncate" style={{ fontSize: fontSizePx }}>
-          {placeholderDefinition?.token ?? element.content ?? 'Placeholder'}
-        </span>
+        <AutoFitText
+          content={placeholderDefinition?.token ?? element.content ?? 'Placeholder'}
+          maxWidth={widthPx - 8} // Padding consideration
+          maxHeight={heightPx - 8}
+          initialFontSize={fontSizePx}
+        />
       );
     }
 
@@ -122,9 +127,12 @@ const CanvasElement: React.FC<CanvasElementProps> = ({ element, onSelect, isSele
     }
 
     return (
-      <span className="text-slate-700 font-medium" style={{ fontSize: fontSizePx }}>
-        {element.content ?? 'Texto'}
-      </span>
+      <AutoFitText
+        content={element.content ?? 'Texto'}
+        maxWidth={widthPx - 8}
+        maxHeight={heightPx - 8}
+        initialFontSize={fontSizePx}
+      />
     );
   };
 

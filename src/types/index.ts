@@ -248,6 +248,7 @@ export interface RepairOrder {
   deviceBrand: string;
   deviceModel: string;
   deviceSerialIMEI: string;
+  devicePassword?: string;
   reportedIssue: string;
   technicianNotes?: string;
   partsUsed: RepairPart[];
@@ -255,6 +256,7 @@ export interface RepairOrder {
   totalCost: number;
   totalPrice: number;
   profit: number;
+  deposit?: number;
   createdAt: Date;
   completedAt?: Date;
 }

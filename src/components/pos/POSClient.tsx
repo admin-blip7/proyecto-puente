@@ -417,7 +417,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}) => {
+  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string) => {
     if (!userProfile || !activeSession) return;
 
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
@@ -427,7 +427,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts);
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -438,7 +438,9 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
       toast({
         title: "✅ Turno Cerrado",
-        description: `Se depositaron ${formatCurrency(actualCash)} a Caja Chica.`,
+        description: depositAccountId
+          ? `Se depositaron ${formatCurrency(actualCash)} a la cuenta seleccionada.`
+          : `Turno cerrado sin depósito automático.`,
       });
 
       console.log('✅ [SESSION] Session closed, printing ticket...');

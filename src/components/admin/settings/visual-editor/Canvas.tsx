@@ -50,13 +50,13 @@ const Canvas: React.FC<CanvasProps> = ({
       console.log('Canvas rendering with backgroundImageUrl:', backgroundImageUrl);
     }
   }, [backgroundImageUrl]);
-  
+
   // Generate grid pattern
   const gridPattern = useMemo(() => {
     if (!showGrid) return undefined;
     const gridSize = 5; // 5mm grid
     const gridPx = mmToPixels(gridSize, scale);
-    
+
     return {
       backgroundImage: `
         linear-gradient(to right, #e5e7eb 1px, transparent 1px),
@@ -70,7 +70,7 @@ const Canvas: React.FC<CanvasProps> = ({
     accept: ['text', 'image', 'qrcode', 'barcode', 'placeholder', 'canvas-element'],
     drop: (item, monitor) => {
       console.log('Canvas drop received item:', item);
-      
+
       if (item.id) {
         const delta = monitor.getDifferenceFromInitialOffset();
         if (!delta) return;
@@ -95,7 +95,7 @@ const Canvas: React.FC<CanvasProps> = ({
         x: pixelsToMm(positionPx.x, scale),
         y: pixelsToMm(positionPx.y, scale),
       };
-      
+
       console.log('Creating element at position:', positionMm);
       onCreateElement(item, positionMm);
     },
@@ -121,7 +121,7 @@ const Canvas: React.FC<CanvasProps> = ({
             {labelHeightMm} mm
           </span>
         </div>
-        
+
         {/* Área de la etiqueta */}
         <div
           ref={ref}
@@ -134,11 +134,35 @@ const Canvas: React.FC<CanvasProps> = ({
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
             backgroundColor: backgroundColor || '#ffffff',
-            backgroundImage: backgroundImageUrl && backgroundImageUrl.trim() ? `url(${backgroundImageUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            ...gridPattern,
+
+            // Complex background composition for Grid + User Image
+            backgroundImage: [
+              // 1. Grid lines (if enabled) - Top Layer
+              ...(showGrid ? [
+                `linear-gradient(to right, #ccc 1px, transparent 1px)`,
+                `linear-gradient(to bottom, #ccc 1px, transparent 1px)`
+              ] : []),
+              // 2. User background image (if exists) - Bottom Layer
+              ...(backgroundImageUrl && backgroundImageUrl.trim() ? [`url(${backgroundImageUrl})`] : [])
+            ].join(', '),
+
+            backgroundSize: [
+              ...(showGrid ? [
+                `${mmToPixels(5, scale)}px ${mmToPixels(5, scale)}px`,
+                `${mmToPixels(5, scale)}px ${mmToPixels(5, scale)}px`
+              ] : []),
+              ...(backgroundImageUrl && backgroundImageUrl.trim() ? ['cover'] : [])
+            ].join(', '),
+
+            backgroundRepeat: [
+              ...(showGrid ? ['repeat', 'repeat'] : []),
+              ...(backgroundImageUrl && backgroundImageUrl.trim() ? ['no-repeat'] : [])
+            ].join(', '),
+
+            backgroundPosition: [
+              ...(showGrid ? ['0 0', '0 0'] : []),
+              ...(backgroundImageUrl && backgroundImageUrl.trim() ? ['center'] : [])
+            ].join(', '),
           }}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -155,18 +179,18 @@ const Canvas: React.FC<CanvasProps> = ({
             {elements
               .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)) // Sort by zIndex
               .map((element) => (
-              <CanvasElement
-                key={element.id}
-                element={element}
-                scale={scale}
-                pxPerMm={pxPerMm}
-                onSelect={onSelectElement}
-                isSelected={element.id === selectedElementId}
-              />
-            ))}
+                <CanvasElement
+                  key={element.id}
+                  element={element}
+                  scale={scale}
+                  pxPerMm={pxPerMm}
+                  onSelect={onSelectElement}
+                  isSelected={element.id === selectedElementId}
+                />
+              ))}
           </div>
         </div>
-        
+
         {/* Leyenda de vista previa */}
         <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center">
           <span className="text-xs text-white/80">

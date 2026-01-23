@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { DynamicRepairLabel } from "./DynamicRepairLabel";
+import { createRoot } from "react-dom/client";
 import { RepairOrder, Product, TicketSettings, LabelSettings } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, MoreHorizontal, Printer, Receipt, Timer, Check, X, Search, Bell, Smartphone, Battery, Droplets, Camera, Sparkles, ChevronRight } from "lucide-react";
@@ -89,102 +91,83 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
   };
 
   const handlePrint = (order: RepairOrder, type: 'ticket' | 'label') => {
-    const isLabel = type === 'label';
 
-    const printWindow = window.open('', 'PRINT', 'height=800,width=800');
-    if (!printWindow) {
-      alert("El navegador bloqueó la ventana de impresión.");
-      return;
-    }
+    if (type === 'label') {
+      const printWindow = window.open("", "_blank", "width=400,height=300");
+      if (printWindow) {
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Etiqueta - ${order.orderId}</title>
+                <style>
+                  body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #fff; }
+                  @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
+                </style>
+              </head>
+              <body>
+                <div id="root"></div>
+              </body>
+            </html>
+          `);
 
-    printWindow.document.write('<html><head><title>Imprimir</title>');
+        const container = printWindow.document.getElementById("root");
+        if (container) {
+          const root = createRoot(container);
+          root.render(<DynamicRepairLabel repair={order} settings={labelSettings} />);
 
-    let content = '';
-    if (isLabel) {
-      printWindow.document.write(`
-          <style>
-              @page { size: ${labelSettings.width}mm ${labelSettings.height}mm; margin: 0; }
-              body { margin: 0; padding: 0; }
-          </style>
-      `);
-      // Extract a short failure summary (first line or short text)
-      const failureSummary = order.reportedIssue.split('\n')[0].substring(0, 30) + (order.reportedIssue.length > 30 ? '...' : '');
-      const workSummary = order.partsUsed.map(p => p.name).join(', ').substring(0, 40) + (order.partsUsed.length > 0 ? '...' : '');
-
-      content = `
-          <div class="label" style="width: ${labelSettings.width}mm; height: ${labelSettings.height}mm; box-sizing: border-box; padding: 2mm; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; font-family: sans-serif; font-size: 10px; line-height: 1.2;">
-              <div style="font-weight: 900; font-size: 14px; margin-bottom: 2px;">${order.orderId}</div>
-              <svg id="barcode-${order.orderId}" style="width: 95%; height: ${labelSettings.barcodeHeight}px; display: block; margin: 0 auto;"></svg>
-              
-              <div style="width: 100%; border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">
-                <div style="font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${order.customerName}</div>
-                <div style="font-size: 10px;">${order.customerPhone}</div>
-              </div>
-
-              <div style="width: 100%; margin-top: 2px;">
-                <div style="font-weight: bold; font-size: 11px;">${order.deviceBrand} ${order.deviceModel}</div>
-              </div>
-              
-              <div style="width: 100%; text-align: left; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 2px;">
-                 <div style="display: flex; gap: 4px;">
-                    <strong style="min-width: 35px;">Falla:</strong> 
-                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${failureSummary || 'N/A'}</span>
-                 </div>
-                 <div style="display: flex; gap: 4px;">
-                    <strong style="min-width: 35px;">Realizar:</strong> 
-                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${workSummary || 'Revisión'}</span>
-                 </div>
-              </div>
-          </div>
-      `;
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        }
+      }
     } else {
+      // Ticket printing logic
+      const printWindow = window.open('', 'PRINT', 'height=800,width=800');
+      if (!printWindow) {
+        alert("El navegador bloqueó la ventana de impresión.");
+        return;
+      }
+
       const { header, body, footer } = ticketSettings;
-      content = `
-            <div style="width: 80mm; font-family: 'Courier New', Courier, monospace; color: black; padding: 3mm; font-size: ${body.fontSize === 'xs' ? '10px' : body.fontSize === 'sm' ? '12px' : '14px'};">
-                <div style="text-align: center; margin-bottom: 1rem;">
-                ${header.showLogo && header.logoUrl ? `<img src="${header.logoUrl}" alt="Logo" style="max-width: 60px; max-height: 60px; margin: 0 auto;"/>` : ''}
-                ${header.show.storeName ? `<h1 style="font-size: 1.2em; font-weight: bold;">${header.storeName}</h1>` : ''}
-                ${header.show.address ? `<p>${header.address}</p>` : ''}
-                ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
-                </div>
-                <p>Folio: ${order.orderId}</p>
-                <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
-                <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
-                <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
-                <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>
-                <p><strong>Falla Reportada:</strong></p>
-                <p>${order.reportedIssue}</p>
-                <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
-                <div style="font-size: 0.8em; margin-top: 1rem;">
-                    <p><strong>Términos y Condiciones:</strong></p>
-                    <p>No nos hacemos responsables por equipos abandonados después de 30 días. La revisión causa un costo de $150 MXN si el equipo no es reparado.</p>
-                </div>
-                <div style="margin-top: 2rem; border-top: 1px solid black; padding-top: 0.5rem;">
-                    <p>Firma de Conformidad del Cliente</p>
-                </div>
-            </div>
-        `;
+      const content = `
+              <div style="width: 80mm; font-family: 'Courier New', Courier, monospace; color: black; padding: 3mm; font-size: ${body.fontSize === 'xs' ? '10px' : body.fontSize === 'sm' ? '12px' : '14px'};">
+                  <div style="text-align: center; margin-bottom: 1rem;">
+                  ${header.showLogo && header.logoUrl ? `<img src="${header.logoUrl}" alt="Logo" style="max-width: 60px; max-height: 60px; margin: 0 auto;"/>` : ''}
+                  ${header.show.storeName ? `<h1 style="font-size: 1.2em; font-weight: bold;">${header.storeName}</h1>` : ''}
+                  ${header.show.address ? `<p>${header.address}</p>` : ''}
+                  ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
+                  </div>
+                  <p>Folio: ${order.orderId}</p>
+                  <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                  <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
+                  <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
+                  <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>
+                  <p><strong>Falla Reportada:</strong></p>
+                  <p>${order.reportedIssue}</p>
+                  <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
+                  <div style="font-size: 0.8em; margin-top: 1rem;">
+                      <p><strong>Términos y Condiciones:</strong></p>
+                      <p>No nos hacemos responsables por equipos abandonados después de 30 días. La revisión causa un costo de $150 MXN si el equipo no es reparado.</p>
+                  </div>
+                  <div style="margin-top: 2rem; border-top: 1px solid black; padding-top: 0.5rem;">
+                      <p>Firma de Conformidad del Cliente</p>
+                  </div>
+              </div>
+          `;
+
+      printWindow.document.write('<html><head><title>Imprimir</title></head><body>');
+      printWindow.document.write(content);
+      printWindow.document.write('</body></html>');
+
+      printWindow.document.close();
+      printWindow.focus();
+
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
     }
-
-    printWindow.document.write('</head><body>');
-    printWindow.document.write(content);
-    printWindow.document.write('</body></html>');
-
-    if (isLabel) {
-      try {
-        JsBarcode(printWindow.document.getElementById(`barcode-${order.orderId}`), order.orderId, {
-          format: 'CODE128', displayValue: false, height: labelSettings.barcodeHeight, width: 1.5, margin: 0,
-        });
-      } catch (e) { console.error(e); }
-    }
-
-    printWindow.document.close();
-    printWindow.focus();
-
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
   };
 
   const filteredOrders = useMemo(() => {

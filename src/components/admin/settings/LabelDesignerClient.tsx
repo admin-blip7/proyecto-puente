@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion } from "@/components/ui/accordion";
-import { getLabelSettings, saveLabelSettings } from "@/lib/services/settingsService";
+import { getLabelSettings, saveLabelSettings, getLabelSettingsById } from "@/lib/services/settingsService";
 import { Save, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -108,13 +108,47 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
   const handleLabelTypeChange = useCallback(async (newLabelType: LabelType) => {
     setSelectedLabelType(newLabelType);
     setSelectedLabelId(null); // Reset specific label selection
+    // Remove forced simple mode for repair labels
     if (newLabelType === 'repair') {
-      setMode('simple');
+      // optimization: pre-load defaults if needed
     }
 
     try {
       // Load the settings for the selected label type
       const settings = await getLabelSettings(newLabelType);
+
+      // Auto-fix for Repair labels that might have been initialized with Product defaults
+      if (newLabelType === 'repair') {
+        let needsFix = false;
+        try {
+          const layout = settings.visualLayout ? JSON.parse(settings.visualLayout) : null;
+          const hasProductElements = layout?.elements?.some((e: any) =>
+            e.content?.includes("Nombre del Producto") || e.content?.includes("SKU") || e.placeholderKey === 'productName'
+          );
+          if (hasProductElements) {
+            needsFix = true;
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+
+        if (needsFix) {
+          settings.visualLayout = JSON.stringify({
+            elements: [
+              { id: "title", type: "text", x: 2, y: 2, width: 47, height: 6, content: "REPARACIÓN", fontSize: 12, fontWeight: "bold", textAlign: "center" },
+              { id: "order", type: "text", x: 2, y: 10, width: 47, height: 5, content: "{ID de Orden}", fontSize: 10, textAlign: "center", placeholderKey: "orderId" }
+            ]
+          });
+          settings.content = {
+            showProductName: false,
+            showSku: false,
+            showPrice: false,
+            showStoreName: true,
+          };
+          settings.height = 25; // Reset height to reasonable repair label default
+        }
+      }
+
       form.reset(settings);
     } catch (error) {
       console.error('Error loading label settings for type:', newLabelType, error);
@@ -122,20 +156,24 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
       const defaultSettings = {
         labelType: newLabelType,
         width: 51,
-        height: 102,
+        height: newLabelType === 'repair' ? 25 : 102,
         orientation: 'vertical' as const,
         fontSize: 9,
         barcodeHeight: 30,
         includeLogo: false,
         logoUrl: "",
         storeName: "Nombre de tu Tienda",
-        content: {
-          showProductName: true,
-          showSku: true,
-          showPrice: true,
-          showStoreName: false,
+        content: newLabelType === 'repair' ? {
+          showProductName: false, showSku: false, showPrice: false, showStoreName: true
+        } : {
+          showProductName: true, showSku: true, showPrice: true, showStoreName: false,
         },
-        visualLayout: null,
+        visualLayout: newLabelType === 'repair' ? JSON.stringify({
+          elements: [
+            { id: "title", type: "text", x: 2, y: 2, width: 47, height: 6, content: "REPARACIÓN", fontSize: 12, fontWeight: "bold", textAlign: "center" },
+            { id: "order", type: "text", x: 2, y: 10, width: 47, height: 5, content: "{ID de Orden}", fontSize: 10, textAlign: "center", placeholderKey: "orderId" }
+          ]
+        }) : null,
       };
       form.reset(defaultSettings);
     }
@@ -146,10 +184,56 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
     const selectedLabel = existingLabels.find(label => label.id === labelId);
 
     if (selectedLabel) {
+      // Don't just set the type based on the listing, we want to load what's actually in the DB
+      // But setting it here helps UI feedback immediately
       setSelectedLabelType(selectedLabel.type);
 
       try {
-        const settings = await getLabelSettings(selectedLabel.type);
+        const settings = await getLabelSettingsById(labelId);
+
+        // Update selectedLabelType based on the actual settings loaded, if available
+        if (settings.labelType) {
+          // If the loaded settings have a type that conflicts with the known type of the label ID, prefer the ID's type
+          // This fixes cases where a repair label was saved with "product" type data
+          if (settings.labelType !== selectedLabel.type) {
+            console.warn(`Label type mismatch. Settings: ${settings.labelType}, ID implies: ${selectedLabel.type}. Forcing ${selectedLabel.type}.`);
+            settings.labelType = selectedLabel.type;
+          }
+          setSelectedLabelType(settings.labelType);
+        } else {
+          // If settings don't specify, use what we know from the list
+          settings.labelType = selectedLabel.type;
+          setSelectedLabelType(selectedLabel.type);
+        }
+
+        // Auto-fix for Repair labels (same logic as before, just in case)
+        if (settings.labelType === 'repair') {
+          let needsFix = false;
+          try {
+            const layout = settings.visualLayout ? JSON.parse(settings.visualLayout) : null;
+            const hasProductElements = layout?.elements?.some((e: any) =>
+              e.content?.includes("Nombre del Producto") || e.content?.includes("SKU") || e.placeholderKey === 'productName'
+            );
+            if (hasProductElements) {
+              needsFix = true;
+            }
+          } catch (e) {
+            // ignore parse error
+          }
+
+          if (needsFix) {
+            settings.visualLayout = JSON.stringify({
+              elements: [
+                { id: "title", type: "text", x: 2, y: 2, width: 47, height: 6, content: "REPARACIÓN", fontSize: 12, fontWeight: "bold", textAlign: "center" },
+                { id: "order", type: "text", x: 2, y: 10, width: 47, height: 5, content: "{ID de Orden}", fontSize: 10, textAlign: "center", placeholderKey: "orderId" }
+              ]
+            });
+            settings.content = { showProductName: false, showSku: false, showPrice: false, showStoreName: true };
+            settings.height = 25;
+            settings.width = 51;
+          }
+        }
+
         form.reset(settings);
       } catch (error) {
         console.error('Error loading specific label settings:', error);
@@ -273,7 +357,10 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
         });
         return;
       }
-      await saveLabelSettings(payload);
+
+      // Pass the selectedLabelId (if any) to save settings to the correct document
+      await saveLabelSettings(payload, selectedLabelId || undefined);
+
       form.reset(payload);
       toast({
         title: "Diseño Guardado",
@@ -312,10 +399,10 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
 
   const visualEditorKey = useMemo(() => {
     const layout = watchedSettings.visualLayout ?? initialSettings.visualLayout ?? '';
-    if (!layout) return 'empty-layout';
+    if (!layout) return `empty-layout-${selectedLabelId}`;
     const head = layout.slice(0, 32);
-    return `${layout.length}-${head}`;
-  }, [watchedSettings.visualLayout, initialSettings.visualLayout]);
+    return `${selectedLabelId || 'new'}-${layout.length}-${head}`;
+  }, [watchedSettings.visualLayout, initialSettings.visualLayout, selectedLabelId]);
 
   return (
     <>
@@ -385,7 +472,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
             </Select>
           </div>
 
-          {selectedLabelType === 'product' && (
+          {(selectedLabelType === 'product' || selectedLabelType === 'repair') && (
             <div className="flex items-center space-x-2">
               <Label htmlFor="visual-mode-label">Modo Visual</Label>
               <Switch
@@ -437,6 +524,7 @@ export default function LabelDesignerClient({ initialSettings }: LabelDesignerCl
               widthMm={watchedSettings.width}
               heightMm={watchedSettings.height}
               orientation={watchedSettings.orientation || 'horizontal'}
+              labelType={selectedLabelType}
             />
           )}
         </TabsContent>

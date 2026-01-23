@@ -32,6 +32,11 @@ const DISCOUNT_SETTINGS_DOC_ID = "discount_settings";
 // --- TICKET SETTINGS ---
 
 const defaultTicketSettings: TicketSettings = {
+  paperWidth: 80,
+  fontStyle: {
+    bold: false,
+    italic: false,
+  },
   header: {
     showLogo: true,
     logoUrl: "",
@@ -226,6 +231,29 @@ const createDefaultLabelSettings = (): Omit<LabelSettings, 'labelType'> => ({
 
 const defaultLabelSettings = createDefaultLabelSettings();
 
+const createDefaultRepairLabelSettings = (): Omit<LabelSettings, 'labelType'> => ({
+  width: 51,
+  height: 25, // Smaller height for repair labels usually, or keep same? User said 101x51 in walkthrough. Let's maintain user preference if known, otherwise distinct default.
+  orientation: 'horizontal',
+  fontSize: 10,
+  barcodeHeight: 15,
+  includeLogo: false,
+  logoUrl: "",
+  storeName: "Nombre de tu Tienda",
+  content: {
+    showProductName: false,
+    showSku: false,
+    showPrice: false,
+    showStoreName: true,
+  },
+  visualLayout: JSON.stringify({
+    elements: [
+      { id: "title", type: "text", x: 2, y: 2, width: 47, height: 6, content: "REPARACIÓN", fontSize: 12, fontWeight: "bold", textAlign: "center" },
+      { id: "order", type: "text", x: 2, y: 10, width: 47, height: 5, content: "{ID de Orden}", fontSize: 10, textAlign: "center", placeholderKey: "orderId" }
+    ]
+  }),
+});
+
 export const getLabelSettings = async (labelType: LabelType = "product"): Promise<LabelSettings> => {
   try {
     const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
@@ -242,18 +270,55 @@ export const getLabelSettings = async (labelType: LabelType = "product"): Promis
 
       log.warn("Invalid label settings in Supabase, returning defaults.", parsed.error);
     } else {
-      await upsertSettingsDoc(docId, createDefaultLabelSettings());
+      const defaults = labelType === 'repair' ? createDefaultRepairLabelSettings() : createDefaultLabelSettings();
+      await upsertSettingsDoc(docId, defaults);
+      return { ...defaults, labelType };
     }
   } catch (error) {
     log.error("Error fetching label settings", error);
   }
+
+  const defaults = labelType === 'repair' ? createDefaultRepairLabelSettings() : createDefaultLabelSettings();
   return {
-    ...createDefaultLabelSettings(),
+    ...defaults,
     labelType,
   };
 };
 
-export const saveLabelSettings = async (settings: LabelSettings): Promise<void> => {
+export const getLabelSettingsById = async (id: string): Promise<LabelSettings> => {
+  try {
+    const { row } = await fetchSettingsDoc(id);
+    if (row) {
+      const rowData = stripMeta(row);
+      const parsed = LabelSettingsSchema.safeParse(rowData);
+
+      // Determine label type from ID if possible, or fallback to data, or default to 'product'
+      const typeFromId = id.includes('repair') ? 'repair' : 'product';
+
+      if (parsed.success) {
+        return {
+          ...parsed.data,
+          labelType: parsed.data.labelType || typeFromId,
+        };
+      }
+
+      log.warn("Invalid label settings in Supabase for ID " + id, parsed.error);
+    }
+  } catch (error) {
+    log.error("Error fetching label settings by ID", error);
+  }
+
+  // Fallback defaults if not found or invalid
+  // Try to guess type from ID
+  const isRepair = id.toLowerCase().includes('repair');
+  const defaults = isRepair ? createDefaultRepairLabelSettings() : createDefaultLabelSettings();
+  return {
+    ...defaults,
+    labelType: isRepair ? 'repair' : 'product',
+  };
+};
+
+export const saveLabelSettings = async (settings: LabelSettings, id?: string): Promise<void> => {
   try {
     const { labelType, ...settingsToSave } = settings;
     // Ensure orientation has a default value if not provided
@@ -262,14 +327,16 @@ export const saveLabelSettings = async (settings: LabelSettings): Promise<void> 
       orientation: settingsToSave.orientation || 'horizontal',
     };
 
-    log.info("Attempting to save label settings", { labelType, dataToValidate });
+    log.info("Attempting to save label settings", { labelType, dataToValidate, id });
 
     const validated = LabelSettingsSchema.parse(dataToValidate);
-    const docId = `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
+
+    // If ID is provided, use it. Otherwise, use the default type-based ID.
+    const docId = id || `${LABEL_SETTINGS_DOC_ID_BASE}_${labelType}`;
 
     log.info("Validation successful, saving to database", { docId });
 
-    await upsertSettingsDoc(docId, validated);
+    await upsertSettingsDoc(docId, { ...validated, labelType }); // Save labelType in the data too
 
     log.info("Label settings saved successfully", { docId });
   } catch (error) {

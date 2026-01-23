@@ -14,7 +14,7 @@ export default async function RepairsPage() {
         getRepairOrders(),
         getProducts(),
         getTicketSettings(),
-        getLabelSettings()
+        getLabelSettings("repair")
     ]);
 
     return (
