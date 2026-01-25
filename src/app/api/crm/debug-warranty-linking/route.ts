@@ -16,20 +16,20 @@ export async function GET(request: NextRequest) {
     // Search for customer by exact phone
     const { data: exactMatch, error: exactError } = await supabase
       .from("crm_clients")
-      .select("id, firestore_id, first_name, last_name, phone")
+      .select("id, first_name, last_name, phone")
       .eq("phone", phone)
       .single();
 
     // Search for all customers with similar phone pattern
     const { data: allClients, error: allError } = await supabase
       .from("crm_clients")
-      .select("id, firestore_id, first_name, last_name, phone")
+      .select("id, first_name, last_name, phone")
       .ilike("phone", `%${phone.replace(/\D/g, "")}%`);
 
     // Get warranties for this phone
     const { data: warranties, error: warrantyError } = await supabase
       .from("warranties_new")
-      .select("id, firestore_id, customer_name, customer_phone, status, reported_at")
+      .select("id, customer_name, customer_phone, status, reported_at")
       .eq("customer_phone", phone);
 
     // Check interactions linked to any matching client

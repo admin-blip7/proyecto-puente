@@ -10,7 +10,7 @@ const log = getLogger("expenseCategoryService");
 const CATEGORIES_TABLE = "expense_categories";
 
 const mapCategory = (row: any): ExpenseCategory => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   name: row?.name ?? "",
   isActive: Boolean(row?.isActive ?? false),
   icon: row?.icon ?? "",
@@ -47,9 +47,7 @@ export const addExpenseCategory = async (
 ): Promise<ExpenseCategory> => {
   try {
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const payload = {
-      firestore_id: firestoreId,
       name: categoryData.name,
       isActive: categoryData.isActive ?? true,
       icon: categoryData.icon ?? null,
@@ -81,7 +79,7 @@ export const updateExpenseCategory = async (
     const { error } = await supabase
       .from(CATEGORIES_TABLE)
       .update(dataToUpdate)
-      .or(`firestore_id.eq.${categoryId},id.eq.${categoryId}`);
+      .eq("id", categoryId);
 
     if (error) {
       throw error;

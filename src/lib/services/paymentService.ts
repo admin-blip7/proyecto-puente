@@ -14,7 +14,7 @@ const CONSIGNOR_PAYMENTS_TABLE = "consignor_payments";
 const STORAGE_PAYMENT_PROOFS_PATH = "payment_proofs";
 
 const mapPayment = (row: any): ConsignorPayment => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   paymentId: row?.paymentid ?? row?.paymentId ?? "",
   consignorId: row?.consignorid ?? row?.consignor_id ?? "",
   amountPaid: Number(row?.amountpaid ?? row?.amountPaid ?? 0),
@@ -27,7 +27,7 @@ const mapPayment = (row: any): ConsignorPayment => ({
 export const getConsignorPayments = async (consignorId: string): Promise<ConsignorPayment[]> => {
   const startTime = Date.now();
   const requestId = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[getConsignorPayments] Starting request`, {
       requestId,
@@ -110,16 +110,16 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
     let data: any[] | null = null;
     let error: any = null;
     const columnVariations = ["consignorid", "consignorId", "consignor_id"];
-    
+
     for (const columnName of columnVariations) {
       try {
         log.debug(`[getConsignorPayments] Attempting query with column: ${columnName}`, { requestId });
-        
+
         // Intentar con diferentes nombres de columna para la ordenación también
         const sortColumns = ["paymentdate", "payment_date", "paymentDate"];
         let queryResult;
         let sortColumnFound = false;
-        
+
         for (const sortColumn of sortColumns) {
           try {
             queryResult = await supabase
@@ -127,7 +127,7 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
               .select("*")
               .eq(columnName, consignorId)
               .order(sortColumn, { ascending: false });
-            
+
             if (!queryResult.error) {
               sortColumnFound = true;
               log.debug(`[getConsignorPayments] Successfully used sort column: ${sortColumn}`, {
@@ -144,7 +144,7 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
             });
           }
         }
-        
+
         // Si ningún nombre de columna de ordenación funciona, intentar sin ordenación
         if (!sortColumnFound) {
           log.debug(`[getConsignorPayments] No valid sort column found, trying unsorted query`, {
@@ -199,7 +199,7 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
 
     const processingTime = Date.now() - startTime;
     const paymentCount = data?.length || 0;
-    
+
     log.info(`[getConsignorPayments] Successfully completed`, {
       requestId,
       consignorId,
@@ -241,7 +241,7 @@ export const getConsignorPayments = async (consignorId: string): Promise<Consign
 export const getConsignorPaymentsBatch = async (consignorIds: string[]): Promise<Record<string, ConsignorPayment[]>> => {
   const requestId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const startTime = Date.now();
-  
+
   try {
     log.info(`[getConsignorPaymentsBatch] Starting batch request`, {
       requestId,
@@ -267,7 +267,7 @@ export const getConsignorPaymentsBatch = async (consignorIds: string[]): Promise
     // Procesar en lotes más pequeños para evitar sobrecarga
     const batchSize = 5;
     const results: Record<string, ConsignorPayment[]> = {};
-    
+
     for (let i = 0; i < validIds.length; i += batchSize) {
       const batch = validIds.slice(i, i + batchSize);
       const batchPromises = batch.map(async (consignorId) => {
@@ -285,7 +285,7 @@ export const getConsignorPaymentsBatch = async (consignorIds: string[]): Promise
       });
 
       const batchResults = await Promise.allSettled(batchPromises);
-      
+
       batchResults.forEach((result, index) => {
         const consignorId = batch[index];
         if (result.status === 'fulfilled') {
@@ -308,7 +308,7 @@ export const getConsignorPaymentsBatch = async (consignorIds: string[]): Promise
 
     const processingTime = Date.now() - startTime;
     const totalPayments = Object.values(results).reduce((sum, payments) => sum + payments.length, 0);
-    
+
     log.info(`[getConsignorPaymentsBatch] Batch completed`, {
       requestId,
       processedCount: validIds.length,
@@ -325,7 +325,7 @@ export const getConsignorPaymentsBatch = async (consignorIds: string[]): Promise
       stack: error instanceof Error ? error.stack : undefined,
       processingTime: `${processingTime}ms`
     });
-    
+
     // Retornar objeto vacío en caso de error grave
     return {};
   }
@@ -370,11 +370,9 @@ export const addConsignorPayment = async (
 
   try {
     const proofOfPaymentUrl = await uploadProofOfPayment(proofFile, consignorId, paymentId);
-    const firestoreId = uuidv4();
     const paymentDate = nowIso();
 
     const payload = {
-      firestore_id: firestoreId,
       paymentid: paymentId,
       consignorid: consignorId,
       amountpaid: amountPaid,
@@ -400,7 +398,7 @@ export const addConsignorPayment = async (
 export const getAllConsignorPayments = async (): Promise<ConsignorPayment[]> => {
   const startTime = Date.now();
   const requestId = `all-payments-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[getAllConsignorPayments] Starting request`, {
       requestId,
@@ -439,7 +437,7 @@ export const getAllConsignorPayments = async (): Promise<ConsignorPayment[]> => 
 
     const processingTime = Date.now() - startTime;
     const paymentCount = data?.length || 0;
-    
+
     log.info(`[getAllConsignorPayments] Successfully completed`, {
       requestId,
       paymentCount,

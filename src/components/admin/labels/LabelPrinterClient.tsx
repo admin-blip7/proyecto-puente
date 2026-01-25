@@ -21,7 +21,7 @@ interface LabelPrinterClientProps {
 }
 
 // 🔥 FIX #1: Stable key generation without timestamps
-const getStableProductKey = (product: Product, index: number): string => {
+const getStableProductKey = (product: { id?: string; sku?: string }, index: number): string => {
     return product.id || product.sku || `product-${index}`;
 };
 
@@ -36,7 +36,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
 
     // 🔥 FIX #2: Removed unstable productKeyMap that was causing re-renders
-    
+
     const resolveSupplierName = (product: Product): string | undefined => {
         type SupplierCandidate = {
             supplierName?: string;
@@ -61,7 +61,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return [];
         const lowerCaseQuery = searchQuery.toLowerCase();
-        
+
         return allProducts.filter(p => {
             const name = p.name.toLowerCase();
             const sku = p.sku.toLowerCase();
@@ -76,7 +76,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
         if (focusTimeoutRef.current) {
             clearTimeout(focusTimeoutRef.current);
         }
-        
+
         // Use requestAnimationFrame for better timing
         requestAnimationFrame(() => {
             focusTimeoutRef.current = setTimeout(() => {
@@ -107,7 +107,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
             };
 
             const candidateProductId = candidate.product.id ?? candidate.product.sku;
-            
+
             const existingItem = prev.find((item) => {
                 const productId = item.product.id ?? item.product.sku;
                 return productId === candidateProductId;
@@ -127,7 +127,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
         // 🔥 FIX #4: Use safe focus instead of direct focus
         safeFocusInput();
     }, [consignorMap, supplierMap, safeFocusInput]);
-    
+
     const handleSearchInputChange = useCallback((value: string) => {
         setSearchQuery(value);
         // Solo abrir el popover si está cerrado y hay texto
@@ -160,7 +160,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
 
     const handleGenerate = async () => {
         if (printList.length === 0) return;
-        
+
         const payload = printList
             .filter((item) => item.quantity > 0)
             .map((item) => ({
@@ -206,8 +206,8 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                         }}>
                             <PopoverTrigger asChild className="w-full">
                                 <div className="relative">
-                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                     <Input
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
                                         ref={searchInputRef}
                                         placeholder="Buscar productos (puedes seleccionar varios)..."
                                         value={searchQuery}
@@ -272,13 +272,13 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                                                 .filter(([_, value]) => value !== null && value !== undefined && value !== "")
                                                                 .slice(0, 3)
                                                                 .map(([key, value]) => (
-                                                                <span
-                                                                    key={`${key}-${value}`}
-                                                                    className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded"
-                                                                >
-                                                                    {key}: {String(value)}
-                                                                </span>
-                                                            ))}
+                                                                    <span
+                                                                        key={`${key}-${value}`}
+                                                                        className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded"
+                                                                    >
+                                                                        {key}: {String(value)}
+                                                                    </span>
+                                                                ))}
                                                         </div>
                                                     )}
                                                 </div>

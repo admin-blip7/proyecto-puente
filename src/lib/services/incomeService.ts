@@ -16,14 +16,8 @@ const CASH_SESSIONS_TABLE = "cash_sessions";
 const STORAGE_RECEIPTS_PATH = "income_receipts";
 
 const mapIncome = (row: any): Income => {
-    // Use firestore_id, then id, then incomeId, then a hash of description + amount + date
-    const id = row?.firestore_id ??
-        row?.id ??
-        row?.incomeId ??
-        `fallback-${row?.description}-${row?.amount}-${row?.paymentDate}`;
-
     return {
-        id: String(id),
+        id: String(row?.id),
         incomeId: row?.incomeId ?? "",
         description: row?.description ?? "",
         category: row?.category ?? "",
@@ -38,7 +32,7 @@ const mapIncome = (row: any): Income => {
 };
 
 const mapCategory = (row: any): IncomeCategory => ({
-    id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     name: row?.name ?? "",
     isActive: Boolean(row?.isActive ?? false),
     icon: row?.icon ?? "",
@@ -116,9 +110,8 @@ export const addIncomeCategory = async (
 ): Promise<IncomeCategory> => {
     try {
         const supabase = getSupabaseServerClient();
-        const firestoreId = uuidv4();
+
         const payload = {
-            firestore_id: firestoreId,
             name: categoryData.name,
             isActive: categoryData.isActive ?? true,
             icon: categoryData.icon ?? null,
@@ -167,7 +160,6 @@ export const addIncome = async (
 
     const supabase = getSupabaseServerClient();
     const incomeId = `INC-${uuidv4().split("-")[0].toUpperCase()}`;
-    const firestoreId = uuidv4();
     const paymentDate = nowIso();
 
     let receiptUrl: string | undefined;
@@ -193,7 +185,6 @@ export const addIncome = async (
     }
 
     const incomePayload = {
-        firestore_id: firestoreId,
         incomeId,
         description: incomeData.description,
         category: incomeData.category,
@@ -202,7 +193,7 @@ export const addIncome = async (
         source: incomeData.source,
         paymentDate,
         receiptUrl: receiptUrl ?? null,
-        sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (incomeData.sessionId || null),
+        sessionId: activeSession ? activeSession.id : (incomeData.sessionId || null),
         icon: incomeData.icon ?? null,
     };
 
@@ -223,13 +214,9 @@ export const addIncome = async (
 
     let query = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance");
+        .select("id, current_balance, name");
 
-    if (uuidValidate(incomeData.destinationAccountId)) {
-        query = query.or(`firestore_id.eq.${incomeData.destinationAccountId},id.eq.${incomeData.destinationAccountId}`);
-    } else {
-        query = query.eq("firestore_id", incomeData.destinationAccountId);
-    }
+    query = query.eq("id", incomeData.destinationAccountId);
 
     const { data: account, error: accountError } = await query.maybeSingle();
 
@@ -245,22 +232,20 @@ export const addIncome = async (
 
     const newBalance = Number(account.current_balance ?? 0) + incomeData.amount;
 
+    console.log(`[addIncome] Updating account balance: ${account.name} (DB ID: ${account.id}), old: ${account.current_balance}, amount: ${incomeData.amount}, new: ${newBalance}`);
+
+    // Always use the database id for reliable updates
+    // This ensures the update works consistently
     const { error: updateError } = await supabase
         .from(ACCOUNTS_TABLE)
         .update({ current_balance: newBalance })
-        .eq("firestore_id", account.firestore_id); // Use firestore_id for update if available, or id
+        .eq("id", account.id);
 
     if (updateError) {
-        // Fallback to ID if firestore_id update failed (though it shouldn't if we found it)
-        const { error: updateError2 } = await supabase
-            .from(ACCOUNTS_TABLE)
-            .update({ current_balance: newBalance })
-            .eq("id", account.id);
-
-        if (updateError2) {
-            log.error("Error updating account balance for income", updateError2);
-            throw new Error("Ingreso registrado, pero falló la actualización del saldo.");
-        }
+        log.error("Error updating account balance for income", updateError);
+        // ROLLBACK: Delete the inserted income since we can't update balance
+        await supabase.from(INCOMES_TABLE).delete().eq("id", insertedIncome.id);
+        throw new Error(`Ingreso registrado, pero falló la actualización del saldo: ${updateError.message}`);
     }
 
     return mapIncome(insertedIncome);
@@ -274,11 +259,7 @@ export const deleteIncome = async (incomeId: string): Promise<void> => {
         .from(INCOMES_TABLE)
         .select("*");
 
-    if (uuidValidate(incomeId)) {
-        query = query.or(`firestore_id.eq.${incomeId},id.eq.${incomeId}`);
-    } else {
-        query = query.eq("firestore_id", incomeId);
-    }
+    query = query.eq("id", incomeId);
 
     const { data: income, error: fetchError } = await query.maybeSingle();
 
@@ -289,12 +270,13 @@ export const deleteIncome = async (incomeId: string): Promise<void> => {
     // 2. Get the account to reverse the balance
     let accountQuery = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance");
+        .select("id, current_balance, name");
 
     if (uuidValidate(income.destinationAccountId)) {
-        accountQuery = accountQuery.or(`firestore_id.eq.${income.destinationAccountId},id.eq.${income.destinationAccountId}`);
+        accountQuery = accountQuery.eq("id", income.destinationAccountId);
     } else {
-        accountQuery = accountQuery.eq("firestore_id", income.destinationAccountId);
+        // If it's not a UUID, it might be an old integer ID or similar, but for now we assume ID
+        accountQuery = accountQuery.eq("id", income.destinationAccountId);
     }
 
     const { data: account, error: accountError } = await accountQuery.maybeSingle();
@@ -302,39 +284,31 @@ export const deleteIncome = async (incomeId: string): Promise<void> => {
     if (account) {
         // Reverse balance (Subtract income amount)
         const newBalance = Number(account.current_balance ?? 0) - Number(income.amount);
+        console.log(`[deleteIncome] Reversing account balance for ${account.name} (DB ID: ${account.id}), old: ${account.current_balance}, amount: -${income.amount}, new: ${newBalance}`);
 
+        // Always use the database id for reliable updates
         const { error: updateError } = await supabase
             .from(ACCOUNTS_TABLE)
             .update({ current_balance: newBalance })
-            .eq("firestore_id", account.firestore_id);
+            .eq("id", account.id);
 
         if (updateError) {
-            // Fallback to ID
-            await supabase
-                .from(ACCOUNTS_TABLE)
-                .update({ current_balance: newBalance })
-                .eq("id", account.id);
+            log.error("Error reversing account balance when deleting income", updateError);
+            // Continue with delete even if balance update fails (partial failure)
         }
     } else {
         log.warn("Account not found when deleting income, balance not reversed.", { incomeId, accountId: income.destinationAccountId });
     }
 
     // 3. Delete the income record
+    // Try delete by ID first
     const { error: deleteError } = await supabase
         .from(INCOMES_TABLE)
         .delete()
-        .eq("firestore_id", income.firestore_id);
+        .eq("id", income.id);
 
     if (deleteError) {
-        // Try fallback to ID if firestore_id delete failed
-        const { error: deleteError2 } = await supabase
-            .from(INCOMES_TABLE)
-            .delete()
-            .eq("id", income.id);
-
-        if (deleteError2) {
-            throw new Error(`No se pudo eliminar el ingreso: ${deleteError2.message}`);
-        }
+        throw new Error(`No se pudo eliminar el ingreso: ${deleteError.message}`);
     }
 };
 

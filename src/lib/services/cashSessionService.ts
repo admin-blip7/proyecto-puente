@@ -26,7 +26,7 @@ const calculateBagsEndAmounts = (
 };
 
 const mapSession = (row: any): CashSession => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   sessionId: row?.sessionId ?? "",
   status: row?.status ?? "Abierto",
   openedBy: row?.openedBy ?? "",
@@ -228,12 +228,10 @@ export const openCashSession = async (
   previousSessionConfirmedAt?: Date
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
-  const firestoreId = uuidv4();
   const sessionId = `CS-${uuidv4().split("-")[0].toUpperCase()}`;
   const openedAt = nowIso();
 
   const payload = {
-    firestore_id: firestoreId,
     sessionId,
     status: "Abierto" as const,
     openedBy: userId,
@@ -277,7 +275,7 @@ export const closeCashSession = async (
     const { data: freshSessionData, error: fetchError } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .select("*")
-      .eq("firestore_id", session.id)
+      .eq("sessionId", session.sessionId)
       .single();
 
     if (fetchError || !freshSessionData) {
@@ -335,7 +333,7 @@ export const closeCashSession = async (
     const { data: updatedData, error } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .update(updatePayload)
-      .eq("firestore_id", session.id)
+      .eq("sessionId", session.sessionId)
       .select();
 
     if (error) {
@@ -345,7 +343,7 @@ export const closeCashSession = async (
     }
 
     if (!updatedData || updatedData.length === 0) {
-      console.warn(`[closeCashSession] No rows updated with firestore_id, trying sessionId fallback...`);
+      console.warn(`[closeCashSession] No rows updated with id, trying sessionId fallback...`);
       const { data: retryData, error: retryError } = await supabase
         .from(CASH_SESSIONS_TABLE)
         .update({ status: "Cerrado", closedAt })
@@ -420,7 +418,7 @@ export const depositToCajaChica = async (
     // Find Caja Chica account
     const { data: cajaChicaAccount, error: findError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("id,firestore_id,name")
+      .select("id,name")
       .eq("name", "Caja Chica")
       .maybeSingle();
 
@@ -434,7 +432,9 @@ export const depositToCajaChica = async (
       throw new Error("Caja Chica account does not exist.");
     }
 
-    const accountId = cajaChicaAccount.firestore_id || cajaChicaAccount.id;
+    // Use the actual database id as the targetAccountId
+    const accountId = cajaChicaAccount.id;
+    console.log(`[depositToCajaChica] Found Caja Chica: DB ID: ${accountId}, Using target ID: ${accountId}`);
 
     // Use addIncome to record the transaction and update balance
     // This ensures it shows up in the transaction history
@@ -472,11 +472,11 @@ export const depositToAccount = async (
   const supabase = getSupabaseServerClient();
 
   try {
-    // Check if account exists
+    // Check if account exists - use the actual database id for accurate lookup
     const { data: account, error: findError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("id,firestore_id,name")
-      .or(`id.eq.${accountId},firestore_id.eq.${accountId}`)
+      .select("id,name")
+      .eq("id", accountId)
       .maybeSingle();
 
     if (findError) {
@@ -485,11 +485,13 @@ export const depositToAccount = async (
     }
 
     if (!account) {
-      log.error("Account not found");
-      throw new Error("Account does not exist.");
+      log.error("Account not found", { accountId });
+      throw new Error(`Account does not exist. ID: ${accountId}`);
     }
 
-    const targetAccountId = account.firestore_id || account.id;
+    // Use the actual database id as targetAccountId
+    const targetAccountId = account.id;
+    console.log(`[depositToAccount] Found account: ${account.name}, DB ID: ${account.id}, Using target ID: ${targetAccountId}`);
 
     // Use addIncome to record the transaction and update balance
     await addIncome({

@@ -12,7 +12,9 @@ const CLIENT_PAYMENTS_TABLE = "client_payments";
 const CREDIT_ACCOUNTS_TABLE = "credit_accounts";
 const ACCOUNTS_TABLE = "accounts";
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+const CLIENT_PAYMENTS_TABLE = "client_payments";
+const CREDIT_ACCOUNTS_TABLE = "credit_accounts";
+const ACCOUNTS_TABLE = "accounts";
 
 export const addClientPayment = async (
   paymentData: Omit<ClientPayment, "id" | "paymentId" | "paymentDate">,
@@ -31,13 +33,13 @@ export const addClientPayment = async (
     await Promise.all([
       supabase
         .from(CREDIT_ACCOUNTS_TABLE)
-        .select("firestore_id,currentBalance")
-        .or(orIdFilter(accountId))
+        .select("id,currentBalance")
+        .eq("id", accountId)
         .maybeSingle(),
       supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id,currentBalance")
-        .or(orIdFilter(depositAccountId))
+        .select("id,currentBalance")
+        .eq("id", depositAccountId)
         .maybeSingle(),
     ]);
 
@@ -49,11 +51,9 @@ export const addClientPayment = async (
     throw new Error("La cuenta de depósito no existe.");
   }
 
-  const firestoreId = uuidv4();
   const paymentDate = nowIso();
 
   const { error: insertError } = await supabase.from(CLIENT_PAYMENTS_TABLE).insert({
-    firestore_id: firestoreId,
     paymentId,
     accountId,
     amountPaid,
@@ -73,11 +73,11 @@ export const addClientPayment = async (
     supabase
       .from(CREDIT_ACCOUNTS_TABLE)
       .update({ current_balance: creditBalance })
-      .eq("firestore_id", creditAccount.firestore_id ?? accountId),
+      .eq("id", creditAccount.id),
     supabase
       .from(ACCOUNTS_TABLE)
       .update({ current_balance: depositBalance })
-      .eq("firestore_id", depositAccount.firestore_id ?? depositAccountId),
+      .eq("id", depositAccount.id),
   ]);
 
   if (creditUpdateError || depositUpdateError) {

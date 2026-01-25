@@ -11,7 +11,7 @@ const log = getLogger("debtService");
 const DEBTS_TABLE = "debts";
 
 const mapDebt = (row: any): Debt => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   creditorName: row?.creditorName ?? "",
   debtType: row?.debtType ?? "Otro",
   currentBalance: Number(row?.current_balance ?? 0),
@@ -23,12 +23,12 @@ const mapDebt = (row: any): Debt => ({
   cat: row?.cat !== null ? Number(row.cat) : undefined,
 });
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+
 
 export const getDebts = async (): Promise<Debt[]> => {
   const startTime = Date.now();
   const requestId = `debts-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[getDebts] Starting request`, {
       requestId,
@@ -87,18 +87,18 @@ export const getDebts = async (): Promise<Debt[]> => {
       // Realizar la consulta principal con manejo flexible de nombres de columna
       let result;
       let error;
-      
+
       // Intentar con diferentes nombres de columna para la ordenación
       const sortColumns = ["creditorName", "creditor_name", "creditorname"];
       let sortColumnFound = false;
-      
+
       for (const sortColumn of sortColumns) {
         try {
           result = await supabase
             .from(DEBTS_TABLE)
             .select("*")
             .order(sortColumn, { ascending: true });
-          
+
           if (!result.error) {
             sortColumnFound = true;
             log.debug(`[getDebts] Successfully used sort column: ${sortColumn}`, { requestId });
@@ -111,7 +111,7 @@ export const getDebts = async (): Promise<Debt[]> => {
           });
         }
       }
-      
+
       // Si ningún nombre de columna funciona, hacer consulta sin ordenación
       if (!sortColumnFound) {
         log.warn(`[getDebts] No valid sort column found, using unsorted query`, { requestId });
@@ -119,7 +119,7 @@ export const getDebts = async (): Promise<Debt[]> => {
           .from(DEBTS_TABLE)
           .select("*");
       }
-      
+
       // Asegurar que result esté definido
       if (!result) {
         throw new Error("Failed to execute debt query");
@@ -155,7 +155,7 @@ export const getDebts = async (): Promise<Debt[]> => {
 
     const processingTime = Date.now() - startTime;
     const debtCount = data?.length || 0;
-    
+
     log.info(`[getDebts] Successfully completed`, {
       requestId,
       debtCount,
@@ -196,7 +196,7 @@ export const addDebt = async (
 ): Promise<Debt> => {
   const startTime = Date.now();
   const requestId = `add-debt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[addDebt] Starting request`, {
       requestId,
@@ -215,9 +215,8 @@ export const addDebt = async (
     }
 
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const payload = {
-      firestore_id: firestoreId,
+      // firestore_id removed
       creditorName: debtData.creditorName.trim(),
       debtType: debtData.debtType ?? "Otro",
       current_balance: debtData.currentBalance,
@@ -247,7 +246,7 @@ export const addDebt = async (
 
     const processingTime = Date.now() - startTime;
     const mappedDebt = mapDebt(data);
-    
+
     log.info(`[addDebt] Successfully completed`, {
       requestId,
       debtId: mappedDebt.id,
@@ -274,7 +273,7 @@ export const updateDebt = async (
 ): Promise<void> => {
   const startTime = Date.now();
   const requestId = `update-debt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[updateDebt] Starting request`, {
       requestId,
@@ -295,7 +294,7 @@ export const updateDebt = async (
     const { error } = await supabase
       .from(DEBTS_TABLE)
       .update(dataToUpdate)
-      .or(orIdFilter(debtId));
+      .eq('id', debtId);
 
     if (error) {
       log.error("[updateDebt] Database operation failed", {
@@ -333,7 +332,7 @@ export const updateDebt = async (
 export const deleteDebt = async (debtId: string): Promise<void> => {
   const startTime = Date.now();
   const requestId = `delete-debt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     log.info(`[deleteDebt] Starting request`, {
       requestId,
@@ -349,7 +348,7 @@ export const deleteDebt = async (debtId: string): Promise<void> => {
     const { error } = await supabase
       .from(DEBTS_TABLE)
       .delete()
-      .or(orIdFilter(debtId));
+      .eq('id', debtId);
 
     if (error) {
       log.error("[deleteDebt] Database operation failed", {

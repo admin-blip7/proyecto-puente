@@ -145,7 +145,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: sales,
-      count: sales.length,
+      count: sales.total,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {

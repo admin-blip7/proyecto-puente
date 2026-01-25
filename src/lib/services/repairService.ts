@@ -13,7 +13,7 @@ const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 
 const mapRepairOrder = (row: any): RepairOrder => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   orderId: row?.orderId ?? "",
   status: row?.status ?? "Recibido",
   customerName: row?.customerName ?? "",
@@ -34,7 +34,7 @@ const mapRepairOrder = (row: any): RepairOrder => ({
   completedAt: row?.completedAt ? toDate(row.completedAt) : undefined,
 });
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+const orIdFilter = (id: string) => `id.eq.${id}`;
 
 export const getRepairOrders = async (): Promise<RepairOrder[]> => {
   try {
@@ -116,11 +116,11 @@ export const addRepairOrder = async (
   try {
     const supabase = getSupabaseServerClient();
     const orderId = await getNextOrderId();
-    const firestoreId = uuidv4();
+
     const createdAt = nowIso();
 
     const payload = {
-      firestore_id: firestoreId,
+
       orderId,
       status: "Recibido" as const,
       customerName: orderData.customerName,
@@ -221,8 +221,8 @@ export const addPartToRepairOrder = async (
 
   const { data: productRow, error: productError } = await supabase
     .from(PRODUCTS_TABLE)
-    .select("firestore_id,stock,cost,price,name")
-    .or(orIdFilter(part.id))
+    .select("id,stock,cost,price,name")
+    .eq("id", part.id)
     .maybeSingle();
 
   if (productError || !productRow) {
@@ -238,15 +238,15 @@ export const addPartToRepairOrder = async (
   const { error: stockError } = await supabase
     .from(PRODUCTS_TABLE)
     .update({ stock: newStock })
-    .eq("firestore_id", productRow.firestore_id ?? part.id);
+    .eq("id", productRow.id);
 
   if (stockError) {
     throw new Error("No se pudo actualizar el stock del producto.");
   }
 
   const { error: logError } = await supabase.from(INVENTORY_LOGS_TABLE).insert({
-    firestore_id: uuidv4(),
-    productId: productRow.firestore_id ?? part.id,
+
+    productId: productRow.id,
     productName: productRow.name ?? part.name,
     change: -quantity,
     reason: "Uso en Reparación",

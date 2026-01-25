@@ -161,7 +161,7 @@ Almacena todos los productos del inventario.
 ```sql
 CREATE TABLE products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  firestore_id text UNIQUE NOT NULL,
+
   name text NOT NULL,
   sku text NOT NULL UNIQUE,
   price numeric NOT NULL DEFAULT 0,
@@ -350,7 +350,7 @@ CREATE TABLE settings (
 ### Convenciones de Nomenclatura
 
 1. **IDs**: Todas las tablas usan UUID como primary key
-2. **firestore_id**: Campo adicional para compatibilidad con migración desde Firebase
+
 3. **created_at/updated_at**: Timestamps automáticos con timestamptz
 4. **jsonb**: Para datos estructurados variables (attributes, metadata, settings)
 5. **text[]**: Arrays de PostgreSQL para listas simples

@@ -27,7 +27,7 @@ export const createProductChange = async (params: CreateProductChangeParams): Pr
             p_sale_id: params.saleId,
             p_original_item_id: params.originalItem.productId, // Assuming productId is the firestore_id/id used in DB
             p_original_quantity: params.originalItem.quantity,
-            p_new_item_id: params.newProduct.firestore_id || params.newProduct.id,
+            p_new_item_id: params.newProduct.id,
             p_new_quantity: params.newQuantity,
             p_reason: params.reason,
             p_user_id: params.performedBy,

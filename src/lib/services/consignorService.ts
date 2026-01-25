@@ -10,14 +10,11 @@ const log = getLogger("consignorService");
 const CONSIGNORS_TABLE = "consignors";
 
 const mapConsignor = (row: any): Consignor => ({
-  id: row?.id ?? "", // Use the UUID id from Supabase
-  firestore_id: row?.firestore_id,
+  id: row?.id ?? "",
   name: row?.name ?? "",
   contactInfo: row?.contactInfo ?? "",
   balanceDue: Number(row?.balanceDue ?? 0),
 });
-
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
 
 export const getConsignors = async (): Promise<Consignor[]> => {
   try {
@@ -32,10 +29,10 @@ export const getConsignors = async (): Promise<Consignor[]> => {
     }
 
     const mappedConsignors = (data ?? []).map(mapConsignor);
-    
+
     // Remove duplicates by name and contactInfo to prevent duplicates in UI
-    const uniqueConsignors = mappedConsignors.filter((consignor, index, self) => 
-      index === self.findIndex(c => 
+    const uniqueConsignors = mappedConsignors.filter((consignor, index, self) =>
+      index === self.findIndex(c =>
         c.name === consignor.name && c.contactInfo === consignor.contactInfo
       )
     );
@@ -53,9 +50,7 @@ export const addConsignor = async (
 ): Promise<Consignor> => {
   try {
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const payload = {
-      firestore_id: firestoreId,
       name: data.name,
       contactInfo: data.contactInfo,
       balanceDue: 0,
@@ -87,7 +82,7 @@ export const updateConsignorInfo = async (
     const { error } = await supabase
       .from(CONSIGNORS_TABLE)
       .update(data)
-      .or(orIdFilter(consignorId));
+      .eq("id", consignorId);
 
     if (error) {
       throw error;
@@ -104,7 +99,7 @@ export const deleteConsignor = async (consignorId: string): Promise<void> => {
     const { error } = await supabase
       .from(CONSIGNORS_TABLE)
       .delete()
-      .or(orIdFilter(consignorId));
+      .eq("id", consignorId);
 
     if (error) {
       throw error;
@@ -123,8 +118,8 @@ export const updateConsignorBalance = async (
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
       .from(CONSIGNORS_TABLE)
-      .select("firestore_id,balanceDue")
-      .or(orIdFilter(consignorId))
+      .select("id,balanceDue")
+      .eq("id", consignorId)
       .maybeSingle();
 
     if (error || !data) {
@@ -135,7 +130,7 @@ export const updateConsignorBalance = async (
     const { error: updateError } = await supabase
       .from(CONSIGNORS_TABLE)
       .update({ balanceDue: newBalance })
-      .eq("firestore_id", data.firestore_id ?? consignorId);
+      .eq("id", data.id);
 
     if (updateError) {
       throw updateError;

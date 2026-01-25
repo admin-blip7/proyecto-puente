@@ -10,8 +10,8 @@ const log = getLogger("purchaseOrdersApi");
 const fetchProduct = async (supabase: ReturnType<typeof getSupabaseServerClient>, productId: string) => {
   const { data, error } = await supabase
     .from("products")
-    .select("firestore_id,id,stock,cost,price,name")
-    .or(`firestore_id.eq.${productId},id.eq.${productId}`)
+    .select("id, firestore_id, stock, cost, price, name")
+    .eq("id", productId)
     .maybeSingle();
 
   if (error) {
@@ -27,8 +27,7 @@ const createInventoryLog = async (
 ) => {
   const { product, change, userId, purchaseOrderId, cost } = params;
   const { error } = await supabase.from("inventory_logs").insert({
-    firestore_id: uuidv4(),
-    productId: product.firestore_id ?? product.id,
+    productId: product.id, // Prefer ID
     productName: product.name ?? "",
     change,
     reason: "Ingreso de Mercancía",
@@ -65,7 +64,7 @@ const applyInventoryForOrder = async (
     const { error: updateError } = await supabase
       .from("products")
       .update({ stock: newStock })
-      .eq("firestore_id", product.firestore_id ?? product.id);
+      .eq("id", product.id);
 
     if (updateError) {
       throw updateError;
@@ -75,7 +74,7 @@ const applyInventoryForOrder = async (
       product,
       change: Number(item.qty ?? item.quantity ?? 0),
       userId,
-      purchaseOrderId: order.firestore_id ?? order.id,
+      purchaseOrderId: order.id, // Prefer ID
       cost: item.finalCost ?? item.cost,
     });
   }

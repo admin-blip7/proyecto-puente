@@ -81,7 +81,7 @@ export default function DebtStrategyDialog({ isOpen, onOpenChange, debts }: Debt
                             <Separator />
                             <h4 className="font-semibold">Plan de Acción:</h4>
                             <ol className="list-decimal list-inside space-y-2 text-sm">
-                                {strategy.snowball.plan.map((step, index) => (
+                                {strategy.snowball.plan.map((step: any, index: number) => (
                                     <li key={index}>
                                         <span className="font-semibold">{step.creditorName}</span>: <span className="text-muted-foreground">{step.reason}</span>
                                     </li>
@@ -101,7 +101,7 @@ export default function DebtStrategyDialog({ isOpen, onOpenChange, debts }: Debt
                             <Separator />
                             <h4 className="font-semibold">Plan de Acción:</h4>
                             <ol className="list-decimal list-inside space-y-2 text-sm">
-                                {strategy.avalanche.plan.map((step, index) => (
+                                {strategy.avalanche.plan.map((step: any, index: number) => (
                                     <li key={index}>
                                         <span className="font-semibold">{step.creditorName}</span>: <span className="text-muted-foreground">{step.reason}</span>
                                     </li>

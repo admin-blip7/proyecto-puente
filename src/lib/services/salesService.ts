@@ -16,7 +16,7 @@ const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 
 const mapSale = (row: any): Sale => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   saleId: row?.saleId ?? "",
   items: Array.isArray(row?.items) ? row.items : [],
   totalAmount: Number(row?.totalAmount ?? 0),
@@ -49,7 +49,6 @@ export const getSales = async (
   try {
     const supabase = getSupabaseServerClient();
 
-    // Note: createdAt is stored as JSON (Firestore timestamp format), not as PostgreSQL timestamp.
     // We need to fetch all sales and filter dates in JavaScript, similar to financeService.ts.
 
     // Fetch all sales with status filter only (we'll filter by date and search in JavaScript)
@@ -65,8 +64,7 @@ export const getSales = async (
     }
 
     // Fetch all data (we'll sort and paginate after filtering)
-    // Note: Can't order by createdAt here because it's stored as JSON (Firestore timestamp format)
-    // not as PostgreSQL timestamp, so server-side ordering doesn't work correctly
+    // Note: Order by createdAt handled in memory due to complex date filtering requirements
     const { data: allData, error, count } = await query;
 
     if (error) {
@@ -86,7 +84,6 @@ export const getSales = async (
         const saleDate = toDate(sale.createdAt);
 
         // Get the date portion in Mexico timezone (YYYY-MM-DD)
-        // This ensures filtering matches the user's local view
         const saleDateStr = saleDate.toLocaleDateString('en-CA', {
           timeZone: 'America/Mexico_City'
         });
@@ -220,7 +217,7 @@ export const addSaleAndUpdateStock = async (
         const { data: product, error: productError } = await supabase
           .from(PRODUCTS_TABLE)
           .select('consignor_id, name')
-          .eq('firestore_id', item.productId)
+          .eq('id', item.productId)
           .single();
 
         if (productError) {
@@ -259,7 +256,7 @@ export const addSaleAndUpdateStock = async (
     // Preparar datos de la venta
     const saleRecord = {
       id: sale.id,
-      firestore_id: sale.id,
+      // firestore_id removed
       saleId: sale.saleId,
       items: sale.items, // Items ahora incluyen consignorId y nombre correcto
       totalAmount: sale.totalAmount,
@@ -314,7 +311,7 @@ export const addSaleAndUpdateStock = async (
           const { data: product, error: productError } = await supabase
             .from(PRODUCTS_TABLE)
             .select('cost')
-            .eq('firestore_id', item.productId)
+            .eq('id', item.productId)
             .single();
 
           if (productError || !product) {
@@ -377,11 +374,11 @@ export const addSaleAndUpdateStock = async (
 
         log.info(`Updating stock for product: ${item.name} (ID: ${item.id})`);
 
-        // Obtener el producto actual usando firestore_id
+        // Obtener el producto actual
         const { data: product, error: productError } = await supabase
           .from(PRODUCTS_TABLE)
-          .select('stock, name')
-          .eq('firestore_id', item.id)
+          .select('stock, name, id') // Ensure we get the ID for logging if needed
+          .eq('id', item.id)
           .single();
 
         if (productError) {
@@ -399,14 +396,14 @@ export const addSaleAndUpdateStock = async (
 
         log.info(`Stock update for ${product.name}: ${currentStock} -> ${newStock} (quantity sold: ${item.quantity})`);
 
-        // Actualizar el stock usando firestore_id
+        // Actualizar el stock
         const { error: updateError } = await supabase
           .from(PRODUCTS_TABLE)
           .update({
             stock: newStock,
-            updated_at: now
+            updated_at: new Date(now),
           })
-          .eq('firestore_id', item.id);
+          .eq("id", item.id);
 
         if (updateError) {
           log.error(`Error updating stock for product ${item.id}`, updateError);
@@ -448,12 +445,19 @@ export const addSaleAndUpdateStock = async (
       try {
         log.info(`Updating CRM client ${crmClientId} with sale info`);
 
-        // First fetch the client by firestore_id to get the database ID and current purchases
-        const { data: clientData, error: fetchError } = await supabase
+        // First fetch the client by id or firestore_id to get the database ID and current purchases
+        let clientQuery = supabase
           .from('crm_clients')
-          .select('id, firestore_id, total_purchases')
-          .eq('firestore_id', crmClientId)
-          .single();
+          .select('id, total_purchases');
+
+        // Check if crmClientId is numeric to search by ID, otherwise search by ID (assuming it's a UUID)
+        if (/^\d+$/.test(crmClientId)) {
+          clientQuery = clientQuery.eq('id', parseInt(crmClientId));
+        } else {
+          clientQuery = clientQuery.eq('id', crmClientId);
+        }
+
+        const { data: clientData, error: fetchError } = await clientQuery.single();
 
         if (fetchError || !clientData) {
           log.warn(`Client not found: ${crmClientId}`, fetchError);
@@ -493,7 +497,7 @@ export const addSaleAndUpdateStock = async (
               const { data: interaction, error: interactionError } = await supabase
                 .from('crm_interactions')
                 .insert({
-                  firestore_id: `interaction-sale-${sale.id}`,
+                  // firestore_id removed
                   client_id: dbClientId,
                   interaction_type: 'sale',
                   interaction_date: now,

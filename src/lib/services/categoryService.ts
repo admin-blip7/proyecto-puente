@@ -68,3 +68,15 @@ export async function deleteProductCategory(id: string): Promise<void> {
     throw new Error("Failed to delete category");
   }
 }
+
+export async function createCategory(label: string): Promise<string> {
+  const cat = await createProductCategory(label);
+  return cat.id;
+}
+
+export async function searchCategories(query: string): Promise<ProductCategory[]> {
+  const all = await getProductCategories();
+  if (!query) return all;
+  const lower = query.toLowerCase();
+  return all.filter(c => c.label.toLowerCase().includes(lower));
+}

@@ -11,7 +11,6 @@ const addPurchaseOrderLocal = async (orderData: any): Promise<string> => {
     const timestamp = nowIso();
 
     const payload = {
-      firestore_id: firestoreId,
       orderNumber: orderData.orderNumber,
       supplier: orderData.supplier,
       totalAmount: Number(orderData.totalAmount) || 0,
@@ -26,12 +25,12 @@ const addPurchaseOrderLocal = async (orderData: any): Promise<string> => {
     };
 
     const { data, error } = await supabase.from("purchase_orders").insert(payload).select();
-    
+
     if (error) {
       throw new Error(`Database error: ${error.message}`);
     }
 
-    return firestoreId;
+    return data?.[0]?.id;
   } catch (error) {
     throw new Error(`Failed to add purchase order: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -39,11 +38,11 @@ const addPurchaseOrderLocal = async (orderData: any): Promise<string> => {
 
 export async function POST(request: Request) {
   console.log("Quick PO intake API called");
-  
+
   try {
     const body = await request.json();
     console.log("Request body parsed", { bodyKeys: Object.keys(body) });
-    
+
     const { action } = body as { action?: string };
     console.log("Action extracted", { action });
 
@@ -51,13 +50,13 @@ export async function POST(request: Request) {
       case "searchProducts": {
         const { query } = body as { query: string };
         const normalized = query?.trim() ?? "";
-        
+
         if (!normalized) {
           return NextResponse.json({ products: [] });
         }
 
         const supabase = getSupabaseServerClient();
-        
+
         // Optimized search with better filtering
         const tokens = normalized
           .toLowerCase()
@@ -65,13 +64,13 @@ export async function POST(request: Request) {
           .filter((token) => token.length > 1)
           .slice(0, 3);
 
-        const searchFilter = tokens.length > 0 
+        const searchFilter = tokens.length > 0
           ? tokens.map(token => `name.ilike.%${token}%`).join(",")
           : `name.ilike.%${normalized}%`;
 
         const { data, error } = await supabase
           .from("products")
-          .select("firestore_id,id,name,sku,price,cost,stock,type,ownershipType,consignorId,reorderPoint")
+          .select("id,name,sku,price,cost,stock,type,ownershipType,consignorId,reorderPoint")
           .or(searchFilter)
           .order('stock', { ascending: false })
           .limit(20);
@@ -81,7 +80,7 @@ export async function POST(request: Request) {
         }
 
         const products = (data ?? []).map((row: any) => ({
-          id: row.firestore_id ?? row.id,
+          id: row.id,
           name: row.name ?? "",
           sku: row.sku ?? "",
           price: Number(row.price ?? 0),
@@ -101,7 +100,7 @@ export async function POST(request: Request) {
         const supabase = getSupabaseServerClient();
         const { data, error } = await supabase
           .from("suppliers")
-          .select("firestore_id,name,totalPurchasedYTD,contactInfo,notes")
+          .select("id,name,totalPurchasedYTD,contactInfo,notes")
           .order('totalPurchasedYTD', { ascending: false })
           .limit(50);
 
@@ -110,7 +109,7 @@ export async function POST(request: Request) {
         }
 
         const suppliers = (data ?? []).map((row: any) => ({
-          id: row.firestore_id ?? row.id,
+          id: row.id,
           name: row.name ?? "",
           totalPurchasedYTD: Number(row.totalPurchasedYTD ?? 0),
           contactInfo: row.contactInfo ?? "",
@@ -122,7 +121,7 @@ export async function POST(request: Request) {
 
       case "savePurchaseOrder": {
         console.log("Processing savePurchaseOrder");
-        
+
         const {
           supplier,
           orderNumber,
@@ -158,12 +157,12 @@ export async function POST(request: Request) {
         try {
           const orderId = await addPurchaseOrderLocal(payload);
           console.log("Purchase order saved successfully", { orderId });
-          return NextResponse.json({ 
-            order: { 
-              id: orderId, 
+          return NextResponse.json({
+            order: {
+              id: orderId,
               ...payload,
               createdAt: new Date().toISOString()
-            } 
+            }
           });
         } catch (purchaseError) {
           console.error("Error saving purchase order", purchaseError);
@@ -192,8 +191,8 @@ export async function POST(request: Request) {
               // Update existing product stock
               const { data: product, error: fetchError } = await supabase
                 .from("products")
-                .select("firestore_id,stock")
-                .eq("firestore_id", item.productId)
+                .select("id,stock")
+                .eq("id", item.productId)
                 .maybeSingle();
 
               if (fetchError) {
@@ -205,7 +204,7 @@ export async function POST(request: Request) {
                 const { error: updateError } = await supabase
                   .from("products")
                   .update({ stock: newStock, lastUpdated: nowIso() })
-                  .eq("firestore_id", product.firestore_id);
+                  .eq("id", product.id);
 
                 if (updateError) {
                   throw updateError;
@@ -213,8 +212,7 @@ export async function POST(request: Request) {
 
                 // Record inventory movement
                 await supabase.from("inventory_logs").insert({
-                  firestore_id: uuidv4(),
-                  productId: product.firestore_id,
+                  productId: product.id,
                   productName: item.productName || item.rawName,
                   change: item.qty ?? 0,
                   reason: "Ingreso de Mercancía",
@@ -226,13 +224,12 @@ export async function POST(request: Request) {
                   },
                 });
 
-                results.push({ success: true, productId: product.firestore_id, newStock });
+                results.push({ success: true, productId: product.id, newStock });
               }
             } else {
               // Create new product
               const timestamp = nowIso();
               const { data: newProduct, error: insertError } = await supabase.from("products").insert({
-                firestore_id: uuidv4(),
                 name: item.productName || item.rawName,
                 sku: item.productId || `AUTO-${Date.now()}`,
                 stock: item.qty,
@@ -247,7 +244,7 @@ export async function POST(request: Request) {
                 throw insertError;
               }
 
-              results.push({ success: true, productId: newProduct.firestore_id, newStock: item.qty });
+              results.push({ success: true, productId: newProduct.id, newStock: item.qty });
             }
           } catch (itemError) {
             console.error(`Error processing item ${item.productId}:`, itemError);
@@ -255,8 +252,8 @@ export async function POST(request: Request) {
           }
         }
 
-        return NextResponse.json({ 
-          success: true, 
+        return NextResponse.json({
+          success: true,
           results,
           summary: {
             total: results.length,
@@ -281,7 +278,6 @@ export async function POST(request: Request) {
         const timestamp = nowIso();
 
         const { data, error } = await supabase.from("suppliers").insert({
-          firestore_id: uuidv4(),
           name: name.trim(),
           contactInfo: contactInfo ?? "",
           notes: notes ?? "",
@@ -302,7 +298,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("Quick PO intake API error", error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Error procesando la petición",
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });

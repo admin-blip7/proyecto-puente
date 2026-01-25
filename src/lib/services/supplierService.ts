@@ -11,7 +11,7 @@ const log = getLogger("supplierService");
 const SUPPLIERS_TABLE = "suppliers";
 
 const mapSupplier = (row: any): Supplier => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   name: row?.name ?? "",
   contactInfo: row?.contactInfo ?? "",
   notes: row?.notes ?? "",
@@ -20,18 +20,16 @@ const mapSupplier = (row: any): Supplier => ({
   updatedAt: toDate(row?.updatedAt),
 });
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+// orIdFilter removed
 
 export async function addSupplier(
   supplierData: Omit<Supplier, "id" | "createdAt" | "updatedAt" | "totalPurchasedYTD">
 ): Promise<string> {
   try {
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const timestamp = nowIso();
 
     const payload = {
-      firestore_id: firestoreId,
       name: supplierData.name,
       contactInfo: supplierData.contactInfo,
       notes: supplierData.notes ?? "",
@@ -40,12 +38,12 @@ export async function addSupplier(
       updatedAt: timestamp,
     };
 
-    const { error } = await supabase.from(SUPPLIERS_TABLE).insert(payload);
-    if (error) {
-      throw error;
+    const { data, error } = await supabase.from(SUPPLIERS_TABLE).insert(payload).select('id').single();
+    if (error || !data) {
+      throw error || new Error("Failed to insert supplier");
     }
 
-    return firestoreId;
+    return data.id;
   } catch (error) {
     log.error("Error adding supplier", error);
     throw error;
@@ -77,7 +75,7 @@ export async function getSupplierById(supplierId: string): Promise<Supplier | nu
     const { data, error } = await supabase
       .from(SUPPLIERS_TABLE)
       .select("*")
-      .or(orIdFilter(supplierId))
+      .eq('id', supplierId)
       .maybeSingle();
 
     if (error) {
@@ -105,7 +103,7 @@ export async function updateSupplier(
     const { error } = await supabase
       .from(SUPPLIERS_TABLE)
       .update(sanitized)
-      .or(orIdFilter(supplierId));
+      .eq('id', supplierId);
 
     if (error) {
       throw error;
@@ -122,7 +120,7 @@ export async function deleteSupplier(supplierId: string): Promise<void> {
     const { error } = await supabase
       .from(SUPPLIERS_TABLE)
       .delete()
-      .or(orIdFilter(supplierId));
+      .eq("id", supplierId);
 
     if (error) {
       throw error;
@@ -141,8 +139,8 @@ export async function updateSupplierPurchaseTotal(
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
       .from(SUPPLIERS_TABLE)
-      .select("firestore_id,totalPurchasedYTD")
-      .or(orIdFilter(supplierId))
+      .select("id,totalPurchasedYTD")
+      .eq('id', supplierId)
       .maybeSingle();
 
     if (error || !data) {
@@ -153,7 +151,7 @@ export async function updateSupplierPurchaseTotal(
     const { error: updateError } = await supabase
       .from(SUPPLIERS_TABLE)
       .update({ totalPurchasedYTD: newTotal, updatedAt: nowIso() })
-      .eq("firestore_id", data.firestore_id ?? supplierId);
+      .eq("id", data.id);
 
     if (updateError) {
       throw updateError;

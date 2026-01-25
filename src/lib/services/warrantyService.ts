@@ -13,7 +13,7 @@ const WARRANTIES_TABLE = "warranties_new";
 const WARRANTY_BUCKET = "warranties";
 
 const mapWarranty = (row: any): Warranty => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   saleId: row?.sale_id ?? row?.saleId ?? "",
   productId: row?.product_id ?? row?.productId ?? "",
   productName: row?.product_name ?? row?.productName ?? "",
@@ -27,11 +27,12 @@ const mapWarranty = (row: any): Warranty => ({
   imageUrls: Array.isArray(row?.image_urls ?? row?.imageUrls) ? (row?.image_urls ?? row?.imageUrls) : [],
 });
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+const orIdFilter = (id: string) => `id.eq.${id}`;
 
 export const getWarranties = async (): Promise<Warranty[]> => {
   try {
     const supabase = await getSupabaseClientWithAuth();
+    if (!supabase) throw new Error("Supabase client not initialized");
     const { data, error } = await supabase
       .from(WARRANTIES_TABLE)
       .select("*")
@@ -59,15 +60,15 @@ export const addWarranty = async (
     if (!supabase) {
       throw new Error("Supabase client not initialized");
     }
-    const firestoreId = uuidv4();
+    // firestoreId removed
     const reportedAt = nowIso();
-    
+
     log.info(`Adding warranty for customer: ${warrantyData.customerName}`);
     const imageUrls = await uploadWarrantyImages(images);
     log.info(`Uploaded ${imageUrls.length} warranty images`);
 
     const payload = {
-      firestore_id: firestoreId,
+      // firestore_id: firestoreId,
       sale_id: warrantyData.saleId,
       product_id: warrantyData.productId,
       product_name: warrantyData.productName,
@@ -93,29 +94,29 @@ export const addWarranty = async (
     }
 
     const warranty = mapWarranty(data);
-    log.info(`Warranty created: ${firestoreId}`);
+    log.info(`Warranty created: ${warranty.id}`);
 
     // Auto-create or link CRM client for warranties
     if (warrantyData.customerName && warrantyData.customerPhone) {
       try {
         log.info(`Creating/linking CRM client for warranty: ${warrantyData.customerName}, phone: ${warrantyData.customerPhone}`);
         const { createCRMClientFromSale } = await import("./crmClientService");
-        
+
         const crmClient = await createCRMClientFromSale({
           name: warrantyData.customerName,
           phone: warrantyData.customerPhone,
           saleAmount: 0,
-          saleId: firestoreId,
+          saleId: warranty.id,
           interactionType: 'warranty'
         });
 
         if (crmClient && crmClient.id) {
-          log.info(`✅ Successfully linked warranty ${firestoreId} to CRM client: ${crmClient.id} (${crmClient.firstName} ${crmClient.lastName})`);
+          log.info(`✅ Successfully linked warranty ${warranty.id} to CRM client: ${crmClient.id} (${crmClient.firstName} ${crmClient.lastName})`);
         } else {
           log.warn(`⚠️ CRM client returned but no ID: ${JSON.stringify(crmClient)}`);
         }
       } catch (crmError) {
-        log.error(`❌ Could not create/link CRM client for warranty ${firestoreId}:`, crmError);
+        log.error(`❌ Could not create/link CRM client for warranty ${warranty.id}:`, crmError);
         // Don't break warranty creation if CRM fails
       }
     } else {
@@ -152,7 +153,7 @@ export const updateWarranty = async (
     const { error } = await supabase
       .from(WARRANTIES_TABLE)
       .update(updates)
-      .eq('firestore_id', warrantyId);
+      .eq("id", warrantyId);
 
     if (error) {
       throw error;

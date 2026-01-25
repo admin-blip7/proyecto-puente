@@ -29,8 +29,7 @@ const CRM_DOCUMENTS_TABLE = "crm_documents";
 
 // Mapping functions
 const mapCRMClient = (row: any): CRMClient => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     _dbId: row?.id ? (typeof row.id === 'number' ? row.id : parseInt(row.id)) : undefined,
     clientCode: row?.client_code ?? row?.clientcode ?? row?.clientCode ?? "",
     identificationType: (row?.identification_type ?? row?.identificationtype ?? row?.identificationType ?? "cedula") as IdentificationType,
@@ -95,7 +94,7 @@ const generateClientCode = async (): Promise<string> => {
 
 // Client CRUD operations
 export const createCRMClient = async (
-    clientData: Omit<CRMClient, "id" | "firestore_id" | "clientCode" | "createdAt" | "updatedAt" | "totalPurchases" | "outstandingBalance">
+    clientData: Omit<CRMClient, "id" | "clientCode" | "createdAt" | "updatedAt" | "totalPurchases" | "outstandingBalance">
 ): Promise<CRMClient> => {
     // Verificar autenticación
     const authenticated = await isAuthenticated();
@@ -144,11 +143,10 @@ export const createCRMClient = async (
         log.info("Creating client for user ID:", userId);
 
         const clientCode = await generateClientCode();
-        const firestoreId = uuidv4();
         const now = nowIso();
 
         const payload = {
-            firestore_id: firestoreId,
+            // firestore_id: firestoreId,
             client_code: clientCode,
             identification_type: clientData.identificationType,
             identification_number: clientData.identificationNumber,
@@ -198,7 +196,7 @@ export const createCRMClient = async (
             throw error;
         }
 
-        log.info("Successfully created CRM client with ID:", data?.firestore_id);
+        log.info("Successfully created CRM client:", data?.id);
         return mapCRMClient(data);
     } catch (error: any) {
         log.error("Full error creating CRM client:", error);
@@ -299,7 +297,7 @@ export const getCRMClientById = async (id: string): Promise<CRMClient | null> =>
         const { data, error, status, statusText } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .eq("firestore_id", id)
+            .eq("id", id)
             .single();
 
         if (error) {
@@ -318,7 +316,7 @@ export const getCRMClientById = async (id: string): Promise<CRMClient | null> =>
             throw error;
         }
 
-        log.info("Successfully retrieved CRM client with ID:", data?.firestore_id);
+        log.info("Successfully retrieved CRM client:", data?.id);
         return mapCRMClient(data);
     } catch (error: any) {
         log.error("Full error getting CRM client by ID:", error);
@@ -363,7 +361,7 @@ export const getCRMClientByIdentification = async (
 
 export const updateCRMClient = async (
     id: string,
-    updates: Partial<Omit<CRMClient, "id" | "firestore_id" | "clientCode" | "createdAt" | "updatedAt">>
+    updates: Partial<Omit<CRMClient, "id" | "clientCode" | "createdAt" | "updatedAt">>
 ): Promise<CRMClient> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -445,7 +443,7 @@ export const updateCRMClient = async (
         const { data, error, status, statusText } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .update(payload)
-            .eq("firestore_id", id)
+            .eq("id", id)
             .select()
             .single();
 
@@ -461,7 +459,7 @@ export const updateCRMClient = async (
             throw error;
         }
 
-        log.info("Successfully updated CRM client with ID:", data?.firestore_id);
+        log.info("Successfully updated CRM client:", data?.id);
         return mapCRMClient(data);
     } catch (error: any) {
         log.error("Full error updating CRM client:", error);
@@ -482,11 +480,11 @@ export const deleteCRMClient = async (id: string): Promise<void> => {
     }
 
     try {
-        // Try to delete by firestore_id first (it's unique)
+        // Try to delete by id or firestore_id
         const { error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .delete()
-            .eq('firestore_id', id);
+            .eq("id", id);
 
         if (error) throw error;
         log.info(`Deleted CRM client with ID: ${id}`);
@@ -517,8 +515,7 @@ export const getCRMDocuments = async (clientId: string): Promise<CRMDocument[]> 
         if (error) throw error;
 
         return (data || []).map((row: any) => ({
-            id: row?.firestore_id ?? row?.id ?? "",
-            firestore_id: row?.firestore_id ?? row?.id ?? "",
+            id: row?.id ?? "",
             clientId: row?.clientid ?? row?.clientId ?? "",
             documentType: (row?.documenttype ?? row?.documentType ?? "other") as DocumentType,
             documentName: row?.documentname ?? row?.documentName ?? "",
@@ -552,8 +549,7 @@ export const getCRMTags = async (): Promise<CRMTag[]> => {
         if (error) throw error;
 
         return (data || []).map((row: any) => ({
-            id: row?.firestore_id ?? row?.id ?? "",
-            firestore_id: row?.firestore_id ?? row?.id ?? "",
+            id: row?.id ?? "",
             name: row?.name ?? "",
             color: row?.color ?? "#6B7280",
             description: row?.description ?? undefined,
@@ -592,8 +588,7 @@ export const getCRMInteractions = async (
         if (error) throw error;
 
         return (data || []).map((row: any) => ({
-            id: row?.firestore_id ?? row?.id ?? "",
-            firestore_id: row?.firestore_id ?? row?.id ?? "",
+            id: row?.id ?? "",
             clientId: row?.client_id ?? row?.clientId ?? "",
             interactionType: (row?.interaction_type ?? row?.interactionType ?? "contact") as InteractionType,
             relatedId: row?.related_id ?? row?.relatedId ?? undefined,
@@ -615,7 +610,7 @@ export const getCRMInteractions = async (
 
 // Task operations
 export const createCRMTask = async (
-    taskData: Omit<CRMTask, "id" | "firestore_id" | "createdAt" | "updatedAt">
+    taskData: Omit<CRMTask, "id" | "createdAt" | "updatedAt">
 ): Promise<CRMTask> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -623,7 +618,7 @@ export const createCRMTask = async (
     }
 
     try {
-        const firestoreId = uuidv4();
+        // firestore_id removed
         const now = nowIso();
 
         // Find the client database ID
@@ -631,7 +626,7 @@ export const createCRMTask = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            firestore_id: firestoreId,
+            // firestore_id: firestoreId,
             client_id: client._dbId || parseInt(client.id),
             title: taskData.title,
             description: taskData.description || null,
@@ -654,8 +649,7 @@ export const createCRMTask = async (
         if (error) throw error;
 
         return {
-            id: data?.firestore_id ?? data?.id ?? "",
-            firestore_id: data?.firestore_id ?? data?.id ?? "",
+            id: data?.id ?? "",
             clientId: data?.clientid ?? data?.clientId ?? "",
             title: data?.title ?? "",
             description: data?.description ?? undefined,
@@ -676,7 +670,7 @@ export const createCRMTask = async (
 
 export const updateCRMTask = async (
     id: string,
-    updates: Partial<Omit<CRMTask, "id" | "firestore_id" | "createdAt" | "updatedAt">>
+    updates: Partial<Omit<CRMTask, "id" | "createdAt" | "updatedAt">>
 ): Promise<CRMTask> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -704,15 +698,14 @@ export const updateCRMTask = async (
         const { data, error } = await supabase
             .from(CRM_TASKS_TABLE)
             .update(payload)
-            .eq("firestore_id", id)
-            .select()
+            .eq("id", id)
+            .select() // .eq("firestore_id", id) -> .or(...)
             .single();
 
         if (error) throw error;
 
         return {
-            id: data?.firestore_id ?? data?.id ?? "",
-            firestore_id: data?.firestore_id ?? data?.id ?? "",
+            id: data?.id ?? "",
             clientId: data?.clientid ?? data?.clientId ?? "",
             title: data?.title ?? "",
             description: data?.description ?? undefined,
@@ -781,8 +774,7 @@ export const getCRMTasks = async (
         if (error) throw error;
 
         return (data || []).map((row: any) => ({
-            id: row?.firestore_id ?? row?.id ?? "",
-            firestore_id: row?.firestore_id ?? row?.id ?? "",
+            id: row?.id ?? "",
             clientId: row?.clientid ?? row?.clientId ?? "",
             title: row?.title ?? "",
             description: row?.description ?? undefined,
@@ -803,7 +795,7 @@ export const getCRMTasks = async (
 
 // Tag operations
 export const createCRMTag = async (
-    tagData: Omit<CRMTag, "id" | "firestore_id" | "createdAt" | "updatedAt" | "isActive">
+    tagData: Omit<CRMTag, "id" | "createdAt" | "updatedAt" | "isActive">
 ): Promise<CRMTag> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -811,11 +803,11 @@ export const createCRMTag = async (
     }
 
     try {
-        const firestoreId = uuidv4();
+        // firestore_id removed
         const now = nowIso();
 
         const payload = {
-            firestore_id: firestoreId,
+            // firestore_id: firestoreId,
             name: tagData.name,
             color: tagData.color || "#6B7280",
             description: tagData.description || null,
@@ -833,8 +825,7 @@ export const createCRMTag = async (
         if (error) throw error;
 
         return {
-            id: data?.firestore_id ?? data?.id ?? "",
-            firestore_id: data?.firestore_id ?? data?.id ?? "",
+            id: data?.id ?? "",
             name: data?.name ?? "",
             color: data?.color ?? "#6B7280",
             description: data?.description ?? undefined,
@@ -1032,7 +1023,7 @@ export const createCRMInteraction = async (
     }
 
     try {
-        const firestoreId = uuidv4();
+        // firestore_id removed
         const now = nowIso();
 
         // Find the client database ID
@@ -1040,7 +1031,7 @@ export const createCRMInteraction = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            firestore_id: firestoreId,
+            // firestore_id: firestoreId,
             client_id: client._dbId || parseInt(client.id),
             interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
@@ -1137,7 +1128,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                     log.info(`Found ${fuzzyMatches.length} fuzzy matches for normalized phone`);
                     const bestMatch = fuzzyMatches[0];
                     log.info(`Using best match: ${bestMatch.phone} (ID: ${bestMatch.id})`);
-                    existingClient = await getCRMClientById(bestMatch.firestore_id);
+                    existingClient = await getCRMClientById(bestMatch.id);
 
                     // Now create interaction for this fuzzy-matched client
                     const intType = saleInfo.interactionType || 'sale';
@@ -1147,7 +1138,6 @@ export const createCRMClientFromSale = async (saleInfo: {
 
                     if (shouldCreateInteraction && existingClient && bestMatch.id) {
                         try {
-                            const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                             const now = nowIso();
                             const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
 
@@ -1155,7 +1145,6 @@ export const createCRMClientFromSale = async (saleInfo: {
                             const { error: interactionError } = await supabase
                                 .from(CRM_INTERACTIONS_TABLE)
                                 .insert({
-                                    firestore_id: interactionFirestoreId,
                                     client_id: bestMatch.id,
                                     interaction_type: intType,
                                     interaction_date: now,
@@ -1168,7 +1157,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                             if (interactionError) {
                                 log.error(`❌ Failed to create ${intType} interaction (fuzzy match):`, interactionError);
                             } else {
-                                log.info(`✅ Successfully created ${intType} interaction (fuzzy match) - firestore_id: ${interactionFirestoreId}`);
+                                log.info(`✅ Successfully created ${intType} interaction (fuzzy match)`);
 
                                 if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
                                     const { error: updateError } = await supabase
@@ -1208,7 +1197,7 @@ export const createCRMClientFromSale = async (saleInfo: {
 
             if (existingByPhone) {
                 log.info(`✅ Client already exists with phone ${saleInfo.phone} - ID: ${existingByPhone.id}`);
-                existingClient = await getCRMClientById(existingByPhone.firestore_id);
+                existingClient = await getCRMClientById(existingByPhone.id);
 
                 // Create interaction for existing client if amount or warranty type
                 const intType = saleInfo.interactionType || 'sale';
@@ -1218,7 +1207,6 @@ export const createCRMClientFromSale = async (saleInfo: {
 
                 if (shouldCreateInteraction && existingClient && existingByPhone.id) {
                     try {
-                        const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                         const now = nowIso();
                         const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
 
@@ -1226,7 +1214,6 @@ export const createCRMClientFromSale = async (saleInfo: {
                         const { error: interactionError } = await supabase
                             .from(CRM_INTERACTIONS_TABLE)
                             .insert({
-                                firestore_id: interactionFirestoreId,
                                 client_id: existingByPhone.id,
                                 interaction_type: intType,
                                 interaction_date: now,
@@ -1239,7 +1226,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                         if (interactionError) {
                             log.error(`❌ Failed to create ${intType} interaction for existing client:`, interactionError);
                         } else {
-                            log.info(`✅ Successfully created ${intType} interaction for existing client - firestore_id: ${interactionFirestoreId}`);
+                            log.info(`✅ Successfully created ${intType} interaction for existing client`);
 
                             // Update total_purchases if there's an amount
                             if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
@@ -1280,13 +1267,13 @@ export const createCRMClientFromSale = async (saleInfo: {
         if (saleInfo.email) {
             const { data: existingByEmail } = await supabase
                 .from(CRM_CLIENTS_TABLE)
-                .select("id, firestore_id")
+                .select("id")
                 .eq("email", saleInfo.email)
                 .single();
 
             if (existingByEmail && !existingClient) {
                 log.info(`Client already exists with email ${saleInfo.email}`);
-                existingClient = await getCRMClientById(existingByEmail.firestore_id);
+                existingClient = await getCRMClientById(existingByEmail.id);
 
                 // Create interaction for existing client if amount or warranty type
                 const intType = saleInfo.interactionType || 'sale';
@@ -1294,7 +1281,6 @@ export const createCRMClientFromSale = async (saleInfo: {
 
                 if (shouldCreateInteraction && existingClient && existingByEmail.id) {
                     try {
-                        const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                         const now = nowIso();
                         const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
 
@@ -1302,7 +1288,6 @@ export const createCRMClientFromSale = async (saleInfo: {
                         const { error: interactionError } = await supabase
                             .from(CRM_INTERACTIONS_TABLE)
                             .insert({
-                                firestore_id: interactionFirestoreId,
                                 client_id: existingByEmail.id,
                                 interaction_type: intType,
                                 interaction_date: now,
@@ -1315,7 +1300,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                         if (interactionError) {
                             log.error(`❌ Failed to create ${intType} interaction for existing client:`, interactionError);
                         } else {
-                            log.info(`✅ Successfully created ${intType} interaction for existing client - firestore_id: ${interactionFirestoreId}`);
+                            log.info(`✅ Successfully created ${intType} interaction for existing client`);
 
                             // Update total_purchases if there's an amount
                             if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {
@@ -1362,13 +1347,11 @@ export const createCRMClientFromSale = async (saleInfo: {
         const clientCode = await generateClientCode();
 
         // Create new client
-        const firestoreId = `sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const now = nowIso();
 
         const { data: newClient, error: createError } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .insert({
-                firestore_id: firestoreId,
                 client_code: clientCode,
                 identification_type: "cedula",
                 identification_number: `temp-${Date.now()}`,
@@ -1390,7 +1373,7 @@ export const createCRMClientFromSale = async (saleInfo: {
             throw createError;
         }
 
-        log.info(`Created new CRM client from sale: ${newClient.firestore_id}`);
+        log.info(`Created new CRM client from sale: ${newClient.id}`);
         const mappedClient = mapCRMClient(newClient);
 
         // If amount information is provided, create the initial interaction
@@ -1402,14 +1385,12 @@ export const createCRMClientFromSale = async (saleInfo: {
 
         if (shouldCreateInteraction) {
             try {
-                const interactionFirestoreId = `interaction-${intType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, type=${intType}, firestore_id=${interactionFirestoreId}`);
+                log.info(`Inserting interaction: client_id=${newClient.id}, amount=${saleInfo.saleAmount}, type=${intType}`);
 
                 const relatedTable = intType === 'repair' ? 'repair_orders' : intType === 'warranty' ? 'warranties_new' : 'sales';
                 const { data: interactionData, error: interactionError } = await supabase
                     .from(CRM_INTERACTIONS_TABLE)
                     .insert({
-                        firestore_id: interactionFirestoreId,
                         client_id: newClient.id, // Use the numeric BIGINT ID
                         interaction_type: intType,
                         interaction_date: now,
@@ -1421,9 +1402,9 @@ export const createCRMClientFromSale = async (saleInfo: {
                     .select();
 
                 if (interactionError) {
-                    log.warn(`Failed to create initial ${intType} interaction for client ${newClient.firestore_id}:`, interactionError);
+                    log.warn(`Failed to create initial ${intType} interaction for client ${newClient.id}:`, interactionError);
                 } else {
-                    log.info(`Created initial ${intType} interaction for new client ${newClient.firestore_id}:`, interactionData);
+                    log.info(`Created initial ${intType} interaction for new client ${newClient.id}:`, interactionData);
 
                     // Update total_purchases if there's an amount (warranties might be $0 initially)
                     if (saleInfo.saleAmount && saleInfo.saleAmount > 0) {

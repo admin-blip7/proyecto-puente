@@ -6,7 +6,7 @@ const log = getLogger("api-sales-change");
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { saleId: string } }
+    { params }: { params: Promise<{ saleId: string }> }
 ) {
     try {
         // Unwrap params (NextJS 15+ requirement or just good practice if async)

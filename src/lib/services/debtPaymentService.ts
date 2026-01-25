@@ -14,8 +14,6 @@ const DEBTS_TABLE = "debts";
 const ACCOUNTS_TABLE = "accounts";
 const STORAGE_DEBT_PROOFS_PATH = "debt_proofs";
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
-
 const uploadProof = async (
   file: File,
   debtId: string,
@@ -53,13 +51,13 @@ export const addDebtPayment = async (
     await Promise.all([
       supabase
         .from(DEBTS_TABLE)
-        .select("firestore_id,current_balance")
-        .or(orIdFilter(debtId))
+        .select("id,current_balance")
+        .eq("id", debtId)
         .maybeSingle(),
       supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id,current_balance")
-        .or(orIdFilter(paidFromAccountId))
+        .select("id,current_balance")
+        .eq("id", paidFromAccountId)
         .maybeSingle(),
     ]);
 
@@ -81,11 +79,9 @@ export const addDebtPayment = async (
     proofUrl = await uploadProof(proofFile, debtId, paymentId);
   }
 
-  const firestoreId = uuidv4();
   const paymentDate = nowIso();
 
   const { error: insertError } = await supabase.from(DEBT_PAYMENTS_TABLE).insert({
-    firestore_id: firestoreId,
     paymentId,
     debtId,
     amountPaid,
@@ -107,11 +103,11 @@ export const addDebtPayment = async (
     supabase
       .from(DEBTS_TABLE)
       .update({ current_balance: newDebtBalance })
-      .eq("firestore_id", debtRow.firestore_id ?? debtId),
+      .eq("id", debtRow.id),
     supabase
       .from(ACCOUNTS_TABLE)
       .update({ current_balance: newAccountBalance })
-      .eq("firestore_id", accountRow.firestore_id ?? paidFromAccountId),
+      .eq("id", accountRow.id),
   ]);
 
   if (debtUpdateError || accountUpdateError) {

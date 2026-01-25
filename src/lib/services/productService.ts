@@ -18,7 +18,7 @@ const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 const PRODUCT_VARIANTS_TABLE = "product_variants";
 
-// Helper function to resolve consignor Firestore ID to PostgreSQL UUID
+// Helper function to verify consignor existence
 const resolveConsignorId = async (consignorId: string | undefined): Promise<string | null> => {
   if (!consignorId || consignorId.trim() === '') {
     log.warn(`Empty consignor ID provided`);
@@ -43,22 +43,6 @@ const resolveConsignorId = async (consignorId: string | undefined): Promise<stri
     return data.id;
   }
 
-  // If not found by ID, try by firestore_id
-  const { data: firestoreData, error: firestoreError } = await supabase
-    .from("consignors")
-    .select("id, name")
-    .eq("firestore_id", consignorId)
-    .maybeSingle();
-
-  if (firestoreError) {
-    log.error(`Error querying consignor by firestore_id: ${consignorId}`, firestoreError);
-  }
-
-  if (firestoreData) {
-    log.info(`Found consignor by firestore_id: ${consignorId} -> ${firestoreData.name} (${firestoreData.id})`);
-    return firestoreData.id;
-  }
-
   log.warn(`Consignor not found for ID: ${consignorId}`);
   return null;
 };
@@ -80,7 +64,7 @@ const generateSearchKeywords = (name: string): string[] => {
 };
 
 const normalizeId = (row: any, index: number) => {
-  const id = row?.id ?? row?.firestore_id;
+  const id = row?.id;
   // Si no hay ID o está duplicado, crear un ID compuesto único
   if (!id) return `temp-${index}-${Date.now()}`;
   return `${id}`;
@@ -111,7 +95,7 @@ const fetchProductRow = async (productId: string) => {
   const { data, error } = await supabase
     .from(PRODUCTS_TABLE)
     .select("*")
-    .or(`id.eq.${productId},firestore_id.eq.${productId}`)
+    .eq("id", productId)
     .maybeSingle();
 
   if (error) {
@@ -222,7 +206,8 @@ export const addProduct = async (
 
   const payload = {
     id: newId,
-    firestore_id: newId,
+    // newId is used as the ID
+
     name: productData.name,
     sku: productData.sku,
     price: Number(productData.price ?? 0),
@@ -288,7 +273,7 @@ export const updateProduct = async (
       attributes: productData.attributes ?? existingRow.attributes ?? {},
       image_urls: productData.imageUrls ?? existingRow.image_urls ?? [],
     })
-    .eq("firestore_id", existingRow.firestore_id ?? productId);
+    .eq("id", existingRow.id);
 
   if (error) {
     log.error("Error updating product", error);
@@ -368,7 +353,7 @@ export const processStockEntry = async (
           row = await fetchProductBySku(item.sku);
           if (row) {
             // Producto encontrado por SKU, actualizarlo
-            productId = row.firestore_id || row.id;
+            productId = row.id;
             item.productId = productId;
             isNewProduct = false;
             log.info(`Found existing product by SKU: ${item.sku}, ID: ${productId}`);
@@ -400,7 +385,7 @@ export const processStockEntry = async (
             productId = newProduct.id;
             item.productId = productId;
             isNewProduct = true;
-            row = { firestore_id: productId, id: productId }; // Asignar para el log
+            row = { id: productId }; // Asignar para el log
             log.info(`Successfully created new product: ${productId}`);
           } catch (addError: any) {
             // Si falla por SKU duplicado, buscarlo nuevamente
@@ -408,7 +393,7 @@ export const processStockEntry = async (
               log.info(`SKU ${item.sku} ya existe, buscando producto existente...`);
               row = await fetchProductBySku(item.sku);
               if (row) {
-                productId = row.firestore_id || row.id;
+                productId = row.id;
                 item.productId = productId;
                 isNewProduct = false;
                 log.info(`Producto encontrado por SKU duplicado: ${productId}`);
@@ -519,11 +504,11 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
   if (!productIds.length) return;
   const supabase = getSupabaseServerClient();
 
-  // First, get the actual firestore_id and id for the products to be deleted
+  // First, get the actual id and name for the products to be deleted
   const { data: productsToDelete, error: fetchError } = await supabase
     .from(PRODUCTS_TABLE)
-    .select('id, firestore_id, name')
-    .or(`id.in.(${productIds.join(',')}),firestore_id.in.(${productIds.join(',')})`);
+    .select('id, name')
+    .in('id', productIds);
 
   if (fetchError) {
     log.error("Error fetching products for deletion", fetchError);
@@ -535,14 +520,9 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
     throw new Error("No se encontraron productos para eliminar.");
   }
 
-  // Extract both id and firestore_id for deletion
   const idsToDelete = productsToDelete.map(p => p.id).filter(Boolean);
-  const firestoreIdsToDelete = productsToDelete.map(p => p.firestore_id).filter(Boolean);
-
-  let deletionError = null;
   let deletedCount = 0;
 
-  // Try to delete by UUID id first
   if (idsToDelete.length > 0) {
     const { error, count } = await supabase
       .from(PRODUCTS_TABLE)
@@ -550,30 +530,11 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
       .in('id', idsToDelete);
 
     if (error) {
-      deletionError = error;
       log.error("Error deleting products by id", error);
+      throw new Error("Failed to delete products: " + error.message);
     } else {
       deletedCount += count || 0;
     }
-  }
-
-  // Try to delete by firestore_id if there are any left
-  if (firestoreIdsToDelete.length > 0) {
-    const { error, count } = await supabase
-      .from(PRODUCTS_TABLE)
-      .delete({ count: 'exact' })
-      .in('firestore_id', firestoreIdsToDelete);
-
-    if (error) {
-      deletionError = error;
-      log.error("Error deleting products by firestore_id", error);
-    } else {
-      deletedCount += count || 0;
-    }
-  }
-
-  if (deletionError) {
-    throw new Error("Failed to delete products: " + deletionError.message);
   }
 
   // Check if we expected to delete more than we actually deleted
@@ -585,7 +546,7 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
 
   log.info(`Successfully deleted ${deletedCount} products`, {
     requestedIds: productIds,
-    foundProducts: productsToDelete.map(p => ({ id: p.id, firestore_id: p.firestore_id, name: p.name }))
+    foundProducts: productsToDelete.map(p => ({ id: p.id, name: p.name }))
   });
 };
 
@@ -599,8 +560,8 @@ export const bulkUpdateProducts = async (
 
   const { data, error } = await supabase
     .from(PRODUCTS_TABLE)
-    .select("firestore_id, price, cost, compatibility_tags")
-    .in("firestore_id", productIds);
+    .select("id, price, cost, compatibility_tags")
+    .in("id", productIds);
 
   if (error) {
     log.error("Error fetching products for bulk update", error);
@@ -653,7 +614,7 @@ export const bulkUpdateProducts = async (
       const { error: updateError } = await supabase
         .from(PRODUCTS_TABLE)
         .update(updates)
-        .eq("firestore_id", row.firestore_id);
+        .eq("id", row.id);
 
       if (updateError) {
         log.error("Error updating product in bulk operation", updateError);

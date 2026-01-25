@@ -10,7 +10,7 @@ const log = getLogger("accountService");
 const ACCOUNTS_TABLE = "accounts";
 
 const mapAccount = (row: any): Account => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   name: row?.name ?? "",
   type: row?.type ?? "Banco",
   currentBalance: Number(row?.current_balance ?? 0),
@@ -38,9 +38,7 @@ export const getAccounts = async (): Promise<Account[]> => {
 export const addAccount = async (accountData: Omit<Account, "id">): Promise<Account> => {
   try {
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const payload = {
-      firestore_id: firestoreId,
       name: accountData.name,
       type: accountData.type,
       current_balance: accountData.currentBalance ?? 0,
@@ -79,7 +77,7 @@ export const updateAccount = async (
     const { error } = await supabase
       .from(ACCOUNTS_TABLE)
       .update(payload)
-      .or(`firestore_id.eq.${accountId},id.eq.${accountId}`);
+      .eq('id', accountId);
 
     if (error) {
       throw error;
@@ -96,7 +94,7 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
     const { error } = await supabase
       .from(ACCOUNTS_TABLE)
       .delete()
-      .or(`firestore_id.eq.${accountId},id.eq.${accountId}`);
+      .eq('id', accountId);
 
     if (error) {
       throw error;

@@ -6,13 +6,13 @@ import { CartItem, SaleItem } from "@/types";
 export async function POST(request: Request) {
   try {
     console.log("🚀 DEBUG SALE WITH DETAILED LOGS endpoint called");
-    
+
     const body = await request.json();
     const { action, testData } = body;
 
     if (action === "simulateSaleWithDetailedLogs") {
       console.log("📦 INICIANDO SIMULACIÓN DE VENTA CON LOGS DETALLADOS");
-      
+
       // Simular datos de venta como los que enviaría el componente POS
       const mockCartItems: CartItem[] = [
         {
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         // Primero verificar si existe el producto de prueba
         const supabase = getSupabaseServerClient();
         console.log("🔍 Verificando producto de prueba...");
-        
+
         const { data: existingProduct, error: productError } = await supabase
           .from("products")
           .select("*")
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
             .from("products")
             .insert({
               id: "test-product-debug",
-              firestore_id: "test-product-debug",
+
               name: "Producto de Debug",
               price: 50,
               cost: 25,
@@ -114,12 +114,12 @@ export async function POST(request: Request) {
         }
 
         console.log("🚀 EJECUTANDO addSaleAndUpdateStock con logs detallados...");
-        
+
         // Medir tiempo de ejecución
         const startTime = Date.now();
         const result = await addSaleAndUpdateStock(mockSaleData, mockCartItems);
         const endTime = Date.now();
-        
+
         console.log(`⏱️ Tiempo de ejecución: ${endTime - startTime}ms`);
         console.log("✅ Sale created successfully:", result);
 
@@ -137,12 +137,12 @@ export async function POST(request: Request) {
           newLogs?.forEach((log, index) => {
             console.log(`  ${index + 1}. ${log.reason}: ${log.change} at ${log.createdAt} | Metadata: ${JSON.stringify(log.metadata)}`);
           });
-          
+
           // Contar logs creados en los últimos 5 segundos
           const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
           const recentLogs = newLogs?.filter(log => log.createdAt > fiveSecondsAgo) || [];
           console.log(`🚨 Logs creados en los últimos 5 segundos: ${recentLogs.length}`);
-          
+
           if (recentLogs.length > 1) {
             console.log("🚨🚨🚨 PROBLEMA DETECTADO: MÚLTIPLES LOGS CREADOS 🚨🚨🚨");
             recentLogs.forEach((log, index) => {
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
 
         if (!finalProductError && finalProduct) {
           console.log(`📊 Stock final: ${finalProduct.stock} (esperado: ${existingProduct?.stock - 1})`);
-          
+
           if (finalProduct.stock !== (existingProduct?.stock - 1)) {
             console.log("🚨🚨🚨 PROBLEMA DE STOCK DETECTADO 🚨🚨🚨");
             console.log(`Expected: ${existingProduct?.stock - 1}, Actual: ${finalProduct.stock}`);

@@ -14,30 +14,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseServerClient();
 
-    // Primero intentar encontrar por firestore_id
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('repair_orders')
       .update({
         technicianNotes: technicianNotes || null,
       })
-      .eq('firestore_id', orderId)
+      .eq('id', orderId)
       .select('*')
       .single();
-
-    // Si no funciona, intentar por id (para casos donde sea UUID)
-    if (error && error.code === 'PGRST116') {
-      const result = await supabase
-        .from('repair_orders')
-        .update({
-          technicianNotes: technicianNotes || null,
-        })
-        .eq('id', orderId)
-        .select('*')
-        .single();
-
-      data = result.data;
-      error = result.error;
-    }
 
     if (error) {
       console.error('Error updating technician notes:', error);
@@ -49,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Mapear los datos al formato esperado
     const updatedOrder = {
-      id: data?.firestore_id ?? data?.id ?? "",
+      id: data?.id ?? "",
       orderId: data?.orderId ?? "",
       status: data?.status ?? "Recibido",
       customerName: data?.customerName ?? "",

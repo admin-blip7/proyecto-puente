@@ -75,7 +75,8 @@ export async function POST(request: Request) {
             const { data: product, error: productError } = await supabase
               .from('products')
               .select('stock, name')
-              .eq('firestore_id', item.productId)
+              .select('id, firestore_id, stock, name')
+              .or(`id.eq.${item.productId},firestore_id.eq.${item.productId}`)
               .single();
 
             if (productError || !product) {
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
                 stock: newStock,
                 updated_at: now
               })
-              .eq('firestore_id', item.productId);
+              .eq('id', product.id);
 
             if (updateError) {
               log.error(`Error updating stock for product ${item.productId}:`, updateError);
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
                 const { data: productWithCost } = await supabase
                   .from('products')
                   .select('cost')
-                  .eq('firestore_id', item.productId)
+                  .or(`id.eq.${item.productId},firestore_id.eq.${item.productId}`)
                   .single();
 
                 if (productWithCost) {

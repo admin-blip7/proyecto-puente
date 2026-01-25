@@ -170,7 +170,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
   const handleAddRepairToCart = (repair: RepairOrder) => {
     const repairProduct: Product = {
       id: `repair-${repair.id}`,
-      firestore_id: `repair-${repair.id}`,
+      id: `repair-${repair.id}`,
       sku: `REP-${repair.orderId}`,
       name: `Reparación #${repair.orderId} - ${repair.deviceModel}`,
       description: repair.reportedIssue,

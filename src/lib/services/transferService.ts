@@ -12,7 +12,7 @@ const TRANSFERS_TABLE = "transfers";
 const ACCOUNTS_TABLE = "accounts";
 
 const mapTransfer = (row: any): Transfer => ({
-    id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     transferId: row?.transferId ?? "",
     sourceAccountId: row?.sourceAccountId ?? "",
     destinationAccountId: row?.destinationAccountId ?? "",
@@ -50,19 +50,13 @@ export const addTransfer = async (
 
     const supabase = getSupabaseServerClient();
     const transferId = `TRF-${uuidv4().split("-")[0].toUpperCase()}`;
-    const firestoreId = uuidv4();
     const transferDate = nowIso();
 
     // 1. Validate Source Account and Check Balance
     let sourceQuery = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance, name");
-
-    if (uuidValidate(transferData.sourceAccountId)) {
-        sourceQuery = sourceQuery.or(`firestore_id.eq.${transferData.sourceAccountId},id.eq.${transferData.sourceAccountId}`);
-    } else {
-        sourceQuery = sourceQuery.eq("firestore_id", transferData.sourceAccountId);
-    }
+        .select("id, current_balance, name")
+        .eq("id", transferData.sourceAccountId);
 
     const { data: sourceAccount, error: sourceError } = await sourceQuery.maybeSingle();
 
@@ -77,13 +71,8 @@ export const addTransfer = async (
     // 2. Validate Destination Account
     let destQuery = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance, name");
-
-    if (uuidValidate(transferData.destinationAccountId)) {
-        destQuery = destQuery.or(`firestore_id.eq.${transferData.destinationAccountId},id.eq.${transferData.destinationAccountId}`);
-    } else {
-        destQuery = destQuery.eq("firestore_id", transferData.destinationAccountId);
-    }
+        .select("id, current_balance, name")
+        .eq("id", transferData.destinationAccountId);
 
     const { data: destAccount, error: destError } = await destQuery.maybeSingle();
 
@@ -93,7 +82,6 @@ export const addTransfer = async (
 
     // 3. Insert Transfer Record
     const transferPayload = {
-        firestore_id: firestoreId,
         transferId,
         sourceAccountId: transferData.sourceAccountId,
         destinationAccountId: transferData.destinationAccountId,
@@ -119,30 +107,14 @@ export const addTransfer = async (
     const { error: updateSourceError } = await supabase
         .from(ACCOUNTS_TABLE)
         .update({ current_balance: newSourceBalance })
-        .eq("firestore_id", sourceAccount.firestore_id);
-
-    if (updateSourceError) {
-        // Try fallback to ID
-        await supabase
-            .from(ACCOUNTS_TABLE)
-            .update({ current_balance: newSourceBalance })
-            .eq("id", sourceAccount.id);
-    }
+        .eq("id", sourceAccount.id);
 
     // 5. Update Destination Account Balance (Add)
     const newDestBalance = Number(destAccount.current_balance) + transferData.amount;
     const { error: updateDestError } = await supabase
         .from(ACCOUNTS_TABLE)
         .update({ current_balance: newDestBalance })
-        .eq("firestore_id", destAccount.firestore_id);
-
-    if (updateDestError) {
-        // Try fallback to ID
-        await supabase
-            .from(ACCOUNTS_TABLE)
-            .update({ current_balance: newDestBalance })
-            .eq("id", destAccount.id);
-    }
+        .eq("id", destAccount.id);
 
     return mapTransfer(insertedTransfer);
 };
@@ -153,13 +125,8 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
     // 1. Get the transfer to know the amount and accounts
     let query = supabase
         .from(TRANSFERS_TABLE)
-        .select("*");
-
-    if (uuidValidate(transferId)) {
-        query = query.or(`firestore_id.eq.${transferId},id.eq.${transferId}`);
-    } else {
-        query = query.eq("firestore_id", transferId);
-    }
+        .select("*")
+        .eq("id", transferId);
 
     const { data: transfer, error: fetchError } = await query.maybeSingle();
 
@@ -170,13 +137,8 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
     // 2. Reverse Source Account Balance (Add amount back)
     let sourceQuery = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance");
-
-    if (uuidValidate(transfer.sourceAccountId)) {
-        sourceQuery = sourceQuery.or(`firestore_id.eq.${transfer.sourceAccountId},id.eq.${transfer.sourceAccountId}`);
-    } else {
-        sourceQuery = sourceQuery.eq("firestore_id", transfer.sourceAccountId);
-    }
+        .select("id, current_balance")
+        .eq("id", transfer.sourceAccountId);
 
     const { data: sourceAccount, error: sourceError } = await sourceQuery.maybeSingle();
 
@@ -185,14 +147,7 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
         const { error: updateSourceError } = await supabase
             .from(ACCOUNTS_TABLE)
             .update({ current_balance: newSourceBalance })
-            .eq("firestore_id", sourceAccount.firestore_id);
-
-        if (updateSourceError) {
-            await supabase
-                .from(ACCOUNTS_TABLE)
-                .update({ current_balance: newSourceBalance })
-                .eq("id", sourceAccount.id);
-        }
+            .eq("id", sourceAccount.id);
     } else {
         log.warn("Source account not found when deleting transfer, balance not reversed.", { transferId, accountId: transfer.sourceAccountId });
     }
@@ -200,13 +155,8 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
     // 3. Reverse Destination Account Balance (Subtract amount)
     let destQuery = supabase
         .from(ACCOUNTS_TABLE)
-        .select("firestore_id, id, current_balance");
-
-    if (uuidValidate(transfer.destinationAccountId)) {
-        destQuery = destQuery.or(`firestore_id.eq.${transfer.destinationAccountId},id.eq.${transfer.destinationAccountId}`);
-    } else {
-        destQuery = destQuery.eq("firestore_id", transfer.destinationAccountId);
-    }
+        .select("id, current_balance")
+        .eq("id", transfer.destinationAccountId);
 
     const { data: destAccount, error: destError } = await destQuery.maybeSingle();
 
@@ -215,14 +165,7 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
         const { error: updateDestError } = await supabase
             .from(ACCOUNTS_TABLE)
             .update({ current_balance: newDestBalance })
-            .eq("firestore_id", destAccount.firestore_id);
-
-        if (updateDestError) {
-            await supabase
-                .from(ACCOUNTS_TABLE)
-                .update({ current_balance: newDestBalance })
-                .eq("id", destAccount.id);
-        }
+            .eq("id", destAccount.id);
     } else {
         log.warn("Destination account not found when deleting transfer, balance not reversed.", { transferId, accountId: transfer.destinationAccountId });
     }
@@ -231,16 +174,9 @@ export const deleteTransfer = async (transferId: string): Promise<void> => {
     const { error: deleteError } = await supabase
         .from(TRANSFERS_TABLE)
         .delete()
-        .eq("firestore_id", transfer.firestore_id);
+        .eq("id", transfer.id);
 
     if (deleteError) {
-        const { error: deleteError2 } = await supabase
-            .from(TRANSFERS_TABLE)
-            .delete()
-            .eq("id", transfer.id);
-
-        if (deleteError2) {
-            throw new Error(`No se pudo eliminar la transferencia: ${deleteError2.message}`);
-        }
+        throw new Error(`No se pudo eliminar la transferencia: ${deleteError.message}`);
     }
 };

@@ -8,7 +8,7 @@ export async function GET(
   try {
     const supabase = getSupabaseServerClient();
     const { id: consignorId } = await params;
-    
+
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
@@ -21,7 +21,7 @@ export async function GET(
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
-    
+
     // Validate pagination parameters
     if (page < 1 || limit < 1 || limit > 100) {
       return NextResponse.json(
@@ -29,22 +29,9 @@ export async function GET(
         { status: 400 }
       );
     }
-    
-    // Check if consignor table has firestore_id column
-    let hasFirestoreId = true;
-    try {
-      const { data: schemaColumns } = await supabase
-        .from('information_schema.columns')
-        .select('column_name')
-        .eq('table_name', 'consignors')
-        .eq('column_name', 'firestore_id')
-        .single();
-      
-      hasFirestoreId = !!schemaColumns;
-    } catch (error) {
-      hasFirestoreId = false;
-    }
-    
+
+
+
     // Validate consignor exists - use direct query to avoid PostgREST issues
     const { data: consignorData, error: consignorError } = await supabase
       .from('consignors')
@@ -114,7 +101,7 @@ export async function GET(
           return item.consignorId === consignorId;
         });
 
-        
+
         return hasConsignorItem;
       })
       .map((sale: any) => {

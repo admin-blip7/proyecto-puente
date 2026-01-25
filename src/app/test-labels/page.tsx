@@ -40,6 +40,13 @@ export default function TestLabelsPage() {
             ];
 
             const mockSettings: LabelSettings = {
+                content: {
+                    showProductName: true,
+                    showSku: true,
+                    showPrice: true,
+                    showStoreName: true
+                },
+                orientation: 'horizontal',
                 width: 50,
                 height: 30,
                 fontSize: 12,

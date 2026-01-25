@@ -33,8 +33,7 @@ const STORAGE_DOCUMENTS_PATH = "crm_documents";
 
 // Mapping functions
 const mapCRMClient = (row: any): CRMClient => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     clientCode: row?.client_code ?? row?.clientCode ?? row?.clientcode ?? "",
     identificationType: (row?.identification_type ?? row?.identificationType ?? row?.identificationtype ?? "cedula") as IdentificationType,
     identificationNumber: row?.identification_number ?? row?.identificationNumber ?? row?.identificationnumber ?? "",
@@ -64,8 +63,7 @@ const mapCRMClient = (row: any): CRMClient => ({
 });
 
 const mapCRMInteraction = (row: any): CRMInteraction => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
     interactionType: (row?.interaction_type ?? row?.interactionType ?? row?.interactiontype ?? "contact") as InteractionType,
     relatedId: row?.related_id ?? row?.relatedId ?? row?.relatedid ?? undefined,
@@ -81,8 +79,7 @@ const mapCRMInteraction = (row: any): CRMInteraction => ({
 });
 
 const mapCRMTag = (row: any): CRMTag => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     name: row?.name ?? "",
     color: row?.color ?? "#6B7280",
     description: row?.description ?? undefined,
@@ -92,8 +89,7 @@ const mapCRMTag = (row: any): CRMTag => ({
 });
 
 const mapCRMTask = (row: any): CRMTask => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
     title: row?.title ?? "",
     description: row?.description ?? undefined,
@@ -110,8 +106,7 @@ const mapCRMTask = (row: any): CRMTask => ({
 });
 
 const mapCRMDocument = (row: any): CRMDocument => ({
-    id: row?.firestore_id ?? row?.id ?? "",
-    firestore_id: row?.firestore_id ?? row?.id ?? "",
+    id: row?.id ?? "",
     clientId: row?.client_id ?? row?.clientId ?? row?.clientid ?? "",
     documentType: (row?.document_type ?? row?.documentType ?? row?.documenttype ?? "other") as DocumentType,
     documentName: row?.document_name ?? row?.documentName ?? row?.documentname ?? "",
@@ -143,7 +138,7 @@ const generateClientCode = async (): Promise<string> => {
             return `${prefix}-0001`;
         }
 
-        const lastCode = data[0].client_code ?? data[0].clientcode;
+        const lastCode = data[0].client_code;
         const lastNumber = parseInt(lastCode.split("-")[2] || "0");
         const nextNumber = lastNumber + 1;
 
@@ -156,17 +151,17 @@ const generateClientCode = async (): Promise<string> => {
 
 // Client CRUD operations
 export const createCRMClient = async (
-    clientData: Omit<CRMClient, "id" | "firestore_id" | "clientCode" | "createdAt" | "updatedAt" | "totalPurchases" | "outstandingBalance">
+    clientData: Omit<CRMClient, "id" | "clientCode" | "createdAt" | "updatedAt" | "totalPurchases" | "outstandingBalance">
 ): Promise<CRMClient> => {
     const supabase = getSupabaseServerClient();
 
     try {
         const clientCode = await generateClientCode();
-        const firestoreId = uuidv4();
+
         const now = nowIso();
 
         const payload = {
-            firestore_id: firestoreId,
+
             client_code: clientCode,
             identification_type: clientData.identificationType,
             identification_number: clientData.identificationNumber,
@@ -278,7 +273,7 @@ export const getCRMClientById = async (id: string): Promise<CRMClient | null> =>
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .select("*")
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("id", id)
             .single();
 
         if (error) {
@@ -321,7 +316,7 @@ export const getCRMClientByIdentification = async (
 
 export const updateCRMClient = async (
     id: string,
-    updates: Partial<Omit<CRMClient, "id" | "firestore_id" | "clientCode" | "createdAt" | "updatedAt">>
+    updates: Partial<Omit<CRMClient, "id" | "clientCode" | "createdAt" | "updatedAt">>
 ): Promise<CRMClient> => {
     const supabase = getSupabaseServerClient();
 
@@ -353,7 +348,7 @@ export const updateCRMClient = async (
         const { data, error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .update(payload)
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("id", id)
             .select()
             .single();
 
@@ -373,7 +368,7 @@ export const deleteCRMClient = async (id: string): Promise<void> => {
         const { error } = await supabase
             .from(CRM_CLIENTS_TABLE)
             .delete()
-            .or(`firestore_id.eq.${id},id.eq.${id}`);
+            .eq("id", id);
 
         if (error) throw error;
     } catch (error) {
@@ -384,12 +379,11 @@ export const deleteCRMClient = async (id: string): Promise<void> => {
 
 // Interaction operations
 export const createCRMInteraction = async (
-    interactionData: Omit<CRMInteraction, "id" | "firestore_id" | "createdAt" | "updatedAt">
+    interactionData: Omit<CRMInteraction, "id" | "createdAt" | "updatedAt">
 ): Promise<CRMInteraction> => {
     const supabase = getSupabaseServerClient();
 
     try {
-        const firestoreId = uuidv4();
         const now = nowIso();
 
         // Find the client database ID
@@ -397,7 +391,7 @@ export const createCRMInteraction = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            firestore_id: firestoreId,
+
             client_id: parseInt(client.id),
             interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
@@ -461,12 +455,11 @@ export const getCRMInteractions = async (
 
 // Task operations
 export const createCRMTask = async (
-    taskData: Omit<CRMTask, "id" | "firestore_id" | "createdAt" | "updatedAt">
+    taskData: Omit<CRMTask, "id" | "createdAt" | "updatedAt">
 ): Promise<CRMTask> => {
     const supabase = getSupabaseServerClient();
 
     try {
-        const firestoreId = uuidv4();
         const now = nowIso();
 
         // Find the client database ID
@@ -474,7 +467,7 @@ export const createCRMTask = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            firestore_id: firestoreId,
+
             client_id: parseInt(client.id),
             title: taskData.title,
             description: taskData.description || null,
@@ -505,7 +498,7 @@ export const createCRMTask = async (
 
 export const updateCRMTask = async (
     id: string,
-    updates: Partial<Omit<CRMTask, "id" | "firestore_id" | "createdAt" | "updatedAt">>
+    updates: Partial<Omit<CRMTask, "id" | "createdAt" | "updatedAt">>
 ): Promise<CRMTask> => {
     const supabase = getSupabaseServerClient();
 
@@ -530,7 +523,7 @@ export const updateCRMTask = async (
         const { data, error } = await supabase
             .from(CRM_TASKS_TABLE)
             .update(payload)
-            .or(`firestore_id.eq.${id},id.eq.${id}`)
+            .eq("id", id)
             .select()
             .single();
 
@@ -617,16 +610,16 @@ export const getCRMTags = async (): Promise<CRMTag[]> => {
 };
 
 export const createCRMTag = async (
-    tagData: Omit<CRMTag, "id" | "firestore_id" | "createdAt" | "updatedAt" | "isActive">
+    tagData: Omit<CRMTag, "id" | "createdAt" | "updatedAt" | "isActive">
 ): Promise<CRMTag> => {
     const supabase = getSupabaseServerClient();
 
     try {
-        const firestoreId = uuidv4();
+
         const now = nowIso();
 
         const payload = {
-            firestore_id: firestoreId,
+
             name: tagData.name,
             color: tagData.color || "#6B7280",
             description: tagData.description || null,
@@ -664,7 +657,6 @@ export const uploadCRMDocument = async (
         const client = await getCRMClientById(clientId);
         if (!client) throw new Error("Client not found");
 
-        const firestoreId = uuidv4();
         const now = nowIso();
 
         // Sanitize filename
@@ -678,11 +670,13 @@ export const uploadCRMDocument = async (
         };
 
         const sanitizedFilename = sanitizeFilename(file.name);
-        const filePath = `${STORAGE_DOCUMENTS_PATH}/${clientId}/${firestoreId}-${sanitizedFilename}`;
+        // Use random UUID for storage path, but let DB generate ID for record
+        const storageId = uuidv4();
+        const filePath = `${STORAGE_DOCUMENTS_PATH}/${clientId}/${storageId}-${sanitizedFilename}`;
         const fileUrl = await uploadFile(file, filePath);
 
         const payload = {
-            firestore_id: firestoreId,
+
             client_id: parseInt(client.id),
             document_type: documentType,
             document_name: file.name,
@@ -787,7 +781,7 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
             activeClients: activeClients || 0,
             newClientsThisMonth: newClientsThisMonth || 0,
             totalPurchases,
-            averagePurchaseValue: totalClients > 0 ? totalPurchases / totalClients : 0,
+            averagePurchaseValue: (totalClients || 0) > 0 ? totalPurchases / (totalClients || 1) : 0,
             topClients,
             recentInteractions,
         };

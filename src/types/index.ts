@@ -6,7 +6,6 @@ export const ownershipTypes: OwnershipType[] = ['Propio', 'Consigna', 'Familiar'
 
 export interface Product {
   id: string;
-  firestore_id?: string;
   name: string;
   description?: string;
   sku: string;
@@ -34,7 +33,6 @@ export interface Product {
 
 export interface Consignor {
   id: string;
-  firestore_id?: string;
   name: string;
   contactInfo: string;
   balanceDue: number;
@@ -483,7 +481,6 @@ export type AccountType = typeof accountTypes[number];
 
 export interface Account {
   id: string;
-  firestore_id?: string;
   name: string;
   type: AccountType;
   currentBalance: number;
@@ -586,7 +583,6 @@ export type DocumentType = 'identification' | 'contract' | 'warranty' | 'invoice
 
 export interface CRMClient {
   id: string;
-  firestore_id?: string;
   _dbId?: number;
   clientCode: string;
   identificationType: IdentificationType;
@@ -616,7 +612,6 @@ export interface CRMClient {
 
 export interface CRMInteraction {
   id: string;
-  firestore_id?: string;
   clientId: string;
   interactionType: InteractionType;
   relatedId?: string;
@@ -633,7 +628,6 @@ export interface CRMInteraction {
 
 export interface CRMTag {
   id: string;
-  firestore_id?: string;
   name: string;
   color: string;
   description?: string;
@@ -644,7 +638,6 @@ export interface CRMTag {
 
 export interface CRMTask {
   id: string;
-  firestore_id?: string;
   clientId: string;
   title: string;
   description?: string;
@@ -660,7 +653,6 @@ export interface CRMTask {
 
 export interface CRMDocument {
   id: string;
-  firestore_id?: string;
   clientId: string;
   documentType: DocumentType;
   documentName: string;

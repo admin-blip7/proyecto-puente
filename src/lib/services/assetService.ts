@@ -11,7 +11,7 @@ const log = getLogger("assetService");
 const ASSETS_TABLE = "fixed_assets";
 
 const mapFixedAsset = (row: any): FixedAsset => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   assetId: row?.assetid ?? row?.assetId ?? "",
   name: row?.name ?? "",
   category: row?.category ?? "Otro",
@@ -81,10 +81,7 @@ export const addAsset = async (
   try {
     const supabase = getSupabaseServerClient();
     const assetId = `ASSET-${uuidv4().split("-")[0].toUpperCase()}`;
-    const firestoreId = uuidv4();
-
     const payload = {
-      firestore_id: firestoreId,
       assetid: assetId,
       name: assetData.name.trim(),
       category: assetData.category ?? "Otro",
@@ -150,7 +147,7 @@ export const runAnnualDepreciation = async (): Promise<number> => {
               currentvalue: newValue,
               lastdepreciationdate: today.toISOString(),
             })
-            .or(`firestore_id.eq.${asset.id},id.eq.${asset.id}`);
+            .eq("id", asset.id);
 
           if (!updateError) updatedCount += 1;
         }

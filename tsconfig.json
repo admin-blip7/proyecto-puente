@@ -39,6 +39,7 @@
     "node_modules",
     "firebase-to-supabase/**/*",
     "scripts/**/*",
-    "supabase/**/*"
+    "supabase/**/*",
+    "Recreate Design tarjetas/**/*"
   ]
 }

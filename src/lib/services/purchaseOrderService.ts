@@ -19,7 +19,7 @@ const mapHistoryEntry = (entry: any): PurchaseOrderHistoryEntry => ({
 });
 
 const mapPurchaseOrder = (row: any): PurchaseOrder => ({
-  id: row?.firestore_id ?? row?.id ?? "",
+  id: row?.id ?? "",
   orderNumber: row?.orderNumber ?? "",
   supplier: row?.supplier ?? "",
   totalAmount: Number(row?.totalAmount ?? 0),
@@ -32,7 +32,7 @@ const mapPurchaseOrder = (row: any): PurchaseOrder => ({
   history: Array.isArray(row?.history) ? row.history.map(mapHistoryEntry) : [],
 });
 
-const orIdFilter = (id: string) => `firestore_id.eq.${id},id.eq.${id}`;
+const orIdFilter = (id: string) => `id.eq.${id}`;
 
 const fetchOrderRow = async (id: string) => {
   const supabase = getSupabaseServerClient();
@@ -53,7 +53,7 @@ export async function addPurchaseOrder(
   orderData: Omit<PurchaseOrder, "id" | "createdAt" | "updatedAt">
 ): Promise<string> {
   try {
-    log.info("Starting addPurchaseOrder", { 
+    log.info("Starting addPurchaseOrder", {
       orderNumber: orderData.orderNumber,
       supplier: orderData.supplier,
       status: orderData.status,
@@ -62,11 +62,9 @@ export async function addPurchaseOrder(
     });
 
     const supabase = getSupabaseServerClient();
-    const firestoreId = uuidv4();
     const timestamp = nowIso();
 
     const payload = {
-      firestore_id: firestoreId,
       orderNumber: orderData.orderNumber,
       supplier: orderData.supplier,
       totalAmount: orderData.totalAmount,
@@ -79,8 +77,7 @@ export async function addPurchaseOrder(
       updatedAt: timestamp,
     };
 
-    log.info("Inserting purchase order with payload", { 
-      firestoreId,
+    log.info("Inserting purchase order with payload", {
       payloadKeys: Object.keys(payload),
       payloadTypes: Object.entries(payload).reduce((acc, [key, value]) => {
         acc[key] = typeof value;
@@ -89,9 +86,9 @@ export async function addPurchaseOrder(
     });
 
     const { data, error } = await supabase.from(PURCHASE_ORDERS_TABLE).insert(payload).select();
-    
+
     if (error) {
-      log.error("Supabase insert error", { 
+      log.error("Supabase insert error", {
         error: error.message,
         code: error.code,
         details: error.details,
@@ -100,8 +97,8 @@ export async function addPurchaseOrder(
       throw error;
     }
 
-    log.info("Purchase order inserted successfully", { firestoreId, data: data?.[0] });
-    return firestoreId;
+    log.info("Purchase order inserted successfully", { data: data?.[0] });
+    return data?.[0]?.id;
   } catch (error) {
     log.error("Error adding purchase order", error);
     throw error;

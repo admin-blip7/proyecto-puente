@@ -44,6 +44,13 @@ export async function POST() {
       name: product.name,
       quantity: 1,
       price: product.price || 1000000,
+      sku: 'DEBUG-SKU',
+      cost: 10000,
+      stock: 100,
+      createdAt: new Date(),
+      ownershipType: 'Propio' as 'Propio',
+      type: 'Venta' as 'Venta',
+      category: 'General'
     }];
 
     // Llamar al servicio de ventas

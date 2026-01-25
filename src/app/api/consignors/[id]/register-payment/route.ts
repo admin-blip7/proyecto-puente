@@ -37,7 +37,7 @@ interface PaymentTransaction {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const startTime = Date.now();
 
@@ -48,7 +48,7 @@ export async function POST(
     const { id: consignorId } = await params;
     if (!consignorId || typeof consignorId !== 'string') {
       return NextResponse.json(
-        { 
+        {
           error: 'ID de consignador inválido',
           code: 'INVALID_CONSIGNOR_ID',
           timestamp: new Date().toISOString()
@@ -63,7 +63,7 @@ export async function POST(
       body = await request.json();
     } catch (parseError) {
       return NextResponse.json(
-        { 
+        {
           error: 'Formato de datos inválido. Debe ser JSON válido.',
           code: 'INVALID_JSON',
           timestamp: new Date().toISOString()
@@ -107,7 +107,7 @@ export async function POST(
 
     if (validationErrors.length > 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Errores de validación',
           details: validationErrors,
           code: 'VALIDATION_ERROR',
@@ -142,7 +142,7 @@ export async function POST(
         });
       }
     } catch (supabaseError) {
-        console.error('Error fetching consignor:', {
+      console.error('Error fetching consignor:', {
         error: supabaseError,
         consignorId,
         timestamp: new Date().toISOString()
@@ -160,7 +160,7 @@ export async function POST(
 
     if (!consignorData) {
       return NextResponse.json(
-        { 
+        {
           error: 'Consignador no encontrado',
           code: 'CONSIGNOR_NOT_FOUND',
           consignorId,
@@ -175,7 +175,7 @@ export async function POST(
     // Business logic validation
     if (currentBalance <= 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'No hay saldo pendiente para registrar pagos',
           code: 'NO_BALANCE_DUE',
           currentBalance,
@@ -187,7 +187,7 @@ export async function POST(
 
     if (amount > currentBalance) {
       return NextResponse.json(
-        { 
+        {
           error: 'El pago no puede exceder el saldo pendiente',
           code: 'PAYMENT_EXCEEDS_BALANCE',
           paymentAmount: amount,
@@ -221,7 +221,7 @@ export async function POST(
     // Execute database operations
     try {
       console.log('=== STARTING DATABASE OPERATIONS ===');
-      
+
       // Simple approach: try to insert and let Supabase handle table creation if needed
       // In Supabase, tables are typically created via migrations, not dynamically
       console.log('Attempting to record transaction directly...');
@@ -339,9 +339,9 @@ export async function POST(
   } catch (error) {
     // Catch-all error handler
     console.error('Unexpected error in payment registration:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Error interno del servidor',
         code: 'INTERNAL_SERVER_ERROR',
         timestamp: new Date().toISOString(),
@@ -355,7 +355,7 @@ export async function POST(
 // Handle unsupported methods
 export async function GET() {
   return NextResponse.json(
-    { 
+    {
       error: 'Método no permitido. Use POST para registrar pagos.',
       code: 'METHOD_NOT_ALLOWED',
       timestamp: new Date().toISOString()
@@ -366,7 +366,7 @@ export async function GET() {
 
 export async function PUT() {
   return NextResponse.json(
-    { 
+    {
       error: 'Método no permitido. Use POST para registrar pagos.',
       code: 'METHOD_NOT_ALLOWED',
       timestamp: new Date().toISOString()
@@ -377,7 +377,7 @@ export async function PUT() {
 
 export async function DELETE() {
   return NextResponse.json(
-    { 
+    {
       error: 'Método no permitido. Use POST para registrar pagos.',
       code: 'METHOD_NOT_ALLOWED',
       timestamp: new Date().toISOString()
