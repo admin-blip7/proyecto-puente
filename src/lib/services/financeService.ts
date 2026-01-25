@@ -18,9 +18,8 @@ const CONTRACTS_TABLE = "contracts";
 const STORAGE_RECEIPTS_PATH = "receipts";
 
 const mapExpense = (row: any): Expense => {
-  // Use firestore_id, then id, then expenseId, then a hash of description + amount + date
-  const id = row?.firestore_id ??
-    row?.id ??
+  // Use id, then expenseId, then a hash of description + amount + date
+  const id = row?.id ??
     row?.expenseId ??
     `fallback-${row?.description}-${row?.amount}-${row?.paymentDate}`;
 
@@ -131,34 +130,19 @@ export const getDailySalesStats = async (startDate: Date, endDate: Date): Promis
 
     const sales = data ?? [];
 
-    // Filter by date range and convert Firestore timestamps
+    // Filter by date range
     const filteredSales = sales
       .filter((sale: any) => {
         if (!sale.createdAt) return false;
 
-        // Handle Firestore timestamp format {_seconds, _nanoseconds}
-        let saleDate: Date;
-        if (sale.createdAt._seconds) {
-          saleDate = new Date(sale.createdAt._seconds * 1000);
-        } else {
-          saleDate = new Date(sale.createdAt);
-        }
+        const saleDate = toDate(sale.createdAt);
 
         return saleDate >= startDate && saleDate <= endDate &&
           (sale.status === 'completed' || !sale.status); // Include completed or null status
       })
       .map((s: any) => {
-        // Convert Firestore timestamp to ISO string
-        let createdAt: string;
-        if (s.createdAt._seconds) {
-          const date = new Date(s.createdAt._seconds * 1000);
-          createdAt = date.toISOString();
-        } else {
-          createdAt = s.createdAt;
-        }
-
         return {
-          createdAt,
+          createdAt: toDate(s.createdAt).toISOString(),
           totalAmount: Number(s.totalAmount)
         };
       });
@@ -181,16 +165,11 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
 
     if (salesError) throw salesError;
 
-    // Filter by date range (handling Firestore timestamps)
+    // Filter by date range
     const filteredSales = (sales || []).filter((sale: any) => {
       if (!sale.createdAt) return false;
 
-      let saleDate: Date;
-      if (sale.createdAt._seconds) {
-        saleDate = new Date(sale.createdAt._seconds * 1000);
-      } else {
-        saleDate = new Date(sale.createdAt);
-      }
+      const saleDate = toDate(sale.createdAt);
 
       return saleDate >= startDate && saleDate <= endDate &&
         (sale.status === 'completed' || !sale.status);
@@ -209,15 +188,15 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
     // Fetch product costs
     const { data: products, error: productsError } = await supabase
       .from("products")
-      .select("firestore_id, cost")
-      .in("firestore_id", Array.from(productIds));
+      .select("id, cost")
+      .in("id", Array.from(productIds));
 
     if (productsError) throw productsError;
 
     // Create product cost map
     const costMap = new Map<string, number>();
     (products || []).forEach((p: any) => {
-      costMap.set(p.firestore_id, Number(p.cost) || 0);
+      costMap.set(p.id, Number(p.cost) || 0);
     });
 
     // Calculate total COGS
@@ -265,15 +244,12 @@ export const addExpense = async (
   }
 
   // Check if we have admin privileges (Service Role Key)
-  // This is required because we are updating accounts and sessions which might be restricted.
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NODE_ENV === 'production') {
-    // In production, we must have the key. In dev, we might warn.
     console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Expense creation might fail due to RLS.");
   }
 
   const supabase = getSupabaseServerClient();
   const expenseId = `EXP-${uuidv4().split("-")[0].toUpperCase()}`;
-  const firestoreId = uuidv4();
   const paymentDate = nowIso();
 
   let receiptUrl: string | undefined;
@@ -299,7 +275,6 @@ export const addExpense = async (
   }
 
   const expensePayload = {
-    firestore_id: firestoreId,
     expenseId,
     description: expenseData.description,
     category: expenseData.category,
@@ -307,7 +282,7 @@ export const addExpense = async (
     paidFromAccountId: expenseData.paidFromAccountId,
     paymentDate,
     receiptUrl: receiptUrl ?? null,
-    sessionId: activeSession ? (activeSession.firestore_id || activeSession.id) : (expenseData.sessionId || null),
+    sessionId: activeSession ? activeSession.sessionId : (expenseData.sessionId || null),
   };
 
   const { data: insertedExpense, error: insertError } = await supabase
@@ -319,89 +294,38 @@ export const addExpense = async (
   if (insertError) {
     log.error("Error inserting expense", {
       insertError,
-      errorDetails: {
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint
-      },
       expensePayload: {
         ...expensePayload,
-        // Don't log sensitive data but log the structure
-        hasValidAccountId: !!expensePayload.paidFromAccountId,
-        accountId: expensePayload.paidFromAccountId
+        hasValidAccountId: !!expensePayload.paidFromAccountId
       }
     });
     throw new Error(`No se pudo registrar el gasto: ${insertError.message}`);
   }
 
-  // First, try to find the account using both possible ID fields
-  let accountRow = null;
-  let accountError = null;
-
-  // Try firestore_id first
-  const { data: byFirestoreId, error: errorFirestore } = await supabase
+  // Get account to update balance
+  const { data: accountRow, error: accountError } = await supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id,current_balance")
-    .eq("firestore_id", expenseData.paidFromAccountId)
+    .select("id,current_balance")
+    .eq("id", expenseData.paidFromAccountId)
     .maybeSingle();
 
-  if (!errorFirestore && byFirestoreId) {
-    accountRow = byFirestoreId;
-  } else {
-    // If not found by firestore_id, try with id field
-    const { data: byId, error: errorId } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .select("firestore_id,current_balance")
-      .eq("id", expenseData.paidFromAccountId)
-      .maybeSingle();
-
-    if (byId) {
-      accountRow = byId;
-      accountError = null;
-    } else {
-      accountError = errorId || errorFirestore;
-    }
-  }
-
   if (accountError || !accountRow) {
-    log.error("Error fetching account", {
-      accountError,
-      accountId: expenseData.paidFromAccountId,
-      errorDetails: accountError,
-      searchAttempts: {
-        firestore_id: expenseData.paidFromAccountId,
-        id: expenseData.paidFromAccountId
-      }
-    });
-
-    // ROLLBACK: Delete the inserted expense since we can't process the payment
+    log.error("Error fetching account for expense", { accountError, accountId: expenseData.paidFromAccountId });
+    // ROLLBACK
     await supabase.from(EXPENSES_TABLE).delete().eq("id", insertedExpense.id);
-
     throw new Error(`No se encontró la cuenta seleccionada. ID: ${expenseData.paidFromAccountId}`);
   }
 
   const newBalance = Number(accountRow.current_balance ?? 0) - expenseData.amount;
-  // Update account balance with more specific ID matching
-  let accountUpdateError = null;
-  // First try updating with firestore_id
-  const { error: errorByFirestoreId } = await supabase
+  // Update account balance
+  const { error: accountUpdateError } = await supabase
     .from(ACCOUNTS_TABLE)
     .update({ current_balance: newBalance })
-    .eq("firestore_id", accountRow.firestore_id);
-
-  if (errorByFirestoreId) {
-    // If that fails, try with id field
-    const { error: errorById } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .update({ current_balance: newBalance })
-      .eq("id", expenseData.paidFromAccountId);
-    accountUpdateError = errorById;
-  }
+    .eq("id", expenseData.paidFromAccountId);
 
   if (accountUpdateError) {
-    log.warn("Failed to update account balance", accountUpdateError);
-    // ROLLBACK: Delete the inserted expense since we failed to update balance
+    log.error("Failed to update account balance", accountUpdateError);
+    // ROLLBACK
     await supabase.from(EXPENSES_TABLE).delete().eq("id", insertedExpense.id);
     throw new Error("Falló la actualización del saldo de la cuenta. Se canceló el registro del gasto.");
   }
@@ -411,45 +335,24 @@ export const addExpense = async (
     const expectedCashInDrawer =
       Number(activeSession.startingFloat ?? 0) + Number(activeSession.totalCashSales ?? 0) - newTotalPayouts;
 
-    // Update the session with more specific ID matching
-    let sessionUpdateError = null;
-    // First try updating with firestore_id
-    const { error: sessionErrorByFirestoreId } = await supabase
+    // Update the session
+    const { error: sessionUpdateError } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .update({
         totalCashPayouts: newTotalPayouts,
         expectedCashInDrawer,
       })
-      .eq("firestore_id", activeSession.firestore_id || activeSession.id);
-
-    if (sessionErrorByFirestoreId) {
-      // If that fails, try with id field
-      const { error: sessionErrorById } = await supabase
-        .from(CASH_SESSIONS_TABLE)
-        .update({
-          totalCashPayouts: newTotalPayouts,
-          expectedCashInDrawer,
-        })
-        .eq("id", activeSession.firestore_id || activeSession.id);
-      sessionUpdateError = sessionErrorById;
-    }
+      .eq("sessionId", activeSession.sessionId);
 
     if (sessionUpdateError) {
       log.warn("Failed to update cash session with expense", sessionUpdateError);
-      // We don't rollback here because the expense is valid and paid, just session tracking failed.
-      // But maybe we should? For now, let's keep it as warning.
     }
   }
-
-  // Ensure we return a serializable object to avoid "Server Components render" errors
-  // Next.js handles Date objects, but sometimes it's safer to be explicit if issues arise.
-  // However, the main issue is likely the error thrown above not being caught/serialized well.
 
   try {
     return mapExpense(insertedExpense);
   } catch (mapError) {
     log.error("Error mapping expense response", mapError);
-    // Return a safe fallback or re-throw a clean error
     throw new Error("Gasto registrado pero hubo un error al procesar la respuesta.");
   }
 };
@@ -488,7 +391,6 @@ export const addInterestEarnings = async (
 
   if (!existingRow) {
     const insertPayload = {
-      firestore_id: uuidv4(),
       dateKey,
       date: timestamp,
       totalInterestEarnings: amount,
@@ -517,7 +419,7 @@ export const addInterestEarnings = async (
       interestTransactions: [...existingTransactions, earningsEntry],
       updatedAt: timestamp,
     })
-    .eq("firestore_id", existingRow.firestore_id ?? existingRow.id);
+    .eq("id", existingRow.id);
 
   if (updateError) {
     log.error("Error updating daily earnings", updateError);
@@ -563,7 +465,6 @@ export async function generatePaymentPlan(
 
     const planId = `${clientId}_${Date.now()}`;
     const payload = {
-      firestore_id: planId,
       clientId,
       creditAmount,
       interestRate,
@@ -624,7 +525,6 @@ export async function generateContract(
 
     const contractId = `${clientId}_${Date.now()}`;
     const payload = {
-      firestore_id: contractId,
       clientId,
       clientName,
       content,
@@ -655,9 +555,10 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
     .select("*");
 
   if (uuidValidate(expenseId)) {
-    query = query.or(`firestore_id.eq.${expenseId},id.eq.${expenseId}`);
+    query = query.eq("id", expenseId);
   } else {
-    query = query.eq("firestore_id", expenseId);
+    // If expenseId is not UUID, try finding by ID assuming it might be stored that way, or fail
+    query = query.eq("id", expenseId);
   }
 
   const { data: expense, error: fetchError } = await query.maybeSingle();
@@ -669,12 +570,10 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
   // 2. Reverse Account Balance (Add amount back)
   let accountQuery = supabase
     .from(ACCOUNTS_TABLE)
-    .select("firestore_id, id, current_balance");
+    .select("id, current_balance");
 
-  if (uuidValidate(expense.paid_from_account_id)) {
-    accountQuery = accountQuery.or(`firestore_id.eq.${expense.paid_from_account_id},id.eq.${expense.paid_from_account_id}`);
-  } else {
-    accountQuery = accountQuery.eq("firestore_id", expense.paid_from_account_id);
+  if (expense.paidFromAccountId) {
+    accountQuery = accountQuery.eq("id", expense.paidFromAccountId);
   }
 
   const { data: account, error: accountError } = await accountQuery.maybeSingle();
@@ -684,36 +583,27 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
     const { error: updateError } = await supabase
       .from(ACCOUNTS_TABLE)
       .update({ current_balance: newBalance })
-      .eq("firestore_id", account.firestore_id);
+      .eq("id", account.id);
 
     if (updateError) {
-      await supabase
-        .from(ACCOUNTS_TABLE)
-        .update({ current_balance: newBalance })
-        .eq("id", account.id);
+      log.error("Failed to reverse account balance", updateError);
     }
   } else {
-    log.warn("Account not found when deleting expense, balance not reversed.", { expenseId, accountId: expense.paid_from_account_id });
+    log.warn("Account not found when deleting expense, balance not reversed.", { expenseId, accountId: expense.paidFromAccountId });
   }
 
   // 3. Reverse Session Totals (if linked)
   if (expense.sessionId) {
     let sessionQuery = supabase
       .from(CASH_SESSIONS_TABLE)
-      .select("firestore_id, id, totalCashPayouts, expectedCashInDrawer");
+      .select("id, totalCashPayouts, expectedCashInDrawer, sessionId");
 
-    if (uuidValidate(expense.sessionId)) {
-      sessionQuery = sessionQuery.or(`firestore_id.eq.${expense.sessionId},id.eq.${expense.sessionId}`);
-    } else {
-      sessionQuery = sessionQuery.eq("firestore_id", expense.sessionId);
-    }
+    sessionQuery = sessionQuery.eq("sessionId", expense.sessionId);
 
     const { data: session, error: sessionError } = await sessionQuery.maybeSingle();
 
     if (session) {
       const newTotalPayouts = Number(session.totalCashPayouts ?? 0) - Number(expense.amount);
-      // expectedCashInDrawer = startingFloat + totalCashSales - totalCashPayouts
-      // So if payouts decrease, expectedCashInDrawer increases
       const newExpectedCash = Number(session.expectedCashInDrawer ?? 0) + Number(expense.amount);
 
       const { error: updateSessionError } = await supabase
@@ -722,16 +612,10 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
           totalCashPayouts: newTotalPayouts,
           expectedCashInDrawer: newExpectedCash
         })
-        .eq("firestore_id", session.firestore_id);
+        .eq("sessionId", session.sessionId);
 
       if (updateSessionError) {
-        await supabase
-          .from(CASH_SESSIONS_TABLE)
-          .update({
-            totalCashPayouts: newTotalPayouts,
-            expectedCashInDrawer: newExpectedCash
-          })
-          .eq("id", session.id);
+        log.error("Failed to reverse session totals", updateSessionError);
       }
     }
   }
@@ -740,17 +624,10 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
   const { error: deleteError } = await supabase
     .from(EXPENSES_TABLE)
     .delete()
-    .eq("firestore_id", expense.firestore_id);
+    .eq("id", expense.id);
 
   if (deleteError) {
-    const { error: deleteError2 } = await supabase
-      .from(EXPENSES_TABLE)
-      .delete()
-      .eq("id", expense.id);
-
-    if (deleteError2) {
-      throw new Error(`No se pudo eliminar el gasto: ${deleteError2.message}`);
-    }
+    throw new Error(`No se pudo eliminar el gasto: ${deleteError.message}`);
   }
 };
 
@@ -794,7 +671,7 @@ export const depositSaleToAccount = async (
       return;
     }
 
-    log.info(`Depositing sale ${saleId} ($${amount}) to account: ${account.name} (${account.firestore_id})`);
+    log.info(`Depositing sale ${saleId} ($${amount}) to account: ${account.name} (${account.id})`);
 
     // 2. Update the account balance
     const newBalance = Number(account.current_balance ?? 0) + amount;
@@ -802,19 +679,11 @@ export const depositSaleToAccount = async (
     const { error: updateError } = await supabase
       .from(ACCOUNTS_TABLE)
       .update({ current_balance: newBalance })
-      .eq("firestore_id", account.firestore_id);
+      .eq("id", account.id);
 
     if (updateError) {
-      // Try fallback to ID
-      const { error: updateError2 } = await supabase
-        .from(ACCOUNTS_TABLE)
-        .update({ current_balance: newBalance })
-        .eq("id", account.id);
-
-      if (updateError2) {
-        log.error("Error updating account balance for cash deposit", updateError2);
-        throw new Error("Error al depositar venta en Caja Chica.");
-      }
+      log.error("Error updating account balance for cash deposit", updateError);
+      throw new Error("Error al depositar venta en Caja Chica.");
     }
 
     log.info(`Deposit successful. New balance for ${account.name}: ${newBalance}`);
@@ -840,15 +709,7 @@ export const getAccountTransactions = async (accountId: string): Promise<Account
     const supabase = getSupabaseServerClient();
 
     // 0. Resolve Account IDs (UUID and Firestore ID) to ensure we catch all linked records
-    const { data: account } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .select("id, firestore_id")
-      .or(`id.eq.${accountId},firestore_id.eq.${accountId}`)
-      .maybeSingle();
-
-    const idsToCheck = account
-      ? [account.id, account.firestore_id].filter((id): id is string => !!id)
-      : [accountId];
+    const idsToCheck = [accountId];
 
     // 1. Fetch Expenses (paidFromAccountId)
     const { data: expenses, error: expenseError } = await supabase
@@ -870,7 +731,7 @@ export const getAccountTransactions = async (accountId: string): Promise<Account
 
     // 3. Map to common structure
     const expenseTransactions: AccountTransaction[] = (expenses || []).map((e: any) => ({
-      id: e.id || e.firestore_id,
+      id: e.id,
       date: toDate(e.paymentDate),
       description: e.description,
       amount: Number(e.amount),
@@ -880,7 +741,7 @@ export const getAccountTransactions = async (accountId: string): Promise<Account
     }));
 
     const incomeTransactions: AccountTransaction[] = (incomes || []).map((i: any) => ({
-      id: i.id || i.firestore_id,
+      id: i.id,
       date: toDate(i.paymentDate),
       description: i.description,
       amount: Number(i.amount),
