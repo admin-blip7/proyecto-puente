@@ -39,9 +39,9 @@ const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.obje
   bagRecargasSale: z.coerce.number().min(0),
   bagMimovilSale: z.coerce.number().min(0),
   bagServiciosSale: z.coerce.number().min(0),
-  bagRecargasActualEnd: z.coerce.number().min(0).optional(),
-  bagMimovilActualEnd: z.coerce.number().min(0).optional(),
-  bagServiciosActualEnd: z.coerce.number().min(0).optional(),
+  bagRecargasActualEnd: z.string().optional(),
+  bagMimovilActualEnd: z.string().optional(),
+  bagServiciosActualEnd: z.string().optional(),
   depositAccountId: z.string().optional(),
 }).refine((data) => {
   // If there is cash to deposit (count > 0), account is required
@@ -90,9 +90,9 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         bagRecargasSale: 0,
         bagMimovilSale: 0,
         bagServiciosSale: 0,
-        bagRecargasActualEnd: 0,
-        bagMimovilActualEnd: 0,
-        bagServiciosActualEnd: 0,
+        bagRecargasActualEnd: "",
+        bagMimovilActualEnd: "",
+        bagServiciosActualEnd: "",
         depositAccountId: "",
       });
     }
@@ -110,15 +110,27 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
+
       const bagsSalesAmounts = {
         'recargas': values.bagRecargasSale,
         'mimovil': values.bagMimovilSale,
         'servicios': values.bagServiciosSale
       };
+
+      // Helper to determine end amount: Input -> Fallback to (Start - Sale)
+      const getEndAmount = (input: string | undefined, key: 'recargas' | 'mimovil' | 'servicios') => {
+        if (input === undefined || input === "") {
+          const start = session.bagsStartAmounts?.[key] || 0;
+          const sale = key === 'recargas' ? values.bagRecargasSale : key === 'mimovil' ? values.bagMimovilSale : values.bagServiciosSale;
+          return start - sale;
+        }
+        return Number(input);
+      };
+
       const bagsActualEndAmounts = {
-        'recargas': values.bagRecargasActualEnd || 0,
-        'mimovil': values.bagMimovilActualEnd || 0,
-        'servicios': values.bagServiciosActualEnd || 0
+        'recargas': getEndAmount(values.bagRecargasActualEnd, 'recargas'),
+        'mimovil': getEndAmount(values.bagMimovilActualEnd, 'mimovil'),
+        'servicios': getEndAmount(values.bagServiciosActualEnd, 'servicios')
       };
       await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId);
     } finally {
@@ -260,8 +272,9 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                       const start = session.bagsStartAmounts?.['recargas'] || 0;
                       const sale = form.watch('bagRecargasSale') || 0;
                       const expectedEnd = start - sale;
-                      const actualEnd = field.value || 0;
-                      const diff = Number(actualEnd) - expectedEnd;
+                      const actualEndStr = field.value;
+                      // Only show diff if user has typed something
+                      const diff = actualEndStr && actualEndStr !== "" ? Number(actualEndStr) - expectedEnd : 0;
 
                       return (
                         <FormItem>
@@ -273,11 +286,12 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                               {...field}
                               className={cn(
                                 "h-8 text-xs",
-                                field.value !== undefined && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
+                                diff !== 0 && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
                               )}
+                              placeholder={expectedEnd.toFixed(2)}
                             />
                           </FormControl>
-                          {field.value !== undefined && Math.abs(diff) > 0.01 && (
+                          {diff !== 0 && Math.abs(diff) > 0.01 && (
                             <div className="text-[10px] text-red-600 font-bold">
                               Diferencia: {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                             </div>
@@ -309,8 +323,8 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                       const start = session.bagsStartAmounts?.['mimovil'] || 0;
                       const sale = form.watch('bagMimovilSale') || 0;
                       const expectedEnd = start - sale;
-                      const actualEnd = field.value || 0;
-                      const diff = Number(actualEnd) - expectedEnd;
+                      const actualEndStr = field.value;
+                      const diff = actualEndStr && actualEndStr !== "" ? Number(actualEndStr) - expectedEnd : 0;
 
                       return (
                         <FormItem>
@@ -322,11 +336,12 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                               {...field}
                               className={cn(
                                 "h-8 text-xs",
-                                field.value !== undefined && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
+                                diff !== 0 && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
                               )}
+                              placeholder={expectedEnd.toFixed(2)}
                             />
                           </FormControl>
-                          {field.value !== undefined && Math.abs(diff) > 0.01 && (
+                          {diff !== 0 && Math.abs(diff) > 0.01 && (
                             <div className="text-[10px] text-red-600 font-bold">
                               Diff: {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                             </div>
@@ -358,8 +373,8 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                       const start = session.bagsStartAmounts?.['servicios'] || 0;
                       const sale = form.watch('bagServiciosSale') || 0;
                       const expectedEnd = start - sale;
-                      const actualEnd = field.value || 0;
-                      const diff = Number(actualEnd) - expectedEnd;
+                      const actualEndStr = field.value;
+                      const diff = actualEndStr && actualEndStr !== "" ? Number(actualEndStr) - expectedEnd : 0;
 
                       return (
                         <FormItem>
@@ -371,11 +386,12 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                               {...field}
                               className={cn(
                                 "h-8 text-xs",
-                                field.value !== undefined && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
+                                diff !== 0 && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : ""
                               )}
+                              placeholder={expectedEnd.toFixed(2)}
                             />
                           </FormControl>
-                          {field.value !== undefined && Math.abs(diff) > 0.01 && (
+                          {diff !== 0 && Math.abs(diff) > 0.01 && (
                             <div className="text-[10px] text-red-600 font-bold">
                               Diff: {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                             </div>
@@ -386,6 +402,14 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                   />
                 </div>
               </div>
+
+              <div className="bg-blue-50 p-2 rounded text-xs text-blue-700 flex gap-2 items-center">
+                <span className="text-lg">ℹ️</span>
+                <div>
+                  <strong>Nota:</strong> Los saldos finales de las bolsas se guardarán y sugerirán automáticamente como saldos iniciales para el siguiente turno.
+                </div>
+              </div>
+
 
               {form.formState.isDirty && (
                 <div className={cn(
@@ -423,6 +447,6 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
           </Form>
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 }

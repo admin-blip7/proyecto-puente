@@ -117,11 +117,41 @@ export const getExpensesBySession = async (
   }
 };
 
+export const getIncomesByDateRange = async (startDate: Date, endDate: Date): Promise<any[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("incomes")
+      .select("*")
+      .gte("paymentDate", startDate.toISOString())
+      .lte("paymentDate", endDate.toISOString())
+      .order("paymentDate", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      incomeId: row.incomeId,
+      description: row.description,
+      category: row.category,
+      amount: Number(row.amount),
+      destinationAccountId: row.destinationAccountId,
+      paymentDate: toDate(row.paymentDate),
+      source: row.source,
+    }));
+  } catch (error) {
+    log.error("Error fetching incomes by date range", error);
+    return [];
+  }
+};
+
 export const getDailySalesStats = async (startDate: Date, endDate: Date): Promise<{ createdAt: string; totalAmount: number }[]> => {
   try {
     const supabase = getSupabaseServerClient();
 
-    // Fetch ALL sales (we'll filter by date client-side since Firestore timestamps don't work with Postgres date filters)
+    // Fetch ALL sales (filtering client-side due to mixed JSONB date formats)
     const { data, error } = await supabase
       .from("sales")
       .select("createdAt, totalAmount, status");
@@ -133,16 +163,13 @@ export const getDailySalesStats = async (startDate: Date, endDate: Date): Promis
     // Filter by date range
     const filteredSales = sales
       .filter((sale: any) => {
-        if (!sale.createdAt) return false;
-
-        const saleDate = toDate(sale.createdAt);
-
-        return saleDate >= startDate && saleDate <= endDate &&
-          (sale.status === 'completed' || !sale.status); // Include completed or null status
+        const createdAt = toDate(sale.createdAt); // Handles mixed types
+        return createdAt >= startDate && createdAt <= endDate &&
+          (sale.status === 'completed' || !sale.status);
       })
       .map((s: any) => {
         return {
-          createdAt: toDate(s.createdAt).toISOString(),
+          createdAt: s.createdAt,
           totalAmount: Number(s.totalAmount)
         };
       });
@@ -158,21 +185,18 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
   try {
     const supabase = getSupabaseServerClient();
 
-    // Fetch all sales with items
+    // Fetch all sales (filtering client-side)
     const { data: sales, error: salesError } = await supabase
       .from("sales")
       .select("items, status, createdAt");
 
     if (salesError) throw salesError;
 
-    // Filter by date range
+    // Filter by status (completed or null) AND date range
     const filteredSales = (sales || []).filter((sale: any) => {
-      if (!sale.createdAt) return false;
-
-      const saleDate = toDate(sale.createdAt);
-
-      return saleDate >= startDate && saleDate <= endDate &&
-        (sale.status === 'completed' || !sale.status);
+      const createdAt = toDate(sale.createdAt);
+      const inDateRange = createdAt >= startDate && createdAt <= endDate;
+      return inDateRange && (sale.status === 'completed' || !sale.status);
     });
 
     // Collect all unique product IDs
@@ -184,6 +208,8 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
         });
       }
     });
+
+    if (productIds.size === 0) return 0;
 
     // Fetch product costs
     const { data: products, error: productsError } = await supabase
@@ -634,7 +660,9 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
 export const depositSaleToAccount = async (
   amount: number,
   paymentMethod: string,
-  saleId: string
+  saleId: string,
+  sessionId?: string,
+  userId?: string
 ): Promise<void> => {
   // Only process cash sales
   if (paymentMethod !== 'Efectivo') {
@@ -648,7 +676,7 @@ export const depositSaleToAccount = async (
     // We'll look for an account named "Caja Chica" first, then any "Efectivo" type account
     let { data: account, error: accountError } = await supabase
       .from(ACCOUNTS_TABLE)
-      .select("*")
+      .select("id, name")
       .ilike("name", "%Caja Chica%")
       .maybeSingle();
 
@@ -656,7 +684,7 @@ export const depositSaleToAccount = async (
       // Fallback: Find first 'Efectivo' account
       const { data: cashAccount, error: cashError } = await supabase
         .from(ACCOUNTS_TABLE)
-        .select("*")
+        .select("id, name")
         .eq("type", "Efectivo")
         .limit(1)
         .maybeSingle();
@@ -673,20 +701,21 @@ export const depositSaleToAccount = async (
 
     log.info(`Depositing sale ${saleId} ($${amount}) to account: ${account.name} (${account.id})`);
 
-    // 2. Update the account balance
-    const newBalance = Number(account.current_balance ?? 0) + amount;
+    // 2. Use addIncome to record the transaction and update balance
+    // This creates traceability in the Income table and ensures the account balance is updated correctly
+    const { addIncome } = await import("./incomeService");
 
-    const { error: updateError } = await supabase
-      .from(ACCOUNTS_TABLE)
-      .update({ current_balance: newBalance })
-      .eq("id", account.id);
+    await addIncome({
+      description: `Venta en Efectivo: ${saleId}`,
+      category: "Venta",
+      amount: amount,
+      destinationAccountId: account.id,
+      source: "Venta en Mostrador",
+      sessionId: sessionId,
+      icon: "shopping-bag"
+    }, undefined, userId);
 
-    if (updateError) {
-      log.error("Error updating account balance for cash deposit", updateError);
-      throw new Error("Error al depositar venta en Caja Chica.");
-    }
-
-    log.info(`Deposit successful. New balance for ${account.name}: ${newBalance}`);
+    log.info(`Deposit successful for sale ${saleId}`);
 
   } catch (error) {
     log.error("Error in depositSaleToAccount", error);

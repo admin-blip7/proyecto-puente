@@ -193,7 +193,7 @@ export const addIncome = async (
         source: incomeData.source,
         paymentDate,
         receiptUrl: receiptUrl ?? null,
-        sessionId: activeSession ? activeSession.id : (incomeData.sessionId || null),
+        sessionId: activeSession ? activeSession.sessionId : (incomeData.sessionId || null),
         icon: incomeData.icon ?? null,
     };
 

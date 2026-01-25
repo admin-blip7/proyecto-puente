@@ -55,24 +55,36 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
   const [cogs, setCOGS] = useState<number>(0);
   const [loadingExpenses, setLoadingExpenses] = useState(false);
 
-  // Fetch expenses, daily sales, and COGS when date range changes
+  /* New incomes state */
+  const [incomes, setIncomes] = useState<{ amount: number }[]>([]);
+
+  // Fetch expenses, daily sales, cogs, AND incomes when date range changes
   useEffect(() => {
     const fetchData = async () => {
       if (!dateRange?.from || !dateRange?.to) return;
 
       setLoadingExpenses(true);
       try {
-        const { getExpensesByDateRange, getDailySalesStats, getCOGSByDateRange } = await import("@/lib/services/financeService");
+        const { getExpensesByDateRange, getDailySalesStats, getCOGSByDateRange, getIncomesByDateRange } = await import("@/lib/services/financeService");
 
-        const [expensesData, salesData, cogsData] = await Promise.all([
+        const [expensesData, salesData, cogsData, incomesData] = await Promise.all([
           getExpensesByDateRange(dateRange.from, dateRange.to),
           getDailySalesStats(dateRange.from, dateRange.to),
-          getCOGSByDateRange(dateRange.from, dateRange.to)
+          getCOGSByDateRange(dateRange.from, dateRange.to),
+          getIncomesByDateRange(dateRange.from, dateRange.to)
         ]);
 
         setExpenses(expensesData);
         setRawSales(salesData);
         setCOGS(cogsData);
+        // Filter out "Corte de Caja" (Cash Drops) from Incomes to prevent double counting
+        // These are just transfers of sales money, not new income.
+        const filteredIncomes = incomesData.filter((inc: any) =>
+          inc.category !== 'Corte de Caja' &&
+          !inc.description?.toLowerCase().includes('depósito de corte de caja')
+        );
+
+        setIncomes(filteredIncomes);
       } catch (error) {
         console.error("Error fetching financial data:", error);
       } finally {
@@ -104,6 +116,9 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
       // Ensure we compare including the full day for 'to' date
       const endDate = new Date(dateRange.to!);
       endDate.setHours(23, 59, 59, 999);
+
+      // Safety check: Ensure both dates are valid
+      if (isNaN(sessionDate.getTime())) return false;
 
       return sessionDate >= dateRange.from! && sessionDate <= endDate;
     });
@@ -154,15 +169,17 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
     const totalSales = rawSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
 
     const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const totalIncomes = incomes.reduce((sum, inc) => sum + (inc.amount || 0), 0);
 
     // Gross Profit = Sales - COGS
     const grossProfit = totalSales - cogs;
 
-    // Net Profit = Gross Profit - Expenses = Sales - COGS - Expenses
-    const netProfit = grossProfit - totalExpenses;
+    // Net Profit = Gross Profit + Other Incomes - Expenses
+    // Formula: (Sales - COGS) + Incomes - Expenses
+    const netProfit = grossProfit + totalIncomes - totalExpenses;
 
-    return { totalSales, totalExpenses, netProfit, cogs, grossProfit };
-  }, [rawSales, expenses, cogs]);
+    return { totalSales, totalExpenses, totalIncomes, netProfit, cogs, grossProfit };
+  }, [rawSales, expenses, cogs, incomes]);
 
   const formatDateTime = (date?: Date) => {
     if (!date) return 'N/A';
@@ -198,7 +215,15 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
       const sessionsForDate = filteredSessions
         .filter(s => {
           if (!s.closedAt) return false;
-          const sessionDateKey = format(new Date(s.closedAt), 'yyyy-MM-dd');
+          // IMPORTANT: Parse date carefully. If s.closedAt is ISO string (UTC), 
+          // new Date() converts to local. format() then uses local. 
+          // Ideally we match based on the "Session Day" concept, usually when it was closed.
+          const sessionDate = new Date(s.closedAt);
+          // Safety check for invalid dates
+          if (isNaN(sessionDate.getTime())) return false;
+
+          const sessionDateKey = format(sessionDate, 'yyyy-MM-dd');
+
           return sessionDateKey === dateKey;
         })
         .sort((a, b) => {
@@ -360,7 +385,19 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
               {formatCurrency(financials.netProfit)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Ventas - COGS - Gastos
+              (Ventas + Ingresos) - COGS - Gastos
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Otros Ingresos</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(financials.totalIncomes)}</div>
+            <p className="text-xs text-muted-foreground">
+              {incomes.length} ingresos extras
             </p>
           </CardContent>
         </Card>

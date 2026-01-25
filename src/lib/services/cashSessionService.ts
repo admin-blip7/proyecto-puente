@@ -120,7 +120,7 @@ export const getAllClosedSessions = async (): Promise<CashSession[]> => {
     const sessions = (data ?? []).map(mapSession);
     const uniqueSessions = sessions.filter(
       (session, index, self) =>
-        index === self.findIndex((s) => s.id === session.id)
+        index === self.findIndex((s) => s.sessionId === session.sessionId)
     );
     return uniqueSessions;
   } catch (error) {
@@ -308,7 +308,7 @@ export const closeCashSession = async (
     const bagsExpectedEndAmounts = calculateBagsEndAmounts(freshSession.bagsStartAmounts || {}, bagsSalesAmounts);
     const finalBagsEndAmounts: Record<string, number> = {};
     for (const key of ['recargas', 'mimovil', 'servicios']) {
-      finalBagsEndAmounts[key] = bagsActualEndAmounts[key] !== undefined && bagsActualEndAmounts[key] !== 0
+      finalBagsEndAmounts[key] = bagsActualEndAmounts[key] !== undefined
         ? bagsActualEndAmounts[key]
         : bagsExpectedEndAmounts[key] || 0;
     }

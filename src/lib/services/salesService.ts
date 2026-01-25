@@ -245,10 +245,34 @@ export const addSaleAndUpdateStock = async (
       consignorId: item.consignorId
     })));
 
+    // Link to Active Session if not provided
+    // This prevents "Orphaned Sales" (ventas huérfanas) which don't appear in cash cuts
+    let finalSessionId = saleData.sessionId;
+    if (!finalSessionId && saleData.cashierId) {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("cash_sessions") // Hardcoded table check to avoid circular dep issues if constants not exported
+          .select("sessionId")
+          .eq("status", "Abierto")
+          .eq("openedBy", saleData.cashierId)
+          .order("openedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (sessionData) {
+          finalSessionId = sessionData.sessionId;
+          log.info(`Auto-linked sale ${saleId} to active session ${finalSessionId}`);
+        }
+      } catch (sessionLookupError) {
+        log.warn("Error looking up active session for sale", sessionLookupError);
+      }
+    }
+
     const sale: Sale = {
       id: uuidv4(),
       saleId,
       ...saleData,
+      sessionId: finalSessionId, // Ensure session ID is attached
       createdAt: new Date(now),
       items: itemsWithConsignorId, // Usar items con consignorId
     };
@@ -269,6 +293,7 @@ export const addSaleAndUpdateStock = async (
       status: 'completed',
       amount_paid: sale.amountPaid,
       change_given: sale.changeGiven,
+      sessionId: sale.sessionId, // Explicitly include the determined session ID
       // Discount fields
       discount_code: (saleData as any).discountCode || null,
       discount_amount: (saleData as any).discountAmount || null,
@@ -299,9 +324,16 @@ export const addSaleAndUpdateStock = async (
     log.info(`Sale ${saleId} inserted successfully`);
 
     // Deposit cash sales to 'Caja Chica'
-    if (sale.paymentMethod === 'Efectivo') {
-      await depositSaleToAccount(sale.totalAmount, sale.paymentMethod, saleId);
-    }
+    // DISABLED: User requested consolidated deposits only at session close (Corte de Caja).
+    // if (sale.paymentMethod === 'Efectivo') {
+    //   await depositSaleToAccount(
+    //     sale.totalAmount, 
+    //     sale.paymentMethod, 
+    //     saleId,
+    //     sale.sessionId,
+    //     sale.cashierId
+    //   );
+    // }
 
     // Actualizar balance de consignadores si hay productos de consignación
     for (const item of sale.items) {

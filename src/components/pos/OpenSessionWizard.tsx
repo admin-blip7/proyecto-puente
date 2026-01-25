@@ -29,6 +29,7 @@ const formSchema = z.object({
     bagRecargas: z.coerce.number(),
     bagMimovil: z.coerce.number(),
     bagServicios: z.coerce.number(),
+    correctedPreviousCash: z.coerce.number().min(0, "El monto no puede ser negativo.").default(0),
 });
 
 export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, lastClosedSession }: OpenSessionWizardProps) {
@@ -44,6 +45,7 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
             bagRecargas: 0,
             bagMimovil: 0,
             bagServicios: 0,
+            correctedPreviousCash: 0,
         }
     });
 
@@ -64,17 +66,23 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
         if (lastClosedSession) {
             // Pre-fill bag values from last session ending amounts
             const bags = lastClosedSession.bagsEndAmounts || {};
+            // Use setValue with shouldDirty: true if you want the form to know it changed,
+            // but for initial load just setting value is fine.
             setValue('bagRecargas', bags['recargas'] || 0);
             setValue('bagMimovil', bags['mimovil'] || 0);
             setValue('bagServicios', bags['servicios'] || 0);
+            setValue('correctedPreviousCash', lastClosedSession.actualCashCount || 0);
         }
     }, [lastClosedSession, setValue]);
 
+    const correctedPreviousCash = watch('correctedPreviousCash');
+
     useEffect(() => {
-        if (cashStayedInDrawer && lastClosedSession) {
-            setValue('startingFloat', lastClosedSession.actualCashCount || 0);
+        if (cashStayedInDrawer) {
+            // Use the potentially edited value
+            setValue('startingFloat', correctedPreviousCash || 0);
         }
-    }, [cashStayedInDrawer, lastClosedSession, setValue]);
+    }, [cashStayedInDrawer, correctedPreviousCash, setValue]);
 
     const handleNext = () => {
         setStep(2);
@@ -138,21 +146,68 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div className="border p-3 rounded bg-muted/20">
                                         <div className="font-semibold mb-2">Efectivo en Caja</div>
-                                        <div className="text-2xl font-bold">{formatCurrency(lastClosedSession.actualCashCount || 0)}</div>
+                                        {/* <div className="text-2xl font-bold">{formatCurrency(lastClosedSession.actualCashCount || 0)}</div> */}
+                                        <FormField
+                                            control={control}
+                                            name="correctedPreviousCash"
+                                            render={({ field }) => (
+                                                <FormItem className="mb-0">
+                                                    <FormControl>
+                                                        <Input
+                                                            {...field}
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="text-xl font-bold h-10"
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
                                     </div>
                                     <div className="border p-3 rounded bg-muted/20">
                                         <div className="font-semibold mb-2">Saldos Electrónicos</div>
-                                        <div className="flex justify-between py-1 border-b border-dashed">
+                                        <div className="flex justify-between items-center py-1 border-b border-dashed gap-2">
                                             <span>Recargas:</span>
-                                            <span>{formatCurrency(prevBags['recargas'] || 0)}</span>
+                                            {/* <span>{formatCurrency(prevBags['recargas'] || 0)}</span> */}
+                                            <FormField
+                                                control={control}
+                                                name="bagRecargas"
+                                                render={({ field }) => (
+                                                    <FormItem className="w-24 mb-0 space-y-0">
+                                                        <FormControl>
+                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
                                         </div>
-                                        <div className="flex justify-between py-1 border-b border-dashed">
+                                        <div className="flex justify-between items-center py-1 border-b border-dashed gap-2">
                                             <span>MiMovil:</span>
-                                            <span>{formatCurrency(prevBags['mimovil'] || 0)}</span>
+                                            <FormField
+                                                control={control}
+                                                name="bagMimovil"
+                                                render={({ field }) => (
+                                                    <FormItem className="w-24 mb-0 space-y-0">
+                                                        <FormControl>
+                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
                                         </div>
-                                        <div className="flex justify-between py-1">
+                                        <div className="flex justify-between items-center py-1 gap-2">
                                             <span>Servicios:</span>
-                                            <span>{formatCurrency(prevBags['servicios'] || 0)}</span>
+                                            <FormField
+                                                control={control}
+                                                name="bagServicios"
+                                                render={({ field }) => (
+                                                    <FormItem className="w-24 mb-0 space-y-0">
+                                                        <FormControl>
+                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -196,7 +251,7 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
                                                     ¿El efectivo se quedó en caja?
                                                 </FormLabel>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Si marca esto, el Efectivo Inicial del nuevo turno será igual al cierre anterior ({formatCurrency(lastClosedSession.actualCashCount || 0)}).
+                                                    Si marca esto, el Efectivo Inicial del nuevo turno será igual al cierre anterior ({formatCurrency(correctedPreviousCash || 0)}).
                                                 </p>
                                             </div>
                                         </FormItem>
