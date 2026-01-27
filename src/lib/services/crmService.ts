@@ -314,6 +314,67 @@ export const getCRMClientByIdentification = async (
     }
 };
 
+/**
+ * Search for a client by phone number
+ * Used to find existing clients before creating duplicates
+ */
+export const getCRMClientByPhone = async (phone: string): Promise<CRMClient | null> => {
+    const supabase = getSupabaseServerClient();
+
+    try {
+        // Normalize phone - remove spaces, dashes, parentheses
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '');
+
+        const { data, error } = await supabase
+            .from(CRM_CLIENTS_TABLE)
+            .select("*")
+            .or(`phone.eq.${normalizedPhone},secondary_phone.eq.${normalizedPhone},identification_number.eq.${normalizedPhone}`)
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            log.error("Error getting CRM client by phone", error);
+            return null;
+        }
+
+        return data ? mapCRMClient(data) : null;
+    } catch (error) {
+        log.error("Error getting CRM client by phone", error);
+        return null;
+    }
+};
+
+/**
+ * Search for a client by first and last name (case insensitive)
+ * Used as fallback to find existing clients
+ */
+export const getCRMClientByName = async (
+    firstName: string,
+    lastName: string
+): Promise<CRMClient | null> => {
+    const supabase = getSupabaseServerClient();
+
+    try {
+        const { data, error } = await supabase
+            .from(CRM_CLIENTS_TABLE)
+            .select("*")
+            .ilike("first_name", firstName.trim())
+            .ilike("last_name", lastName.trim())
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            log.error("Error getting CRM client by name", error);
+            return null;
+        }
+
+        return data ? mapCRMClient(data) : null;
+    } catch (error) {
+        log.error("Error getting CRM client by name", error);
+        return null;
+    }
+};
+
 export const updateCRMClient = async (
     id: string,
     updates: Partial<Omit<CRMClient, "id" | "clientCode" | "createdAt" | "updatedAt">>

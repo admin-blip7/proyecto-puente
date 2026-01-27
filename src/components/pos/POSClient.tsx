@@ -170,7 +170,6 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
   const handleAddRepairToCart = (repair: RepairOrder) => {
     const repairProduct: Product = {
       id: `repair-${repair.id}`,
-      id: `repair-${repair.id}`,
       sku: `REP-${repair.orderId}`,
       name: `Reparación #${repair.orderId} - ${repair.deviceModel}`,
       description: repair.reportedIssue,
@@ -544,17 +543,12 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       printOperationRef.current.isActive = true;
 
       // Wait for a frame to ensure the effect has completed
+      // Wait for a frame to ensure the effect has completed and element is rendered
       setTimeout(() => {
-        // Create the ticket HTML string
-        const ticketHtml = createTicketHtml(printTicketSession);
-
-        // Proceed with printing
-        console.log('✅ [TICKET] Ticket HTML ready, starting print...');
-        printHtml(ticketHtml);
-
-        setPrintTicketSession(null);
-        printOperationRef.current.isActive = false;
-      }, 100);
+        // Proceed with printing via PDF
+        console.log('✅ [TICKET] Element ready, starting PDF generation...');
+        generateAndPrintPdf();
+      }, 500); // Slight delay to ensure React render
 
       return () => {
         printOperationRef.current.isActive = false;
@@ -562,39 +556,79 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }, [ticketReady, printTicketSession, toast]);
 
-  const printHtml = (htmlContent: string) => {
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Ticket de Corte - ${new Date().toLocaleDateString()}</title>
-            <style>
-              body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; }
-              @media print {
-                body { margin: 0; padding: 0; }
-                .no-print { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${htmlContent}
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 500);
-              }
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } else {
-      toast({
-        title: '⚠️ Ventana bloqueada',
-        description: 'Permita los popups para imprimir el ticket.',
-        variant: 'destructive'
+  const generateAndPrintPdf = async () => {
+    console.log('🔄 [TICKET] Starting generateAndPrintPdf...');
+    const input = ticketElementRef.current;
+    if (!input) {
+      console.error('❌ [TICKET] Ticket element not found');
+      return;
+    }
+
+    try {
+      console.log('🔄 [TICKET] Generating canvas with html2canvas...');
+      const canvas = await html2canvas(input, {
+        scale: 2,
+        useCORS: true,
+        logging: false, // reduce noise
+        windowWidth: 350
       });
+      console.log('✅ [TICKET] Canvas generated');
+
+      const imgData = canvas.toDataURL('image/png');
+      const imgProps = new jsPDF().getImageProperties(imgData);
+
+      // Calculate PDF height based on aspect ratio (width fixed at 80mm)
+      const pdfWidth = 80;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      // Create PDF with exact height
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, Math.max(pdfHeight, 10)] // ensure min height
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      // Add auto-print script
+      pdf.autoPrint();
+
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      console.log('✅ [TICKET] Blob URL created:', blobUrl);
+
+      // Log success and toast
+      toast({
+        title: "🖨️ Imprimiendo ticket...",
+        description: "Se ha enviado el documento a la impresora."
+      });
+
+      // Use iframe to print (better compatibility than window.open)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+
+      // Wait a moment for the blob to load in the iframe
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.print();
+        }
+      }, 1000);
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(blobUrl);
+        setPrintTicketSession(null);
+        printOperationRef.current.isActive = false;
+        console.log('✅ [TICKET] Cleanup done');
+      }, 5000); // 5s to allow user to interact with print dialog
+
+    } catch (error) {
+      console.error('❌ [TICKET] Error generating PDF:', error);
+      toast({ variant: 'destructive', title: "Error", description: "No se pudo generar el ticket." });
+      printOperationRef.current.isActive = false;
     }
   };
 
@@ -613,121 +647,8 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     return new Date(dateString).toLocaleString('es-ES');
   };
 
-  const createTicketHtml = (session: CashSession): string => {
-    // Group sales items by product
-    const soldProducts: Record<string, { name: string; quantity: number; total: number }> = {};
+  // createTicketHtml removed as we now use direct component capture via html2canvas
 
-    ticketSales.forEach(sale => {
-      if (sale.status !== 'cancelled') {
-        sale.items.forEach(item => {
-          const key = item.name; // Group by name
-          if (!soldProducts[key]) {
-            soldProducts[key] = { name: item.name, quantity: 0, total: 0 };
-          }
-          soldProducts[key].quantity += item.quantity;
-          soldProducts[key].total += (item.priceAtSale * item.quantity);
-        });
-      }
-    });
-
-    const soldProductsList = Object.values(soldProducts);
-
-    return `
-      <div style="width: 80mm; margin: 0 auto;">
-        <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
-          REPORTE DE CORTE DE CAJA
-        </div>
-        <div style="text-align: center; font-size: 10px; margin-bottom: 10px;">
-          22 ELECTRONIC GROUP
-        </div>
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Sesión:</strong> ${session.sessionId}</div>
-        <div><strong>Cajero:</strong> ${session.closedByName || session.openedByName || 'N/A'}</div>
-        <div><strong>Fecha Apertura:</strong> ${formatDateVal(session.openedAt?.toString())}</div>
-        <div><strong>Fecha Cierre:</strong> ${formatDateVal(session.closedAt?.toString())}</div>
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Productos Vendidos:</strong></div>
-        ${soldProductsList.length > 0 ?
-        soldProductsList.map(item => `
-            <div style="display: flex; justify-content: space-between; font-size: 11px;">
-              <span>${item.quantity}x ${item.name}</span>
-              <span>${formatCurrencyVal(item.total)}</span>
-            </div>
-          `).join('')
-        : '<div style="font-style: italic;">No hubo ventas registradas</div>'
-      }
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Ventas Totales:</strong> ${formatCurrencyVal((session.totalCashSales || 0) + (session.totalCardSales || 0))}</div>
-        <div><strong>Ventas en Efectivo:</strong> ${formatCurrencyVal(session.totalCashSales || 0)}</div>
-        <div><strong>Ventas con Tarjeta:</strong> ${formatCurrencyVal(session.totalCardSales || 0)}</div>
-        
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Gastos (Salidas de Efectivo):</strong></div>
-        ${ticketExpenses.length > 0 ?
-        ticketExpenses.map(exp => `
-            <div style="display: flex; justify-content: space-between; font-size: 11px;">
-              <span>${exp.description || exp.category}</span>
-              <span>${formatCurrencyVal(exp.amount)}</span>
-            </div>
-          `).join('')
-        : '<div style="font-style: italic;">No hubo gastos registrados</div>'
-      }
-        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 2px;">
-          <span>Total Gastos:</span>
-          <span>${formatCurrencyVal(session.totalCashPayouts || 0)}</span>
-        </div>
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Ingresos (Entradas de Efectivo):</strong></div>
-        ${ticketIncomes.length > 0 ?
-        ticketIncomes.map(inc => `
-            <div style="display: flex; justify-content: space-between; font-size: 11px;">
-              <span>${inc.description || inc.category}</span>
-              <span>${formatCurrencyVal(inc.amount)}</span>
-            </div>
-          `).join('')
-        : '<div style="font-style: italic;">No hubo ingresos registrados</div>'
-      }
-        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 2px;">
-          <span>Total Ingresos:</span>
-          <span>${formatCurrencyVal(ticketIncomes.reduce((sum, i) => sum + i.amount, 0))}</span>
-        </div>
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-
-        <div><strong>Arqueo:</strong></div>
-        <div>  Efectivo Inicial: ${formatCurrencyVal(session.startingFloat || 0)}</div>
-        <div>  (+) Ventas Efectivo: ${formatCurrencyVal(session.totalCashSales || 0)}</div>
-        <div>  (-) Gastos Efectivo: ${formatCurrencyVal(session.totalCashPayouts || 0)}</div>
-        <div style="border-top: 1px dotted black; margin: 2px 0;"></div>
-        <div>  Efectivo Esperado: ${formatCurrencyVal(session.expectedCashInDrawer || 0)}</div>
-        <div>  Efectivo en Caja: ${formatCurrencyVal(session.actualCashCount || 0)}</div>
-        <div>  <strong>Diferencia: ${formatCurrencyVal(session.difference || 0)}</strong></div>
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-        <div><strong>Saldos de Bolsas:</strong></div>
-        ${(['recargas', 'mimovil', 'servicios']).map(key => {
-        // Cast to any to access dynamic props if TS complains, or rely on interface
-        const start = (session.bagsStartAmounts as any)?.[key] || 0;
-        const sale = (session.bagsSalesAmounts as any)?.[key] || 0;
-        const end = (session.bagsEndAmounts as any)?.[key] || (start - sale);
-        return `<div>  ${key.charAt(0).toUpperCase() + key.slice(1)}: ${formatCurrencyVal(start)} - ${formatCurrencyVal(sale)} = <strong>${formatCurrencyVal(end)}</strong></div>`;
-      }).join('')}
-
-        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
-        <div style="text-align: center; font-size: 10px;">
-          ¡Gracias por su preferencia!
-        </div>
-      </div>
-    `;
-  };
 
   // Create a DOM element directly for printing
 
@@ -1074,6 +995,9 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
             <CashCloseTicket
               id="cash-close-ticket"
               session={printTicketSession}
+              sales={ticketSales}
+              expenses={ticketExpenses}
+              incomes={ticketIncomes}
             />
           </div>
         )
@@ -1083,17 +1007,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
         onOpenChange={setShowRepairsDialog}
         onAddRepair={handleAddRepairToCart}
       />
-      {/* Hidden ticket for printing */}
-      {
-        printTicketSession && (
-          <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
-            <CashCloseTicket
-              id="cash-close-ticket"
-              session={printTicketSession}
-            />
-          </div>
-        )
-      }
+
     </>
   );
 }

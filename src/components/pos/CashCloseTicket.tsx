@@ -9,6 +9,9 @@ import { useEffect, useState } from "react";
 
 interface CashCloseTicketProps {
   session: CashSession;
+  sales?: any[]; // Using any[] for now to avoid circular deps if types are tricky, but preferably proper types
+  expenses?: any[];
+  incomes?: any[];
   storeName?: string;
   storeAddress?: string;
   storePhone?: string;
@@ -25,6 +28,9 @@ const defaultStoreInfo = {
 
 export default function CashCloseTicket({
   session,
+  sales = [],
+  expenses = [],
+  incomes: propIncomes = [],
   storeName = defaultStoreInfo.name,
   storeAddress = defaultStoreInfo.address,
   storePhone = defaultStoreInfo.phone,
@@ -36,13 +42,17 @@ export default function CashCloseTicket({
     fontFamily: "'Courier New', Courier, monospace",
   };
 
-  const [incomes, setIncomes] = useState<Income[]>([]);
+  // Use props incomes if provided, otherwise fetch (backward compatibility)
+  const [incomes, setIncomes] = useState<Income[]>(propIncomes as Income[]);
 
   useEffect(() => {
-    if (session?.sessionId) {
+    // Only fetch if not provided in props and session exists
+    if (session?.sessionId && propIncomes.length === 0) {
       getIncomesBySession(session.sessionId).then(setIncomes);
+    } else if (propIncomes.length > 0) {
+      setIncomes(propIncomes as Income[]);
     }
-  }, [session?.sessionId]);
+  }, [session?.sessionId, propIncomes]);
 
   return (
     <div
@@ -81,6 +91,60 @@ export default function CashCloseTicket({
 
       <hr className="border-dashed border-black my-2" />
 
+
+
+      {/* Sales Detail - Grouped by Product */}
+      {
+        sales.length > 0 && (
+          <div className="space-y-1 mb-3">
+            <p className="font-bold">DETALLE DE PRODUCTOS:</p>
+            {(() => {
+              // Group sales items
+              const soldProducts: Record<string, { name: string; quantity: number; total: number }> = {};
+              sales.forEach((sale: any) => {
+                if (sale.status !== 'cancelled' && sale.items) {
+                  sale.items.forEach((item: any) => {
+                    const key = item.name;
+                    if (!soldProducts[key]) {
+                      soldProducts[key] = { name: item.name, quantity: 0, total: 0 };
+                    }
+                    soldProducts[key].quantity += item.quantity;
+                    soldProducts[key].total += (item.priceAtSale * item.quantity);
+                  });
+                }
+              });
+
+              const list = Object.values(soldProducts);
+              if (list.length === 0) return <div className="italic">No hay items</div>;
+
+              return list.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-xs">
+                  <span>{item.quantity}x {item.name}</span>
+                  <span>{formatCurrency(item.total)}</span>
+                </div>
+              ));
+            })()}
+            <hr className="border-dashed border-black my-2" />
+          </div>
+        )
+      }
+
+      {/* Expenses Detail */}
+      {
+        expenses.length > 0 && (
+          <div className="space-y-1 mb-3">
+            <p className="font-bold">DETALLE DE GASTOS:</p>
+            {expenses.map((exp: any, index: number) => (
+              <div key={index} className="flex justify-between text-xs">
+                <span>{exp.description || exp.category}</span>
+                <span>{formatCurrency(exp.amount)}</span>
+              </div>
+            ))}
+            <hr className="border-dashed border-black my-2" />
+          </div>
+        )
+      }
+
       {/* Sales Summary */}
       <div className="space-y-1 mb-3">
         <p className="font-bold">RESUMEN DE VENTAS:</p>
@@ -109,20 +173,22 @@ export default function CashCloseTicket({
       <hr className="border-dashed border-black my-2" />
 
       {/* Incomes Detail */}
-      {incomes.length > 0 && (
-        <>
-          <div className="space-y-1 mb-3">
-            <p className="font-bold">DETALLE DE INGRESOS:</p>
-            {incomes.map((income, index) => (
-              <div key={index} className="flex justify-between">
-                <span>{income.description || income.category}</span>
-                <span>{formatCurrency(income.amount)}</span>
-              </div>
-            ))}
-          </div>
-          <hr className="border-dashed border-black my-2" />
-        </>
-      )}
+      {
+        incomes.length > 0 && (
+          <>
+            <div className="space-y-1 mb-3">
+              <p className="font-bold">DETALLE DE INGRESOS:</p>
+              {incomes.map((income, index) => (
+                <div key={index} className="flex justify-between">
+                  <span>{income.description || income.category}</span>
+                  <span>{formatCurrency(income.amount)}</span>
+                </div>
+              ))}
+            </div>
+            <hr className="border-dashed border-black my-2" />
+          </>
+        )
+      }
 
       <hr className="border-dashed border-black my-2" />
 
@@ -196,6 +262,6 @@ export default function CashCloseTicket({
         <p className="text-xs">Gracias por su preferencia</p>
         <p className="text-xs">Este documento no es un comprobante fiscal</p>
       </div>
-    </div>
+    </div >
   );
 }

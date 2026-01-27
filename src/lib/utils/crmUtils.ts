@@ -1,10 +1,14 @@
 import { CRMClient, IdentificationType, ClientType, CRMClientStatus } from "@/types";
-import { getCRMClientByIdentification, createCRMClient, updateCRMClient, addSaleInteraction } from "@/lib/services/crmService";
+import { getCRMClientByIdentification, createCRMClient, updateCRMClient, addSaleInteraction, getCRMClientByPhone, getCRMClientByName } from "@/lib/services/crmService";
 import { v4 as uuidv4 } from "uuid";
 
 /**
  * Busca un cliente por identificación o lo crea si no existe
- * Útil para integraciones automáticas con ventas y otros servicios
+ * Search priority:
+ * 1. By phone number (if provided)
+ * 2. By identification number
+ * 3. By name (exact match, case insensitive)
+ * 4. Create new if none found
  */
 export const findOrCreateClient = async (
     identificationType: IdentificationType,
@@ -18,30 +22,66 @@ export const findOrCreateClient = async (
     }
 ): Promise<CRMClient> => {
     try {
-        // Primero buscar si el cliente ya existe
-        let existingClient = await getCRMClientByIdentification(identificationType, identificationNumber);
+        let existingClient: CRMClient | null = null;
+
+        // 1. First, try to find by phone (most reliable for returning customers)
+        if (clientData.phone) {
+            existingClient = await getCRMClientByPhone(clientData.phone);
+            if (existingClient) {
+                console.log(`Found existing client by phone: ${existingClient.id}`);
+            }
+        }
+
+        // 2. If not found by phone, try by identification number (skip temp IDs)
+        if (!existingClient && identificationNumber && !identificationNumber.startsWith('temp-') && !identificationNumber.startsWith('TEMP-')) {
+            existingClient = await getCRMClientByIdentification(identificationType, identificationNumber);
+            if (existingClient) {
+                console.log(`Found existing client by identification: ${existingClient.id}`);
+            }
+        }
+
+        // 3. If still not found, try by name
+        if (!existingClient && clientData.firstName && clientData.lastName && clientData.lastName !== 'Sin Apellido') {
+            existingClient = await getCRMClientByName(clientData.firstName, clientData.lastName);
+            if (existingClient) {
+                console.log(`Found existing client by name: ${existingClient.id}`);
+            }
+        }
 
         if (existingClient) {
-            // Si el cliente existe, actualizar información básica si está vacía
+            // Update with new information if available
             const needsUpdate =
                 (!existingClient.phone && clientData.phone) ||
                 (!existingClient.email && clientData.email) ||
-                (!existingClient.companyName && clientData.company);
+                (!existingClient.companyName && clientData.company) ||
+                // Update identification if current one is temporary
+                (existingClient.identificationNumber?.startsWith('temp-') && identificationNumber && !identificationNumber.startsWith('temp-'));
 
             if (needsUpdate) {
-                existingClient = await updateCRMClient(existingClient.id, {
-                    phone: existingClient.phone || clientData.phone || undefined,
-                    email: existingClient.email || clientData.email || undefined,
-                    companyName: existingClient.companyName || clientData.company || undefined,
-                });
+                const updates: any = {};
+                if (!existingClient.phone && clientData.phone) updates.phone = clientData.phone;
+                if (!existingClient.email && clientData.email) updates.email = clientData.email;
+                if (!existingClient.companyName && clientData.company) updates.companyName = clientData.company;
+                // Update temp identification with real one
+                if (existingClient.identificationNumber?.startsWith('temp-') && identificationNumber && !identificationNumber.startsWith('temp-')) {
+                    updates.identificationNumber = identificationNumber;
+                    updates.identificationType = identificationType;
+                }
+
+                existingClient = await updateCRMClient(existingClient.id, updates);
+                console.log(`Updated existing client ${existingClient.id} with new info`);
             }
 
             return existingClient;
         } else {
-            // Crear nuevo cliente
+            // Create new client - use phone as identification if no real ID provided
+            const finalIdentificationNumber = (!identificationNumber || identificationNumber.startsWith('temp-') || identificationNumber.startsWith('TEMP-'))
+                ? (clientData.phone || `temp-${Date.now()}`)
+                : identificationNumber;
+
             const newClient = await createCRMClient({
                 identificationType,
-                identificationNumber,
+                identificationNumber: finalIdentificationNumber,
                 firstName: clientData.firstName,
                 lastName: clientData.lastName,
                 phone: clientData.phone || undefined,
@@ -55,6 +95,7 @@ export const findOrCreateClient = async (
                 notes: "Cliente creado automáticamente desde venta",
             });
 
+            console.log(`Created new CRM client: ${newClient.id}`);
             return newClient;
         }
     } catch (error) {
