@@ -312,7 +312,9 @@ export const generateAndPrintLabels = async (
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
       URL.revokeObjectURL(downloadUrl);
 
       alert('La ventana de impresión fue bloqueada. El PDF se ha descargado automáticamente.');

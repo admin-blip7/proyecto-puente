@@ -618,7 +618,9 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
       // Cleanup
       setTimeout(() => {
-        document.body.removeChild(iframe);
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
         URL.revokeObjectURL(blobUrl);
         setPrintTicketSession(null);
         printOperationRef.current.isActive = false;
