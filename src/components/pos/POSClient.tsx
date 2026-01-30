@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 import OpenSessionWizard from "./OpenSessionWizard";
 import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
+// Dialog now repurposed as Success/Summary dialog
 import CashDepositVerificationDialog from "./CashDepositVerificationDialog";
 
 import { getSales } from "@/lib/services/salesService";
@@ -432,7 +433,6 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       setActiveSession(null);
       setClosingDrawer(false);
 
-      // Save closed session and print ticket directly
       setClosedSessionData(closedSession);
 
       toast({
@@ -443,10 +443,11 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       });
 
       console.log('✅ [SESSION] Session closed, printing ticket...');
+      // Auto-print first
       await printCashCloseTicket(closedSession);
 
-      // No need to show deposit verification anymore
-      setShowDepositVerification(false);
+      // Show success dialog
+      setShowDepositVerification(true);
     } catch (error) {
       console.error('❌ [SESSION] Error closing drawer:', error);
       toast({ variant: 'destructive', title: "❌ Error", description: "No se pudo cerrar el turno de caja." })
@@ -455,47 +456,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
 
 
-  const handleDepositConfirmation = async (depositAmount: number) => {
-    if (!closedSessionData) return;
 
-    console.log('🔄 [DEPOSIT] Confirming deposit:', depositAmount);
-
-    try {
-      await depositToCajaChica(closedSessionData.sessionId, depositAmount);
-      console.log('✅ [DEPOSIT] Successfully deposited to Caja Chica');
-
-      toast({
-        title: "✅ Depósito Confirmado",
-        description: `${formatCurrency(depositAmount)} agregados a Caja Chica`,
-      });
-
-      // Now print the ticket after deposit confirmation
-      await printCashCloseTicket(closedSessionData);
-
-      setClosedSessionData(null);
-      setShowDepositVerification(false);
-    } catch (error) {
-      console.error('❌ [DEPOSIT] Error depositing to Caja Chica:', error);
-      throw error; // Re-throw to let the dialog handle it
-    }
-  }
-
-  const handleSkipDeposit = () => {
-    console.log('⚠️ [DEPOSIT] User skipped deposit to Caja Chica');
-
-    if (!closedSessionData) return;
-
-    toast({
-      title: "ℹ️ Depósito Omitido",
-      description: "No se realizó depósito a Caja Chica",
-    });
-
-    // Print ticket even if deposit was skipped
-    printCashCloseTicket(closedSessionData);
-
-    setClosedSessionData(null);
-    setShowDepositVerification(false);
-  }
 
   const printCashCloseTicket = async (session: CashSession) => {
     console.log('🔄 [TICKET] Preparing ticket for session:', session.sessionId);
@@ -783,8 +744,11 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
             isOpen={showDepositVerification}
             onOpenChange={setShowDepositVerification}
             session={closedSessionData}
-            onConfirm={handleDepositConfirmation}
-            onSkip={handleSkipDeposit}
+            onReprint={() => {
+              if (closedSessionData) {
+                printCashCloseTicket(closedSessionData);
+              }
+            }}
           />
         )}
       </>
@@ -970,8 +934,11 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
           isOpen={showDepositVerification}
           onOpenChange={setShowDepositVerification}
           session={closedSessionData}
-          onConfirm={handleDepositConfirmation}
-          onSkip={handleSkipDeposit}
+          onReprint={() => {
+            if (closedSessionData) {
+              printCashCloseTicket(closedSessionData);
+            }
+          }}
         />
       )}
       {showBuscadorCompatibilidad && (

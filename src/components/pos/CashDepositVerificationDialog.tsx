@@ -1,14 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, Printer } from "lucide-react";
 import { CashSession } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
@@ -18,175 +13,81 @@ interface CashDepositVerificationDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     session: CashSession;
-    onConfirm: (depositAmount: number) => Promise<void>;
-    onSkip: () => void;
+    onReprint: () => void;
 }
-
-const formSchema = z.object({
-    depositAmount: z.coerce.number().min(0, "El depósito no puede ser negativo."),
-});
 
 export default function CashDepositVerificationDialog({
     isOpen,
     onOpenChange,
     session,
-    onConfirm,
-    onSkip
+    onReprint
 }: CashDepositVerificationDialogProps) {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            depositAmount: session.totalCashSales || 0,
-        },
-    });
-
-    const { watch, reset } = form;
-    const depositAmount = watch('depositAmount', 0);
-
+    // Auto-focus the close or print button?
     useEffect(() => {
-        if (isOpen) {
-            reset({ depositAmount: session.totalCashSales || 0 });
-            setError(null);
-        }
-    }, [isOpen, reset, session.totalCashSales]);
-
-    const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        const maxDeposit = session.totalCashSales || 0;
-
-        if (values.depositAmount > maxDeposit) {
-            setError(`No puedes depositar más de ${formatCurrency(maxDeposit)} (total de ventas en efectivo)`);
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            await onConfirm(values.depositAmount);
-            onOpenChange(false);
-        } catch (err) {
-            setError("Error al procesar el depósito. Por favor intenta nuevamente.");
-            console.error("Error processing deposit:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSkip = () => {
-        onSkip();
-        onOpenChange(false);
-    };
-
-    const handleClose = (open: boolean) => {
-        if (!open && !loading) {
-            form.reset();
-            setError(null);
-        }
-        onOpenChange(open);
-    };
+        // Optional: auto-reprint logic if desired, but user asked for explicit option
+    }, [isOpen]);
 
     return (
-        <Dialog open={isOpen} onOpenChange={handleClose}>
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Verificar Depósito a Caja Chica</DialogTitle>
-                    <DialogDescription>
-                        Confirma la cantidad de efectivo que se depositará en Caja Chica.
+                    <div className="mx-auto bg-green-100 p-3 rounded-full mb-2">
+                        <CheckCircle2 className="h-8 w-8 text-green-600" />
+                    </div>
+                    <DialogTitle className="text-center">Corte de Caja Exitoso</DialogTitle>
+                    <DialogDescription className="text-center">
+                        El turno ha sido cerrado y la información guardada.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-3 text-sm py-4">
-                    <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            El turno ha sido cerrado exitosamente. Ahora confirma cuánto efectivo se depositará en Caja Chica.
-                        </AlertDescription>
-                    </Alert>
-
-                    <Separator />
-
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Ventas en Efectivo del Turno:</span>
-                        <span className="font-bold text-green-600">{formatCurrency(session.totalCashSales || 0)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Efectivo Contado en Caja:</span>
-                        <span className="font-medium">{formatCurrency(session.actualCashCount || 0)}</span>
-                    </div>
-
-                    {session.difference !== undefined && session.difference !== 0 && (
+                <div className="space-y-4 text-sm py-4">
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Diferencia:</span>
-                            <span className={`font-medium ${session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {session.difference > 0 ? '+' : ''}{formatCurrency(session.difference)}
-                            </span>
+                            <span className="text-muted-foreground">Total Ventas (Efectivo):</span>
+                            <span className="font-bold">{formatCurrency(session.totalCashSales || 0)}</span>
                         </div>
-                    )}
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Efectivo Contado:</span>
+                            <span className="font-medium">{formatCurrency(session.actualCashCount || 0)}</span>
+                        </div>
+
+                        {session.difference !== undefined && session.difference !== 0 && (
+                            <>
+                                <Separator className="my-2" />
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Diferencia:</span>
+                                    <span className={`font-bold ${session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {session.difference > 0 ? '+' : ''}{formatCurrency(session.difference)}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="text-xs text-muted-foreground text-center">
+                        Puedes imprimir el comprobante de cierre ahora.
+                    </div>
                 </div>
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="depositAmount"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Cantidad a Depositar en Caja Chica</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            {...field}
-                                            autoFocus
-                                        />
-                                    </FormControl>
-                                    <FormDescription>
-                                        Por defecto muestra el total de ventas en efectivo. Puedes ajustar si es necesario.
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
-
-                        <DialogFooter className="flex-col sm:flex-row gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleSkip}
-                                disabled={loading}
-                                className="w-full sm:w-auto"
-                            >
-                                Omitir Depósito
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full sm:w-auto"
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="animate-spin mr-2" />
-                                        Procesando...
-                                    </>
-                                ) : (
-                                    `Depositar ${formatCurrency(depositAmount)}`
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                <DialogFooter className="flex-col sm:flex-row gap-2 sm:justify-center">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onReprint}
+                        className="w-full sm:w-auto"
+                    >
+                        <Printer className="mr-2 h-4 w-4" />
+                        Imprimir Ticket
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={() => onOpenChange(false)}
+                        className="w-full sm:w-auto"
+                    >
+                        Cerrar
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
