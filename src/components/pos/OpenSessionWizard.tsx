@@ -71,7 +71,14 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
             setValue('bagRecargas', bags['recargas'] || 0);
             setValue('bagMimovil', bags['mimovil'] || 0);
             setValue('bagServicios', bags['servicios'] || 0);
-            setValue('correctedPreviousCash', lastClosedSession.actualCashCount || 0);
+
+            // Should default to what was left in drawer (not total count if deposited)
+            const leftover = lastClosedSession.cashLeftForNextSession;
+            // If leftover is defined (new system), use it. value 0 is valid.
+            // If undefined (old system), use actualCashCount as legacy fallback.
+            const previousCash = leftover !== undefined ? leftover : (lastClosedSession.actualCashCount || 0);
+
+            setValue('correctedPreviousCash', previousCash);
         }
     }, [lastClosedSession, setValue]);
 
@@ -145,7 +152,7 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
 
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div className="border p-3 rounded bg-muted/20">
-                                        <div className="font-semibold mb-2">Efectivo en Caja</div>
+                                        <div className="font-semibold mb-2">Efectivo en Caja (Dejado)</div>
                                         {/* <div className="text-2xl font-bold">{formatCurrency(lastClosedSession.actualCashCount || 0)}</div> */}
                                         <FormField
                                             control={control}

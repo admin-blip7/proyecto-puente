@@ -194,7 +194,6 @@ export const addIncome = async (
         paymentDate,
         receiptUrl: receiptUrl ?? null,
         sessionId: activeSession ? activeSession.sessionId : (incomeData.sessionId || null),
-        icon: incomeData.icon ?? null,
     };
 
     const { data: insertedIncome, error: insertError } = await supabase

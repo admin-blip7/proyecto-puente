@@ -7,6 +7,7 @@ import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 import { getSalesBySession } from "./salesService";
 import { addIncome } from "./incomeService";
+import { revalidatePath } from "next/cache";
 
 const log = getLogger("cashSessionService");
 
@@ -43,10 +44,10 @@ const mapSession = (row: any): CashSession => ({
   actualCashCount: row?.actualCashCount !== null ? Number(row.actualCashCount) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
   isBalanced: row?.is_balanced ?? row?.isBalanced ?? false,
-  bagsStartAmounts: row?.bags_start_amounts ?? {},
   bagsSalesAmounts: row?.bags_sales_amounts ?? {},
   bagsEndAmounts: row?.bags_end_amounts ?? {},
   previousSessionConfirmedAt: row?.previous_session_confirmed_at ? toDate(row.previous_session_confirmed_at) : undefined,
+  cashLeftForNextSession: row?.cash_left_for_next_session !== null && row?.cash_left_for_next_session !== undefined ? Number(row.cash_left_for_next_session) : undefined,
 });
 
 /**
@@ -220,6 +221,14 @@ export const getSessionForDate = async (date: Date): Promise<CashSession | null>
   }
 };
 
+// Helper to create Firestore-compatible timestamp for legacy sorting compatibility
+const createTimestamp = () => ({
+  _seconds: Math.floor(Date.now() / 1000),
+  _nanoseconds: 0
+});
+
+const generateSessionId = () => `CS-${uuidv4().split("-")[0].toUpperCase()}`;
+
 export const openCashSession = async (
   userId: string,
   userName: string,
@@ -228,33 +237,35 @@ export const openCashSession = async (
   previousSessionConfirmedAt?: Date
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
-  const sessionId = `CS-${uuidv4().split("-")[0].toUpperCase()}`;
-  const openedAt = nowIso();
+  const sessionId = generateSessionId();
 
-  const payload = {
+  // Use Object format for openedAt to match legacy data structure and ensure correct JSONB sorting
+  const openedAtObj = createTimestamp();
+
+  const newSession = {
     sessionId,
-    status: "Abierto" as const,
     openedBy: userId,
     openedByName: userName,
-    openedAt,
+    openedAt: openedAtObj,
     startingFloat,
-    totalCashSales: 0,
-    totalCardSales: 0,
-    totalCashPayouts: 0,
-    expectedCashInDrawer: startingFloat,
+    status: "Abierto",
     bags_start_amounts: bagsStartAmounts,
-    bags_sales_amounts: {},
-    bags_end_amounts: {},
-    previous_session_confirmed_at: previousSessionConfirmedAt ? previousSessionConfirmedAt.toISOString() : null,
+    previous_session_confirmed_at: previousSessionConfirmedAt
   };
 
-  const { error } = await supabase.from(CASH_SESSIONS_TABLE).insert(payload);
+  const { data, error } = await supabase
+    .from(CASH_SESSIONS_TABLE)
+    .insert(newSession)
+    .select()
+    .single();
+
   if (error) {
     log.error("Error opening cash session", error);
-    throw new Error("Failed to open cash session.");
+    throw error;
   }
 
-  return mapSession(payload);
+  revalidatePath('/pos');
+  return mapSession(data);
 };
 
 export const closeCashSession = async (
@@ -264,7 +275,8 @@ export const closeCashSession = async (
   actualCashCount: number,
   bagsSalesAmounts: Record<string, number> = {},
   bagsActualEndAmounts: Record<string, number> = {},
-  depositAccountId?: string
+  depositAccountId?: string,
+  cashLeftForNextSession: number = 0
 ): Promise<CashSession> => {
   console.log(`[closeCashSession] Starting for session ${session.sessionId}`);
   const supabase = getSupabaseServerClient();
@@ -301,7 +313,10 @@ export const closeCashSession = async (
     const expectedCashInDrawer = enrichedSession.startingFloat + enrichedSession.totalCashSales - enrichedSession.totalCashPayouts;
     const difference = actualCashCount - expectedCashInDrawer;
     const isBalanced = difference === 0;
-    const closedAt = nowIso();
+
+    // Use Object format for closedAt to match legacy data structure and ensure correct JSONB sorting
+    const closedAtObj = createTimestamp();
+    const closedAtDate = new Date(); // distinct valid Date object for return value
 
     // 3. Calculate Bag End Amounts
     console.log(`[closeCashSession] Calculating bag amounts...`);
@@ -319,7 +334,7 @@ export const closeCashSession = async (
       status: "Cerrado",
       closedBy: userId,
       closedByName: userName,
-      closedAt,
+      closedAt: closedAtObj,
       actualCashCount,
       expectedCashInDrawer,
       difference,
@@ -328,6 +343,7 @@ export const closeCashSession = async (
       totalCardSales: enrichedSession.totalCardSales,
       bags_sales_amounts: bagsSalesAmounts,
       bags_end_amounts: finalBagsEndAmounts,
+      cash_left_for_next_session: cashLeftForNextSession,
     };
 
     const { data: updatedData, error } = await supabase
@@ -346,7 +362,7 @@ export const closeCashSession = async (
       console.warn(`[closeCashSession] No rows updated with id, trying sessionId fallback...`);
       const { data: retryData, error: retryError } = await supabase
         .from(CASH_SESSIONS_TABLE)
-        .update({ status: "Cerrado", closedAt })
+        .update({ status: "Cerrado", closedAt: closedAtObj })
         .eq("sessionId", session.sessionId)
         .select();
 
@@ -361,13 +377,23 @@ export const closeCashSession = async (
 
     // 5. Deposit to Account (if specified)
     if (depositAccountId) {
+      // Deposit the difference: Actual Cash - Cash Left for Next Session
+      // If result is negative/zero, we handle it (though logically actual should be >= left)
+      const amountToDeposit = Math.max(0, actualCashCount - cashLeftForNextSession);
+
       console.log(`[closeCashSession] Attempting deposit to account ${depositAccountId}...`);
-      try {
-        await depositToAccount(session.sessionId, depositAccountId, actualCashCount);
-        console.log(`[closeCashSession] Deposit successful.`);
-      } catch (depositError) {
-        console.error(`[closeCashSession] Deposit failed (non-fatal):`, depositError);
-        log.error("Error depositing to account during session close", depositError);
+      console.log(`[closeCashSession] Net deposit: ${amountToDeposit} (Actual: ${actualCashCount} - Left: ${cashLeftForNextSession})`);
+
+      if (amountToDeposit > 0) {
+        try {
+          await depositToAccount(session.sessionId, depositAccountId, amountToDeposit);
+          console.log(`[closeCashSession] Deposit successful.`);
+        } catch (depositError) {
+          console.error(`[closeCashSession] Deposit failed:`, depositError);
+          log.error("Error depositing to account during session close", depositError);
+        }
+      } else {
+        console.log(`[closeCashSession] Deposit skipped (Amount <= 0).`);
       }
     } else {
       console.log(`[closeCashSession] No deposit account specified, skipping deposit.`);
@@ -375,17 +401,21 @@ export const closeCashSession = async (
 
     console.log(`[closeCashSession] Session close process completed successfully.`);
 
+    revalidatePath('/pos');
+    revalidatePath('/admin/finance/cash-history');
+
     return {
       ...enrichedSession,
       status: "Cerrado",
       closedBy: userId,
       closedByName: userName,
-      closedAt: new Date(closedAt),
+      closedAt: closedAtDate,
       actualCashCount,
       expectedCashInDrawer,
       difference,
       isBalanced,
       bagsEndAmounts: finalBagsEndAmounts,
+      cashLeftForNextSession,
     };
 
   } catch (fatalError: any) {

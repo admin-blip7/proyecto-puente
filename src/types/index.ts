@@ -375,6 +375,7 @@ export interface CashSession {
   bagsSalesAmounts?: Record<string, number>;
   bagsEndAmounts?: Record<string, number>;
   previousSessionConfirmedAt?: Date;
+  cashLeftForNextSession?: number;
 }
 
 export const TicketSettingsSchema = z.object({

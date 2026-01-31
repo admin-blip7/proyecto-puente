@@ -49,10 +49,16 @@ export default function CashCloseTicket({
     // Only fetch if not provided in props and session exists
     if (session?.sessionId && propIncomes.length === 0) {
       getIncomesBySession(session.sessionId).then(setIncomes);
-    } else if (propIncomes.length > 0) {
       setIncomes(propIncomes as Income[]);
     }
   }, [session?.sessionId, propIncomes]);
+
+  // Filter out "Corte de Caja" (Deposits) from Incomes for the Ticket display
+  // These are transfers/deposits, not "Cash Incomes" for the drawer.
+  const displayIncomes = incomes.filter(inc =>
+    inc.category !== 'Corte de Caja' &&
+    !inc.description?.toLowerCase().includes('depósito de corte de caja')
+  );
 
   return (
     <div
@@ -71,7 +77,7 @@ export default function CashCloseTicket({
       <div className="text-center space-y-1 mb-4">
         <p className="font-bold text-base">=== CORTE DE CAJA ===</p>
         <p>Folio: {session.sessionId}</p>
-        <p>Fecha: {format(session.closedAt || session.openedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+        <p>Fecha: {format(new Date(session.closedAt || session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}</p>
       </div>
 
       <hr className="border-dashed border-black my-2" />
@@ -79,11 +85,11 @@ export default function CashCloseTicket({
       {/* Session Info */}
       <div className="space-y-1 mb-3">
         <p><strong>Turno:</strong></p>
-        <p>  Apertura: {format(session.openedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+        <p>  Apertura: {format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}</p>
         <p>  Cajero: {session.openedByName}</p>
         {session.closedAt && (
           <>
-            <p>  Cierre: {format(session.closedAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+            <p>  Cierre: {format(new Date(session.closedAt), "dd/MM/yyyy HH:mm", { locale: es })}</p>
             <p>  Cierra: {session.closedByName}</p>
           </>
         )}
@@ -166,7 +172,7 @@ export default function CashCloseTicket({
         </div>
         <div className="flex justify-between">
           <span>Ingresos de Caja:</span>
-          <span>{formatCurrency(incomes.reduce((acc, inc) => acc + inc.amount, 0))}</span>
+          <span>{formatCurrency(displayIncomes.reduce((acc, inc) => acc + inc.amount, 0))}</span>
         </div>
       </div>
 
@@ -174,11 +180,11 @@ export default function CashCloseTicket({
 
       {/* Incomes Detail */}
       {
-        incomes.length > 0 && (
+        displayIncomes.length > 0 && (
           <>
             <div className="space-y-1 mb-3">
               <p className="font-bold">DETALLE DE INGRESOS:</p>
-              {incomes.map((income, index) => (
+              {displayIncomes.map((income, index) => (
                 <div key={index} className="flex justify-between">
                   <span>{income.description || income.category}</span>
                   <span>{formatCurrency(income.amount)}</span>
@@ -209,6 +215,12 @@ export default function CashCloseTicket({
           <div className={`flex justify-between font-bold ${session.difference === 0 ? '' : session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
             <span>Diferencia:</span>
             <span>{session.difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(session.difference))}</span>
+          </div>
+        )}
+        {session.cashLeftForNextSession !== undefined && session.cashLeftForNextSession > 0 && (
+          <div className="flex justify-between font-bold text-blue-800">
+            <span>Efectivo Dejado en Caja:</span>
+            <span>{formatCurrency(session.cashLeftForNextSession)}</span>
           </div>
         )}
       </div>

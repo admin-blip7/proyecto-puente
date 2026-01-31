@@ -487,6 +487,32 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                         <span className="font-semibold">{row.session ? formatCurrency(row.session.actualCashCount ?? 0) : '-'}</span>
                       </div>
 
+                      {row.session?.cashLeftForNextSession && row.session.cashLeftForNextSession > 0 ? (
+                        <div className="flex justify-between items-center text-blue-600">
+                          <span className="text-muted-foreground text-xs">Dejado en Caja:</span>
+                          <span className="font-semibold">{formatCurrency(row.session.cashLeftForNextSession)}</span>
+                        </div>
+                      ) : null}
+
+                      {row.session && (
+                        <div className="mt-2 pt-2 border-t border-dashed">
+                          <span className="text-xs font-semibold text-muted-foreground mb-1 block">Bolsas (Venta / Saldo)</span>
+                          {['recargas', 'mimovil', 'servicios'].map(key => {
+                            const sale = (row.session!.bagsSalesAmounts as any)?.[key] || 0;
+                            const end = (row.session!.bagsEndAmounts as any)?.[key] || 0;
+                            if (sale === 0 && end === 0) return null;
+                            return (
+                              <div key={key} className="flex justify-between text-xs py-0.5">
+                                <span className="capitalize text-muted-foreground">{key}:</span>
+                                <span>
+                                  <span className="text-blue-600">{formatCurrency(sale)}</span> / <span className="font-medium">{formatCurrency(end)}</span>
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
                       <div className="flex justify-between items-center pt-2 mt-2 border-t bg-muted/20 -mx-4 px-4 py-2">
                         <span className="font-medium">Diferencia:</span>
                         <span className={cn("font-bold text-lg",

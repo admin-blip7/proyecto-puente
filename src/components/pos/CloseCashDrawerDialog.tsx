@@ -21,7 +21,7 @@ interface CloseCashDrawerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   session: CashSession;
-  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string) => Promise<void>;
+  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string, cashLeftForNextSession?: number) => Promise<void>;
 }
 
 // Schema dinámico que valida según las ventas de la sesión
@@ -43,14 +43,25 @@ const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.obje
   bagMimovilActualEnd: z.string().optional(),
   bagServiciosActualEnd: z.string().optional(),
   depositAccountId: z.string().optional(),
+  cashLeftForNextSession: z.coerce.number().min(0, "El efectivo a dejar no puede ser negativo."),
 }).refine((data) => {
-  // If there is cash to deposit (count > 0), account is required
-  if (data.actualCashCount > 0 && !data.depositAccountId) {
+  // Check that leftover cash is not greater than actual cash
+  if (data.cashLeftForNextSession > data.actualCashCount) {
     return false;
   }
   return true;
 }, {
-  message: "Debes seleccionar una cuenta para el depósito.",
+  message: "El efectivo a dejar no puede ser mayor al efectivo real en caja.",
+  path: ["cashLeftForNextSession"],
+}).refine((data) => {
+  // If there is cash to deposit (count > leftover), account is required
+  const depositAmount = data.actualCashCount - data.cashLeftForNextSession;
+  if (depositAmount > 0 && !data.depositAccountId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Debes seleccionar una cuenta para el depósito (hay efectivo excedente).",
   path: ["depositAccountId"],
 });
 
@@ -94,6 +105,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         bagMimovilActualEnd: "",
         bagServiciosActualEnd: "",
         depositAccountId: "",
+        cashLeftForNextSession: 0,
       });
     }
   }, [isOpen, reset]);
@@ -132,7 +144,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         'mimovil': getEndAmount(values.bagMimovilActualEnd, 'mimovil'),
         'servicios': getEndAmount(values.bagServiciosActualEnd, 'servicios')
       };
-      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId);
+      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId, values.cashLeftForNextSession);
     } finally {
       setLoading(false);
     }
@@ -219,6 +231,25 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="cashLeftForNextSession"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Efectivo a Dejar para Siguiente Turno</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {actualCashCount > 0 && (
                 <FormField
                   control={form.control}
@@ -242,6 +273,8 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                       </Select>
                       <div className="text-[10px] text-muted-foreground">
                         El efectivo contado se depositará en esta cuenta.
+                        <br />
+                        <strong>Monto a depositar: {formatCurrency(Math.max(0, actualCashCount - (form.watch('cashLeftForNextSession') || 0)))}</strong>
                       </div>
                       <FormMessage />
                     </FormItem>

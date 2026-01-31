@@ -131,53 +131,74 @@ export const getSalesBySession = async (
 ): Promise<Sale[]> => {
   try {
     const supabase = getSupabaseServerClient();
+    let allSales: any[] = [];
 
-    // 1. Try fetching by sessionId (camelCase)
-    let { data, error } = await supabase
+    // 1. Fetch by sessionId (Primary source)
+    const { data: sessionSales, error: sessionError } = await supabase
       .from(SALES_TABLE)
       .select("*")
       .eq("sessionId", sessionId)
       .order("createdAt", { ascending: false });
 
-    // 2. Fallback: If no sales found and we have time range info, try fetching by time range
-    if ((!data || data.length === 0) && cashierId && startDate && endDate) {
-      log.info(`No sales found by session ID ${sessionId}, trying time range fallback...`);
-      log.info(`Fallback params: cashierId=${cashierId}, start=${startDate.toISOString()}, end=${endDate.toISOString()}`);
+    if (sessionError) {
+      log.error("Error fetching sales by session ID", sessionError);
+      // We don't return empty yet, we try to get orphans if possible, 
+      // although if this failed, likely DB is down.
+    } else {
+      allSales = sessionSales || [];
+    }
 
-      // Fetch recent sales for this cashier and filter in memory to avoid DB type errors
-      // (createdAt might be mixed JSON/String types causing SQL errors with gte/lte)
-      const { data: dataTime, error: errorTime } = await supabase
-        .from(SALES_TABLE)
-        .select("*")
-        .eq("cashierId", cashierId)
-        .order("createdAt", { ascending: false })
-        .limit(100);
+    // 2. Fetch Orphan Sales (Secondary source)
+    // Include sales that have NO sessionId but fall within the time range for this cashier
+    if (cashierId && startDate && endDate) {
+      try {
+        log.info(`Checking for orphan sales for session ${sessionId} (Cashier: ${cashierId})`);
 
-      if (errorTime) {
-        log.error("Error in fallback sales fetch:", errorTime);
-      } else {
-        // Filter in memory
-        const filteredSales = (dataTime || []).filter(row => {
-          const rowDate = toDate(row.createdAt);
-          return rowDate >= startDate && rowDate <= endDate;
-        });
+        // Fetch sales by cashier that have no session ID
+        const { data: orphanCandidates, error: orphanError } = await supabase
+          .from(SALES_TABLE)
+          .select("*")
+          .eq("cashierId", cashierId)
+          .is("sessionId", null) // Only get sales that are truly orphans
+          .order("createdAt", { ascending: false });
 
-        log.info(`Fallback found ${filteredSales.length} sales (filtered from ${dataTime?.length || 0})`);
+        if (orphanError) {
+          log.warn("Error fetching orphan candidates:", orphanError);
+        } else if (orphanCandidates && orphanCandidates.length > 0) {
+          // Filter by date range in memory to be safe against timezone/format issues
+          const startMm = startDate.getTime();
+          const endMm = endDate.getTime();
 
-        if (filteredSales.length > 0) {
-          data = filteredSales;
-          error = null;
+          const validOrphans = orphanCandidates.filter(row => {
+            const rowDate = toDate(row.createdAt || row.created_at);
+            const rowTime = rowDate.getTime();
+            return rowTime >= startMm && rowTime <= endMm;
+          });
+
+          if (validOrphans.length > 0) {
+            log.info(`Found ${validOrphans.length} orphan sales to include in session ${sessionId}`);
+            // Merge orphans
+            allSales = [...allSales, ...validOrphans];
+          }
         }
+      } catch (orphanErr) {
+        log.error("Error processing orphan sales", orphanErr);
       }
     }
 
-    if (error) {
-      log.error("Error fetching sales by session", error);
-      // Don't throw, just return empty to avoid breaking the UI
+    if (allSales.length === 0 && sessionError) {
+      // If we failed to get session sales and found no orphans, returm empty
       return [];
     }
 
-    return (data || []).map(mapSale);
+    // Sort combined results by date descending
+    allSales.sort((a, b) => {
+      const dateA = toDate(a.createdAt || a.created_at).getTime();
+      const dateB = toDate(b.createdAt || b.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    return allSales.map(mapSale);
   } catch (error) {
     log.error("Error in getSalesBySession", error);
     return [];

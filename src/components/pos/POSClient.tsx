@@ -74,6 +74,10 @@ interface POSClientProps {
 }
 
 export default function POSClient({ initialProducts, initialCategories = [] }: POSClientProps) {
+  const { toast } = useToast();
+  const { userProfile } = useAuth();
+  const printOperationRef = useRef({ isActive: false });
+
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -199,12 +203,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       description: `Orden #${repair.orderId} agregada al carrito.`
     });
   };
-  const printWindowRef = useRef<Window | null>(null);
-  const printOperationRef = useRef<{ isActive: boolean }>({ isActive: false });
-  const ticketElementRef = useRef<HTMLDivElement | null>(null);
-  const { userProfile } = useAuth();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
+  const [ticketElement, setTicketElement] = useState<HTMLDivElement | null>(null);
 
   // Function to refresh products from the database
   const refreshProducts = useCallback(async () => {
@@ -238,12 +237,12 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
   useEffect(() => {
     if (printTicketSession) {
-      console.log('🔄 [TICKET] printTicketSession changed, setting ticketReady after delay...');
-      // Add a small delay to ensure React has time to render the element
+      console.log('🔄 [TICKET] printTicketSession changed, waiting for render...');
+      // Allow time for the hidden div to be rendered in the DOM
       const timeoutId = setTimeout(() => {
         console.log('✅ [TICKET] Setting ticketReady to true');
         setTicketReady(true);
-      }, 300);
+      }, 500); // Increased to 500ms to be safe
 
       return () => clearTimeout(timeoutId);
     } else {
@@ -417,17 +416,18 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string) => {
+  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string, cashLeftForNextSession: number = 0) => {
     if (!userProfile || !activeSession) return;
 
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
     console.log('🔄 [SESSION] Bag Sales:', bagsSalesAmounts);
     console.log('🔄 [SESSION] Bag Actual Ends:', bagsActualEndAmounts);
+    console.log('🔄 [SESSION] Leftover Cash:', cashLeftForNextSession);
     console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId);
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId, cashLeftForNextSession);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -493,41 +493,81 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       setTicketSales([]);
     }
 
+    toast({
+      title: "Generando ticket...",
+      description: "Por favor espere..."
+    });
+
     setPrintTicketSession(session);
-    setTicketReady(true);
+    // Let the useEffect handle setTicketReady(true) after render
+    // setTicketReady(true);
   };
 
   // Effect to create and print ticket
   useEffect(() => {
-    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
-      console.log('🔄 [TICKET] useEffect triggered:', { ticketReady, printSessionId: printTicketSession.sessionId });
-      printOperationRef.current.isActive = true;
+    const conditions = {
+      ticketReady,
+      hasSession: !!printTicketSession,
+      sessionId: printTicketSession?.sessionId,
+      hasElement: !!ticketElement,
+      isPrinting: printOperationRef.current.isActive
+    };
 
-      // Wait for a frame to ensure the effect has completed
-      // Wait for a frame to ensure the effect has completed and element is rendered
-      setTimeout(() => {
-        // Proceed with printing via PDF
-        console.log('✅ [TICKET] Element ready, starting PDF generation...');
-        generateAndPrintPdf();
-      }, 500); // Slight delay to ensure React render
+    console.log('🔄 [TICKET] Print effect checking conditions:', JSON.stringify(conditions));
+
+    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
+      // Check element existence (ref or DOM)
+      const el = ticketElement || document.getElementById('cash-close-ticket');
+
+      if (el) {
+        console.log('✅ [TICKET] Conditions met, starting print flow...');
+        printOperationRef.current.isActive = true;
+
+        // Wait for a frame to ensure the effect has completed
+        setTimeout(() => {
+          console.log('✅ [TICKET] Timeout reached. Checking element again...');
+          // Re-acquire element to be safe
+          const finalEl = ticketElement || document.getElementById('cash-close-ticket');
+
+          if (finalEl) {
+            console.log('✅ [TICKET] Element found, calling generateAndPrintPdf');
+            generateAndPrintPdf(finalEl as HTMLElement);
+          } else {
+            console.error('❌ [TICKET] Element lost after timeout!');
+            printOperationRef.current.isActive = false;
+          }
+        }, 500);
+      } else {
+        console.warn('⚠️ [TICKET] Ready to print but element missing (DOM/Ref). Waiting...');
+      }
 
       return () => {
-        printOperationRef.current.isActive = false;
+        // cleanup if needed
       };
+    } else {
+      if (printOperationRef.current.isActive) {
+        console.log('ℹ️ [TICKET] Skipping: Already printing');
+      } else if (!ticketReady) {
+        console.log('ℹ️ [TICKET] Skipping: Ticket not ready');
+      }
     }
-  }, [ticketReady, printTicketSession, toast]);
+  }, [ticketReady, printTicketSession, ticketElement, toast]);
 
-  const generateAndPrintPdf = async () => {
+  const generateAndPrintPdf = async (element: HTMLElement) => {
     console.log('🔄 [TICKET] Starting generateAndPrintPdf...');
-    const input = ticketElementRef.current;
-    if (!input) {
+    if (!element) {
       console.error('❌ [TICKET] Ticket element not found');
+      toast({
+        title: "Error de impresión",
+        description: "No se encontró el contenido del ticket.",
+        variant: "destructive"
+      });
       return;
     }
 
     try {
       console.log('🔄 [TICKET] Generating canvas with html2canvas...');
-      const canvas = await html2canvas(input, {
+      const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false, // reduce noise
@@ -751,6 +791,19 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
             }}
           />
         )}
+        {
+          printTicketSession && (
+            <div ref={setTicketElement} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
+              <CashCloseTicket
+                id="cash-close-ticket"
+                session={printTicketSession}
+                sales={ticketSales}
+                expenses={ticketExpenses}
+                incomes={ticketIncomes}
+              />
+            </div>
+          )
+        }
       </>
     )
   }
@@ -960,7 +1013,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       />
       {
         printTicketSession && (
-          <div ref={ticketElementRef} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
+          <div ref={setTicketElement} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
             <CashCloseTicket
               id="cash-close-ticket"
               session={printTicketSession}
