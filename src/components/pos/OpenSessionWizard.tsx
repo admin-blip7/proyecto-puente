@@ -73,14 +73,24 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
             setValue('bagServicios', bags['servicios'] || 0);
 
             // Should default to what was left in drawer (not total count if deposited)
-            const leftover = lastClosedSession.cashLeftForNextSession;
-            // If leftover is defined (new system), use it. value 0 is valid.
-            // If undefined (old system), use actualCashCount as legacy fallback.
-            const previousCash = leftover !== undefined ? leftover : (lastClosedSession.actualCashCount || 0);
+            // If balance bag was used (new system), use the amount that was deposited into the balance bag
+            // Otherwise, use cashLeftForNextSession (legacy system)
+            const initialCash = (lastClosedSession.balanceBagAmount !== undefined && lastClosedSession.balanceBagAmount > 0)
+                ? lastClosedSession.balanceBagAmount
+                : (lastClosedSession.cashLeftForNextSession !== undefined ? lastClosedSession.cashLeftForNextSession : (lastClosedSession.actualCashCount || 0));
 
-            setValue('correctedPreviousCash', previousCash);
+            setValue('correctedPreviousCash', initialCash);
         }
-    }, [lastClosedSession, setValue]);
+
+        // Si se selecciona "El efectivo se quedó en caja", pre-llenar el startingFloat con el dinero anterior
+        if (cashStayedInDrawer && lastClosedSession) {
+            const initialCash = (lastClosedSession.balanceBagAmount !== undefined && lastClosedSession.balanceBagAmount > 0)
+                ? lastClosedSession.balanceBagAmount
+                : (lastClosedSession.cashLeftForNextSession !== undefined ? lastClosedSession.cashLeftForNextSession : (lastClosedSession.actualCashCount || 0));
+            
+            setValue('startingFloat', initialCash);
+        }
+    }, [lastClosedSession, setValue, cashStayedInDrawer]);
 
     const correctedPreviousCash = watch('correctedPreviousCash');
 

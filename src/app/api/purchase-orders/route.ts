@@ -10,7 +10,7 @@ const log = getLogger("purchaseOrdersApi");
 const fetchProduct = async (supabase: ReturnType<typeof getSupabaseServerClient>, productId: string) => {
   const { data, error } = await supabase
     .from("products")
-    .select("id, firestore_id, stock, cost, price, name")
+    .select("id, stock, cost, price, name")
     .eq("id", productId)
     .maybeSingle();
 

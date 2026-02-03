@@ -103,6 +103,7 @@ export function CustomerSection({
                                 <div className="flex items-center border-b border-zinc-100 dark:border-zinc-800 px-4">
                                     <Search className="mr-3 h-5 w-5 shrink-0 text-zinc-400" />
                                     <input
+                                        id="customerSearch"
                                         className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm font-medium outline-none placeholder:text-zinc-400"
                                         placeholder="Nombre, teléfono o cédula..."
                                         value={crmClientSearch}
@@ -152,10 +153,11 @@ export function CustomerSection({
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                         <div className="flex justify-between items-center">
-                            <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Nombre del Cliente</Label>
+                            <Label htmlFor="customerName" className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Nombre del Cliente</Label>
                             <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">Opcional</span>
                         </div>
                         <Input
+                            id="customerName"
                             className="h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-semibold px-4"
                             placeholder="Ej: Juan Pérez"
                             value={customerName}
@@ -164,12 +166,13 @@ export function CustomerSection({
                     </div>
                     <div className="space-y-1.5">
                         <div className="flex justify-between items-center">
-                            <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Teléfono</Label>
+                            <Label htmlFor="customerPhone" className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Teléfono</Label>
                             <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">Opcional</span>
                         </div>
                         <div className="relative">
                             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                             <Input
+                                id="customerPhone"
                                 className="h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-semibold pl-11 pr-4"
                                 placeholder="Ej: 555-123-4567"
                                 value={customerPhone}

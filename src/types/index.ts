@@ -155,15 +155,17 @@ export interface Warranty {
 export interface InventoryLog {
   id: string;
   productId: string;
-  productName: string;
-  change: number;
-  reason: 'Venta' | 'Venta a Crédito' | 'Ingreso de Mercancía' | 'Ajuste Manual' | 'Devolución' | 'Creación de Producto' | 'Uso en Reparación';
+  quantityChange: number;
+  changeType: string;
   updatedBy: string; // User ID
   createdAt: Date;
   metadata?: {
     saleId?: string;
     repairOrderId?: string;
     cost?: number;
+    ownership_type?: string;
+    is_new_product?: boolean;
+    product_name?: string;
   };
 }
 
@@ -376,6 +378,10 @@ export interface CashSession {
   bagsEndAmounts?: Record<string, number>;
   previousSessionConfirmedAt?: Date;
   cashLeftForNextSession?: number;
+  // Nuevos campos para bolsa de saldo de efectivo
+  balanceBagAccountId?: string; // ID de la cuenta donde se deposita el dinero de la bolsa de saldo
+  balanceBagAmount?: number; // Monto de efectivo en la bolsa de saldo (separado del efectivo operativo)
+  dailySalesAccountId?: string; // ID de la cuenta donde se registran las ventas diarias (日销售账户)
 }
 
 export const TicketSettingsSchema = z.object({

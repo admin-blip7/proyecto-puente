@@ -416,18 +416,20 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string, cashLeftForNextSession: number = 0) => {
+  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string, cashLeftForNextSession: number = 0, balanceBagAccountId?: string, dailySalesAccountId?: string) => {
     if (!userProfile || !activeSession) return;
 
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
     console.log('🔄 [SESSION] Bag Sales:', bagsSalesAmounts);
     console.log('🔄 [SESSION] Bag Actual Ends:', bagsActualEndAmounts);
     console.log('🔄 [SESSION] Leftover Cash:', cashLeftForNextSession);
+    console.log('🔄 [SESSION] Balance Bag Account:', balanceBagAccountId);
+    console.log('🔄 [SESSION] Daily Sales Account:', dailySalesAccountId);
     console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId, cashLeftForNextSession);
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId, cashLeftForNextSession, balanceBagAccountId, dailySalesAccountId);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -435,11 +437,35 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
       setClosedSessionData(closedSession);
 
+      // Parse balance bag accounts to show detailed message
+      let message: string;
+      try {
+        if (balanceBagAccountId) {
+          const balanceBagAccounts = JSON.parse(balanceBagAccountId);
+          const activeBags = Object.entries(balanceBagAccounts)
+            .filter(([_, accountId]) => !!accountId)
+            .map(([bagType, _]) => bagType.toUpperCase());
+
+          if (activeBags.length > 0 && cashLeftForNextSession > 0) {
+            message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará como registro para el siguiente turno (${activeBags.join(', ')}).`;
+          } else if (cashLeftForNextSession > 0) {
+            message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará como registro para el siguiente turno.`;
+          } else {
+            message = `Turno cerrado sin dinero a dejar.`;
+          }
+        } else if (cashLeftForNextSession > 0) {
+          message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará para el siguiente turno.`;
+        } else {
+          message = `Turno cerrado.`;
+        }
+      } catch {
+        // If parsing fails, use simple message
+        message = `Turno cerrado.`;
+      }
+
       toast({
         title: "✅ Turno Cerrado",
-        description: depositAccountId
-          ? `Se depositaron ${formatCurrency(actualCash)} a la cuenta seleccionada.`
-          : `Turno cerrado sin depósito automático.`,
+        description: message,
       });
 
       console.log('✅ [SESSION] Session closed, printing ticket...');
@@ -567,15 +593,52 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
     try {
       console.log('🔄 [TICKET] Generating canvas with html2canvas...');
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false, // reduce noise
-        windowWidth: 350
+
+      // Create a temporary clone of the element for better thermal printer compatibility
+      const tempElement = element.cloneNode(true) as HTMLElement;
+      
+      // Force inline styles for thermal printing
+      tempElement.style.backgroundColor = '#FFFFFF';
+      tempElement.style.color = '#000000';
+      
+      // Force all text elements to be black for thermal printing
+      const allTextElements = tempElement.querySelectorAll('*');
+      allTextElements.forEach(el => {
+        const htmlEl = el as HTMLElement;
+        // Get computed styles to preserve font properties
+        const computedStyles = window.getComputedStyle(el as Element);
+        htmlEl.style.color = '#000000';
+        htmlEl.style.fontWeight = computedStyles.fontWeight;
+        htmlEl.style.fontFamily = computedStyles.fontFamily;
       });
+
+      document.body.appendChild(tempElement);
+
+      const canvas = await html2canvas(tempElement, {
+        scale: 3, // Increased scale for better quality on thermal printers
+        useCORS: true,
+        logging: false,
+        windowWidth: 350,
+        backgroundColor: '#ffffff', // Explicit white background
+        // Options for better thermal printer rendering
+        onclone: (clonedDoc) => {
+          // Ensure the cloned document has white background
+          const clonedEl = clonedDoc.getElementById(tempElement.id);
+          if (clonedEl) {
+            clonedEl.style.backgroundColor = '#ffffff';
+            clonedEl.style.color = '#000000';
+          }
+        }
+      });
+
+      // Remove temporary element
+      document.body.removeChild(tempElement);
+      
       console.log('✅ [TICKET] Canvas generated');
 
-      const imgData = canvas.toDataURL('image/png');
+      // Use JPEG instead of PNG for better thermal printer compatibility
+      // JPEG with quality 1.0 produces solid black text that works better on thermal
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const imgProps = new jsPDF().getImageProperties(imgData);
 
       // Calculate PDF height based on aspect ratio (width fixed at 80mm)
@@ -589,7 +652,8 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
         format: [pdfWidth, Math.max(pdfHeight, 10)] // ensure min height
       });
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // Add the image to PDF
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
       // Add auto-print script
       pdf.autoPrint();

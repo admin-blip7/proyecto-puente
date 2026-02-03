@@ -16,12 +16,14 @@ import { formatCurrency } from "@/lib/utils";
 import { getAccounts } from "@/lib/services/accountService";
 import { Account } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Pin, PinOff } from "lucide-react";
 
 interface CloseCashDrawerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   session: CashSession;
-  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string, cashLeftForNextSession?: number) => Promise<void>;
+  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string, cashLeftForNextSession?: number, balanceBagAccountId?: string, dailySalesAccountId?: string) => Promise<void>;
 }
 
 // Schema dinámico que valida según las ventas de la sesión
@@ -44,6 +46,10 @@ const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.obje
   bagServiciosActualEnd: z.string().optional(),
   depositAccountId: z.string().optional(),
   cashLeftForNextSession: z.coerce.number().min(0, "El efectivo a dejar no puede ser negativo."),
+  balanceBagRecargasAccountId: z.string().optional(),
+  balanceBagMimovilAccountId: z.string().optional(),
+  balanceBagServiciosAccountId: z.string().optional(),
+  dailySalesAccountId: z.string().optional(),
 }).refine((data) => {
   // Check that leftover cash is not greater than actual cash
   if (data.cashLeftForNextSession > data.actualCashCount) {
@@ -54,21 +60,41 @@ const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.obje
   message: "El efectivo a dejar no puede ser mayor al efectivo real en caja.",
   path: ["cashLeftForNextSession"],
 }).refine((data) => {
-  // If there is cash to deposit (count > leftover), account is required
-  const depositAmount = data.actualCashCount - data.cashLeftForNextSession;
-  if (depositAmount > 0 && !data.depositAccountId) {
+  // Si hay efectivo a dejar (cashLeftForNextSession > 0), debe haber al menos una bolsa de saldo seleccionada
+  const hasAnyBalanceBag = !!data.balanceBagRecargasAccountId || !!data.balanceBagMimovilAccountId || !!data.balanceBagServiciosAccountId;
+  
+  if (data.cashLeftForNextSession > 0 && !hasAnyBalanceBag) {
     return false;
   }
+  
+  // Si hay dinero a depositar (actualCashCount - cashLeftForNextSession), solo requiere cuenta de depósito si NO hay bolsas de saldo
+  const depositAmount = data.actualCashCount - data.cashLeftForNextSession;
+  const hasDepositAccount = !!data.depositAccountId;
+  
+  if (depositAmount > 0 && !hasDepositAccount && !hasAnyBalanceBag) {
+    return false;
+  }
+  
   return true;
 }, {
-  message: "Debes seleccionar una cuenta para el depósito (hay efectivo excedente).",
-  path: ["depositAccountId"],
+  message: "Debe seleccionar al menos una cuenta de bolsa de saldo para el efectivo a dejar.",
+  path: ["cashLeftForNextSession"],
 });
+
+// Tipo para las cuentas fijadas
+interface FixedAccounts {
+  recargas?: string;
+  mimovil?: string;
+  servicios?: string;
+  dailySales?: string;
+}
 
 export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, onConfirm }: CloseCashDrawerDialogProps) {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [fixedAccounts, setFixedAccounts] = useState<FixedAccounts>({});
+  const [pinnedAccounts, setPinnedAccounts] = useState<FixedAccounts>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -77,8 +103,60 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         .then(setAccounts)
         .catch(console.error)
         .finally(() => setLoadingAccounts(false));
+
+      // Cargar cuentas fijadas desde localStorage
+      const saved = localStorage.getItem('fixedBalanceBagAccounts');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setFixedAccounts(parsed);
+        } catch (e) {
+          console.error('Error al cargar cuentas fijadas:', e);
+        }
+      }
+
+      // Cargar cuenta de ventas diarias fijada desde localStorage
+      const savedDailySales = localStorage.getItem('fixedDailySalesAccount');
+      if (savedDailySales) {
+        try {
+          const parsed = JSON.parse(savedDailySales);
+          setFixedAccounts(prev => ({ ...prev, dailySales: parsed }));
+          setPinnedAccounts(prev => ({ ...prev, dailySales: parsed }));
+        } catch (e) {
+          console.error('Error al cargar cuenta de ventas diarias fijada:', e);
+        }
+      }
     }
   }, [isOpen]);
+
+  // Función para guardar cuenta fija
+  const handlePinAccount = (type: 'recargas' | 'mimovil' | 'servicios' | 'dailySales', accountId: string, isPinned: boolean) => {
+    const newFixedAccounts = { ...fixedAccounts };
+
+    if (isPinned) {
+      newFixedAccounts[type] = accountId;
+      setFixedAccounts(newFixedAccounts);
+      setPinnedAccounts(newFixedAccounts);
+      
+      // Guardar en localStorage según el tipo
+      if (type === 'dailySales') {
+        localStorage.setItem('fixedDailySalesAccount', JSON.stringify(accountId));
+      } else {
+        localStorage.setItem('fixedBalanceBagAccounts', JSON.stringify(newFixedAccounts));
+      }
+    } else {
+      delete newFixedAccounts[type];
+      setFixedAccounts(newFixedAccounts);
+      setPinnedAccounts(newFixedAccounts);
+      
+      // Guardar en localStorage según el tipo
+      if (type === 'dailySales') {
+        localStorage.removeItem('fixedDailySalesAccount');
+      } else {
+        localStorage.setItem('fixedBalanceBagAccounts', JSON.stringify(newFixedAccounts));
+      }
+    }
+  };
 
   // Calcular si hay ventas en efectivo y el efectivo esperado
   const hasCashSales = (session.totalCashSales ?? 0) > 0;
@@ -94,8 +172,17 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
   const { watch, reset } = form;
   const actualCashCount = watch('actualCashCount', 0);
 
+  // Verificar si hay alguna bolsa de saldo seleccionada
+  const balanceBagRecargasAccountId = watch('balanceBagRecargasAccountId', '');
+  const balanceBagMimovilAccountId = watch('balanceBagMimovilAccountId', '');
+  const balanceBagServiciosAccountId = watch('balanceBagServiciosAccountId', '');
+  const hasAnyBalanceBag = !!balanceBagRecargasAccountId ||
+                           !!balanceBagMimovilAccountId ||
+                           !!balanceBagServiciosAccountId;
+
   useEffect(() => {
     if (isOpen) {
+      const initialFixedAccounts = fixedAccounts.recargas || fixedAccounts.mimovil || fixedAccounts.servicios ? fixedAccounts : {};
       reset({
         actualCashCount: 0,
         bagRecargasSale: 0,
@@ -106,9 +193,18 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         bagServiciosActualEnd: "",
         depositAccountId: "",
         cashLeftForNextSession: 0,
+        balanceBagRecargasAccountId: initialFixedAccounts.recargas || "",
+        balanceBagMimovilAccountId: initialFixedAccounts.mimovil || "",
+        balanceBagServiciosAccountId: initialFixedAccounts.servicios || "",
+        dailySalesAccountId: initialFixedAccounts.dailySales || "",
       });
+      
+      // Actualizar pinnedAccounts basado en las cuentas fijadas SOLO si están vacíos (carga inicial)
+      if (!pinnedAccounts.recargas && !pinnedAccounts.mimovil && !pinnedAccounts.servicios && !pinnedAccounts.dailySales) {
+        setPinnedAccounts(initialFixedAccounts);
+      }
     }
-  }, [isOpen, reset]);
+  }, [isOpen, reset, fixedAccounts]);
 
   const expectedCashInDrawer = useMemo(() => {
     return session.startingFloat + session.totalCashSales - session.totalCashPayouts;
@@ -144,7 +240,15 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         'mimovil': getEndAmount(values.bagMimovilActualEnd, 'mimovil'),
         'servicios': getEndAmount(values.bagServiciosActualEnd, 'servicios')
       };
-      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId, values.cashLeftForNextSession);
+
+      // Obtener las cuentas de bolsa de saldo activas
+      const balanceBagAccounts = {
+        recargas: values.balanceBagRecargasAccountId,
+        mimovil: values.balanceBagMimovilAccountId,
+        servicios: values.balanceBagServiciosAccountId
+      };
+
+      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId, values.cashLeftForNextSession, JSON.stringify(balanceBagAccounts), values.dailySalesAccountId);
     } finally {
       setLoading(false);
     }
@@ -250,7 +354,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                 )}
               />
 
-              {actualCashCount > 0 && (
+              {actualCashCount > 0 && !hasAnyBalanceBag && (
                 <FormField
                   control={form.control}
                   name="depositAccountId"
@@ -280,6 +384,20 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                     </FormItem>
                   )}
                 />
+              )}
+
+              {/* Mensaje informativo cuando hay bolsas de saldo seleccionadas */}
+              {hasAnyBalanceBag && actualCashCount > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-orange-600 font-bold text-lg">ℹ️</span>
+                    <div className="text-xs text-orange-800">
+                      <p className="font-semibold mb-1">Bolsa de Saldo seleccionada</p>
+                      <p>El dinero a dejar (<strong>{formatCurrency(form.watch('cashLeftForNextSession') || 0)}</strong>) se guardará como registro para mostrar en el siguiente turno.</p>
+                      <p className="mt-1 text-orange-700">No se usará ninguna cuenta de depósito para evitar duplicidad.</p>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-3 gap-4">
@@ -442,6 +560,265 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                   <strong>Nota:</strong> Los saldos finales de las bolsas se guardarán y sugerirán automáticamente como saldos iniciales para el siguiente turno.
                 </div>
               </div>
+
+              <Separator className="my-2" />
+              <div className="font-semibold mb-2">Cuentas de Bolsa de Saldo</div>
+
+              {/* Selector de cuenta para ventas diarias */}
+              <FormField
+                control={form.control}
+                name="dailySalesAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        日销售账户 (Ventas Diarias)
+                        {field.value && (
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                            ✓ Ventas Diarias
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={!!pinnedAccounts.dailySales}
+                          onCheckedChange={(checked) => field.value && handlePinAccount('dailySales', field.value, checked)}
+                          disabled={!field.value}
+                          className={cn(pinnedAccounts.dailySales && "bg-blue-600")}
+                        />
+                        <Pin className={cn("h-4 w-4", pinnedAccounts.dailySales ? "text-blue-600" : "text-muted-foreground")} />
+                      </div>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={cn(
+                          field.value && "border-green-600 bg-green-50 focus:ring-green-600"
+                        )}>
+                          <SelectValue placeholder="Selecciona una cuenta para ventas diarias..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            <span>{account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-[10px] text-muted-foreground">
+                      {field.value ? (
+                        <>
+                          El efectivo de ventas diarias se registrará en esta cuenta.
+                          <br />
+                          Esta cuenta es independiente de las bolsas de saldo.
+                          {pinnedAccounts.dailySales && (
+                            <span className="text-blue-600 font-medium"> Esta cuenta está fijada para usar automáticamente en futuros cierres.</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Sin cuenta seleccionada para ventas diarias.
+                          <br />
+                          Selecciona una cuenta para registrar las ventas diarias.
+                        </>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Selector de cuenta de bolsa de saldo para Recargas */}
+              <FormField
+                control={form.control}
+                name="balanceBagRecargasAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        Bolsa de Saldo - Recargas
+                        {field.value && (
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                            ✓ Recargas
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={!!pinnedAccounts.recargas}
+                          onCheckedChange={(checked) => field.value && handlePinAccount('recargas', field.value, checked)}
+                          disabled={!field.value}
+                          className={cn(pinnedAccounts.recargas && "bg-blue-600")}
+                        />
+                        <Pin className={cn("h-4 w-4", pinnedAccounts.recargas ? "text-blue-600" : "text-muted-foreground")} />
+                      </div>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={cn(
+                          field.value && "border-green-600 bg-green-50 focus:ring-green-600"
+                        )}>
+                          <SelectValue placeholder="Selecciona una cuenta para la bolsa de Recargas..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            <span>{account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-[10px] text-muted-foreground">
+                      {field.value ? (
+                        <>
+                          El efectivo de Recargas se depositará en esta cuenta como <strong>Bolsa de Saldo</strong>.
+                          <br />
+                          Este dinero estará reservado y NO se mezclará con el efectivo operativo.
+                          {pinnedAccounts.recargas && (
+                            <span className="text-blue-600 font-medium"> Esta cuenta está fijada para usar automáticamente en futuros cierres.</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Sin bolsa de saldo seleccionada para Recargas.
+                          <br />
+                          Usa la bolsa de saldo para mantener dinero de Recargas reservado separado del efectivo disponible.
+                        </>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Selector de cuenta de bolsa de saldo para MiMovil */}
+              <FormField
+                control={form.control}
+                name="balanceBagMimovilAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        Bolsa de Saldo - MiMovil
+                        {field.value && (
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                            ✓ MiMovil
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={!!pinnedAccounts.mimovil}
+                          onCheckedChange={(checked) => field.value && handlePinAccount('mimovil', field.value, checked)}
+                          disabled={!field.value}
+                          className={cn(pinnedAccounts.mimovil && "bg-blue-600")}
+                        />
+                        <Pin className={cn("h-4 w-4", pinnedAccounts.mimovil ? "text-blue-600" : "text-muted-foreground")} />
+                      </div>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={cn(
+                          field.value && "border-green-600 bg-green-50 focus:ring-green-600"
+                        )}>
+                          <SelectValue placeholder="Selecciona una cuenta para la bolsa de MiMovil..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            <span>{account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-[10px] text-muted-foreground">
+                      {field.value ? (
+                        <>
+                          El efectivo de MiMovil se depositará en esta cuenta como <strong>Bolsa de Saldo</strong>.
+                          <br />
+                          Este dinero estará reservado y NO se mezclará con el efectivo operativo.
+                          {pinnedAccounts.mimovil && (
+                            <span className="text-blue-600 font-medium"> Esta cuenta está fijada para usar automáticamente en futuros cierres.</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Sin bolsa de saldo seleccionada para MiMovil.
+                          <br />
+                          Usa la bolsa de saldo para mantener dinero de MiMovil reservado separado del efectivo disponible.
+                        </>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Selector de cuenta de bolsa de saldo para Servicios */}
+              <FormField
+                control={form.control}
+                name="balanceBagServiciosAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        Bolsa de Saldo - Servicios
+                        {field.value && (
+                          <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                            ✓ Servicios
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={!!pinnedAccounts.servicios}
+                          onCheckedChange={(checked) => field.value && handlePinAccount('servicios', field.value, checked)}
+                          disabled={!field.value}
+                          className={cn(pinnedAccounts.servicios && "bg-blue-600")}
+                        />
+                        <Pin className={cn("h-4 w-4", pinnedAccounts.servicios ? "text-blue-600" : "text-muted-foreground")} />
+                      </div>
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={cn(
+                          field.value && "border-green-600 bg-green-50 focus:ring-green-600"
+                        )}>
+                          <SelectValue placeholder="Selecciona una cuenta para la bolsa de Servicios..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            <span>{account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-[10px] text-muted-foreground">
+                      {field.value ? (
+                        <>
+                          El efectivo de Servicios se depositará en esta cuenta como <strong>Bolsa de Saldo</strong>.
+                          <br />
+                          Este dinero estará reservado y NO se mezclará con el efectivo operativo.
+                          {pinnedAccounts.servicios && (
+                            <span className="text-blue-600 font-medium"> Esta cuenta está fijada para usar automáticamente en futuros cierres.</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Sin bolsa de saldo seleccionada para Servicios.
+                          <br />
+                          Usa la bolsa de saldo para mantener dinero de Servicios reservado separado del efectivo disponible.
+                        </>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
 
               {form.formState.isDirty && (

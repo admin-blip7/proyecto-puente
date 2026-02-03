@@ -146,7 +146,6 @@ export const createCRMClient = async (
         const now = nowIso();
 
         const payload = {
-            // firestore_id: firestoreId,
             client_code: clientCode,
             identification_type: clientData.identificationType,
             identification_number: clientData.identificationNumber,
@@ -626,7 +625,6 @@ export const createCRMTask = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            // firestore_id: firestoreId,
             client_id: client._dbId || parseInt(client.id),
             title: taskData.title,
             description: taskData.description || null,
@@ -807,7 +805,6 @@ export const createCRMTag = async (
         const now = nowIso();
 
         const payload = {
-            // firestore_id: firestoreId,
             name: tagData.name,
             color: tagData.color || "#6B7280",
             description: tagData.description || null,
@@ -891,8 +888,7 @@ export const getCRMStats = async (): Promise<CRMClientStats> => {
             .limit(10);
 
         const recentInteractions = (recentInteractionsData || []).map((row: any) => ({
-            id: row?.firestore_id ?? row?.id ?? "",
-            firestore_id: row?.firestore_id ?? row?.id ?? "",
+            id: row?.id ?? "",
             clientId: row?.client_id ?? row?.clientId ?? "",
             interactionType: (row?.interaction_type ?? row?.interactionType ?? "contact") as InteractionType,
             relatedId: row?.related_id ?? row?.relatedId ?? undefined,
@@ -1015,7 +1011,7 @@ export const addCreditPaymentInteraction = async (
 
 // Create interaction function
 export const createCRMInteraction = async (
-    interactionData: Omit<CRMInteraction, "id" | "firestore_id" | "createdAt" | "updatedAt">
+    interactionData: Omit<CRMInteraction, "id" | "createdAt" | "updatedAt">
 ): Promise<CRMInteraction> => {
     const supabase = await getSupabaseClientWithAuth();
     if (!supabase) {
@@ -1031,7 +1027,6 @@ export const createCRMInteraction = async (
         if (!client) throw new Error("Client not found");
 
         const payload = {
-            // firestore_id: firestoreId,
             client_id: client._dbId || parseInt(client.id),
             interaction_type: interactionData.interactionType,
             related_id: interactionData.relatedId || null,
@@ -1060,8 +1055,7 @@ export const createCRMInteraction = async (
         });
 
         return {
-            id: data?.firestore_id ?? data?.id ?? "",
-            firestore_id: data?.firestore_id ?? data?.id ?? "",
+            id: data?.id ?? "",
             clientId: data?.clientid ?? data?.clientId ?? "",
             interactionType: (data?.interactiontype ?? data?.interactionType ?? "contact") as InteractionType,
             relatedId: data?.relatedid ?? data?.relatedId ?? undefined,
@@ -1107,7 +1101,7 @@ export const createCRMClientFromSale = async (saleInfo: {
 
             const { data: existingByPhone, error: phoneError } = await supabase
                 .from(CRM_CLIENTS_TABLE)
-                .select("id, firestore_id, phone")
+                .select("id, phone")
                 .eq("phone", saleInfo.phone)
                 .single();
 
@@ -1116,7 +1110,7 @@ export const createCRMClientFromSale = async (saleInfo: {
                 log.info(`Exact match not found, trying to fetch all clients and match normalized phone...`);
                 const { data: allClients } = await supabase
                     .from(CRM_CLIENTS_TABLE)
-                    .select("id, firestore_id, phone");
+                    .select("id, phone");
 
                 // Find matching client by normalized phone
                 const fuzzyMatches = allClients?.filter(client => {

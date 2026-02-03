@@ -43,6 +43,7 @@ export function ProductList({ cartItems, serials, handleSerialChange }: ProductL
                                 {Array.from({ length: item.quantity }).map((_, index) => (
                                     <div key={`${item.id}-${index}`} className="relative group">
                                         <Input
+                                            id={`serial-${item.id}-${index}`}
                                             placeholder={`Ingrese Serie/IMEI #${index + 1}...`}
                                             value={serials[item.id]?.[index] || ''}
                                             onChange={(e) => handleSerialChange(item.id, index, e.target.value)}

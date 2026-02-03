@@ -40,6 +40,10 @@ export default function CashCloseTicket({
   const wrapperStyle = {
     width: "80mm",
     fontFamily: "'Courier New', Courier, monospace",
+    // Enhanced styles for thermal printing
+    backgroundColor: '#FFFFFF',
+    color: '#000000',
+    lineHeight: '1.4',
   };
 
   // Use props incomes if provided, otherwise fetch (backward compatibility)
@@ -63,7 +67,14 @@ export default function CashCloseTicket({
   return (
     <div
       className="cash-close-ticket bg-white text-black font-mono shadow-lg p-3 text-xs"
-      style={wrapperStyle}
+      style={{
+        ...wrapperStyle,
+        // Force inline styles for thermal printing
+        background: '#FFFFFF',
+        color: '#000000',
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact',
+      }}
       id={id}
     >
       {/* Header */}
@@ -212,13 +223,13 @@ export default function CashCloseTicket({
           </div>
         )}
         {session.difference !== undefined && (
-          <div className={`flex justify-between font-bold ${session.difference === 0 ? '' : session.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`flex justify-between font-bold ${session.difference === 0 ? '' : ''}`}>
             <span>Diferencia:</span>
             <span>{session.difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(session.difference))}</span>
           </div>
         )}
         {session.cashLeftForNextSession !== undefined && session.cashLeftForNextSession > 0 && (
-          <div className="flex justify-between font-bold text-blue-800">
+          <div className="flex justify-between font-bold">
             <span>Efectivo Dejado en Caja:</span>
             <span>{formatCurrency(session.cashLeftForNextSession)}</span>
           </div>
@@ -249,7 +260,7 @@ export default function CashCloseTicket({
                 <span>Saldo: <strong>{formatCurrency(actualEnd)}</strong></span>
               </div>
               {diff !== 0 && (
-                <div className={`text-xs pl-2 font-bold ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-xs pl-2 font-bold`}>
                   Diferencia: {diff > 0 ? '+' : ''}{formatCurrency(diff)}
                 </div>
               )}

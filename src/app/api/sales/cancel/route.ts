@@ -74,9 +74,8 @@ export async function POST(request: Request) {
             // Get current product stock
             const { data: product, error: productError } = await supabase
               .from('products')
-              .select('stock, name')
-              .select('id, firestore_id, stock, name')
-              .or(`id.eq.${item.productId},firestore_id.eq.${item.productId}`)
+              .select('id, stock, name')
+              .eq('id', item.productId)
               .single();
 
             if (productError || !product) {
@@ -126,7 +125,7 @@ export async function POST(request: Request) {
                 const { data: productWithCost } = await supabase
                   .from('products')
                   .select('cost')
-                  .or(`id.eq.${item.productId},firestore_id.eq.${item.productId}`)
+                  .eq('id', item.productId)
                   .single();
 
                 if (productWithCost) {

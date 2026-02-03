@@ -56,10 +56,11 @@ export function PaymentMethodSection({
             {paymentMethod === 'Efectivo' && (
                 <div className="mt-6 p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-4 shadow-inner">
                     <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Monto Pagado por el Cliente</Label>
+                        <Label htmlFor="amountPaid" className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Monto Pagado por el Cliente</Label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xl text-zinc-900 dark:text-zinc-100">$</span>
                             <Input
+                                id="amountPaid"
                                 type="number"
                                 placeholder="0.00"
                                 value={amountPaid || ''}

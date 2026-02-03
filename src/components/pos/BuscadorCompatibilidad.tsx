@@ -204,12 +204,13 @@ export default function BuscadorCompatibilidad({ onClose, onAddToCart }: Buscado
         <div className="space-y-3">
           {/* Modelo con autocompletar */}
           <div className="relative">
-            <label className="block text-xs font-medium mb-1 opacity-90">
+            <label htmlFor="modeloCelular" className="block text-xs font-medium mb-1 opacity-90">
               Modelo del Celular
             </label>
             <div className="relative">
               <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-70" />
               <input
+                id="modeloCelular"
                 type="text"
                 value={modelo}
                 onChange={(e) => setModelo(e.target.value)}
@@ -236,10 +237,11 @@ export default function BuscadorCompatibilidad({ onClose, onAddToCart }: Buscado
           {/* Medidas */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium mb-1 opacity-90">
+              <label htmlFor="altoMedida" className="block text-xs font-medium mb-1 opacity-90">
                 Alto (cm)
               </label>
               <input
+                id="altoMedida"
                 type="number"
                 step="0.1"
                 value={alto}
@@ -249,10 +251,11 @@ export default function BuscadorCompatibilidad({ onClose, onAddToCart }: Buscado
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1 opacity-90">
+              <label htmlFor="anchoMedida" className="block text-xs font-medium mb-1 opacity-90">
                 Ancho (cm)
               </label>
               <input
+                id="anchoMedida"
                 type="number"
                 step="0.1"
                 value={ancho}
@@ -277,22 +280,20 @@ export default function BuscadorCompatibilidad({ onClose, onAddToCart }: Buscado
       <div className="flex border-b">
         <button
           onClick={() => setMostrarHistorial(false)}
-          className={`flex-1 py-2 px-4 font-medium text-sm transition-colors ${
-            !mostrarHistorial
+          className={`flex-1 py-2 px-4 font-medium text-sm transition-colors ${!mostrarHistorial
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <Package className="w-4 h-4 inline mr-1" />
           Resultados ({resultados.length})
         </button>
         <button
           onClick={() => setMostrarHistorial(true)}
-          className={`flex-1 py-2 px-4 font-medium text-sm transition-colors ${
-            mostrarHistorial
+          className={`flex-1 py-2 px-4 font-medium text-sm transition-colors ${mostrarHistorial
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           <History className="w-4 h-4 inline mr-1" />
           Historial
@@ -410,8 +411,8 @@ export default function BuscadorCompatibilidad({ onClose, onAddToCart }: Buscado
       {/* Footer info */}
       <div className="p-3 bg-gray-50 border-t">
         <p className="text-xs text-gray-500 text-center">
-          Sistema de tolerancia: <span className="text-green-600 font-medium">Compatible</span> (0 a -2mm), 
-          <span className="text-yellow-600 font-medium"> Posiblemente compatible</span> (hasta 5mm), 
+          Sistema de tolerancia: <span className="text-green-600 font-medium">Compatible</span> (0 a -2mm),
+          <span className="text-yellow-600 font-medium"> Posiblemente compatible</span> (hasta 5mm),
           <span className="text-red-600 font-medium"> No compatible</span> (más de 5mm)
         </p>
       </div>

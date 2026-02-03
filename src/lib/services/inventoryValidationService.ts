@@ -26,19 +26,19 @@ export interface InventoryIssue {
 }
 
 export class InventoryValidationService {
-  
+
   // Validación completa del inventario
   static async validateInventory(): Promise<InventoryValidationResult> {
     log.info("🔍 INICIANDO VALIDACIÓN COMPLETA DE INVENTARIO");
-    
+
     const issues: InventoryIssue[] = [];
     const supabase = getSupabaseServerClient();
-    
+
     try {
       // 1. Obtener todos los productos
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id, firestore_id, name, stock, sku, cost, ownershipType")
+        .select("id, name, stock, sku, cost, ownershipType")
         .eq("type", "Venta");
 
       if (productsError) {
@@ -123,7 +123,7 @@ export class InventoryValidationService {
         const { data: logs, error: logsError } = await supabase
           .from("inventory_logs")
           .select("*")
-          .eq("productId", product.firestore_id || product.id)
+          .eq("productId", product.id)
           .order("createdAt", { ascending: false });
 
         if (logsError) {
@@ -135,7 +135,7 @@ export class InventoryValidationService {
 
         // Calcular cambio total desde logs
         const totalChange = logs.reduce((sum, log) => sum + log.change, 0);
-        
+
         // Obtener stock inicial (primera venta) y calcular stock esperado
         const stockFromLogs = this.calculateExpectedStock(logs);
         const currentStock = Number(product.stock || 0);
@@ -178,7 +178,7 @@ export class InventoryValidationService {
     try {
       // Obtener logs de las últimas 24 horas
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      
+
       const { data: recentLogs, error: logsError } = await supabase
         .from("inventory_logs")
         .select("*")
@@ -193,11 +193,11 @@ export class InventoryValidationService {
 
       // Agrupar por saleId y productId
       const logsBySaleProduct: Record<string, any[]> = {};
-      
+
       recentLogs.forEach(log => {
         const saleId = log.metadata?.saleId;
         const productId = log.productId;
-        
+
         if (saleId && productId) {
           const key = `${saleId}-${productId}`;
           if (!logsBySaleProduct[key]) {
@@ -212,7 +212,7 @@ export class InventoryValidationService {
         if (logs.length > 1) {
           const [saleId, productId] = key.split('-');
           const product = logs[0] as any;
-          
+
           issues.push({
             productId,
             productName: product.productName,
@@ -236,7 +236,7 @@ export class InventoryValidationService {
       });
 
       log.info(`📊 Encontrados ${issues.length} casos de logs duplicados`);
-      
+
     } catch (error) {
       log.error("Error validando logs duplicados:", error);
     }
@@ -249,13 +249,13 @@ export class InventoryValidationService {
     if (!logs || logs.length === 0) return 0;
 
     // Encontrar el log más antiguo para calcular stock inicial
-    const sortedLogs = [...logs].sort((a, b) => 
+    const sortedLogs = [...logs].sort((a, b) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
     // Calcular stock actual basado en cambios
     const totalChange = logs.reduce((sum, log) => sum + log.change, 0);
-    
+
     // Asumir que el stock más reciente es el correcto
     // y calcular cuál debería ser basado en los cambios
     const mostRecentLog = sortedLogs[sortedLogs.length - 1];
@@ -271,7 +271,7 @@ export class InventoryValidationService {
     details: string[];
   }> {
     log.info(`🔧 INICIANDO CORRECCIÓN AUTOMÁTICA DE ${issues.length} PROBLEMAS`);
-    
+
     const details: string[] = [];
     let fixed = 0;
     let failed = 0;
@@ -289,12 +289,12 @@ export class InventoryValidationService {
               details.push(`❌ Error corrigiendo stock negativo: ${issue.productName} - ${result.error}`);
             }
             break;
-            
+
           case 'duplicate_logs':
             // No corregir duplicados automáticamente por seguridad
             details.push(`⚠️ Logs duplicados requieren corrección manual: ${issue.productName}`);
             break;
-            
+
           default:
             details.push(`ℹ️ Tipo de problema ${issue.type} requiere corrección manual`);
         }
@@ -305,7 +305,7 @@ export class InventoryValidationService {
     }
 
     log.info(`📊 CORRECCIÓN COMPLETADA: ${fixed} arreglados, ${failed} fallidos`);
-    
+
     return { fixed, failed, details };
   }
 
@@ -315,7 +315,7 @@ export class InventoryValidationService {
     error?: string;
   }> {
     const supabase = getSupabaseServerClient();
-    
+
     try {
       const { error } = await supabase
         .from("products")
@@ -342,7 +342,7 @@ export class InventoryValidationService {
       });
 
       return { success: true };
-      
+
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -351,30 +351,30 @@ export class InventoryValidationService {
   // Generar reporte de validación
   static generateValidationReport(result: InventoryValidationResult): string {
     const { isValid, issues, summary } = result;
-    
+
     let report = `# REPORTE DE VALIDACIÓN DE INVENTARIO\n\n`;
     report += `**Fecha:** ${new Date().toLocaleString()}\n`;
     report += `**Estado:** ${isValid ? '✅ VÁLIDO' : '❌ PROBLEMAS DETECTADOS'}\n\n`;
-    
+
     report += `## Resumen\n`;
     report += `- Total productos: ${summary.totalProducts}\n`;
     report += `- Productos con problemas: ${summary.productsWithIssues}\n`;
     report += `- Discrepancia total: ${summary.totalDiscrepancy} unidades\n\n`;
-    
+
     if (issues.length > 0) {
       report += `## Problemas Detectados\n\n`;
-      
+
       // Agrupar por severidad
       const bySeverity = issues.reduce((acc, issue) => {
         if (!acc[issue.severity]) acc[issue.severity] = [];
         acc[issue.severity].push(issue);
         return acc;
       }, {} as Record<string, InventoryIssue[]>);
-      
+
       Object.entries(bySeverity).forEach(([severity, severityIssues]) => {
         const icon = severity === 'critical' ? '🚨' : severity === 'high' ? '⚠️' : severity === 'medium' ? '⚡' : 'ℹ️';
         report += `### ${icon} ${severity.toUpperCase()} (${severityIssues.length})\n\n`;
-        
+
         severityIssues.forEach(issue => {
           report += `- **${issue.productName}**\n`;
           report += `  - ${issue.description}\n`;
@@ -385,9 +385,9 @@ export class InventoryValidationService {
         });
       });
     }
-    
+
     report += `## Recomendaciones\n\n`;
-    
+
     if (!isValid) {
       report += `- Ejecutar corrección de datos inmediatamente\n`;
       report += `- Revisar procesos de venta para identificar causa raíz\n`;
@@ -396,7 +396,7 @@ export class InventoryValidationService {
       report += `- Mantener monitoreo regular\n`;
       report += `- Considerar validaciones automáticas periódicas\n`;
     }
-    
+
     return report;
   }
 }

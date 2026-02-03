@@ -68,7 +68,6 @@ export const addWarranty = async (
     log.info(`Uploaded ${imageUrls.length} warranty images`);
 
     const payload = {
-      // firestore_id: firestoreId,
       sale_id: warrantyData.saleId,
       product_id: warrantyData.productId,
       product_name: warrantyData.productName,

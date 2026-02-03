@@ -12,20 +12,29 @@ import { depositSaleToAccount } from "./financeService";
 const log = getLogger("salesService");
 
 const SALES_TABLE = "sales";
+const SALE_ITEMS_TABLE = "sale_items";
 const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 
 const mapSale = (row: any): Sale => ({
   id: row?.id ?? "",
-  saleId: row?.saleId ?? "",
-  items: Array.isArray(row?.items) ? row.items : [],
-  totalAmount: Number(row?.totalAmount ?? 0),
-  paymentMethod: row?.paymentMethod ?? "Efectivo",
-  cashierId: row?.cashierId ?? "",
-  cashierName: row?.cashierName ?? "",
-  customerName: row?.customerName ?? null,
-  customerPhone: row?.customerPhone ?? null,
-  createdAt: toDate(row?.created_at ?? row?.createdAt), // Usar created_at primero
+  saleId: row?.sale_number ?? row?.saleId ?? "", // Usar sale_number como saleId
+  items: Array.isArray(row?.sale_items)
+    ? row.sale_items.map((it: any) => ({
+      productId: it.product_id,
+      name: it.product_name,
+      quantity: it.quantity,
+      priceAtSale: Number(it.price_at_sale),
+      consignorId: it.consignor_id
+    }))
+    : [],
+  totalAmount: Number(row?.total_amount ?? 0),
+  paymentMethod: row?.payment_method ?? "Efectivo",
+  cashierId: row?.cashier_id ?? "",
+  cashierName: row?.cashier_name ?? "",
+  customerName: row?.customer_name ?? null,
+  customerPhone: row?.customer_phone ?? null,
+  createdAt: row?.created_at ? toDate(row.created_at) : new Date(),
   status: row?.status ?? "completed",
   cancelledAt: row?.cancelled_at ? toDate(row.cancelled_at) : undefined,
   cancelledBy: row?.cancelled_by ?? undefined,
@@ -49,12 +58,9 @@ export const getSales = async (
   try {
     const supabase = getSupabaseServerClient();
 
-    // We need to fetch all sales and filter dates in JavaScript, similar to financeService.ts.
-
-    // Fetch all sales with status filter only (we'll filter by date and search in JavaScript)
     let query = supabase
       .from(SALES_TABLE)
-      .select("*", { count: 'exact' });
+      .select("*, sale_items(*)", { count: 'exact' });
 
     // Status Filter
     if (includeStatus === 'cancelled') {
@@ -63,8 +69,6 @@ export const getSales = async (
       query = query.or('status.is.null,status.eq.completed');
     }
 
-    // Fetch all data (we'll sort and paginate after filtering)
-    // Note: Order by createdAt handled in memory due to complex date filtering requirements
     const { data: allData, error, count } = await query;
 
     if (error) {
@@ -80,15 +84,11 @@ export const getSales = async (
       sales = sales.filter(sale => {
         if (!sale.createdAt) return false;
 
-        // Use robust toDate utility
         const saleDate = toDate(sale.createdAt);
-
-        // Get the date portion in Mexico timezone (YYYY-MM-DD)
         const saleDateStr = saleDate.toLocaleDateString('en-CA', {
           timeZone: 'America/Mexico_City'
         });
 
-        // Apply date filters using string comparison for dates
         if (startDate && saleDateStr < startDate) return false;
         if (endDate && saleDateStr > endDate) return false;
 
@@ -96,7 +96,7 @@ export const getSales = async (
       });
     }
 
-    // Search Filter (JavaScript-side)
+    // Search Filter
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       sales = sales.filter(sale =>
@@ -105,7 +105,6 @@ export const getSales = async (
       );
     }
 
-    // Apply pagination after filtering
     const total = sales.length;
     const from = page * limit;
     const to = from + limit;
@@ -133,68 +132,23 @@ export const getSalesBySession = async (
     const supabase = getSupabaseServerClient();
     let allSales: any[] = [];
 
-    // 1. Fetch by sessionId (Primary source)
+    // 1. Fetch by session_id (Primary source)
     const { data: sessionSales, error: sessionError } = await supabase
       .from(SALES_TABLE)
-      .select("*")
-      .eq("sessionId", sessionId)
-      .order("createdAt", { ascending: false });
+      .select("*, sale_items(*)")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false });
 
     if (sessionError) {
       log.error("Error fetching sales by session ID", sessionError);
-      // We don't return empty yet, we try to get orphans if possible, 
-      // although if this failed, likely DB is down.
     } else {
       allSales = sessionSales || [];
     }
 
-    // 2. Fetch Orphan Sales (Secondary source)
-    // Include sales that have NO sessionId but fall within the time range for this cashier
-    if (cashierId && startDate && endDate) {
-      try {
-        log.info(`Checking for orphan sales for session ${sessionId} (Cashier: ${cashierId})`);
-
-        // Fetch sales by cashier that have no session ID
-        const { data: orphanCandidates, error: orphanError } = await supabase
-          .from(SALES_TABLE)
-          .select("*")
-          .eq("cashierId", cashierId)
-          .is("sessionId", null) // Only get sales that are truly orphans
-          .order("createdAt", { ascending: false });
-
-        if (orphanError) {
-          log.warn("Error fetching orphan candidates:", orphanError);
-        } else if (orphanCandidates && orphanCandidates.length > 0) {
-          // Filter by date range in memory to be safe against timezone/format issues
-          const startMm = startDate.getTime();
-          const endMm = endDate.getTime();
-
-          const validOrphans = orphanCandidates.filter(row => {
-            const rowDate = toDate(row.createdAt || row.created_at);
-            const rowTime = rowDate.getTime();
-            return rowTime >= startMm && rowTime <= endMm;
-          });
-
-          if (validOrphans.length > 0) {
-            log.info(`Found ${validOrphans.length} orphan sales to include in session ${sessionId}`);
-            // Merge orphans
-            allSales = [...allSales, ...validOrphans];
-          }
-        }
-      } catch (orphanErr) {
-        log.error("Error processing orphan sales", orphanErr);
-      }
-    }
-
-    if (allSales.length === 0 && sessionError) {
-      // If we failed to get session sales and found no orphans, returm empty
-      return [];
-    }
-
     // Sort combined results by date descending
     allSales.sort((a, b) => {
-      const dateA = toDate(a.createdAt || a.created_at).getTime();
-      const dateB = toDate(b.createdAt || b.created_at).getTime();
+      const dateA = toDate(a.created_at).getTime();
+      const dateB = toDate(b.created_at).getTime();
       return dateB - dateA;
     });
 
@@ -218,119 +172,65 @@ export const addSaleAndUpdateStock = async (
     const now = nowIso();
 
     log.info(`Processing sale: ${saleId}`);
-    log.info(`Original sale items:`, saleData.items.map(item => ({
-      productId: item.productId,
-      name: item.name,
-      quantity: item.quantity,
-      priceAtSale: item.priceAtSale
-    })));
 
     // Obtener información de consignador para cada item
     const itemsWithConsignorId = await Promise.all(
       saleData.items.map(async (item) => {
-        log.info(`Processing item:`, {
-          productId: item.productId,
-          name: item.name,
-          quantity: item.quantity
-        });
-
-        // Buscar el producto para obtener el consignorId
         const { data: product, error: productError } = await supabase
           .from(PRODUCTS_TABLE)
           .select('consignor_id, name')
           .eq('id', item.productId)
           .single();
 
-        if (productError) {
-          log.error(`Error fetching product ${item.productId}:`, productError);
-        } else {
-          log.info(`Found product:`, {
-            id: item.productId,
-            name: product.name,
-            consignorId: product.consignor_id
-          });
-        }
-
         return {
           ...item,
           consignorId: product?.consignor_id || null,
-          // Always use the product name from the database to ensure consistency
           name: product?.name || item.name || 'Producto sin nombre'
         };
       })
     );
 
-    log.info(`Items with consignorId:`, itemsWithConsignorId.map(item => ({
-      productId: item.productId,
-      name: item.name,
-      consignorId: item.consignorId
-    })));
-
-    // Link to Active Session if not provided
-    // This prevents "Orphaned Sales" (ventas huérfanas) which don't appear in cash cuts
+    // Link to Active Session
     let finalSessionId = saleData.sessionId;
     if (!finalSessionId && saleData.cashierId) {
       try {
-        const { data: sessionData, error: sessionError } = await supabase
-          .from("cash_sessions") // Hardcoded table check to avoid circular dep issues if constants not exported
-          .select("sessionId")
+        const { data: sessionData } = await supabase
+          .from("cash_sessions")
+          .select("id")
           .eq("status", "Abierto")
-          .eq("openedBy", saleData.cashierId)
-          .order("openedAt", { ascending: false })
+          .eq("opened_by", saleData.cashierId)
+          .order("opened_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (sessionData) {
-          finalSessionId = sessionData.sessionId;
-          log.info(`Auto-linked sale ${saleId} to active session ${finalSessionId}`);
+          finalSessionId = sessionData.id;
         }
       } catch (sessionLookupError) {
         log.warn("Error looking up active session for sale", sessionLookupError);
       }
     }
 
-    const sale: Sale = {
-      id: uuidv4(),
-      saleId,
-      ...saleData,
-      sessionId: finalSessionId, // Ensure session ID is attached
-      createdAt: new Date(now),
-      items: itemsWithConsignorId, // Usar items con consignorId
-    };
+    const saleUUID = uuidv4();
 
-    // Preparar datos de la venta
+    // Preparar datos de la venta (Cabecera)
     const saleRecord = {
-      id: sale.id,
-      // firestore_id removed
-      saleId: sale.saleId,
-      items: sale.items, // Items ahora incluyen consignorId y nombre correcto
-      totalAmount: sale.totalAmount,
-      paymentMethod: sale.paymentMethod,
-      cashierId: sale.cashierId,
-      cashierName: sale.cashierName,
-      customerName: sale.customerName,
-      customerPhone: sale.customerPhone,
-      createdAt: sale.createdAt,
+      id: saleUUID,
+      sale_number: saleId,
+      total_amount: saleData.totalAmount,
+      payment_method: saleData.paymentMethod,
+      cashier_id: saleData.cashierId,
+      cashier_name: saleData.cashierName,
+      customer_name: saleData.customerName,
+      customer_phone: saleData.customerPhone,
+      created_at: now,
       status: 'completed',
-      amount_paid: sale.amountPaid,
-      change_given: sale.changeGiven,
-      sessionId: sale.sessionId, // Explicitly include the determined session ID
-      // Discount fields
+      amount_paid: saleData.amountPaid,
+      change_given: saleData.changeGiven,
+      session_id: finalSessionId,
       discount_code: (saleData as any).discountCode || null,
       discount_amount: (saleData as any).discountAmount || null,
-      discount_percentage: (saleData as any).discountPercentage || null,
     };
-
-    log.info(`Sale record to insert:`, {
-      saleId: saleRecord.saleId,
-      itemCount: saleRecord.items.length,
-      items: saleRecord.items.map(item => ({
-        productId: item.productId,
-        name: item.name,
-        quantity: item.quantity,
-        consignorId: item.consignorId
-      }))
-    });
 
     // Insertar la venta
     const { error: saleError } = await supabase
@@ -342,22 +242,37 @@ export const addSaleAndUpdateStock = async (
       throw new Error(`Error al guardar la venta: ${saleError.message}`);
     }
 
+    // Insertar los items de la venta
+    const saleItemsRecords = itemsWithConsignorId.map(item => ({
+      sale_id: saleUUID,
+      product_id: item.productId,
+      product_name: item.name,
+      quantity: item.quantity,
+      price_at_sale: item.priceAtSale,
+      consignor_id: item.consignorId
+    }));
+
+    const { error: itemsError } = await supabase
+      .from(SALE_ITEMS_TABLE)
+      .insert(saleItemsRecords);
+
+    if (itemsError) {
+      log.error("Error inserting sale items", itemsError);
+    }
+
+    const finalSale: Sale = {
+      id: saleUUID,
+      saleId: saleId,
+      ...saleData,
+      sessionId: finalSessionId,
+      createdAt: new Date(now),
+      items: itemsWithConsignorId,
+    };
+
     log.info(`Sale ${saleId} inserted successfully`);
 
-    // Deposit cash sales to 'Caja Chica'
-    // DISABLED: User requested consolidated deposits only at session close (Corte de Caja).
-    // if (sale.paymentMethod === 'Efectivo') {
-    //   await depositSaleToAccount(
-    //     sale.totalAmount, 
-    //     sale.paymentMethod, 
-    //     saleId,
-    //     sale.sessionId,
-    //     sale.cashierId
-    //   );
-    // }
-
     // Actualizar balance de consignadores si hay productos de consignación
-    for (const item of sale.items) {
+    for (const item of finalSale.items) {
       if (item.consignorId) {
         try {
           // Obtener el costo del producto
@@ -514,7 +429,7 @@ export const addSaleAndUpdateStock = async (
 
         if (fetchError || !clientData) {
           log.warn(`Client not found: ${crmClientId}`, fetchError);
-          return sale;
+          return finalSale;
         }
 
         const dbClientId = clientData.id;
@@ -556,7 +471,7 @@ export const addSaleAndUpdateStock = async (
                   interaction_date: now,
                   amount: saleData.totalAmount,
                   description: `Sale: ${saleId}`,
-                  related_id: sale.id,
+                  related_id: finalSale.id,
                   related_table: 'sales',
                   status: 'completed'
                 })
@@ -590,7 +505,7 @@ export const addSaleAndUpdateStock = async (
       }
     }
 
-    return sale;
+    return finalSale;
 
   } catch (error) {
     log.error("Error in addSaleAndUpdateStock", error);

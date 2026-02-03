@@ -26,7 +26,7 @@ const mapIncome = (row: any): Income => {
         source: row?.source ?? "",
         paymentDate: toDate(row?.paymentDate),
         receiptUrl: row?.receiptUrl ?? undefined,
-        sessionId: row?.sessionId ?? undefined,
+        sessionId: row?.session_id ?? row?.sessionId ?? undefined,
         icon: row?.icon ?? "",
     };
 };
@@ -173,8 +173,8 @@ export const addIncome = async (
             .from(CASH_SESSIONS_TABLE)
             .select("*")
             .eq("status", "Abierto")
-            .eq("openedBy", userId)
-            .order("openedAt", { ascending: false })
+            .eq("opened_by", userId)
+            .order("opened_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
@@ -193,7 +193,7 @@ export const addIncome = async (
         source: incomeData.source,
         paymentDate,
         receiptUrl: receiptUrl ?? null,
-        sessionId: activeSession ? activeSession.sessionId : (incomeData.sessionId || null),
+        session_id: activeSession ? activeSession.id : (incomeData.sessionId || null),
     };
 
     const { data: insertedIncome, error: insertError } = await supabase
@@ -319,11 +319,11 @@ export const getIncomesBySession = async (
     try {
         const supabase = getSupabaseServerClient();
 
-        // Try to fetch by sessionId first if the column exists (it should after migration)
+        // Try to fetch by session_id first if the column exists (it should after migration)
         const { data, error } = await supabase
             .from(INCOMES_TABLE)
             .select("*")
-            .eq("sessionId", sessionId)
+            .eq("session_id", sessionId)
             .order("paymentDate", { ascending: false });
 
         if (!error && data && data.length > 0) {

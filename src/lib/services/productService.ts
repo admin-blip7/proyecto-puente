@@ -458,15 +458,14 @@ export const processStockEntry = async (
       // Registrar en el log de inventario
       const logData = {
         product_id: productId,
-        product_name: item.name,
-        change: item.quantity,
-        reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
+        quantity_change: item.quantity,
+        change_type: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
         updated_by: userId,
         created_at: nowIso(),
         metadata: {
           cost: item.cost,
-          ownershipType: item.ownershipType,
-          isNewProduct
+          ownership_type: item.ownershipType,
+          is_new_product: isNewProduct
         },
       };
 
@@ -747,8 +746,6 @@ export const getInventoryValueHistory = async (days: number = 30): Promise<Inven
       // Actually simpler: 
       // Current Value is End of Today.
       // To get End of Yesterday: Undo Today's logs.
-
-      // Date to UNDO logs for:
       const dateToUndo = new Date();
       dateToUndo.setDate(dateToUndo.getDate() - (d - 1));
       const dateToUndoStr = dateToUndo.toISOString().split('T')[0];
@@ -756,12 +753,12 @@ export const getInventoryValueHistory = async (days: number = 30): Promise<Inven
       const dayLogs = logsByDate.get(dateToUndoStr) || [];
 
       for (const log of dayLogs) {
-        // Only consider Propio products. 
-        // We need to know cost and if it was 'Propio'.
-        // Metadata usually stores this.
-        if (log.metadata?.ownershipType === 'Propio') {
-          const changeAmount = Number(log.change) * Number(log.metadata?.cost || 0);
-          runningValue -= changeAmount;
+        // Only consider Propio products.
+        const ownership = log.metadata?.ownership_type || log.metadata?.ownershipType;
+        if (ownership === 'Propio') {
+          const cost = Number(log.metadata?.cost || 0);
+          const change = Number(log.quantity_change ?? log.change ?? 0);
+          runningValue -= (change * cost);
         }
       }
 

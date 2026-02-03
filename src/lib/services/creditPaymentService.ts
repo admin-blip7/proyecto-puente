@@ -12,10 +12,6 @@ const CLIENT_PAYMENTS_TABLE = "client_payments";
 const CREDIT_ACCOUNTS_TABLE = "credit_accounts";
 const ACCOUNTS_TABLE = "accounts";
 
-const CLIENT_PAYMENTS_TABLE = "client_payments";
-const CREDIT_ACCOUNTS_TABLE = "credit_accounts";
-const ACCOUNTS_TABLE = "accounts";
-
 export const addClientPayment = async (
   paymentData: Omit<ClientPayment, "id" | "paymentId" | "paymentDate">,
   depositAccountId: string

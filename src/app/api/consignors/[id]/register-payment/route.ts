@@ -12,7 +12,6 @@ interface PaymentRequestBody {
 
 interface ConsignorData {
   id: string;
-  firestore_id?: string;
   name: string;
   contactInfo: string;
   balanceDue: number;
@@ -22,17 +21,16 @@ interface ConsignorData {
 
 interface PaymentTransaction {
   id: string;
-  firestore_id: string;
-  consignorId: string; // Corrected to match database schema
-  consignorName: string; // Fixed capitalization to match DB schema
+  consignorId: string;
+  consignorName: string;
   amount: number;
-  paymentMethod: string; // Fixed capitalization to match DB schema
+  paymentMethod: string;
   notes?: string;
-  previousBalance: number; // Fixed capitalization to match DB schema
-  newBalance: number; // Fixed capitalization to match DB schema
-  transactionType: 'payment'; // Fixed capitalization to match DB schema
-  createdAt: string; // Fixed capitalization to match DB schema
-  processedBy?: string; // Fixed capitalization to match DB schema
+  previousBalance: number;
+  newBalance: number;
+  transactionType: 'payment';
+  createdAt: string;
+  processedBy?: string;
 }
 
 export async function POST(
@@ -206,9 +204,8 @@ export async function POST(
     // Prepare transaction data
     const transactionData: PaymentTransaction = {
       id: randomUUID(),
-      firestore_id: uuidv4(),
-      consignorId: consignorData.id, // Use the UUID id from Supabase
-      consignorName: consignorData.name, // Fixed capitalization to match DB schema
+      consignorId: consignorData.id,
+      consignorName: consignorData.name,
       amount: Math.round(amount * 100) / 100,
       paymentMethod: paymentMethod, // Fixed capitalization to match DB schema
       notes: notes?.trim() || undefined,
@@ -255,7 +252,6 @@ export async function POST(
       const { data: insertedTransaction, error: transactionError } = await supabase
         .from('consignor_transactions')
         .insert({
-          firestore_id: transactionData.firestore_id,
           consignorid: transactionData.consignorId,
           consignorname: transactionData.consignorName,
           amount: transactionData.amount,

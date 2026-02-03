@@ -11,15 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import AddEditSupplierDialog from "@/components/admin/suppliers/AddEditSupplierDialog";
-import { 
-  Package, 
-  Search, 
-  Copy, 
-  Save, 
-  CheckCircle, 
-  Loader2, 
-  Plus, 
-  Minus, 
+import {
+  Package,
+  Search,
+  Copy,
+  Save,
+  CheckCircle,
+  Loader2,
+  Plus,
+  Minus,
   ExternalLink,
   Truck,
   ArrowLeft,
@@ -58,7 +58,7 @@ interface ShippingInfo {
   tracking?: string;
   guideUrl?: string;
   cost?: number;
- }
+}
 
 interface PurchaseOrder {
   createdAt: any;
@@ -109,14 +109,14 @@ async function quickIntakeApiRequest<T>(payload: Record<string, unknown>): Promi
 export default function QuickPOIntake() {
   const { toast } = useToast();
   const router = useRouter();
-  
+
   // State
   const [rawText, setRawText] = useState(`2 pantalla moto one fusion
 1 pantalla samsung a50
 1 pantalla oppo a38
 1 pantalla moto e6 plus
 1 iPhone 15 pro max`);
-  
+
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [shipping, setShipping] = useState<ShippingInfo>({});
   const [supplier, setSupplier] = useState(''); // Nombre del proveedor
@@ -155,7 +155,7 @@ export default function QuickPOIntake() {
 
     // Try to extract quantity from the beginning
     const qtyMatch = trimmed.match(/^(\d+)\s+(.+)$/);
-    
+
     if (qtyMatch) {
       return {
         qty: parseInt(qtyMatch[1]),
@@ -183,7 +183,7 @@ export default function QuickPOIntake() {
     try {
       setSearchingProducts(true);
       const tokens = tokenizeText(searchQuery).slice(0, 3);
-      
+
       if (tokens.length === 0) {
         setSearchResults([]);
         setShowSearchResults(false);
@@ -200,10 +200,10 @@ export default function QuickPOIntake() {
     } catch (error) {
       log.error("Error searching products:", error);
       toast({
-         variant: "destructive",
-         title: "Error",
-         description: "Error al buscar productos."
-       });
+        variant: "destructive",
+        title: "Error",
+        description: "Error al buscar productos."
+      });
     } finally {
       setSearchingProducts(false);
     }
@@ -224,7 +224,7 @@ export default function QuickPOIntake() {
     setProductSearchQuery('');
     setSearchResults([]);
     setShowSearchResults(false);
-    
+
     toast({
       title: "Producto agregado",
       description: `${product.name} ha sido agregado a la lista de compras.`
@@ -284,7 +284,7 @@ export default function QuickPOIntake() {
   }, [rawText, parseLine, toast]);
 
   const handleCopyNormalizedNames = useCallback(() => {
-    const normalizedLines = parsedItems.map(item => 
+    const normalizedLines = parsedItems.map(item =>
       `${item.qty} x ${item.productName || item.rawName}`
     ).join('\n');
 
@@ -303,7 +303,7 @@ export default function QuickPOIntake() {
   }, [parsedItems, toast]);
 
   const handleUpdateItem = useCallback((index: number, field: keyof ParsedItem, value: any) => {
-    setParsedItems(prev => prev.map((item, i) => 
+    setParsedItems(prev => prev.map((item, i) =>
       i === index ? { ...item, [field]: value } : item
     ));
   }, []);
@@ -330,10 +330,10 @@ export default function QuickPOIntake() {
     }
 
     // Validar que los items tengan información mínima
-    const invalidItems = parsedItems.filter(item => 
+    const invalidItems = parsedItems.filter(item =>
       !item.productName && !item.productId
     );
-    
+
     if (invalidItems.length > 0) {
       toast({
         variant: "destructive",
@@ -430,7 +430,7 @@ export default function QuickPOIntake() {
       setShipping({});
       setSupplier("");
       setNotes("");
-      
+
     } catch (error) {
       log.error("Error saving purchase order:", error);
       toast({
@@ -538,7 +538,7 @@ export default function QuickPOIntake() {
         action: "confirmArrival",
         items: itemsWithAllocation,
         userId: 'Usuario Actual',
-        purchaseOrderId: saveResponse.order.id ?? saveResponse.order.firestore_id ?? orderNumber,
+        purchaseOrderId: saveResponse.order.id ?? orderNumber,
       });
 
       toast({
@@ -552,7 +552,7 @@ export default function QuickPOIntake() {
       setShipping({});
       setSupplier("");
       setNotes("");
-      
+
     } catch (error) {
       log.error("Error updating inventory:", error);
       toast({
@@ -604,7 +604,7 @@ export default function QuickPOIntake() {
             className="font-mono text-sm"
           />
           <div className="flex gap-2">
-            <Button 
+            <Button
               onClick={handleParseItems}
               disabled={!rawText.trim() || searchingProducts}
               className="flex items-center gap-2"
@@ -616,7 +616,7 @@ export default function QuickPOIntake() {
               )}
               Parsear en Items
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={handleCopyNormalizedNames}
               disabled={parsedItems.length === 0}
@@ -626,7 +626,7 @@ export default function QuickPOIntake() {
               Copiar Nombres Normalizados
             </Button>
           </div>
-          
+
           {/* Barra de búsqueda de productos */}
           <div className="border-t pt-4 mt-4">
             <Label htmlFor="product-search" className="text-sm font-medium text-gray-700 mb-2 block">
@@ -653,7 +653,7 @@ export default function QuickPOIntake() {
                   </div>
                 )}
               </div>
-              
+
               {/* Resultados de búsqueda */}
               {showSearchResults && searchResults.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -678,7 +678,7 @@ export default function QuickPOIntake() {
                   ))}
                 </div>
               )}
-              
+
               {showSearchResults && searchResults.length === 0 && productSearchQuery.trim() && !searchingProducts && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-4">
                   <p className="text-sm text-gray-500 text-center">No se encontraron productos</p>
@@ -810,45 +810,45 @@ export default function QuickPOIntake() {
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0">
                     <Command>
-                      <CommandInput 
-                        placeholder="Buscar proveedor..." 
+                      <CommandInput
+                        placeholder="Buscar proveedor..."
                         value={supplierSearchQuery}
                         onValueChange={setSupplierSearchQuery}
                       />
                       <CommandList>
                         <CommandEmpty>No se encontraron proveedores.</CommandEmpty>
                         <CommandGroup>
-                           {suppliers
-                             .filter(s => 
-                               !supplierSearchQuery || 
-                               s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
-                               s.contactInfo?.toLowerCase().includes(supplierSearchQuery.toLowerCase())
-                             )
-                             .map((supplierItem) => (
-                               <CommandItem
-                                 key={supplierItem.id}
-                                 value={supplierItem.name}
-                                 onSelect={() => {
-                                   setSupplier(supplierItem.name);
-                                   setSupplierSearchQuery('');
-                                   setShowSupplierDropdown(false);
-                                 }}
-                               >
-                                 <Check
-                                   className={cn(
-                                     "mr-2 h-4 w-4",
-                                     supplier === supplierItem.name ? "opacity-100" : "opacity-0"
-                                   )}
-                                 />
-                                 <div className="flex flex-col">
-                                   <span className="font-medium">{supplierItem.name}</span>
-                                   {supplierItem.contactInfo && (
-                                     <span className="text-sm text-muted-foreground">{supplierItem.contactInfo}</span>
-                                   )}
-                                 </div>
-                               </CommandItem>
-                             ))}
-                         </CommandGroup>
+                          {suppliers
+                            .filter(s =>
+                              !supplierSearchQuery ||
+                              s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
+                              s.contactInfo?.toLowerCase().includes(supplierSearchQuery.toLowerCase())
+                            )
+                            .map((supplierItem) => (
+                              <CommandItem
+                                key={supplierItem.id}
+                                value={supplierItem.name}
+                                onSelect={() => {
+                                  setSupplier(supplierItem.name);
+                                  setSupplierSearchQuery('');
+                                  setShowSupplierDropdown(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    supplier === supplierItem.name ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{supplierItem.name}</span>
+                                  {supplierItem.contactInfo && (
+                                    <span className="text-sm text-muted-foreground">{supplierItem.contactInfo}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
                       </CommandList>
                     </Command>
                   </PopoverContent>
@@ -958,7 +958,7 @@ export default function QuickPOIntake() {
               )}
               Guardar Orden de Compra
             </Button>
-            
+
             <Button
               variant="secondary"
               onClick={handleConfirmArrivalAndStock}
@@ -975,20 +975,20 @@ export default function QuickPOIntake() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Modal de creación de proveedor */}
-       <AddEditSupplierDialog
-         isOpen={showCreateSupplierModal}
-         onClose={() => setShowCreateSupplierModal(false)}
-         onSupplierSaved={(supplier) => {
-           setSupplier(supplier.name);
-           setShowCreateSupplierModal(false);
-           toast({
-             title: "Proveedor creado",
-             description: `${supplier.name} ha sido agregado exitosamente`
-           });
-         }}
-       />
+      <AddEditSupplierDialog
+        isOpen={showCreateSupplierModal}
+        onClose={() => setShowCreateSupplierModal(false)}
+        onSupplierSaved={(supplier) => {
+          setSupplier(supplier.name);
+          setShowCreateSupplierModal(false);
+          toast({
+            title: "Proveedor creado",
+            description: `${supplier.name} ha sido agregado exitosamente`
+          });
+        }}
+      />
     </div>
   );
 }

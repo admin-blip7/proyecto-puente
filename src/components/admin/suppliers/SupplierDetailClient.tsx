@@ -11,11 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { 
-  ArrowLeft, 
-  Edit, 
-  Save, 
-  X, 
+import {
+  ArrowLeft,
+  Edit,
+  Save,
+  X,
   Calendar,
   DollarSign,
   Package,
@@ -67,7 +67,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
       }
 
       const orders = (data ?? []).map((row) => ({
-        id: row.firestore_id ?? row.id,
+        id: row.id,
         orderNumber: row.orderNumber,
         totalAmount: Number(row.totalAmount ?? 0),
         status: row.status,
@@ -131,7 +131,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
       received: { label: "Recibida", variant: "default" as const },
       cancelled: { label: "Cancelada", variant: "destructive" as const },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };

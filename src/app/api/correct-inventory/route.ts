@@ -4,15 +4,15 @@ import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 export async function POST(request: Request) {
   try {
     console.log("🔧 INICIANDO CORRECCIÓN DE INVENTARIO...");
-    
+
     const body = await request.json();
     const { action, dryRun = false } = body;
 
     if (action === "analyzeDuplicates") {
       console.log("📊 Analizando logs duplicados...");
-      
+
       const supabase = getSupabaseServerClient();
-      
+
       // Obtener todos los logs de venta
       const { data: allLogs, error: logsError } = await supabase
         .from("inventory_logs")
@@ -29,11 +29,11 @@ export async function POST(request: Request) {
 
       // Agrupar por saleId y productId
       const logsBySaleProduct: Record<string, any[]> = {};
-      
+
       allLogs.forEach(log => {
         const saleId = log.metadata?.saleId;
         const productId = log.productId;
-        
+
         if (saleId && productId) {
           const key = `${saleId}-${productId}`;
           if (!logsBySaleProduct[key]) {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
       // Identificar grupos con duplicados
       const duplicateGroups = Object.entries(logsBySaleProduct).filter(([key, logs]) => logs.length > 1);
-      
+
       console.log(`🚨 Grupos con duplicados: ${duplicateGroups.length}`);
 
       // Analizar impacto
@@ -63,9 +63,9 @@ export async function POST(request: Request) {
         const totalDeduction = logs.reduce((sum, log) => sum + log.change, 0);
         const expectedDeduction = logs[0].change;
         const overDeduction = Math.abs(totalDeduction - expectedDeduction);
-        
+
         analysis.totalOverDeduction += overDeduction;
-        
+
         analysis.correctionsNeeded.push({
           saleId,
           productId,
@@ -92,22 +92,22 @@ export async function POST(request: Request) {
 
     } else if (action === "executeCorrection") {
       console.log("🔧 Ejecutando corrección de inventario...");
-      
+
       if (dryRun) {
         console.log("🧪 MODO PRUEBA - No se realizarán cambios reales");
       }
 
       const supabase = getSupabaseServerClient();
-      
+
       // Primero analizar duplicados
       const analysisResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/correct-inventory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'analyzeDuplicates' })
       });
-      
+
       const analysisData = await analysisResponse.json();
-      
+
       if (!analysisData.success) {
         throw new Error("Failed to analyze duplicates");
       }
@@ -131,13 +131,13 @@ export async function POST(request: Request) {
 
       for (const correction of correctionsNeeded) {
         console.log(`🔧 Procesando: ${correction.productName} (Venta: ${correction.saleId})`);
-        
+
         try {
           if (!dryRun) {
             // Mantener solo el primer log, eliminar los demás
             const logsToKeep = [correction.logs[0]];
             const logsToDelete = correction.logs.slice(1);
-            
+
             // Eliminar logs duplicados
             for (const logToDelete of logsToDelete) {
               const { error: deleteError } = await supabase
@@ -155,12 +155,12 @@ export async function POST(request: Request) {
             const { data: product, error: productError } = await supabase
               .from("products")
               .select("id, stock")
-              .or(`id.eq.${correction.productId},firestore_id.eq.${correction.productId}`)
+              .eq("id", correction.productId)
               .maybeSingle();
 
             if (!productError && product) {
               const newStock = product.stock + correction.overDeduction;
-              
+
               const { error: updateError } = await supabase
                 .from("products")
                 .update({ stock: newStock })
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
             overDeduction: correction.overDeduction,
             status: dryRun ? 'simulated' : 'corrected'
           });
-          
+
         } catch (error) {
           console.error(`❌ Error en corrección de ${correction.productName}:`, error);
           correctionDetails.push({
@@ -214,9 +214,9 @@ export async function POST(request: Request) {
 
     } else if (action === "validateCorrection") {
       console.log("🔍 Validando corrección aplicada...");
-      
+
       const supabase = getSupabaseServerClient();
-      
+
       // Verificar logs duplicados restantes
       const { data: finalLogs, error: finalError } = await supabase
         .from("inventory_logs")
@@ -241,7 +241,7 @@ export async function POST(request: Request) {
       });
 
       const remainingDuplicates = Object.values(finalGroups).filter(logs => logs.length > 1).length;
-      
+
       // Verificar stock negativo
       const { data: negativeStock, error: negativeError } = await supabase
         .from("products")
@@ -304,9 +304,9 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     console.log("🔍 Verificando estado de corrección de inventario...");
-    
+
     const supabase = getSupabaseServerClient();
-    
+
     // Verificar estado actual
     const { data: recentLogs, error: logsError } = await supabase
       .from("inventory_logs")
@@ -332,7 +332,7 @@ export async function GET() {
     });
 
     const duplicateCount = Object.values(logsBySaleProduct).filter(logs => logs.length > 1).length;
-    
+
     // Verificar stock negativo
     const { data: negativeStock, error: negativeError } = await supabase
       .from("products")

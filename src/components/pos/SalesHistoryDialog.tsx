@@ -104,6 +104,8 @@ export default function SalesHistoryDialog({
                         <div className="relative flex-1">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
+                                id="salesSearch"
+                                aria-label="Buscar ventas"
                                 type="search"
                                 placeholder="Buscar por número de venta, cliente o producto..."
                                 className="pl-8"
@@ -113,6 +115,8 @@ export default function SalesHistoryDialog({
                         </div>
                         <div className="w-40">
                             <Input
+                                id="salesDate"
+                                aria-label="Filtrar por fecha"
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => { setSelectedDate(e.target.value); setPage(0); }}

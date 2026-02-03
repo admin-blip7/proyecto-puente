@@ -289,8 +289,8 @@ export const addExpense = async (
       .from(CASH_SESSIONS_TABLE)
       .select("*")
       .eq("status", "Abierto")
-      .eq("openedBy", userId)
-      .order("openedAt", { ascending: false })
+      .eq("opened_by", userId)
+      .order("opened_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -308,7 +308,7 @@ export const addExpense = async (
     paidFromAccountId: expenseData.paidFromAccountId,
     paymentDate,
     receiptUrl: receiptUrl ?? null,
-    sessionId: activeSession ? activeSession.sessionId : (expenseData.sessionId || null),
+    sessionId: activeSession ? activeSession.id : (expenseData.sessionId || null),
   };
 
   const { data: insertedExpense, error: insertError } = await supabase
@@ -357,18 +357,18 @@ export const addExpense = async (
   }
 
   if (activeSession) {
-    const newTotalPayouts = Number(activeSession.totalCashPayouts ?? 0) + expenseData.amount;
+    const newTotalPayouts = Number(activeSession.total_cash_payouts ?? 0) + expenseData.amount;
     const expectedCashInDrawer =
-      Number(activeSession.startingFloat ?? 0) + Number(activeSession.totalCashSales ?? 0) - newTotalPayouts;
+      Number(activeSession.starting_float ?? 0) + Number(activeSession.total_cash_sales ?? 0) - newTotalPayouts;
 
     // Update the session
     const { error: sessionUpdateError } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .update({
-        totalCashPayouts: newTotalPayouts,
-        expectedCashInDrawer,
+        total_cash_payouts: newTotalPayouts,
+        expected_cash_in_drawer: expectedCashInDrawer,
       })
-      .eq("sessionId", activeSession.sessionId);
+      .eq("id", activeSession.id);
 
     if (sessionUpdateError) {
       log.warn("Failed to update cash session with expense", sessionUpdateError);
@@ -620,25 +620,23 @@ export const deleteExpense = async (expenseId: string): Promise<void> => {
 
   // 3. Reverse Session Totals (if linked)
   if (expense.sessionId) {
-    let sessionQuery = supabase
+    const { data: session, error: sessionError } = await supabase
       .from(CASH_SESSIONS_TABLE)
-      .select("id, totalCashPayouts, expectedCashInDrawer, sessionId");
-
-    sessionQuery = sessionQuery.eq("sessionId", expense.sessionId);
-
-    const { data: session, error: sessionError } = await sessionQuery.maybeSingle();
+      .select("id, total_cash_payouts, expected_cash_in_drawer")
+      .eq("id", expense.sessionId)
+      .maybeSingle();
 
     if (session) {
-      const newTotalPayouts = Number(session.totalCashPayouts ?? 0) - Number(expense.amount);
-      const newExpectedCash = Number(session.expectedCashInDrawer ?? 0) + Number(expense.amount);
+      const newTotalPayouts = Number(session.total_cash_payouts ?? 0) - Number(expense.amount);
+      const newExpectedCash = Number(session.expected_cash_in_drawer ?? 0) + Number(expense.amount);
 
       const { error: updateSessionError } = await supabase
         .from(CASH_SESSIONS_TABLE)
         .update({
-          totalCashPayouts: newTotalPayouts,
-          expectedCashInDrawer: newExpectedCash
+          total_cash_payouts: newTotalPayouts,
+          expected_cash_in_drawer: newExpectedCash
         })
-        .eq("sessionId", session.sessionId);
+        .eq("id", session.id);
 
       if (updateSessionError) {
         log.error("Failed to reverse session totals", updateSessionError);

@@ -162,22 +162,6 @@ export default function ShoppingCart({
           </Button>
         </div>
 
-        {/* Customer Selector (Mocked for now based on UI) */}
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 mb-4">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Customer Name</span>
-            <button className="text-primary text-xs font-semibold hover:underline">+ Add New</button>
-          </div>
-          <div className="flex items-center gap-3 bg-white dark:bg-card p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer hover:border-primary/50 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs uppercase">
-              Inv
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-semibold text-gray-900 dark:text-white">Invitado General</div>
-              <div className="text-[10px] text-gray-500 dark:text-gray-400">Cliente Mostrador</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Cart Items List */}
@@ -223,6 +207,8 @@ export default function ShoppingCart({
                       <div className="space-y-2">
                         <div className="text-xs font-medium text-muted-foreground">Modificar Precio</div>
                         <Input
+                          id={`edit-price-${item.id}`}
+                          aria-label="Modificar precio"
                           type="number"
                           step="0.01"
                           min="0"
@@ -325,6 +311,8 @@ export default function ShoppingCart({
                   <div className="space-y-3">
                     <div className="text-sm font-medium">Código de Descuento</div>
                     <Input
+                      id="discountCode"
+                      aria-label="Código de descuento"
                       placeholder="Ingresa el código"
                       value={discountCodeInput}
                       onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}

@@ -28,10 +28,10 @@ interface ConsignorClientProps {
 
 export default function ConsignorClient({ initialConsignors }: ConsignorClientProps) {
   // Remove duplicate consignors by ID to avoid React key conflicts
-  const uniqueConsignors = initialConsignors.filter((consignor, index, self) => 
+  const uniqueConsignors = initialConsignors.filter((consignor, index, self) =>
     index === self.findIndex(c => c.id === consignor.id)
   );
-  
+
   const [consignors, setConsignors] = useState<Consignor[]>(uniqueConsignors);
   const [selectedConsignor, setSelectedConsignor] = useState<Consignor | null>(null);
   const [isAddEditDialogOpen, setAddEditDialogOpen] = useState(false);
@@ -49,12 +49,12 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
     setSelectedConsignor(consignor);
     setAddEditDialogOpen(true);
   };
-  
+
   const handleOpenDeleteDialog = (consignor: Consignor) => {
     setSelectedConsignor(consignor);
     setDeleteDialogOpen(true);
   };
-  
+
   const handleOpenPaymentDialog = (consignor: Consignor) => {
     console.log("Opening payment dialog for:", consignor.name);
     setSelectedConsignor(consignor);
@@ -65,37 +65,37 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
     setConsignors(prev => {
       // Filter out any existing consignor with the same ID, then add the new one
       const filtered = prev.filter(c => c.id !== newConsignor.id);
-      return [newConsignor, ...filtered].sort((a,b) => a.name.localeCompare(b.name));
+      return [newConsignor, ...filtered].sort((a, b) => a.name.localeCompare(b.name));
     });
   };
-  
+
   const handleConsignorUpdated = (updatedConsignor: Consignor) => {
-      setConsignors(prev => {
-        // Remove any existing consignor with the same ID, then update with the new one
-        const filtered = prev.filter(c => c.id !== updatedConsignor.id);
-        return [updatedConsignor, ...filtered];
-      });
+    setConsignors(prev => {
+      // Remove any existing consignor with the same ID, then update with the new one
+      const filtered = prev.filter(c => c.id !== updatedConsignor.id);
+      return [updatedConsignor, ...filtered];
+    });
   };
-  
+
   const handleConsignorDeleted = (consignorId: string) => {
-      setConsignors(prev => prev.filter(c => c.id !== consignorId));
+    setConsignors(prev => prev.filter(c => c.id !== consignorId));
   };
-  
+
   const handlePaymentRegistered = (consignorId: string, amountPaid: number) => {
-      // Update local state immediately for UI feedback
-      setConsignors(prev => prev.map(c =>
-        (c.id === consignorId || c.firestore_id === consignorId)
-            ? { ...c, balanceDue: c.balanceDue - amountPaid }
-            : c
-      ));
-      
-      // Delayed and conditional data refresh to prevent render conflicts
-      setTimeout(() => {
-        // Only refresh if the dialog is closed to avoid interference
-        if (!isPaymentDialogOpen) {
-          handleRefreshData();
-        }
-      }, 1500);
+    // Update local state immediately for UI feedback
+    setConsignors(prev => prev.map(c =>
+      c.id === consignorId
+        ? { ...c, balanceDue: c.balanceDue - amountPaid }
+        : c
+    ));
+
+    // Delayed and conditional data refresh to prevent render conflicts
+    setTimeout(() => {
+      // Only refresh if the dialog is closed to avoid interference
+      if (!isPaymentDialogOpen) {
+        handleRefreshData();
+      }
+    }, 1500);
   };
 
   const handlePaymentDialogOpenChange = (open: boolean) => {
@@ -108,13 +108,13 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
   const handleViewSalesReport = (consignor: Consignor) => {
     router.push(`/admin/consignors/${consignor.id}/sales-report`);
   };
-  
+
   const handleRefreshData = async () => {
     setIsRefreshing(true);
     try {
       const refreshedConsignors = await getConsignors();
       // Remove duplicates by ID
-      const uniqueRefreshed = refreshedConsignors.filter((consignor, index, self) => 
+      const uniqueRefreshed = refreshedConsignors.filter((consignor, index, self) =>
         index === self.findIndex(c => c.id === consignor.id)
       );
       setConsignors(uniqueRefreshed);
@@ -205,7 +205,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
                             Ver Reportes
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleOpenPaymentDialog(consignor)}
                             disabled={consignor.balanceDue <= 0}
                           >
@@ -213,7 +213,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
                             Registrar Pago
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleOpenDeleteDialog(consignor)}
                             className="text-red-600"
                           >
@@ -237,7 +237,7 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
           </ScrollArea>
         </CardContent>
       </Card>
-      
+
       <AddEditConsignorDialog
         isOpen={isAddEditDialogOpen}
         onOpenChange={setAddEditDialogOpen}
@@ -246,16 +246,16 @@ export default function ConsignorClient({ initialConsignors }: ConsignorClientPr
         onConsignorUpdated={handleConsignorUpdated}
       />
       <DeleteConsignorDialog
-          isOpen={isDeleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          consignor={selectedConsignor}
-          onConsignorDeleted={handleConsignorDeleted}
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        consignor={selectedConsignor}
+        onConsignorDeleted={handleConsignorDeleted}
       />
       <RegisterPaymentDialog
-          isOpen={isPaymentDialogOpen}
-          onOpenChange={handlePaymentDialogOpenChange}
-          consignor={selectedConsignor}
-          onPaymentRegistered={handlePaymentRegistered}
+        isOpen={isPaymentDialogOpen}
+        onOpenChange={handlePaymentDialogOpenChange}
+        consignor={selectedConsignor}
+        onPaymentRegistered={handlePaymentRegistered}
       />
     </>
   );

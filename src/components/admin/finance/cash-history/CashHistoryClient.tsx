@@ -77,11 +77,13 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
         setExpenses(expensesData);
         setRawSales(salesData);
         setCOGS(cogsData);
-        // Filter out "Corte de Caja" (Cash Drops) from Incomes to prevent double counting
-        // These are just transfers of sales money, not new income.
+        // Filter out "Corte de Caja" and "Bolsa de Saldo" from Incomes to prevent double counting
+        // These are just transfers of sales money and balance bag deposits, not new income.
         const filteredIncomes = incomesData.filter((inc: any) =>
           inc.category !== 'Corte de Caja' &&
-          !inc.description?.toLowerCase().includes('depósito de corte de caja')
+          inc.category !== 'Bolsa de Saldo' &&
+          !inc.description?.toLowerCase().includes('depósito de corte de caja') &&
+          !inc.description?.toLowerCase().includes('bolsa de saldo')
         );
 
         setIncomes(filteredIncomes);
@@ -488,9 +490,16 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                       </div>
 
                       {row.session?.cashLeftForNextSession && row.session.cashLeftForNextSession > 0 ? (
-                        <div className="flex justify-between items-center text-blue-600">
+                        <div className="flex justify-between items-center">
                           <span className="text-muted-foreground text-xs">Dejado en Caja:</span>
-                          <span className="font-semibold">{formatCurrency(row.session.cashLeftForNextSession)}</span>
+                          <span className="font-semibold text-blue-600">{formatCurrency(row.session.cashLeftForNextSession)}</span>
+                        </div>
+                      ) : null}
+
+                      {row.session?.balanceBagAmount && row.session.balanceBagAmount > 0 ? (
+                        <div className="flex justify-between items-center bg-purple-50 -mx-4 px-4 py-2 border-y border-purple-200">
+                          <span className="text-muted-foreground text-xs">Bolsa de Saldo:</span>
+                          <span className="font-semibold text-purple-700">{formatCurrency(row.session.balanceBagAmount)}</span>
                         </div>
                       ) : null}
 

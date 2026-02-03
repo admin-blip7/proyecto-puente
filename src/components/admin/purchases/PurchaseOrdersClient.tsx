@@ -10,14 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  ArrowLeft, 
-  Search, 
-  Filter, 
-  Package, 
-  Truck, 
-  CheckCircle, 
-  Clock, 
+import {
+  ArrowLeft,
+  Search,
+  Filter,
+  Package,
+  Truck,
+  CheckCircle,
+  Clock,
   Eye,
   Edit,
   Plus,
@@ -106,11 +106,11 @@ export default function PurchaseOrdersClient() {
         ...order,
         createdAt: order.createdAt ?? order.created_at,
         updatedAt: order.updatedAt ?? order.updated_at,
-        id: order.id ?? order.firestore_id,
+        id: order.id,
       })) as PurchaseOrder[];
-      
+
       // Remove duplicate orders to prevent React key conflicts
-      const uniqueOrders = ordersData.filter((order, index, self) => 
+      const uniqueOrders = ordersData.filter((order, index, self) =>
         index === self.findIndex(o => o.id === order.id)
       );
 
@@ -135,10 +135,10 @@ export default function PurchaseOrdersClient() {
     let filtered = orders;
 
     if (searchTerm) {
-      filtered = filtered.filter(order => 
+      filtered = filtered.filter(order =>
         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.items.some(item => 
+        order.items.some(item =>
           (item.productName ?? '').toLowerCase().includes(searchTerm.toLowerCase())
         )
       );
@@ -217,7 +217,7 @@ export default function PurchaseOrdersClient() {
     setSelectedOrder(null);
   };
 
-  
+
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
@@ -229,7 +229,7 @@ export default function PurchaseOrdersClient() {
     });
   };
 
-  
+
   const handleDeleteOrder = async (order: PurchaseOrder) => {
     const ok = typeof window !== 'undefined' ? window.confirm(`¿Eliminar la orden ${order.orderNumber}? Esta acción no se puede deshacer.`) : true;
     if (!ok) return;
@@ -269,341 +269,341 @@ export default function PurchaseOrdersClient() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Volver</span>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Órdenes de Compra</h1>
+              <p className="text-gray-600">Gestiona y da seguimiento a todas las órdenes de compra</p>
+            </div>
+          </div>
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.back()}
+            onClick={() => router.push('/admin/inventory/quick-po-intake')}
             className="flex items-center space-x-2"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Volver</span>
+            <Plus className="h-4 w-4" />
+            <span>Nueva Orden</span>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Órdenes de Compra</h1>
-            <p className="text-gray-600">Gestiona y da seguimiento a todas las órdenes de compra</p>
-          </div>
         </div>
-        <Button
-          onClick={() => router.push('/admin/inventory/quick-po-intake')}
-          className="flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Nueva Orden</span>
-        </Button>
-      </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar por número de orden, proveedor o producto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar por número de orden, proveedor o producto..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-full sm:w-48">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="ordered">Ordenado</SelectItem>
+                    <SelectItem value="in_transit">En Tránsito</SelectItem>
+                    <SelectItem value="received">Recibido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-64">
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger>
+                    <ArrowUpDown className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin orden</SelectItem>
+                    <SelectItem value="avg_desc">Costo promedio unitario (alto → bajo)</SelectItem>
+                    <SelectItem value="avg_asc">Costo promedio unitario (bajo → alto)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="w-full sm:w-48">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filtrar por estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="draft">Borrador</SelectItem>
-                  <SelectItem value="ordered">Ordenado</SelectItem>
-                  <SelectItem value="in_transit">En Tránsito</SelectItem>
-                  <SelectItem value="received">Recibido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-64">
-              <Select value={sortOption} onValueChange={setSortOption}>
-                <SelectTrigger>
-                  <ArrowUpDown className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin orden</SelectItem>
-                  <SelectItem value="avg_desc">Costo promedio unitario (alto → bajo)</SelectItem>
-                  <SelectItem value="avg_asc">Costo promedio unitario (bajo → alto)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Orders List */}
-      <div className="grid gap-4">
-        {filteredOrders.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay órdenes</h3>
-                <p className="text-gray-600">
-                  {searchTerm || statusFilter !== 'all' 
-                    ? 'No se encontraron órdenes con los filtros aplicados'
-                    : 'Aún no hay órdenes de compra registradas'
-                  }
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredOrders.map((order, index) => {
-            const StatusIcon = statusConfig[order.status].icon;
-            const totalQty = order.items?.reduce((sum, item) => sum + ((item.quantity ?? item.qty ?? 0) as number), 0) ?? 0;
-            const sumCost = order.items?.reduce((sum, item) => {
-              const unit = (item.finalCost ?? item.unitCost ?? item.cost ?? item.unitPrice ?? 0) as number;
-              const qty = (item.quantity ?? item.qty ?? 0) as number;
-              return sum + unit * qty;
-            }, 0) ?? 0;
-            const avgUnitCost = totalQty > 0 ? (sumCost / totalQty) : 0;
-            return (
-              <Card key={`${order.id}-${index}`} className="hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {order.orderNumber}
-                        </h3>
-                        <Badge className={statusConfig[order.status].color}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusConfig[order.status].label}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <User className="h-4 w-4" />
-                          <span>{order.supplier}</span>
+        {/* Orders List */}
+        <div className="grid gap-4">
+          {filteredOrders.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay órdenes</h3>
+                  <p className="text-gray-600">
+                    {searchTerm || statusFilter !== 'all'
+                      ? 'No se encontraron órdenes con los filtros aplicados'
+                      : 'Aún no hay órdenes de compra registradas'
+                    }
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredOrders.map((order, index) => {
+              const StatusIcon = statusConfig[order.status].icon;
+              const totalQty = order.items?.reduce((sum, item) => sum + ((item.quantity ?? item.qty ?? 0) as number), 0) ?? 0;
+              const sumCost = order.items?.reduce((sum, item) => {
+                const unit = (item.finalCost ?? item.unitCost ?? item.cost ?? item.unitPrice ?? 0) as number;
+                const qty = (item.quantity ?? item.qty ?? 0) as number;
+                return sum + unit * qty;
+              }, 0) ?? 0;
+              const avgUnitCost = totalQty > 0 ? (sumCost / totalQty) : 0;
+              return (
+                <Card key={`${order.id}-${index}`} className="hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center space-x-3">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {order.orderNumber}
+                          </h3>
+                          <Badge className={statusConfig[order.status].color}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig[order.status].label}
+                          </Badge>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(order.orderDate)}</span>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <User className="h-4 w-4" />
+                            <span>{order.supplier}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>{formatDate(order.orderDate)}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="h-4 w-4" />
+                            <span className="font-medium">{formatCurrency(order.totalAmount ?? 0)}</span>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center space-x-2 cursor-help">
+                                <Package className="h-4 w-4" />
+                                <span className="font-medium">{totalQty} productos · Costo promedio: {formatCurrency(avgUnitCost)}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                <div>Total de cantidades: <span className="font-medium">{totalQty}</span></div>
+                                <div>Suma de costos: <span className="font-medium">{formatCurrency(sumCost)}</span></div>
+                                <div>Promedio unitario: <span className="font-medium">{formatCurrency(avgUnitCost)}</span></div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <DollarSign className="h-4 w-4" />
-                          <span className="font-medium">{formatCurrency(order.totalAmount ?? 0)}</span>
+
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">{order.items.length}</span> productos
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center space-x-2 cursor-help">
-                              <Package className="h-4 w-4" />
-                              <span className="font-medium">{totalQty} productos · Costo promedio: {formatCurrency(avgUnitCost)}</span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="space-y-1">
-                              <div>Total de cantidades: <span className="font-medium">{totalQty}</span></div>
-                              <div>Suma de costos: <span className="font-medium">{formatCurrency(sumCost)}</span></div>
-                              <div>Promedio unitario: <span className="font-medium">{formatCurrency(avgUnitCost)}</span></div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
                       </div>
 
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">{order.items.length}</span> productos
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setShowHistoryDialog(true);
-                        }}
-                        className="flex items-center space-x-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        <span>Ver Historial</span>
-                      </Button>
-
-                      {order.status === 'in_transit' && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setShowReceiveDialog(true);
-                          }}
-                          className="flex items-center space-x-2"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Marcar Recibido</span>
-                        </Button>
-                      )}
-
-                      {order.status === 'ordered' && (
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => updateOrderStatus(order.id, 'in_transit')}
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowHistoryDialog(true);
+                          }}
                           className="flex items-center space-x-2"
                         >
-                          <Truck className="h-4 w-4" />
-                          <span>En Tránsito</span>
+                          <Eye className="h-4 w-4" />
+                          <span>Ver Historial</span>
                         </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteOrder(order)}
-                        className="flex items-center space-x-2"
-                        title="Eliminar orden"
-                      >
-                        <Trash className="h-4 w-4" />
-                        <span>Eliminar</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
 
-      {/* History Dialog */}
-      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Historial de la Orden {selectedOrder?.orderNumber}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selectedOrder && (
-              <>
-                {/* Order Details */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Detalles de la Orden</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Proveedor:</span>
-                      <p className="font-medium">{selectedOrder.supplier}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Total:</span>
-                      <p className="font-medium">{formatCurrency(selectedOrder.totalAmount ?? 0)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Fecha de Orden:</span>
-                      <p className="font-medium">{formatDate(selectedOrder.orderDate)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Estado Actual:</span>
-                      <Badge className={statusConfig[selectedOrder.status].color}>
-                        {statusConfig[selectedOrder.status].label}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
+                        {order.status === 'in_transit' && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setShowReceiveDialog(true);
+                            }}
+                            className="flex items-center space-x-2"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Marcar Recibido</span>
+                          </Button>
+                        )}
 
-                {/* Items */}
-                <div>
-                  <h4 className="font-medium mb-2">Productos ({selectedOrder.items.length})</h4>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {selectedOrder.items.map((item, index) => (
-                      <div key={index} className="text-sm bg-gray-50 p-2 rounded">
-                        <div className="flex justify-between items-center">
-                          <span>{item.productName}</span>
-                          <span className="text-gray-600">
-                            {(item.quantity ?? item.qty ?? 0)} × {formatCurrency((item.finalCost ?? item.unitPrice ?? item.unitCost ?? item.cost ?? 0))} = {formatCurrency((item.totalPrice ?? item.totalCost ?? ((item.quantity ?? item.qty ?? 0) * (item.finalCost ?? item.unitPrice ?? item.unitCost ?? item.cost ?? 0))))}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Precio de venta: {formatCurrency(item.salePrice ?? item.price ?? 0)}
-                        </div>
+                        {order.status === 'ordered' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, 'in_transit')}
+                            className="flex items-center space-x-2"
+                          >
+                            <Truck className="h-4 w-4" />
+                            <span>En Tránsito</span>
+                          </Button>
+                        )}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteOrder(order)}
+                          className="flex items-center space-x-2"
+                          title="Eliminar orden"
+                        >
+                          <Trash className="h-4 w-4" />
+                          <span>Eliminar</span>
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
 
-                {/* History */}
-                <div>
-                  <h4 className="font-medium mb-2">Historial de Cambios</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {selectedOrder.history?.length > 0 ? (
-                      selectedOrder.history.map((entry, index) => (
-                        <div key={index} className="border-l-2 border-blue-200 pl-4 pb-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-sm">{entry.action}</p>
-                              <p className="text-xs text-gray-600">por {entry.user}</p>
-                              {entry.notes && (
-                                <p className="text-xs text-gray-700 mt-1">{entry.notes}</p>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {formatDate(entry.timestamp)}
+        {/* History Dialog */}
+        <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Historial de la Orden {selectedOrder?.orderNumber}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedOrder && (
+                <>
+                  {/* Order Details */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">Detalles de la Orden</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Proveedor:</span>
+                        <p className="font-medium">{selectedOrder.supplier}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Total:</span>
+                        <p className="font-medium">{formatCurrency(selectedOrder.totalAmount ?? 0)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Fecha de Orden:</span>
+                        <p className="font-medium">{formatDate(selectedOrder.orderDate)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Estado Actual:</span>
+                        <Badge className={statusConfig[selectedOrder.status].color}>
+                          {statusConfig[selectedOrder.status].label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div>
+                    <h4 className="font-medium mb-2">Productos ({selectedOrder.items.length})</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {selectedOrder.items.map((item, index) => (
+                        <div key={index} className="text-sm bg-gray-50 p-2 rounded">
+                          <div className="flex justify-between items-center">
+                            <span>{item.productName}</span>
+                            <span className="text-gray-600">
+                              {(item.quantity ?? item.qty ?? 0)} × {formatCurrency((item.finalCost ?? item.unitPrice ?? item.unitCost ?? item.cost ?? 0))} = {formatCurrency((item.totalPrice ?? item.totalCost ?? ((item.quantity ?? item.qty ?? 0) * (item.finalCost ?? item.unitPrice ?? item.unitCost ?? item.cost ?? 0))))}
                             </span>
                           </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Precio de venta: {formatCurrency(item.salePrice ?? item.price ?? 0)}
+                          </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-600 text-sm">No hay historial disponible</p>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Receive Order Dialog */}
-      <Dialog open={showReceiveDialog} onOpenChange={setShowReceiveDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Marcar Orden como Recibida</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              ¿Confirmas que has recibido todos los productos de la orden <strong>{selectedOrder?.orderNumber}</strong>?
-              Los productos serán automáticamente agregados al inventario.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notas adicionales (opcional)
-              </label>
-              <Textarea
-                value={receiveNotes}
-                onChange={(e) => setReceiveNotes(e.target.value)}
-                placeholder="Agregar comentarios sobre la recepción..."
-                rows={3}
-              />
+                  {/* History */}
+                  <div>
+                    <h4 className="font-medium mb-2">Historial de Cambios</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {selectedOrder.history?.length > 0 ? (
+                        selectedOrder.history.map((entry, index) => (
+                          <div key={index} className="border-l-2 border-blue-200 pl-4 pb-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-sm">{entry.action}</p>
+                                <p className="text-xs text-gray-600">por {entry.user}</p>
+                                {entry.notes && (
+                                  <p className="text-xs text-gray-700 mt-1">{entry.notes}</p>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(entry.timestamp)}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-600 text-sm">No hay historial disponible</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowReceiveDialog(false);
-                  setReceiveNotes('');
-                  setSelectedOrder(null);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleReceiveOrder}>
-                Confirmar Recepción
-              </Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* Receive Order Dialog */}
+        <Dialog open={showReceiveDialog} onOpenChange={setShowReceiveDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Marcar Orden como Recibida</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                ¿Confirmas que has recibido todos los productos de la orden <strong>{selectedOrder?.orderNumber}</strong>?
+                Los productos serán automáticamente agregados al inventario.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notas adicionales (opcional)
+                </label>
+                <Textarea
+                  value={receiveNotes}
+                  onChange={(e) => setReceiveNotes(e.target.value)}
+                  placeholder="Agregar comentarios sobre la recepción..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowReceiveDialog(false);
+                    setReceiveNotes('');
+                    setSelectedOrder(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleReceiveOrder}>
+                  Confirmar Recepción
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </TooltipProvider>
   );
 }

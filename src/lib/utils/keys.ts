@@ -15,44 +15,39 @@ const log = getLogger("KeyUtils");
  * @returns Una key única y segura
  */
 export function generateUniqueKey(
-  item: any, 
-  index: number, 
+  item: any,
+  index: number,
   prefix: string = 'item'
 ): string {
   // Si el item tiene un ID válido, usarlo
   if (item?.id && typeof item.id === 'string' && item.id.trim() !== '') {
     return item.id;
   }
-  
-  // Si el item tiene un firestore_id válido, usarlo
-  if (item?.firestore_id && typeof item.firestore_id === 'string' && item.firestore_id.trim() !== '') {
-    return item.firestore_id;
-  }
-  
+
   // Generar una key alternativa usando información disponible
   let alternativeKey = prefix;
-  
+
   // Agregar nombre si está disponible
   if (item?.name && typeof item.name === 'string' && item.name.trim() !== '') {
     alternativeKey += `-${item.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)}`;
   }
-  
+
   // Agregar SKU si está disponible
   if (item?.sku && typeof item.sku === 'string' && item.sku.trim() !== '') {
     alternativeKey += `-${item.sku.replace(/[^a-zA-Z0-9]/g, '')}`;
   }
-  
+
   // Agregar creditorName si está disponible (para deudas)
   if (item?.creditorName && typeof item.creditorName === 'string' && item.creditorName.trim() !== '') {
     alternativeKey += `-${item.creditorName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10)}`;
   }
-  
+
   // Siempre agregar el índice como último recurso
   alternativeKey += `-${index}`;
-  
+
   // Agregar timestamp para garantizar unicidad
   alternativeKey += `-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  
+
   // Log para debugging
   log.debug("Generated alternative key", {
     originalId: item?.id,
@@ -64,7 +59,7 @@ export function generateUniqueKey(
     },
     index
   });
-  
+
   return alternativeKey;
 }
 
@@ -76,19 +71,19 @@ export function generateUniqueKey(
  * @returns Array de elementos con keys seguras
  */
 export function safeMap<T, R>(
-  items: T[], 
-  renderFn: (item: T, index: number) => R, 
+  items: T[],
+  renderFn: (item: T, index: number) => R,
   prefix: string = 'item'
 ): R[] {
   return items.map((item, index) => {
     const element = renderFn(item, index);
-    
+
     // Si el elemento es un React element, agregar key segura
     if (element && typeof element === 'object' && 'key' in element) {
       const safeKey = generateUniqueKey(item, index, prefix);
       (element as any).key = safeKey;
     }
-    
+
     return element;
   });
 }
@@ -110,15 +105,15 @@ export function isValidKey(key: string, existingKeys: Set<string> = new Set()): 
  * @returns Mapa de elemento a key única
  */
 export function generateKeyMap<T>(
-  items: T[], 
+  items: T[],
   prefix: string = 'item'
 ): Map<T, string> {
   const keyMap = new Map<T, string>();
   const usedKeys = new Set<string>();
-  
+
   items.forEach((item, index) => {
     let key = generateUniqueKey(item, index, prefix);
-    
+
     // Asegurar que la key sea única
     let originalKey = key;
     let counter = 1;
@@ -126,11 +121,11 @@ export function generateKeyMap<T>(
       key = `${originalKey}-${counter}`;
       counter++;
     }
-    
+
     usedKeys.add(key);
     keyMap.set(item, key);
   });
-  
+
   return keyMap;
 }
 
@@ -146,7 +141,7 @@ export function reportInvalidIds<T>(items: T[], itemType: string = 'item'): void
       (typeof itemAsAny.id === 'string' && itemAsAny.id.trim() === '') ||
       (typeof itemAsAny.id === 'object' && itemAsAny.id === null);
   });
-  
+
   if (invalidItems.length > 0) {
     log.warn(`Found ${invalidItems.length} ${itemType}(s) with invalid IDs`, {
       itemType,
