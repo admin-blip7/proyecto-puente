@@ -45,6 +45,7 @@ const mapSession = (row: any): CashSession => ({
   difference: row?.difference !== null ? Number(row.difference) : undefined,
   isBalanced: row?.is_balanced ?? false,
   bagsSalesAmounts: row?.bags_data?.sales ?? row?.bags_sales_amounts ?? {},
+  bagsStartAmounts: row?.bags_data?.start ?? row?.bags_start_amounts ?? {},
   bagsEndAmounts: row?.bags_data?.end ?? row?.bags_end_amounts ?? {},
   previousSessionConfirmedAt: row?.previous_session_confirmed_at ? toDate(row.previous_session_confirmed_at) : undefined,
   cashLeftForNextSession: row?.cash_left_for_next_session !== null && row?.cash_left_for_next_session !== undefined ? Number(row.cash_left_for_next_session) : undefined,
@@ -309,8 +310,83 @@ export const closeCashSession = async (
     }
 
     // 3. Deposit to Accounts
-    if (depositAccountId && (actualCashCount - cashLeftForNextSession) > 0) {
-      await depositToAccount(session.sessionId, depositAccountId, actualCashCount - cashLeftForNextSession);
+
+    // 3a. Main Deposit (Net Cash Sales / Profit)
+    // Priority: Explicit depositAccountId > dailySalesAccountId
+    const mainDepositAccount = depositAccountId || dailySalesAccountId;
+    const netDepositAmount = actualCashCount - cashLeftForNextSession;
+
+    if (mainDepositAccount && netDepositAmount > 0) {
+      const depositNote = depositAccountId ? undefined : "Ventas Diarias";
+      await depositToAccount(
+        session.sessionId,
+        mainDepositAccount,
+        netDepositAmount,
+        depositNote,
+        "Corte de Caja"
+      );
+    }
+
+    // 3b. Balance Bag Deposits
+    // If specific accounts were selected for balance bags, deposit their respective amounts
+    if (balanceBagAccountId) {
+      try {
+        let balanceBagAccounts: Record<string, string> = {};
+        // Handle both JSON string or object (if type confusion occurs)
+        if (typeof balanceBagAccountId === 'string') {
+          // If it looks like JSON, parse it
+          if (balanceBagAccountId.startsWith('{')) {
+            balanceBagAccounts = JSON.parse(balanceBagAccountId);
+          } else {
+            log.warn("balanceBagAccountId is not a JSON object:", balanceBagAccountId);
+          }
+        } else if (typeof balanceBagAccountId === 'object') {
+          balanceBagAccounts = balanceBagAccountId;
+        }
+
+        // Log para debugging
+        console.log('[Balance Bag] Processing deposits:', {
+          balanceBagAccounts,
+          bagsActualEndAmounts,
+          rawBalanceBagAccountId: balanceBagAccountId
+        });
+
+        // Iterate through known bag types
+        const bagTypes = ['recargas', 'mimovil', 'servicios'];
+
+        for (const type of bagTypes) {
+          const accountId = balanceBagAccounts[type];
+          const startAmount = session.bagsStartAmounts?.[type] || 0;
+          const endAmount = bagsActualEndAmounts[type] || 0;
+          // Calculate sales: what was sold from the bag (start - end)
+          // This is the amount that should be deposited to the account, NOT the end amount
+          const salesAmount = startAmount - endAmount;
+
+          console.log(`[Balance Bag] ${type}: accountId=${accountId}, start=${startAmount}, end=${endAmount}, sales=${salesAmount}`);
+
+          if (accountId && salesAmount > 0) {
+            console.log(`[Balance Bag] Depositing ${salesAmount} (sales) to ${accountId} for ${type}`);
+            await depositToAccount(
+              session.sessionId,
+              accountId,
+              salesAmount,
+              `Bolsa de Saldo - ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+              "Bolsa de Saldo"
+            );
+            console.log(`[Balance Bag] ✅ Deposit successful for ${type}`);
+          } else if (salesAmount <= 0) {
+            console.log(`[Balance Bag] ⏭️ Skipping ${type}: no sales or negative balance (salesAmount=${salesAmount})`);
+          } else {
+            console.log(`[Balance Bag] ⏭️ Skipping ${type}: no account selected`);
+          }
+        }
+      } catch (e) {
+        log.error("Error processing balance bag deposits", e);
+        // Don't fail the entire closure if bag deposits fail?
+        // Or should we? For now, log and continue to ensure session closes.
+      }
+    } else {
+      console.log('[Balance Bag] No balance bag account ID provided, skipping balance bag deposits');
     }
 
     revalidatePath('/pos');

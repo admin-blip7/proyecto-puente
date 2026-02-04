@@ -152,9 +152,10 @@ export const getDailySalesStats = async (startDate: Date, endDate: Date): Promis
     const supabase = getSupabaseServerClient();
 
     // Fetch ALL sales (filtering client-side due to mixed JSONB date formats)
+    // FIX: Use snake_case column names to match DB
     const { data, error } = await supabase
       .from("sales")
-      .select("createdAt, totalAmount, status");
+      .select("created_at, total_amount, status");
 
     if (error) throw error;
 
@@ -163,14 +164,14 @@ export const getDailySalesStats = async (startDate: Date, endDate: Date): Promis
     // Filter by date range
     const filteredSales = sales
       .filter((sale: any) => {
-        const createdAt = toDate(sale.createdAt); // Handles mixed types
+        const createdAt = toDate(sale.created_at); // Handles mixed types
         return createdAt >= startDate && createdAt <= endDate &&
           (sale.status === 'completed' || !sale.status);
       })
       .map((s: any) => {
         return {
-          createdAt: s.createdAt,
-          totalAmount: Number(s.totalAmount)
+          createdAt: s.created_at, // Map back to camelCase for consumer
+          totalAmount: Number(s.total_amount)
         };
       });
 
@@ -186,15 +187,16 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
     const supabase = getSupabaseServerClient();
 
     // Fetch all sales (filtering client-side)
+    // FIX: Use snake_case
     const { data: sales, error: salesError } = await supabase
       .from("sales")
-      .select("items, status, createdAt");
+      .select("items, status, created_at");
 
     if (salesError) throw salesError;
 
     // Filter by status (completed or null) AND date range
     const filteredSales = (sales || []).filter((sale: any) => {
-      const createdAt = toDate(sale.createdAt);
+      const createdAt = toDate(sale.created_at);
       const inDateRange = createdAt >= startDate && createdAt <= endDate;
       return inDateRange && (sale.status === 'completed' || !sale.status);
     });

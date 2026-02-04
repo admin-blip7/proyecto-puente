@@ -62,12 +62,12 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
         }
     }, [isOpen, lastClosedSession]);
 
+    // Initialize values once when lastClosedSession changes (dialog opens)
+    // This should NOT re-run when checkboxes are toggled, to preserve user edits
     useEffect(() => {
         if (lastClosedSession) {
             // Pre-fill bag values from last session ending amounts
             const bags = lastClosedSession.bagsEndAmounts || {};
-            // Use setValue with shouldDirty: true if you want the form to know it changed,
-            // but for initial load just setting value is fine.
             setValue('bagRecargas', bags['recargas'] || 0);
             setValue('bagMimovil', bags['mimovil'] || 0);
             setValue('bagServicios', bags['servicios'] || 0);
@@ -81,16 +81,7 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
 
             setValue('correctedPreviousCash', initialCash);
         }
-
-        // Si se selecciona "El efectivo se quedó en caja", pre-llenar el startingFloat con el dinero anterior
-        if (cashStayedInDrawer && lastClosedSession) {
-            const initialCash = (lastClosedSession.balanceBagAmount !== undefined && lastClosedSession.balanceBagAmount > 0)
-                ? lastClosedSession.balanceBagAmount
-                : (lastClosedSession.cashLeftForNextSession !== undefined ? lastClosedSession.cashLeftForNextSession : (lastClosedSession.actualCashCount || 0));
-            
-            setValue('startingFloat', initialCash);
-        }
-    }, [lastClosedSession, setValue, cashStayedInDrawer]);
+    }, [lastClosedSession, setValue]);
 
     const correctedPreviousCash = watch('correctedPreviousCash');
 
