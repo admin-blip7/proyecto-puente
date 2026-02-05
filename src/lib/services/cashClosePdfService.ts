@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import { CashSession, Income, Expense, Sale } from '@/types/index';
 import { calculateNetCashSales } from '@/lib/utils/cashCalculations';
 
-const MM_TO_PT = 2.83465;
+const MM_TO_PT = 72 / 25.4; // Precise conversion: 1 inch = 72 pt, 1 inch = 25.4 mm
 
 interface CashClosePdfOptions {
     session: CashSession;
@@ -73,7 +73,16 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     let estimatedHeightPt = 600 + (soldList.length * 15) + (expenses.length * 15) + (displayIncomes.length * 15);
 
     // Create single long page for receipt
-    const page = pdf.addPage([receiptWidthPt, estimatedHeightPt] as any);
+    // Create single long page for receipt
+    const page = pdf.addPage([receiptWidthPt, estimatedHeightPt] as any) as any;
+
+    // Explicitly set size to ensure it's not ignored by the producer
+    if (page.setSize) {
+        page.setSize(receiptWidthPt, estimatedHeightPt);
+    } else if (page.setWidth && page.setHeight) {
+        page.setWidth(receiptWidthPt);
+        page.setHeight(estimatedHeightPt);
+    }
 
     let y = estimatedHeightPt - marginPt;
     const fontSize = 9;

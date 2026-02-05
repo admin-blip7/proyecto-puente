@@ -7,8 +7,8 @@ import { getLogger } from '@/lib/logger';
 
 const log = getLogger('ticketPdfService');
 
-// Constants for conversion (1 mm = 2.83465 points)
-const MM_TO_PT = 2.83465;
+// Constants for conversion (1 inch = 72 points, 1 inch = 25.4 mm)
+const MM_TO_PT = 72 / 25.4; // ~2.83464566929
 
 interface PdfTicketOptions {
     sale: Sale;
@@ -48,9 +48,16 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
     console.log(`[generateTicketPdf] Paper Width: ${paperWidthPt}pt, Height: ${pageHeightPt}pt`);
 
     // Create page and force size (to avoid library default falling back to A4)
-    // Create page and force size
     // For thermal printers, width is fixed, height is variable.
-    const page = pdf.addPage([paperWidthPt, pageHeightPt] as any);
+    const page = pdf.addPage([paperWidthPt, pageHeightPt] as any) as any;
+
+    // Explicitly set size again to ensure it's captured correctly by the PDF producer
+    if (page.setSize) {
+        page.setSize(paperWidthPt, pageHeightPt);
+    } else if (page.setWidth && page.setHeight) {
+        page.setWidth(paperWidthPt);
+        page.setHeight(pageHeightPt);
+    }
 
     // Base font sizes for 80mm thermal paper
     // A bit larger for better readability on thermal prints
