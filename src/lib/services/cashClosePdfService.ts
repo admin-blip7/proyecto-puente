@@ -74,15 +74,9 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
 
     // Create single long page for receipt
     // Create single long page for receipt
-    const page = pdf.addPage([receiptWidthPt, estimatedHeightPt] as any) as any;
-
-    // Explicitly set size to ensure it's not ignored by the producer
-    if (page.setSize) {
-        page.setSize(receiptWidthPt, estimatedHeightPt);
-    } else if (page.setWidth && page.setHeight) {
-        page.setWidth(receiptWidthPt);
-        page.setHeight(estimatedHeightPt);
-    }
+    // Create single long page for receipt
+    // Create single long page for receipt
+    const page = pdf.addPage({ width: receiptWidthPt, height: estimatedHeightPt });
 
     let y = estimatedHeightPt - marginPt;
     const fontSize = 9;

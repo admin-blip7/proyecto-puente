@@ -49,15 +49,7 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
 
     // Create page and force size (to avoid library default falling back to A4)
     // For thermal printers, width is fixed, height is variable.
-    const page = pdf.addPage([paperWidthPt, pageHeightPt] as any) as any;
-
-    // Explicitly set size again to ensure it's captured correctly by the PDF producer
-    if (page.setSize) {
-        page.setSize(paperWidthPt, pageHeightPt);
-    } else if (page.setWidth && page.setHeight) {
-        page.setWidth(paperWidthPt);
-        page.setHeight(pageHeightPt);
-    }
+    const page = pdf.addPage({ width: paperWidthPt, height: pageHeightPt });
 
     // Base font sizes for 80mm thermal paper
     // A bit larger for better readability on thermal prints
