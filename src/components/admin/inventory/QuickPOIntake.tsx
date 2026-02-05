@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,28 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import AddEditSupplierDialog from "@/components/admin/suppliers/AddEditSupplierDialog";
 import {
@@ -27,7 +49,9 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
-  X
+  X,
+  AlertTriangle,
+  Info
 } from "lucide-react";
 import { Product } from "@/types";
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty, CommandGroup } from "@/components/ui/command";
@@ -47,11 +71,268 @@ interface ParsedItem {
   productName?: string;
   cost?: number;
   salePrice?: number;
+  total?: number; // Auto-calculated: qty × cost
   // Prorrateo de envío
   allocatedShippingPerUnit?: number;
   totalAllocatedShipping?: number;
   finalCost?: number;
 }
+
+// Duplicate detection interface
+interface DuplicateMatch {
+  product: Product;
+  similarityScore: number;
+  matchReason: string[];
+}
+
+// Similar products search result interface with weighted score
+interface SimilarProductMatch {
+  product: Product;
+  commonWordsCount: number;
+  commonWords: string[];
+  score: number; // Weighted relevance score for sorting
+}
+
+// Fuzzy matching algorithm - Levenshtein distance based
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const m = str1.length;
+  const n = str2.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+
+  return dp[m][n];
+};
+
+// Calculate similarity score (0 to 1, where 1 is exact match)
+const calculateSimilarityScore = (str1: string, str2: string): number => {
+  const normalized1 = str1.toLowerCase().trim();
+  const normalized2 = str2.toLowerCase().trim();
+  
+  if (normalized1 === normalized2) return 1;
+  
+  const maxLen = Math.max(normalized1.length, normalized2.length);
+  if (maxLen === 0) return 1;
+  
+  const distance = levenshteinDistance(normalized1, normalized2);
+  const similarity = 1 - (distance / maxLen);
+  
+  return Math.max(0, similarity);
+};
+
+// Check if strings are similar enough (threshold 0.6 for fuzzy matching)
+const areSimilar = (str1: string, str2: string, threshold: number = 0.6): boolean => {
+  return calculateSimilarityScore(str1, str2) >= threshold;
+};
+
+// Check for common tokens/words overlap
+const checkTokenOverlap = (str1: string, str2: string): { hasOverlap: boolean; commonTokens: string[] } => {
+  const tokens1 = new Set(str1.toLowerCase().split(/\s+/).filter(t => t.length > 2));
+  const tokens2 = new Set(str2.toLowerCase().split(/\s+/).filter(t => t.length > 2));
+  
+  const commonTokens = [...tokens1].filter(token => tokens2.has(token));
+  const hasOverlap = commonTokens.length >= 2 && (commonTokens.length / Math.max(tokens1.size, tokens2.size)) >= 0.3;
+  
+  return { hasOverlap, commonTokens };
+};
+
+// Find potential duplicates in inventory
+const findPotentialDuplicates = (
+  productName: string,
+  inventoryProducts: Product[],
+  existingParsedItems: ParsedItem[],
+  currentIndex?: number
+): DuplicateMatch[] => {
+  const matches: DuplicateMatch[] = [];
+  const threshold = 0.6; // Similarity threshold for fuzzy matching
+
+  // Check against inventory products
+  for (const product of inventoryProducts) {
+    const matchReason: string[] = [];
+    let totalScore = 0;
+    let scoreCount = 0;
+
+    // Check name similarity
+    const nameSimilarity = calculateSimilarityScore(productName, product.name);
+    if (nameSimilarity >= threshold) {
+      matchReason.push(`Name similarity: ${(nameSimilarity * 100).toFixed(0)}%`);
+      totalScore += nameSimilarity;
+      scoreCount++;
+    }
+
+    // Check token overlap
+    const { hasOverlap, commonTokens } = checkTokenOverlap(productName, product.name);
+    if (hasOverlap) {
+      matchReason.push(`Common words: ${commonTokens.slice(0, 3).join(', ')}`);
+      totalScore += 0.5;
+      scoreCount++;
+    }
+
+    // Check if product name contains key tokens from input
+    const inputTokens = productName.toLowerCase().split(/\s+/).filter(t => t.length > 3);
+    const productNameLower = product.name.toLowerCase();
+    const matchedTokens = inputTokens.filter(token => productNameLower.includes(token));
+    if (matchedTokens.length >= 2) {
+      matchReason.push(`Contains key phrases: ${matchedTokens.join(', ')}`);
+      totalScore += 0.4;
+      scoreCount++;
+    }
+
+    // Calculate average score
+    const avgScore = scoreCount > 0 ? totalScore / scoreCount : 0;
+
+    if (avgScore >= threshold) {
+      matches.push({
+        product,
+        similarityScore: avgScore,
+        matchReason,
+      });
+    }
+  }
+
+  // Sort by similarity score (highest first)
+  matches.sort((a, b) => b.similarityScore - a.similarityScore);
+
+  return matches.slice(0, 5); // Return top 5 matches
+};
+
+/**
+ * Tokenize a string into words, handling case sensitivity and punctuation
+ * @param text - The input string to tokenize
+ * @returns Array of lowercase words with punctuation removed
+ */
+const tokenizeWords = (text: string): string[] => {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+    .split(/\s+/) // Split on whitespace
+    .filter(word => word.length > 2); // Filter out short words
+};
+
+/**
+ * Find similar products based on word intersection count
+ * This function tokenizes both the target product name and all inventory products,
+ * calculates the count of intersecting words, and returns results sorted by
+ * the number of shared words in descending order.
+ *
+ * @param targetProductName - The product name to find similar products for
+ * @param allProducts - Array of all available products to search through
+ * @returns Array of similar products sorted by common word count (descending)
+ */
+const findSimilarProductsByWordIntersection = (
+  targetProductName: string,
+  allProducts: Product[]
+): SimilarProductMatch[] => {
+  // Edge case: empty target product name
+  if (!targetProductName || !targetProductName.trim()) {
+    return [];
+  }
+
+  // Edge case: no products to search
+  if (!allProducts || allProducts.length === 0) {
+    return [];
+  }
+
+  // Tokenize the target product name
+  const targetWords = new Set(tokenizeWords(targetProductName));
+  
+  // Edge case: target has no valid words after tokenization
+  if (targetWords.size === 0) {
+    return [];
+  }
+
+  // Normalize for case-insensitive comparison
+  const targetLower = targetProductName.toLowerCase().trim();
+  
+  const matches: SimilarProductMatch[] = [];
+
+  // Search through all products
+  for (const product of allProducts) {
+    const productLower = product.name.toLowerCase().trim();
+
+    // Skip if comparing to same product (exact name match)
+    if (productLower === targetLower) {
+      continue;
+    }
+
+    // Initialize score for this product
+    let score = 0;
+
+    // ===== MATCH TYPE SCORING =====
+    
+    // 1. Exact match: Highest priority (1000 points)
+    // This handles cases where user types exact product name
+    if (productLower === targetLower) {
+      score += 1000;
+    }
+    
+    // 2. Starts with match: High priority (500 points)
+    // This gives preference to products that begin with query
+    else if (productLower.startsWith(targetLower)) {
+      score += 500;
+    }
+    
+    // 3. Partial string match: Medium priority (200 points)
+    // This gives preference to products that contain full query string
+    else if (productLower.includes(targetLower)) {
+      score += 200;
+    }
+
+    // ===== WORD INTERSECTION SCORING =====
+    
+    // Calculate base score from common words (10 points per common word)
+    const productWords = tokenizeWords(product.name);
+    const productWordSet = new Set(productWords);
+    const commonWords: string[] = [...targetWords].filter(word => productWordSet.has(word));
+    
+    // Only consider if there's at least one common word
+    if (commonWords.length > 0) {
+      score += commonWords.length * 10;
+    } else {
+      continue; // Skip products with no word overlap
+    }
+
+    // ===== KEYWORD PRESENCE BONUS =====
+    
+    // Extract keywords from target query (words with 4+ characters)
+    // These are likely brand names or important product attributes
+    const targetKeywords = [...targetWords].filter(word => word.length >= 4);
+    
+    // Significant bonus for each keyword found in product name (50 points per keyword)
+    // This ensures brand-specific products rank much higher than generic ones
+    for (const keyword of targetKeywords) {
+      if (productLower.includes(keyword)) {
+        score += 50;
+      }
+    }
+
+    // Add product to matches with calculated score
+    matches.push({
+      product,
+      commonWordsCount: commonWords.length,
+      commonWords,
+      score,
+    });
+  }
+
+  // Sort results by weighted score in descending order
+  // Higher scores (more relevant) appear first
+  matches.sort((a, b) => b.score - a.score);
+
+  // Return all matches (optionally limit to top N results if needed)
+  return matches;
+};
 
 interface ShippingInfo {
   carrier?: string;
@@ -131,6 +412,31 @@ export default function QuickPOIntake() {
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [inventoryProducts, setInventoryProducts] = useState<Product[]>([]); // All inventory products for duplicate detection
+  const [duplicateAlert, setDuplicateAlert] = useState<{
+    isOpen: boolean;
+    productName: string;
+    matches: DuplicateMatch[];
+    itemIndex: number;
+  }>({ isOpen: false, productName: '', matches: [], itemIndex: -1 });
+
+  // Similar products dialog state
+  const [similarProductsDialog, setSimilarProductsDialog] = useState<{
+    isOpen: boolean;
+    targetProductName: string;
+    similarProducts: SimilarProductMatch[];
+  }>({ isOpen: false, targetProductName: '', similarProducts: [] });
+
+  // Product autocomplete state
+  const [autocompleteState, setAutocompleteState] = useState<{
+    itemIndex: number;
+    isOpen: boolean;
+    query: string;
+    suggestions: Product[];
+  }>({ itemIndex: -1, isOpen: false, query: '', suggestions: [] });
+
+  // Ref for autocomplete dropdown container
+  const autocompleteRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Utility functions
   const normalizeText = useCallback((text: string): string => {
@@ -170,6 +476,14 @@ export default function QuickPOIntake() {
     }
   }, []);
 
+  // Debounce function to prevent excessive API calls
+  const debounce = useCallback(<T extends any[]>(func: (...args: any[]) => void, wait: number): ((...args: T) => void) => {
+    let timeout: NodeJS.Timeout | null = null;
+    return (...args: T) => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  }, []);
 
 
   // Función para buscar productos en el inventario
@@ -217,7 +531,8 @@ export default function QuickPOIntake() {
       productId: product.id,
       productName: product.name,
       cost: product.cost,
-      salePrice: product.price
+      salePrice: product.price,
+      total: product.cost || 0,
     };
 
     setParsedItems(prev => [...prev, newItem]);
@@ -229,6 +544,73 @@ export default function QuickPOIntake() {
       title: "Producto agregado",
       description: `${product.name} ha sido agregado a la lista de compras.`
     });
+  }, [toast]);
+
+  // Handler for selecting a matching product from duplicate alert
+  const handleSelectMatchingProduct = useCallback((product: Product) => {
+    const { itemIndex } = duplicateAlert;
+    if (itemIndex >= 0) {
+      setParsedItems(prev => prev.map((item, i) => {
+        if (i === itemIndex) {
+          return {
+            ...item,
+            productName: product.name,
+            productId: product.id,
+            cost: product.cost || item.cost,
+            salePrice: product.price || item.salePrice,
+            total: item.qty * (product.cost || item.cost || 0),
+          };
+        }
+        return item;
+      }));
+    }
+    setDuplicateAlert({ isOpen: false, productName: '', matches: [], itemIndex: -1 });
+    toast({
+      title: "Producto seleccionado",
+      description: `Se ha asignado el producto existente: ${product.name}`,
+    });
+  }, [duplicateAlert, toast]);
+
+  // Handler for confirming to proceed with new product entry
+  const handleProceedWithNew = useCallback(() => {
+    setDuplicateAlert({ isOpen: false, productName: '', matches: [], itemIndex: -1 });
+    toast({
+      title: "Continuando con nuevo producto",
+      description: "Se agregará un nuevo producto al inventario.",
+    });
+  }, [toast]);
+
+  // Handler for opening similar products dialog when clicking on a product name
+  const handleOpenSimilarProductsDialog = useCallback((productName: string) => {
+    if (!productName || !productName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se puede buscar productos similares sin un nombre de producto."
+      });
+      return;
+    }
+
+    // Find similar products using word intersection algorithm
+    const similarProducts = findSimilarProductsByWordIntersection(productName, inventoryProducts);
+
+    // Open the dialog with the results
+    setSimilarProductsDialog({
+      isOpen: true,
+      targetProductName: productName,
+      similarProducts: similarProducts,
+    });
+  }, [inventoryProducts, toast]);
+
+  // Handler for selecting a similar product from the dialog
+  const handleSelectSimilarProduct = useCallback((product: Product) => {
+    // Show a toast message when a product is viewed
+    toast({
+      title: "Producto seleccionado",
+      description: `Has seleccionado ver: ${product.name}`,
+    });
+    // Note: This is for viewing purposes - the original table row is not modified
+    // Users can manually update the table row if they want to use a different product
   }, [toast]);
 
   // Load suppliers on component mount
@@ -252,6 +634,27 @@ export default function QuickPOIntake() {
     loadSuppliers();
   }, [toast]);
 
+  // Load inventory products for duplicate detection on component mount
+  useEffect(() => {
+    const loadInventoryProducts = async () => {
+      try {
+        // Use a minimal search pattern to load all products
+        const response = await quickIntakeApiRequest<{ products: Product[] }>({ 
+          action: "searchProducts", 
+          query: "a" // Minimal query to return broader results
+        });
+        if (response?.products) {
+          setInventoryProducts(response.products);
+        }
+      } catch (error) {
+        log.error("Error loading inventory products:", error);
+        // Don't show toast for this - duplicate detection is optional feature
+      }
+    };
+
+    loadInventoryProducts();
+  }, []);
+
   // Handlers
   const handleParseItems = useCallback(async () => {
     setSearchingProducts(true);
@@ -266,7 +669,13 @@ export default function QuickPOIntake() {
         }
       }
 
-      setParsedItems(items);
+      // Calculate totals for all parsed items
+      const itemsWithTotals = items.map(item => ({
+        ...item,
+        total: (item.qty || 0) * (item.cost || 0),
+      }));
+
+      setParsedItems(itemsWithTotals);
       toast({
         title: "Items parseados",
         description: `Se procesaron ${items.length} items correctamente.`
@@ -303,10 +712,145 @@ export default function QuickPOIntake() {
   }, [parsedItems, toast]);
 
   const handleUpdateItem = useCallback((index: number, field: keyof ParsedItem, value: any) => {
-    setParsedItems(prev => prev.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    ));
+    setParsedItems(prev => {
+      const updated = prev.map((item, i) => {
+        if (i === index) {
+          const newItem = { ...item, [field]: value };
+
+          // Auto-calculate total when quantity or cost changes
+          if (field === 'qty' || field === 'cost') {
+            const qty = field === 'qty' ? (value as number) : item.qty;
+            const cost = field === 'cost' ? (value as number) : item.cost;
+            newItem.total = (qty || 0) * (cost || 0);
+          }
+
+          // Check for duplicates when product name is entered
+          if (field === 'productName' && value && typeof value === 'string' && value.trim()) {
+            const duplicates = findPotentialDuplicates(value.trim(), inventoryProducts, prev, index);
+            if (duplicates.length > 0) {
+              // Schedule duplicate alert (use setTimeout to avoid state update during render)
+              setTimeout(() => {
+                setDuplicateAlert({
+                  isOpen: true,
+                  productName: value.trim(),
+                  matches: duplicates,
+                  itemIndex: index,
+                });
+              }, 100);
+            }
+          }
+
+          return newItem;
+        }
+        return item;
+      });
+
+      // Recalculate totals for all items to ensure consistency
+      return updated.map(item => ({
+        ...item,
+        total: (item.qty || 0) * (item.cost || 0),
+      }));
+    });
+  }, [inventoryProducts]);
+
+  // Autocomplete search handler with debouncing
+  const debouncedAutocompleteSearch = useMemo(
+    () => debounce(async (query: string) => {
+      if (!query || query.length < 2) {
+        setAutocompleteState(prev => ({ ...prev, isOpen: false, suggestions: [] }));
+        return;
+      }
+
+      try {
+        const response = await quickIntakeApiRequest<{ products: Product[] }>({
+          action: "searchProducts",
+          query: query.trim(),
+        });
+        
+        setAutocompleteState(prev => ({
+          ...prev,
+          suggestions: response?.products || [],
+          isOpen: (response?.products?.length || 0) > 0,
+        }));
+      } catch (error) {
+        log.error("Error searching autocomplete products:", error);
+        // Silently fail - autocomplete is a helpful feature, not critical
+        setAutocompleteState(prev => ({ ...prev, isOpen: false, suggestions: [] }));
+      }
+    }, 300),
+    []
+  );
+
+  // Handle product name input change with autocomplete
+  const handleProductInputChange = useCallback((index: number, value: string) => {
+    // Update the item with new product name
+    handleUpdateItem(index, 'productName', value);
+    
+    // Trigger autocomplete search
+    setAutocompleteState(prev => ({
+      ...prev,
+      itemIndex: index,
+      query: value,
+    }));
+    
+    debouncedAutocompleteSearch(value);
+  }, [handleUpdateItem, debouncedAutocompleteSearch]);
+
+  // Handle selecting a product from autocomplete dropdown
+  const handleSelectAutocompleteProduct = useCallback((product: Product, index: number) => {
+    // Update the item with selected product data
+    setParsedItems(prev => prev.map((item, i) => {
+      if (i === index) {
+        return {
+          ...item,
+          productName: product.name,
+          productId: product.id,
+          cost: product.cost || item.cost,
+          salePrice: product.price || item.salePrice,
+          total: (item.qty || 0) * (product.cost || item.cost || 0),
+        };
+      }
+      return item;
+    }));
+    
+    // Close autocomplete dropdown
+    setAutocompleteState({
+      itemIndex: -1,
+      isOpen: false,
+      query: '',
+      suggestions: [],
+    });
+    
+    toast({
+      title: "Producto seleccionado",
+      description: `Se ha asignado: ${product.name}`,
+    });
+  }, [toast]);
+
+  // Close autocomplete dropdown when clicking outside
+  const closeAutocomplete = useCallback(() => {
+    setAutocompleteState({
+      itemIndex: -1,
+      isOpen: false,
+      query: '',
+      suggestions: [],
+    });
   }, []);
+
+  // Handle click outside to close autocomplete dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (autocompleteState.isOpen && autocompleteState.itemIndex >= 0) {
+        const container = autocompleteRefs.current[autocompleteState.itemIndex];
+        if (container && !container.contains(event.target as Node)) {
+          closeAutocomplete();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [autocompleteState.isOpen, autocompleteState.itemIndex, closeAutocomplete]);
 
   // Función auxiliar para actualizar el proveedor
   const handleSavePurchaseOrder = useCallback(async () => {
@@ -568,7 +1112,8 @@ export default function QuickPOIntake() {
   const canSave = useMemo(() => parsedItems.length > 0 && !loading, [parsedItems.length, loading]);
 
   return (
-    <div className="space-y-6 p-6">
+    <TooltipProvider>
+      <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Package className="h-6 w-6" />
@@ -689,92 +1234,200 @@ export default function QuickPOIntake() {
         </CardContent>
       </Card>
 
-      {/* Section 2: Editable Items List */}
+      {/* Section 2: Excel-like Table Interface */}
       {parsedItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Items Parseados ({parsedItems.length})</CardTitle>
             <CardDescription>
-              Edita cantidades, asigna productos y configura costos
+              Edita cantidades, asigna productos y configura costos. El Total se calcula automáticamente.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {parsedItems.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
-                      <Label htmlFor={`qty-${index}`}>Cantidad</Label>
-                      <Input
-                        id={`qty-${index}`}
-                        type="number"
-                        min="1"
-                        value={item.qty}
-                        onChange={(e) => handleUpdateItem(index, 'qty', parseInt(e.target.value) || 1)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`rawName-${index}`}>Nombre Original</Label>
-                      <Input
-                        id={`rawName-${index}`}
-                        value={item.rawName}
-                        onChange={(e) => handleUpdateItem(index, 'rawName', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`cost-${index}`}>Costo</Label>
-                      <Input
-                        id={`cost-${index}`}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.cost || ''}
-                        onChange={(e) => handleUpdateItem(index, 'cost', parseFloat(e.target.value) || undefined)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`salePrice-${index}`}>Precio Venta</Label>
-                      <Input
-                        id={`salePrice-${index}`}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.salePrice || ''}
-                        onChange={(e) => handleUpdateItem(index, 'salePrice', parseFloat(e.target.value) || undefined)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Product Assignment */}
-                  <div>
-                    <Label>Producto Asignado</Label>
-                    {item.productId ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary">{item.productName}</Badge>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-[60px] text-center font-semibold">Actions</TableHead>
+                    <TableHead className="w-[80px] text-center font-semibold">Quantity</TableHead>
+                    <TableHead className="min-w-[200px] font-semibold">Product</TableHead>
+                    <TableHead className="w-[120px] font-semibold">Cost</TableHead>
+                    <TableHead className="w-[120px] font-semibold">Sale Price</TableHead>
+                    <TableHead className="w-[120px] text-right font-semibold">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {parsedItems.map((item, index) => (
+                    <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                      {/* Actions Column - Delete Button */}
+                      <TableCell className="p-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleUpdateItem(index, 'productId', undefined)}
+                          onClick={() => {
+                            setParsedItems(prev => prev.filter((_, i) => i !== index));
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label={`Remove item ${index + 1}`}
                         >
-                          <Minus className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <div className="mt-1">
+                      </TableCell>
+
+                      {/* Quantity Column */}
+                      <TableCell className="p-2">
                         <Input
-                          placeholder="Nombre del producto (manual)"
-                          value={item.productName || ''}
-                          onChange={(e) => handleUpdateItem(index, 'productName', e.target.value)}
+                          type="number"
+                          min="1"
+                          value={item.qty}
+                          onChange={(e) => handleUpdateItem(index, 'qty', parseInt(e.target.value) || 1)}
+                          className="text-center font-medium"
+                          aria-label={`Quantity for item ${index + 1}`}
                         />
-                      </div>
-                    )}
-                  </div>
+                      </TableCell>
 
+                      {/* Product Column */}
+                      <TableCell className="p-2">
+                        {item.productId ? (
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className="text-sm py-1 px-2 cursor-pointer hover:bg-secondary/80 transition-colors"
+                              onClick={() => handleOpenSimilarProductsDialog(item.productName || item.rawName)}
+                            >
+                              {item.productName}
+                            </Badge>
+                            {/* Info icon with tooltip for assigned product */}
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <div
+                                  className="inline-flex text-muted-foreground hover:text-primary transition-colors cursor-help"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>recommends checking that there are no duplicate products in system</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdateItem(index, 'productId', undefined)}
+                              aria-label={`Remove product assignment for item ${index + 1}`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div ref={(el) => { autocompleteRefs.current[index] = el; }} className="relative">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                placeholder="Enter product name..."
+                                value={item.productName || item.rawName || ''}
+                                onChange={(e) => handleProductInputChange(index, e.target.value)}
+                                aria-label={`Product name for item ${index + 1}`}
+                              />
+                              {/* Info icon with tooltip for manual entry */}
+                              {(item.productName || item.rawName) && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <div
+                                      className="inline-flex text-muted-foreground hover:text-primary transition-colors cursor-help shrink-0"
+                                    >
+                                      <Info className="h-3.5 w-3.5" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>recommends checking that there are no duplicate products in system</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                            {/* Autocomplete dropdown */}
+                            {autocompleteState.isOpen && autocompleteState.itemIndex === index && autocompleteState.suggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                {autocompleteState.suggestions.map((product) => (
+                                  <div
+                                    key={product.id}
+                                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                    onClick={() => handleSelectAutocompleteProduct(product, index)}
+                                  >
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1">
+                                        <h4 className="text-sm font-medium text-gray-900">{product.name}</h4>
+                                        <p className="text-xs text-gray-500">SKU: {product.sku}</p>
+                                        <div className="flex gap-4 text-xs mt-1">
+                                          <span>Cost: {formatCurrency(product.cost ?? 0)}</span>
+                                          <span>Price: {formatCurrency(product.price ?? 0)}</span>
+                                        </div>
+                                      </div>
+                                      <Plus className="h-4 w-4 text-primary flex-shrink-0 mt-1" />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {item.productId && (
+                          <p className="text-xs text-muted-foreground mt-1">SKU: {inventoryProducts.find(p => p.id === item.productId)?.sku || 'N/A'}</p>
+                        )}
+                      </TableCell>
 
-                </div>
-              ))}
+                      {/* Cost Column */}
+                      <TableCell className="p-2">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.cost || ''}
+                            onChange={(e) => handleUpdateItem(index, 'cost', parseFloat(e.target.value) || undefined)}
+                            placeholder="0.00"
+                            className="pl-6 font-medium"
+                            aria-label={`Cost for item ${index + 1}`}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Sale Price Column */}
+                      <TableCell className="p-2">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.salePrice || ''}
+                            onChange={(e) => handleUpdateItem(index, 'salePrice', parseFloat(e.target.value) || undefined)}
+                            placeholder="0.00"
+                            className="pl-6 font-medium"
+                            aria-label={`Sale price for item ${index + 1}`}
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Total Column (Auto-calculated) */}
+                      <TableCell className="p-2 text-right">
+                        <div className="font-semibold text-base text-primary">
+                          {formatCurrency(item.total || 0)}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Summary Row */}
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell className="text-center text-lg" colSpan={5}>
+                      Grand Total
+                    </TableCell>
+                    <TableCell className="text-right text-lg text-primary">
+                      {formatCurrency(parsedItems.reduce((sum, item) => sum + (item.total || 0), 0))}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
@@ -989,6 +1642,156 @@ export default function QuickPOIntake() {
           });
         }}
       />
-    </div>
+
+      {/* Duplicate Detection Alert Dialog */}
+      <Dialog open={duplicateAlert.isOpen} onOpenChange={(open) => setDuplicateAlert({ ...duplicateAlert, isOpen: open })}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Potential Duplicate Product Detected
+            </DialogTitle>
+            <DialogDescription>
+              The product name &quot;{duplicateAlert.productName}&quot; may already exist in your inventory. 
+              Please review the similar items below and decide whether to use an existing product or continue with a new entry.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-4">
+            {duplicateAlert.matches.map((match, idx) => (
+              <Card key={match.product.id} className="border-amber-200 bg-amber-50/50 hover:bg-amber-50 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold text-base">{match.product.name}</h4>
+                        <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
+                          {(match.similarityScore * 100).toFixed(0)}% Similar
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">SKU: {match.product.sku}</p>
+                      <div className="flex gap-4 text-sm">
+                        <span>Cost: <span className="font-medium">{formatCurrency(match.product.cost ?? 0)}</span></span>
+                        <span>Price: <span className="font-medium">{formatCurrency(match.product.price ?? 0)}</span></span>
+                        <span>Stock: <span className="font-medium">{match.product.stock}</span></span>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Match reasons:</strong>
+                        <ul className="list-disc list-inside mt-1 space-y-0.5">
+                          {match.matchReason.map((reason, i) => (
+                            <li key={i}>{reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => handleSelectMatchingProduct(match.product)}
+                      className="shrink-0"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Use This Product
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateAlert({ isOpen: false, productName: '', matches: [], itemIndex: -1 })}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleProceedWithNew}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Continue with New Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Similar Products Dialog */}
+      <Dialog open={similarProductsDialog.isOpen} onOpenChange={(open) => setSimilarProductsDialog({ ...similarProductsDialog, isOpen: open })}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Similar Products for: "{similarProductsDialog.targetProductName}"
+            </DialogTitle>
+            <DialogDescription>
+              Found {similarProductsDialog.similarProducts.length} product(s) with shared words.
+              Results are sorted by weighted relevance score (descending), prioritizing exact matches,
+              brands, and keywords.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-4">
+            {similarProductsDialog.similarProducts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No similar products found with shared words.</p>
+              </div>
+            ) : (
+              similarProductsDialog.similarProducts.map((match, idx) => (
+                <Card key={match.product.id} className="hover:bg-muted/50 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold text-base">{match.product.name}</h4>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {match.commonWordsCount} common word(s)
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">SKU: {match.product.sku}</p>
+                        <div className="flex gap-4 text-sm mb-3">
+                          <span>Cost: <span className="font-medium">{formatCurrency(match.product.cost ?? 0)}</span></span>
+                          <span>Price: <span className="font-medium">{formatCurrency(match.product.price ?? 0)}</span></span>
+                          <span>Stock: <span className="font-medium">{match.product.stock}</span></span>
+                        </div>
+                        <div className="bg-muted/50 rounded-md p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Shared words:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {match.commonWords.map((word, i) => (
+                              <Badge key={`${word}-${i}`} variant="secondary" className="text-xs">
+                                {word}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleSelectSimilarProduct(match.product)}
+                        variant="outline"
+                        className="shrink-0"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setSimilarProductsDialog({ isOpen: false, targetProductName: '', similarProducts: [] })}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }

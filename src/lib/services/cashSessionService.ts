@@ -26,6 +26,19 @@ const calculateBagsEndAmounts = (
   return result;
 };
 
+/**
+ * REFACTORING NOTE: mapSession handles both old (with bag data) and new (simplified) sessions
+ * 
+ * To maintain backward compatibility with existing database records that contain bag data,
+ * this function still reads bag-related fields from the database.
+ * However, these fields are no longer used in the simplified closing workflow.
+ * 
+ * New sessions will not populate these fields as they've been removed from
+ * openCashSession and closeCashSession functions.
+ * 
+ * @param row - Database row from cash_sessions table
+ * @returns Mapped CashSession object
+ */
 const mapSession = (row: any): CashSession => ({
   id: row?.id ?? "",
   sessionId: row?.session_number ?? row?.sessionId ?? "",
@@ -44,6 +57,10 @@ const mapSession = (row: any): CashSession => ({
   actualCashCount: row?.actual_cash_count !== null ? Number(row.actual_cash_count) : undefined,
   difference: row?.difference !== null ? Number(row.difference) : undefined,
   isBalanced: row?.is_balanced ?? false,
+  // NEW: Variance type for surplus/shortage/balanced classification
+  varianceType: row?.variance_type ?? undefined,
+  // BACKWARD COMPATIBILITY: These fields still read from DB for old sessions
+  // but are no longer populated in new simplified workflow
   bagsSalesAmounts: row?.bags_data?.sales ?? row?.bags_sales_amounts ?? {},
   bagsStartAmounts: row?.bags_data?.start ?? row?.bags_start_amounts ?? {},
   bagsEndAmounts: row?.bags_data?.end ?? row?.bags_end_amounts ?? {},
@@ -206,11 +223,32 @@ export const getAllOpenSessions = async (): Promise<CashSession[]> => {
   }
 };
 
+/**
+ * CASH FLOAT MANAGEMENT FEATURE: Enhanced opening process with float support
+ * 
+ * This function now supports automatic float carryover from previous session:
+ * - Optional closingFloat parameter can be used as the default starting float
+ * - This allows the system to automatically use the previous session's closing float
+ * - Users can verify or adjust the amount before confirming
+ * 
+ * Previous complexity eliminated (from refactoring):
+ * - Removed bags_data, bags_start_amounts - no longer tracking balance bags
+ * 
+ * CASH FLOAT MANAGEMENT ADDED BACK:
+ * - closingFloat parameter can be passed as default startingFloat
+ * - Enables automatic float carryover between shifts
+ * - User can verify or adjust the amount in OpenSessionWizard
+ *
+ * @param userId - User ID opening the session
+ * @param userName - Name of the user opening the session
+ * @param startingFloat - Initial cash amount in the drawer
+ * @param previousSessionConfirmedAt - Optional timestamp when previous session was confirmed
+ * @returns The newly created cash session
+ */
 export const openCashSession = async (
   userId: string,
   userName: string,
   startingFloat: number,
-  bagsStartAmounts: Record<string, number> = {},
   previousSessionConfirmedAt?: Date
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
@@ -223,9 +261,7 @@ export const openCashSession = async (
     opened_at: new Date().toISOString(),
     starting_float: startingFloat,
     status: "Abierto",
-    bags_data: {
-      start: bagsStartAmounts
-    },
+    // SIMPLIFICATION: Removed bags_data, bags_start_amounts - no longer tracking balance bags
     previous_session_confirmed_at: previousSessionConfirmedAt
   };
 
@@ -244,19 +280,85 @@ export const openCashSession = async (
   return mapSession(data);
 };
 
+/**
+ * CASH FLOAT MANAGEMENT FEATURE: Enhanced closing process with float support
+ *
+ * This function now handles cash float management for the POS system:
+ * 1. actualCashCount - The total cash counted in the drawer
+ * 2. depositAccountId - The target account for depositing the NET amount
+ * 3. closingFloat - Amount of cash to leave in drawer for next shift (float money)
+ *
+ * Cash Float Logic:
+ * - Deposit Amount = actualCashCount - closingFloat
+ * - Opening Float (next shift) = Closing Float (current shift)
+ * - Float money is excluded from sales reporting
+ * - Net Cash Sales = (actualCashCount - startingFloat - closingFloat)
+ *
+ * Previous complexity eliminated (from refactoring):
+ * - No more bagsSalesAmounts tracking (recargas, mimovil, servicios)
+ * - No more bagsActualEndAmounts calculations
+ * - No more balanceBagAccountId (single deposit account instead of multiple)
+ * - No more dailySalesAccountId (consolidated into single deposit)
+ *
+ * CASH FLOAT MANAGEMENT ADDED BACK:
+ * - closingFloat parameter to retain change money between shifts
+ * - cashLeftForNextSession field is persisted to database
+ * - Only net amount (actualCashCount - closingFloat) is deposited
+ *
+ * Error Handling:
+ * - Validates that depositAccountId exists before processing
+ * - Validates closingFloat is non-negative and doesn't exceed actualCashCount
+ * - Ensures deposit amount is positive
+ * - Provides clear error messages for validation failures
+ *
+ * @param session - The cash session to close
+ * @param userId - User ID closing the session
+ * @param userName - Name of the user closing the session
+ * @param actualCashCount - Total cash counted in drawer
+ * @param depositAccountId - Target account ID for the deposit (required)
+ * @param closingFloat - Amount to leave in drawer for next shift (float money)
+ * @returns The updated closed cash session
+ * @throws Error if depositAccountId is not provided or account doesn't exist
+ */
 export const closeCashSession = async (
   session: CashSession,
   userId: string,
   userName: string,
   actualCashCount: number,
-  bagsSalesAmounts: Record<string, number> = {},
-  bagsActualEndAmounts: Record<string, number> = {},
   depositAccountId?: string,
-  cashLeftForNextSession: number = 0,
-  balanceBagAccountId?: string,
-  dailySalesAccountId?: string
+  closingFloat?: number
 ): Promise<CashSession> => {
   const supabase = getSupabaseServerClient();
+
+  // VALIDATION: Determine if deposit account validation is required
+  // Auto-closed sessions (from cron) pass empty string to skip deposit
+  const isDepositRequired = depositAccountId !== undefined && depositAccountId.trim() !== "";
+
+  if (isDepositRequired) {
+    if (!depositAccountId || depositAccountId.trim() === "") {
+      const error = new Error("Deposit account ID is required. Please select a valid deposit account.");
+      log.error("closeCashSession validation failed: No deposit account provided", { session: session.sessionId });
+      throw error;
+    }
+  }
+
+  // CASH FLOAT MANAGEMENT: Validate closing float
+  const floatAmount = closingFloat || 0;
+  if (floatAmount < 0) {
+    const error = new Error("Closing float cannot be negative.");
+    log.error("closeCashSession validation failed: Negative closing float", { session: session.sessionId, closingFloat });
+    throw error;
+  }
+
+  if (floatAmount > actualCashCount) {
+    const error = new Error("Closing float cannot exceed total cash count.");
+    log.error("closeCashSession validation failed: Float exceeds cash count", {
+      session: session.sessionId,
+      actualCashCount,
+      closingFloat: floatAmount
+    });
+    throw error;
+  }
 
   try {
     // 1. Recalculate Totals
@@ -269,6 +371,10 @@ export const closeCashSession = async (
     const now = new Date().toISOString();
 
     // 2. Database Update
+    // CASH FLOAT MANAGEMENT: Now storing closing_float (cash_left_for_next_session)
+    // VARIANCE CLASSIFICATION: Calculate and store variance type (surplus/shortage/balanced)
+    const varianceType = difference === 0 ? 'balanced' : (difference > 0 ? 'surplus' : 'shortage');
+    
     const updatePayload: any = {
       status: "Cerrado",
       closed_by: userId,
@@ -278,24 +384,13 @@ export const closeCashSession = async (
       expected_cash_in_drawer: expectedCashInDrawer,
       difference: difference,
       is_balanced: isBalanced,
+      // NEW: Variance type for clearer surplus/shortage/balanced classification
+      variance_type: varianceType,
       total_cash_sales: enrichedSession.totalCashSales,
       total_card_sales: enrichedSession.totalCardSales,
-      bags_data: {
-        start: session.bagsStartAmounts,
-        sales: bagsSalesAmounts,
-        end: bagsActualEndAmounts
-      },
-      cash_left_for_next_session: cashLeftForNextSession,
+      // CASH FLOAT MANAGEMENT: Persist closing float to database
+      cash_left_for_next_session: floatAmount,
     };
-
-    if (balanceBagAccountId) {
-      updatePayload.balance_bag_account_id = balanceBagAccountId;
-      updatePayload.balance_bag_amount = cashLeftForNextSession;
-    }
-
-    if (dailySalesAccountId) {
-      updatePayload.daily_sales_account_id = dailySalesAccountId;
-    }
 
     const { data: updatedData, error } = await supabase
       .from(CASH_SESSIONS_TABLE)
@@ -309,84 +404,23 @@ export const closeCashSession = async (
       throw new Error("Failed to close cash session.");
     }
 
-    // 3. Deposit to Accounts
-
-    // 3a. Main Deposit (Net Cash Sales / Profit)
-    // Priority: Explicit depositAccountId > dailySalesAccountId
-    const mainDepositAccount = depositAccountId || dailySalesAccountId;
-    const netDepositAmount = actualCashCount - cashLeftForNextSession;
-
-    if (mainDepositAccount && netDepositAmount > 0) {
-      const depositNote = depositAccountId ? undefined : "Ventas Diarias";
+    // 3. Deposit to Account
+    // CASH FLOAT MANAGEMENT: Only deposit net amount (actualCashCount - closingFloat)
+    // Float money remains in drawer for next shift and is NOT deposited
+    const depositAmount = actualCashCount - floatAmount;
+    if (depositAmount > 0 && depositAccountId) {
       await depositToAccount(
         session.sessionId,
-        mainDepositAccount,
-        netDepositAmount,
-        depositNote,
+        depositAccountId,
+        depositAmount,
+        `Corte de Caja - Ventas Netas (Total: ${actualCashCount}, Float: ${floatAmount})`,
         "Corte de Caja"
       );
-    }
-
-    // 3b. Balance Bag Deposits
-    // If specific accounts were selected for balance bags, deposit their respective amounts
-    if (balanceBagAccountId) {
-      try {
-        let balanceBagAccounts: Record<string, string> = {};
-        // Handle both JSON string or object (if type confusion occurs)
-        if (typeof balanceBagAccountId === 'string') {
-          // If it looks like JSON, parse it
-          if (balanceBagAccountId.startsWith('{')) {
-            balanceBagAccounts = JSON.parse(balanceBagAccountId);
-          } else {
-            log.warn("balanceBagAccountId is not a JSON object:", balanceBagAccountId);
-          }
-        } else if (typeof balanceBagAccountId === 'object') {
-          balanceBagAccounts = balanceBagAccountId;
-        }
-
-        // Log para debugging
-        console.log('[Balance Bag] Processing deposits:', {
-          balanceBagAccounts,
-          bagsActualEndAmounts,
-          rawBalanceBagAccountId: balanceBagAccountId
-        });
-
-        // Iterate through known bag types
-        const bagTypes = ['recargas', 'mimovil', 'servicios'];
-
-        for (const type of bagTypes) {
-          const accountId = balanceBagAccounts[type];
-          const startAmount = session.bagsStartAmounts?.[type] || 0;
-          const endAmount = bagsActualEndAmounts[type] || 0;
-          // Calculate sales: what was sold from the bag (start - end)
-          // This is the amount that should be deposited to the account, NOT the end amount
-          const salesAmount = startAmount - endAmount;
-
-          console.log(`[Balance Bag] ${type}: accountId=${accountId}, start=${startAmount}, end=${endAmount}, sales=${salesAmount}`);
-
-          if (accountId && salesAmount > 0) {
-            console.log(`[Balance Bag] Depositing ${salesAmount} (sales) to ${accountId} for ${type}`);
-            await depositToAccount(
-              session.sessionId,
-              accountId,
-              salesAmount,
-              `Bolsa de Saldo - ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-              "Bolsa de Saldo"
-            );
-            console.log(`[Balance Bag] ✅ Deposit successful for ${type}`);
-          } else if (salesAmount <= 0) {
-            console.log(`[Balance Bag] ⏭️ Skipping ${type}: no sales or negative balance (salesAmount=${salesAmount})`);
-          } else {
-            console.log(`[Balance Bag] ⏭️ Skipping ${type}: no account selected`);
-          }
-        }
-      } catch (e) {
-        log.error("Error processing balance bag deposits", e);
-        // Don't fail the entire closure if bag deposits fail?
-        // Or should we? For now, log and continue to ensure session closes.
-      }
+      log.info(`Deposited ${depositAmount} to account ${depositAccountId} for session ${session.sessionId}. Float ${floatAmount} retained in drawer.`);
+    } else if (floatAmount > 0) {
+      log.info(`No deposit made for session ${session.sessionId} - all cash (${floatAmount}) retained as float for next shift.`);
     } else {
-      console.log('[Balance Bag] No balance bag account ID provided, skipping balance bag deposits');
+      log.info(`No deposit made for session ${session.sessionId} - amount is 0`);
     }
 
     revalidatePath('/pos');

@@ -1,6 +1,44 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react";
+/**
+ * CASH FLOAT MANAGEMENT FEATURE
+ * 
+ * This component implements cash float management for the POS system, allowing
+ * retention of change money between shifts without affecting daily sales reporting.
+ * 
+ * Cash Float Management Workflow:
+ * 1. User counts total cash in drawer at end of shift
+ * 2. User specifies amount to leave for next shift (closing float)
+ * 3. System calculates deposit amount = total cash - closing float
+ * 4. Deposit is made to selected account (excludes float money)
+ * 5. Opening float for next shift = closing float from previous shift
+ * 
+ * Key Features:
+ * - Closing Float: Amount of change money to leave in drawer (e.g., $100-200)
+ * - Net Cash Sales = (Total Cash Counted - Opening Float - Closing Float)
+ * - Float money is excluded from daily sales totals
+ * - Prevents cash shortage for giving change in next shift
+ * 
+ * Sales Calculation Formula:
+ * Net Cash Sales = Total Cash Counted - Opening Float - Closing Float
+ * 
+ * This ensures:
+ * - Float money doesn't inflate sales figures
+ * - Change is always available for transactions
+ * - Accurate reporting of actual revenue vs operational cash
+ * 
+ * Previous complexity eliminated (from refactoring):
+ * - Removed all bag cards (recargas, mimovil, servicios)
+ * - Removed bag sales tracking and end amount calculations
+ * - Removed balance bag account selections
+ * 
+ * Error handling:
+ * - Validates that a deposit account is selected before submission
+ * - Validates closing float is non-negative and doesn't exceed cash in drawer
+ * - Shows clear error messages for validation failures
+ */
+
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Pin, Smartphone, Wand2, Wrench, ArrowRight, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { CashSession } from "@/types";
 import { Separator } from "../ui/separator";
 import { cn } from "@/lib/utils";
@@ -18,289 +56,51 @@ import { Account } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-// Configuración de colores para cada bolsa
-const BAG_CONFIG = {
-  recargas: {
-    label: 'Recargas',
-    icon: Smartphone,
-    emoji: '📱',
-    bgClass: 'bg-blue-50',
-    borderClass: 'border-blue-200',
-    textClass: 'text-blue-700',
-    badgeClass: 'bg-blue-100 text-blue-700',
-    selectedBorder: 'border-blue-500',
-    selectedBg: 'bg-blue-50',
-    inputFocus: 'focus:ring-blue-500 focus:border-blue-500'
-  },
-  mimovil: {
-    label: 'MiMovil',
-    icon: Wand2,
-    emoji: '🟢',
-    bgClass: 'bg-green-50',
-    borderClass: 'border-green-200',
-    textClass: 'text-green-700',
-    badgeClass: 'bg-green-100 text-green-700',
-    selectedBorder: 'border-green-500',
-    selectedBg: 'bg-green-50',
-    inputFocus: 'focus:ring-green-500 focus:border-green-500'
-  },
-  servicios: {
-    label: 'Servicios',
-    icon: Wrench,
-    emoji: '🔧',
-    bgClass: 'bg-orange-50',
-    borderClass: 'border-orange-200',
-    textClass: 'text-orange-700',
-    badgeClass: 'bg-orange-100 text-orange-700',
-    selectedBorder: 'border-orange-500',
-    selectedBg: 'bg-orange-50',
-    inputFocus: 'focus:ring-orange-500 focus:border-orange-500'
-  }
-} as const;
-
-type BagType = keyof typeof BAG_CONFIG;
-
 interface CloseCashDrawerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   session: CashSession;
-  onConfirm: (actualCash: number, bagsSalesAmounts: Record<string, number>, bagsActualEndAmounts: Record<string, number>, depositAccountId?: string, cashLeftForNextSession?: number, balanceBagAccountId?: string, dailySalesAccountId?: string) => Promise<void>;
+  onConfirm: (actualCash: number, depositAccountId: string, closingFloat: number) => Promise<void>;
 }
 
-// Schema dinámico que valida según las ventas de la sesión
-const createFormSchema = (hasCashSales: boolean, expectedCash: number) => z.object({
+// CASH FLOAT MANAGEMENT: Form schema with closing float support
+// Schema validates cash count, deposit account selection, and closing float amount
+// MODIFIED: Removed validation that restricted cash amount to match expected surplus
+// Now allows any non-negative value - surplus/shortage is calculated separately
+const createFormSchema = (hasCashSales: boolean) => z.object({
   actualCashCount: z.coerce.number()
     .min(0, "El conteo no puede ser negativo.")
     .refine(
       (val) => !hasCashSales || val > 0,
       { message: "Debes ingresar el conteo real de efectivo antes de cerrar." }
-    )
-    .refine(
-      (val) => !hasCashSales || Math.abs(val - expectedCash) <= expectedCash * 0.5,
-      { message: `El conteo parece incorrecto. Se esperan aproximadamente ${expectedCash.toFixed(2)}` }
     ),
-  bagRecargasSale: z.coerce.number().min(0),
-  bagMimovilSale: z.coerce.number().min(0),
-  bagServiciosSale: z.coerce.number().min(0),
-  bagRecargasActualEnd: z.string().optional(),
-  bagMimovilActualEnd: z.string().optional(),
-  bagServiciosActualEnd: z.string().optional(),
-  depositAccountId: z.string().optional(),
-  cashLeftForNextSession: z.coerce.number().min(0, "El efectivo a dejar no puede ser negativo."),
-  balanceBagRecargasAccountId: z.string().optional(),
-  balanceBagMimovilAccountId: z.string().optional(),
-  balanceBagServiciosAccountId: z.string().optional(),
-  dailySalesAccountId: z.string().optional(),
-}).refine((data) => {
-  // Check that leftover cash is not greater than actual cash
-  if (data.cashLeftForNextSession > data.actualCashCount) {
-    return false;
+  // CASH FLOAT MANAGEMENT: Closing float field - amount to leave for next shift
+  closingFloat: z.coerce.number()
+    .min(0, "El efectivo a dejar no puede ser negativo."),
+  // Deposit account selection (required)
+  depositAccountId: z.string({
+    required_error: "Debe seleccionar una cuenta de depósito.",
+    invalid_type_error: "ID de cuenta inválido."
+  }).min(1, "Debe seleccionar una cuenta de depósito."),
+}).superRefine((data, ctx) => {
+  // CASH FLOAT MANAGEMENT: Validate closing float doesn't exceed actual cash count
+  if (data.closingFloat > data.actualCashCount) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "El efectivo a dejar no puede exceder el conteo total de efectivo.",
+      path: ["closingFloat"],
+    });
   }
-  return true;
-}, {
-  message: "El efectivo a dejar no puede ser mayor al efectivo real en caja.",
-  path: ["cashLeftForNextSession"],
-}).refine((data) => {
-  // Si hay efectivo a dejar (cashLeftForNextSession > 0), debe haber al menos una bolsa de saldo seleccionada
-  const hasAnyBalanceBag = !!data.balanceBagRecargasAccountId || !!data.balanceBagMimovilAccountId || !!data.balanceBagServiciosAccountId;
-
-  if (data.cashLeftForNextSession > 0 && !hasAnyBalanceBag) {
-    return false;
-  }
-
-  // Si hay dinero a depositar (actualCashCount - cashLeftForNextSession), solo requiere cuenta de depósito si NO hay bolsas de saldo
-  const depositAmount = data.actualCashCount - data.cashLeftForNextSession;
-  const hasDepositAccount = !!data.depositAccountId;
-
-  if (depositAmount > 0 && !hasDepositAccount && !hasAnyBalanceBag) {
-    return false;
-  }
-
-  return true;
-}, {
-  message: "Debe seleccionar al menos una cuenta de bolsa de saldo para el efectivo a dejar.",
-  path: ["cashLeftForNextSession"],
 });
 
-// Tipo para las cuentas fijadas
-interface FixedAccounts {
-  recargas?: string;
-  mimovil?: string;
-  servicios?: string;
-  dailySales?: string;
-}
-
-// Componente de tarjeta para una bolsa con su cuenta
-interface BagCardProps {
-  bagType: BagType;
-  session: CashSession;
-  form: ReturnType<typeof useForm<z.infer<ReturnType<typeof createFormSchema>>>>;
-  accounts: Account[];
-  pinnedAccounts: FixedAccounts;
-  onPinAccount: (type: 'recargas' | 'mimovil' | 'servicios' | 'dailySales', accountId: string, isPinned: boolean) => void;
-}
-
-function BagCard({ bagType, session, form, accounts, pinnedAccounts, onPinAccount }: BagCardProps) {
-  const config = BAG_CONFIG[bagType];
-  const saleFieldName = `bag${bagType.charAt(0).toUpperCase() + bagType.slice(1)}Sale` as 'bagRecargasSale' | 'bagMimovilSale' | 'bagServiciosSale';
-  const endFieldName = `bag${bagType.charAt(0).toUpperCase() + bagType.slice(1)}ActualEnd` as 'bagRecargasActualEnd' | 'bagMimovilActualEnd' | 'bagServiciosActualEnd';
-  const accountFieldName = `balanceBag${bagType.charAt(0).toUpperCase() + bagType.slice(1)}AccountId` as 'balanceBagRecargasAccountId' | 'balanceBagMimovilAccountId' | 'balanceBagServiciosAccountId';
-
-  const startAmount = session.bagsStartAmounts?.[bagType] || 0;
-  const saleAmount = form.watch(saleFieldName) || 0;
-  const endAmount = startAmount - saleAmount;
-  const selectedAccountId = form.watch(accountFieldName);
-
-  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-
-  return (
-    <div className={cn(
-      "rounded-lg border-2 p-3 space-y-2 transition-all",
-      config.borderClass,
-      selectedAccountId ? config.selectedBorder : config.borderClass,
-      selectedAccountId ? config.bgClass : "bg-white"
-    )}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{config.emoji}</span>
-          <h4 className={cn("font-semibold text-sm", config.textClass)}>
-            {config.label}
-          </h4>
-        </div>
-        {selectedAccountId && (
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs", config.badgeClass)}>
-            ✓ {config.label}
-          </span>
-        )}
-      </div>
-
-      {/* Montos */}
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div className="text-center p-1 bg-gray-50 rounded">
-          <div className="text-muted-foreground">Inicial</div>
-          <div className="font-medium">{formatCurrency(startAmount)}</div>
-        </div>
-        <div className="text-center p-1 bg-gray-50 rounded">
-          <div className="text-muted-foreground">Venta</div>
-          <FormField
-            control={form.control}
-            name={saleFieldName}
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    {...field}
-                    className={cn("h-7 text-xs text-center font-medium", config.inputFocus)}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        </div>
-        <div className={cn("text-center p-1 rounded", config.bgClass)}>
-          <div className={cn("font-medium", config.textClass)}>Saldo Final</div>
-          <div className={cn("font-bold text-sm", config.textClass)}>{formatCurrency(endAmount)}</div>
-        </div>
-      </div>
-
-      {/* Campo de saldo manual (opcional) */}
-      <FormField
-        control={form.control}
-        name={endFieldName}
-        render={({ field }) => {
-          const expectedEnd = startAmount - saleAmount;
-          const actualEndStr = field.value;
-          const diff = actualEndStr && actualEndStr !== "" ? Number(actualEndStr) - expectedEnd : 0;
-
-          return (
-            <FormItem>
-              <FormControl>
-                <Input
-                  type="number"
-                  step="0.01"
-                  {...field}
-                  className={cn(
-                    "h-7 text-xs",
-                    diff !== 0 && Math.abs(diff) > 0.01 ? "border-red-400 bg-red-50" : "",
-                    config.inputFocus
-                  )}
-                  placeholder={`Saldo calculado: ${expectedEnd.toFixed(2)}`}
-                />
-              </FormControl>
-              {diff !== 0 && Math.abs(diff) > 0.01 && (
-                <div className="text-[10px] text-red-600 font-medium flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Diferencia: {diff > 0 ? '+' : ''}{diff.toFixed(2)}
-                </div>
-              )}
-            </FormItem>
-          )
-        }}
-      />
-
-      {/* Selector de cuenta */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className={cn("text-xs font-medium", config.textClass)}>
-            Cuenta destino
-          </label>
-          <div className="flex items-center gap-1">
-            <Switch
-              checked={!!pinnedAccounts[bagType]}
-              onCheckedChange={(checked) => selectedAccountId && onPinAccount(bagType, selectedAccountId, checked)}
-              disabled={!selectedAccountId}
-              className={cn(pinnedAccounts[bagType] && "bg-blue-600")}
-            />
-            <Pin className={cn("h-3 w-3", pinnedAccounts[bagType] ? "text-blue-600" : "text-muted-foreground")} />
-          </div>
-        </div>
-        <FormField
-          control={form.control}
-          name={accountFieldName}
-          render={({ field }) => (
-            <FormItem>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger className={cn(
-                    "h-8 text-xs",
-                    field.value ? config.selectedBorder : "",
-                    field.value ? config.selectedBg : "",
-                    config.inputFocus
-                  )}>
-                    <SelectValue placeholder={`Selecciona cuenta para ${config.label}...`} />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      <span>{account.name} ({account.type}) | Saldo: {formatCurrency(account.currentBalance || 0)}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {selectedAccount && (
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <ArrowRight className="h-3 w-3" />
-            <span>Se depositará {formatCurrency(endAmount)} en <strong>{selectedAccount.name}</strong></span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
+// SIMPLIFICATION: Removed FixedAccounts interface - no longer needed for account pinning
+ 
 export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, onConfirm }: CloseCashDrawerDialogProps) {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [fixedAccounts, setFixedAccounts] = useState<FixedAccounts>({});
-  const [pinnedAccounts, setPinnedAccounts] = useState<FixedAccounts>({});
+  const [pinnedAccount, setPinnedAccount] = useState<string>("");
+  // FIX: Use ref to track if dialog was already open to preserve values during pin operation
+  const wasDialogOpen = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -308,182 +108,108 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
         .then(setAccounts)
         .catch(console.error);
 
-      // Cargar cuentas fijadas desde localStorage
-      const saved = localStorage.getItem('fixedBalanceBagAccounts');
+      // Load pinned account from localStorage (simplified - only one account now)
+      const saved = localStorage.getItem('fixedDepositAccount');
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          setFixedAccounts(parsed);
+          setPinnedAccount(saved);
         } catch (e) {
-          console.error('Error al cargar cuentas fijadas:', e);
-        }
-      }
-
-      // Cargar cuenta de ventas diarias fijada desde localStorage
-      const savedDailySales = localStorage.getItem('fixedDailySalesAccount');
-      if (savedDailySales) {
-        try {
-          const parsed = JSON.parse(savedDailySales);
-          setFixedAccounts(prev => ({ ...prev, dailySales: parsed }));
-          setPinnedAccounts(prev => ({ ...prev, dailySales: parsed }));
-        } catch (e) {
-          console.error('Error al cargar cuenta de ventas diarias fijada:', e);
+          console.error('Error loading pinned deposit account:', e);
         }
       }
     }
   }, [isOpen]);
 
-  // Función para guardar cuenta fija
-  const handlePinAccount = (type: 'recargas' | 'mimovil' | 'servicios' | 'dailySales', accountId: string, isPinned: boolean) => {
-    const newFixedAccounts = { ...fixedAccounts };
-
-    if (isPinned) {
-      newFixedAccounts[type] = accountId;
-      setFixedAccounts(newFixedAccounts);
-      setPinnedAccounts(newFixedAccounts);
-
-      // Guardar en localStorage según el tipo
-      if (type === 'dailySales') {
-        localStorage.setItem('fixedDailySalesAccount', JSON.stringify(accountId));
-      } else {
-        localStorage.setItem('fixedBalanceBagAccounts', JSON.stringify(newFixedAccounts));
-      }
-    } else {
-      delete newFixedAccounts[type];
-      setFixedAccounts(newFixedAccounts);
-      setPinnedAccounts(newFixedAccounts);
-
-      // Guardar en localStorage según el tipo
-      if (type === 'dailySales') {
-        localStorage.removeItem('fixedDailySalesAccount');
-      } else {
-        localStorage.setItem('fixedBalanceBagAccounts', JSON.stringify(newFixedAccounts));
-      }
-    }
-  };
-
-  // Calcular si hay ventas en efectivo y el efectivo esperado
+  // SIMPLIFICATION: Only need two form fields now
   const hasCashSales = (session.totalCashSales ?? 0) > 0;
   const expectedCash = (session.startingFloat ?? 0) + (session.totalCashSales ?? 0) - (session.totalCashPayouts ?? 0);
 
-  // Crear schema dinámico basado en las ventas de la sesión
-  const formSchema = useMemo(() => createFormSchema(hasCashSales, expectedCash), [hasCashSales, expectedCash]);
+  const formSchema = useMemo(() => createFormSchema(hasCashSales), [hasCashSales]);
 
-  const form = useForm<z.infer<ReturnType<typeof createFormSchema>>>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      actualCashCount: 0,
+      closingFloat: 0, // CASH FLOAT MANAGEMENT: Default to 0, user can adjust
+      depositAccountId: pinnedAccount || "",
+    }
   });
 
   const { watch, reset } = form;
   const actualCashCount = watch('actualCashCount', 0);
-  const cashLeftForNextSession = watch('cashLeftForNextSession', 0);
-  const dailySalesAccountId = watch('dailySalesAccountId', '');
+  const closingFloat = watch('closingFloat', 0);
+  const depositAccountId = watch('depositAccountId', '');
 
-  // Verificar si hay alguna bolsa de saldo seleccionada
-  const balanceBagRecargasAccountId = watch('balanceBagRecargasAccountId', '');
-  const balanceBagMimovilAccountId = watch('balanceBagMimovilAccountId', '');
-  const balanceBagServiciosAccountId = watch('balanceBagServiciosAccountId', '');
-  const hasAnyBalanceBag = !!balanceBagRecargasAccountId ||
-    !!balanceBagMimovilAccountId ||
-    !!balanceBagServiciosAccountId;
+  const selectedAccount = accounts.find(a => a.id === depositAccountId);
 
-  // Calcular totales para el resumen
-  const bagTotals = useMemo(() => {
-    const totals: Record<BagType, { start: number; sale: number; end: number; account?: Account }> = {
-      recargas: { start: 0, sale: 0, end: 0 },
-      mimovil: { start: 0, sale: 0, end: 0 },
-      servicios: { start: 0, sale: 0, end: 0 }
-    };
+  // Toggle for pinning single deposit account
+  const handlePinAccount = (accountId: string, isPinned: boolean) => {
+    if (isPinned) {
+      setPinnedAccount(accountId);
+      localStorage.setItem('fixedDepositAccount', accountId);
+    } else {
+      setPinnedAccount("");
+      localStorage.removeItem('fixedDepositAccount');
+    }
+  };
 
-    (['recargas', 'mimovil', 'servicios'] as const).forEach(type => {
-      const start = session.bagsStartAmounts?.[type] || 0;
-      const saleFieldName = type === 'recargas' ? 'bagRecargasSale' : type === 'mimovil' ? 'bagMimovilSale' : 'bagServiciosSale';
-      const sale = watch(saleFieldName) || 0;
-      const accountId = watch(`balanceBag${type.charAt(0).toUpperCase() + type.slice(1)}AccountId` as 'balanceBagRecargasAccountId' | 'balanceBagMimovilAccountId' | 'balanceBagServiciosAccountId');
-      const account = accounts.find(a => a.id === accountId);
-
-      totals[type] = {
-        start,
-        sale,
-        end: start - sale,
-        account: account || undefined
-      };
-    });
-
-    return totals;
-  }, [session, watch, accounts]);
-
-  const netDepositAmount = Math.max(0, actualCashCount - cashLeftForNextSession);
-  const dailySalesAccount = accounts.find(a => a.id === dailySalesAccountId);
-
+  // FIX: Preserve form values when pinning account - only reset when dialog opens
+  // BUG: The issue was that pinnedAccount change was triggering form reset, wiping entered values
+  // SOLUTION: Use ref to track if dialog was already open, only reset on initial open
   useEffect(() => {
-    if (isOpen) {
-      const initialFixedAccounts = fixedAccounts.recargas || fixedAccounts.mimovil || fixedAccounts.servicios ? fixedAccounts : {};
+    if (isOpen && !wasDialogOpen.current) {
+      // First time opening the dialog - reset all values to 0
       reset({
         actualCashCount: 0,
-        bagRecargasSale: 0,
-        bagMimovilSale: 0,
-        bagServiciosSale: 0,
-        bagRecargasActualEnd: "",
-        bagMimovilActualEnd: "",
-        bagServiciosActualEnd: "",
-        depositAccountId: "",
-        cashLeftForNextSession: 0,
-        balanceBagRecargasAccountId: initialFixedAccounts.recargas || "",
-        balanceBagMimovilAccountId: initialFixedAccounts.mimovil || "",
-        balanceBagServiciosAccountId: initialFixedAccounts.servicios || "",
-        dailySalesAccountId: initialFixedAccounts.dailySales || "",
+        closingFloat: 0,
+        depositAccountId: pinnedAccount || "",
       });
-
-      // Actualizar pinnedAccounts basado en las cuentas fijadas SOLO si están vacíos (carga inicial)
-      if (!pinnedAccounts.recargas && !pinnedAccounts.mimovil && !pinnedAccounts.servicios && !pinnedAccounts.dailySales) {
-        setPinnedAccounts(initialFixedAccounts);
-      }
+      wasDialogOpen.current = true;
+    } else if (isOpen && wasDialogOpen.current) {
+      // Dialog was already open - preserve cash amounts when pinning account
+      const currentValues = form.getValues();
+      reset({
+        actualCashCount: currentValues.actualCashCount || 0,
+        closingFloat: currentValues.closingFloat || 0,
+        depositAccountId: pinnedAccount || "",
+      });
+    } else if (!isOpen) {
+      // Dialog closed - reset flag for next open
+      wasDialogOpen.current = false;
     }
-  }, [isOpen, reset, fixedAccounts, pinnedAccounts]);
+  }, [isOpen, reset, pinnedAccount, form]);
 
   const expectedCashInDrawer = useMemo(() => {
     return session.startingFloat + session.totalCashSales - session.totalCashPayouts;
   }, [session]);
 
   const difference = useMemo(() => {
-    return actualCashCount - expectedCashInDrawer;
+     return actualCashCount - expectedCashInDrawer;
   }, [actualCashCount, expectedCashInDrawer]);
 
+  // Calculate variance classification for clearer display
+  const varianceType = useMemo(() => {
+    if (difference === 0) return 'balanced';
+    return difference > 0 ? 'surplus' : 'shortage';
+  }, [difference]);
+
+  // CASH FLOAT MANAGEMENT: Calculate deposit amount (cash to deposit, excluding float)
+  const depositAmount = useMemo(() => {
+    return actualCashCount - closingFloat;
+  }, [actualCashCount, closingFloat]);
+
+  // CASH FLOAT MANAGEMENT: Calculate net cash sales for reporting
+  // Formula: Net Cash Sales = (Total Cash Counted - Opening Float - Closing Float)
+  const netCashSales = useMemo(() => {
+    return actualCashCount - session.startingFloat - closingFloat;
+  }, [actualCashCount, session.startingFloat, closingFloat]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     try {
-
-      const bagsSalesAmounts = {
-        'recargas': values.bagRecargasSale,
-        'mimovil': values.bagMimovilSale,
-        'servicios': values.bagServiciosSale
-      };
-
-      // Helper to determine end amount: Input -> Fallback to (Start - Sale)
-      const getEndAmount = (input: string | undefined, key: 'recargas' | 'mimovil' | 'servicios') => {
-        if (input === undefined || input === "") {
-          const start = session.bagsStartAmounts?.[key] || 0;
-          const sale = key === 'recargas' ? values.bagRecargasSale : key === 'mimovil' ? values.bagMimovilSale : values.bagServiciosSale;
-          return start - sale;
-        }
-        return Number(input);
-      };
-
-      const bagsActualEndAmounts = {
-        'recargas': getEndAmount(values.bagRecargasActualEnd, 'recargas'),
-        'mimovil': getEndAmount(values.bagMimovilActualEnd, 'mimovil'),
-        'servicios': getEndAmount(values.bagServiciosActualEnd, 'servicios')
-      };
-
-      // Obtener las cuentas de bolsa de saldo activas
-      const balanceBagAccounts = {
-        recargas: values.balanceBagRecargasAccountId,
-        mimovil: values.balanceBagMimovilAccountId,
-        servicios: values.balanceBagServiciosAccountId
-      };
-
-      await onConfirm(values.actualCashCount, bagsSalesAmounts, bagsActualEndAmounts, values.depositAccountId, values.cashLeftForNextSession, JSON.stringify(balanceBagAccounts), values.dailySalesAccountId);
+      // CASH FLOAT MANAGEMENT: Pass closing float to persist amount left for next shift
+      // Deposit amount will be: actualCashCount - closingFloat
+      await onConfirm(values.actualCashCount, values.depositAccountId, values.closingFloat);
     } finally {
       setLoading(false);
     }
@@ -498,11 +224,13 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Realizar Corte de Caja</DialogTitle>
           <DialogDescription>
-            Confirma los totales del turno y registra el efectivo final para cerrar.
+            Confirma el total de efectivo y selecciona la cuenta de depósito para cerrar el turno.
+            <br />
+            <span className="text-amber-600">Especifica el cambio a dejar para el siguiente turno.</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -538,7 +266,7 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                 name="actualCashCount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Conteo de Efectivo Real</FormLabel>
+                    <FormLabel>Conteo de Efectivo Real (Total en Caja)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -553,91 +281,72 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                 )}
               />
 
+              {/* CASH FLOAT MANAGEMENT: Closing float input field */}
               <FormField
                 control={form.control}
-                name="cashLeftForNextSession"
+                name="closingFloat"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Efectivo a Dejar para Siguiente Turno</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Cambio a Dejar (Fondo para Siguiente Turno)
+                      <div className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs">
+                        ⚡ Float
+                      </div>
+                    </FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <Input
+                          className="pl-7 bg-amber-50 border-amber-200 focus:ring-amber-500"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...field}
+                        />
+                      </div>
                     </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Este dinero se quedará en la caja para dar cambio en el siguiente turno.
+                      <br />
+                      <strong className="text-amber-700">No se contará como venta.</strong>
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
               <Separator />
-              <div className="flex items-center gap-2">
-                <span className="text-lg">💰</span>
-                <h3 className="font-semibold">Bolsas de Saldo</h3>
-              </div>
 
-              {/* Tarjetas de bolsas */}
-              <div className="space-y-3">
-                {(['recargas', 'mimovil', 'servicios'] as const).map(bagType => (
-                  <BagCard
-                    key={bagType}
-                    bagType={bagType}
-                    session={session}
-                    form={form}
-                    accounts={accounts}
-                    pinnedAccounts={pinnedAccounts}
-                    onPinAccount={handlePinAccount}
-                  />
-                ))}
-              </div>
-
-              {/* Nota informativa */}
-              <div className="bg-blue-50 p-2 rounded text-xs text-blue-700 flex gap-2 items-center">
-                <span>ℹ️</span>
-                <div>
-                  <strong>Nota:</strong> Los saldos finales de las bolsas se guardarán y sugerirán automáticamente como saldos iniciales para el siguiente turno.
-                </div>
-              </div>
-
-              <Separator />
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🏪</span>
-                <h3 className="font-semibold">Ventas Diarias</h3>
-              </div>
-
-              {/* Selector de cuenta para ventas diarias */}
+              {/* Single deposit account selector */}
               <FormField
                 control={form.control}
-                name="dailySalesAccountId"
+                name="depositAccountId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        Cuenta para Ventas Diarias
+                        Cuenta de Depósito
                         {field.value && (
-                          <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs">
-                            ✓ Ventas Diarias
+                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">
+                            ✓ Cuenta Seleccionada
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Switch
-                          checked={!!pinnedAccounts.dailySales}
-                          onCheckedChange={(checked) => field.value && handlePinAccount('dailySales', field.value, checked)}
+                          checked={pinnedAccount === field.value}
+                          onCheckedChange={(checked) => field.value && handlePinAccount(field.value, checked)}
                           disabled={!field.value}
-                          className={cn(pinnedAccounts.dailySales && "bg-blue-600")}
+                          className={cn(pinnedAccount === field.value && "bg-blue-600")}
                         />
-                        <Pin className={cn("h-4 w-4", pinnedAccounts.dailySales ? "text-blue-600" : "text-muted-foreground")} />
                       </div>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className={cn(
-                          field.value && "border-purple-500 bg-purple-50 focus:ring-purple-500"
+                          field.value && "border-blue-500 bg-blue-50 focus:ring-blue-500"
                         )}>
-                          <SelectValue placeholder="Selecciona una cuenta para ventas diarias..." />
+                          <SelectValue placeholder="Selecciona cuenta de depósito..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -648,102 +357,146 @@ export default function CloseCashDrawerDialog({ isOpen, onOpenChange, session, o
                         ))}
                       </SelectContent>
                     </Select>
-                    <div className="text-[10px] text-muted-foreground">
-                      {field.value ? (
-                        <>
-                          El efectivo de ventas diarias se registrará en esta cuenta.
-                          Esta cuenta es independiente de las bolsas de saldo.
-                          {pinnedAccounts.dailySales && (
-                            <span className="text-blue-600 font-medium"> Esta cuenta está fijada para usar automáticamente en futuros cierres.</span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          Sin cuenta seleccionada para ventas diarias.
-                          Selecciona una cuenta para registrar las ventas diarias.
-                        </>
-                      )}
-                    </div>
+                    {field.value && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        El efectivo neto ({formatCurrency(depositAmount)}) se depositará en <strong>{selectedAccount?.name}</strong>.
+                        {closingFloat > 0 && (
+                          <span className="text-amber-600 font-medium block mt-1"> {formatCurrency(closingFloat)} se quedará en caja como fondo.</span>
+                        )}
+                        {pinnedAccount === field.value && (
+                          <span className="text-blue-600 font-medium block mt-1"> Esta cuenta está fijada para uso automático.</span>
+                        )}
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Panel de resumen de depósitos */}
-              {(actualCashCount > 0 || hasAnyBalanceBag) && (
+              {/* CASH FLOAT MANAGEMENT: Updated deposit summary panel */}
+              {actualCashCount > 0 && selectedAccount && (
                 <>
                   <Separator />
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">📋</span>
-                    <h3 className="font-semibold">Resumen de Depósitos</h3>
-                  </div>
-
                   <div className="bg-gray-50 rounded-lg border p-3 space-y-2 text-sm">
-                    {netDepositAmount > 0 && dailySalesAccount && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">📋</span>
+                      <h3 className="font-semibold">Resumen del Depósito</h3>
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                      <span className="text-muted-foreground">Total Efectivo Contado:</span>
+                      <span className="font-semibold">{formatCurrency(actualCashCount)}</span>
+                    </div>
+                    {closingFloat > 0 && (
                       <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                        <span className="text-muted-foreground">Ventas Diarias → {dailySalesAccount.name}</span>
-                        <span className="font-semibold text-purple-700">{formatCurrency(netDepositAmount)}</span>
+                        <span className="text-muted-foreground">Menos Cambio a Dejar:</span>
+                        <span className="font-semibold text-amber-600">- {formatCurrency(closingFloat)}</span>
                       </div>
                     )}
-
-                    {(['recargas', 'mimovil', 'servicios'] as const).map(type => {
-                      const { end, account } = bagTotals[type];
-                      if (!account || end <= 0) return null;
-                      const config = BAG_CONFIG[type];
-
-                      return (
-                        <div key={type} className={cn("flex justify-between items-center py-1", config.textClass)}>
-                          <span className="flex items-center gap-1">
-                            <span>{config.emoji}</span>
-                            <span>{config.label} → {account.name}</span>
-                          </span>
-                          <span className="font-semibold">{formatCurrency(end)}</span>
-                        </div>
-                      );
-                    })}
-
-                    <div className="flex justify-between items-center py-2 border-t-2 border-gray-300 font-bold">
-                      <span>Total a Depositar:</span>
-                      <span className="text-lg">
-                        {formatCurrency(
-                          (dailySalesAccount && netDepositAmount > 0 ? netDepositAmount : 0) +
-                          (bagTotals.recargas.account && bagTotals.recargas.end > 0 ? bagTotals.recargas.end : 0) +
-                          (bagTotals.mimovil.account && bagTotals.mimovil.end > 0 ? bagTotals.mimovil.end : 0) +
-                          (bagTotals.servicios.account && bagTotals.servicios.end > 0 ? bagTotals.servicios.end : 0)
-                        )}
-                      </span>
+                    <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                      <span className="text-muted-foreground font-medium">Total a Depositar → {selectedAccount.name}</span>
+                      <span className="font-bold text-lg text-blue-700">{formatCurrency(depositAmount)}</span>
                     </div>
+                    <div className="flex justify-between items-center py-1 bg-amber-50 rounded p-2">
+                      <span className="text-muted-foreground text-xs">Ventas Netas de Efectivo (para reporte):</span>
+                      <span className="font-bold text-amber-700">{formatCurrency(netCashSales)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      * El cambio a dejar ({formatCurrency(closingFloat)}) se quedará en la caja para el siguiente turno.
+                    </p>
                   </div>
                 </>
               )}
 
-              {/* Diferencia de conteo */}
-              {form.formState.isDirty && (
+              {/* Variance Analysis: Expected vs Actual with clear surplus/shortage classification */}
+              {actualCashCount > 0 && (
                 <div className={cn(
-                  "flex flex-col gap-2 p-3 rounded-md border",
-                  difference === 0 && "bg-muted border-transparent",
-                  difference > 0 && "bg-green-50 text-green-800 border-green-200",
-                  difference < 0 && "bg-red-50 text-red-800 border-red-200",
+                  "flex flex-col gap-3 p-4 rounded-md border",
+                  varianceType === 'balanced' && "bg-slate-50 border-slate-200",
+                  varianceType === 'surplus' && "bg-green-50 text-green-900 border-green-300",
+                  varianceType === 'shortage' && "bg-red-50 text-red-900 border-red-300",
                 )}>
-                  <div className="flex justify-between font-bold text-base items-center">
-                    <span>Diferencia (Sobrante/Faltante):</span>
-                    <span>{difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(difference))}</span>
+                  {/* Section Header */}
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-300">
+                    <span className="text-lg font-bold flex items-center gap-2">
+                      {varianceType === 'balanced' && '⚖️'}
+                      {varianceType === 'surplus' && '📈'}
+                      {varianceType === 'shortage' && '📉'}
+                      Análisis de Variación
+                    </span>
                   </div>
-                  {difference !== 0 && (
-                    <div className="flex items-start gap-2 text-xs mt-1">
-                      <AlertCircle className="h-4 w-4 mt-0.5" />
-                      <div>
-                        <p className="font-semibold">Atención: El efectivo no cuadra.</p>
-                        <p>Por favor verifique que contó correctamente todo el dinero en caja.</p>
-                        {difference < 0 && <p className="mt-1 font-bold">Faltan {formatCurrency(Math.abs(difference))}</p>}
-                        {difference > 0 && <p className="mt-1 font-bold">Sobran {formatCurrency(Math.abs(difference))}</p>}
-                      </div>
+
+                  {/* Expected vs Actual Comparison */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 bg-white/50 rounded px-3">
+                      <span className="text-sm font-semibold">Efectivo Esperado:</span>
+                      <span className="text-lg font-bold">{formatCurrency(expectedCashInDrawer)}</span>
                     </div>
-                  )}
+                    <div className="flex justify-between items-center py-2 bg-white/50 rounded px-3">
+                      <span className="text-sm font-semibold">Efectivo Contado:</span>
+                      <span className="text-lg font-bold">{formatCurrency(actualCashCount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-3 border-t-2 border-gray-300">
+                      <span className={cn(
+                        "text-base font-bold",
+                        varianceType === 'surplus' && "text-green-700",
+                        varianceType === 'shortage' && "text-red-700",
+                        varianceType === 'balanced' && "text-slate-700"
+                      )}>
+                        {varianceType === 'balanced' && 'Cuenta Equilibrada'}
+                        {varianceType === 'surplus' && 'SOBRANTE (Exceso)'}
+                        {varianceType === 'shortage' && 'FALTANTE (Déficit)'}
+                      </span>
+                      <span className={cn(
+                        "text-2xl font-bold",
+                        varianceType === 'surplus' && "text-green-800",
+                        varianceType === 'shortage' && "text-red-800",
+                        varianceType === 'balanced' && "text-slate-800"
+                      )}>
+                        {difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(difference))}
+                      </span>
+                    </div>
+
+                    {/* Detailed variance explanation */}
+                    {difference !== 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-white/50 rounded text-sm">
+                        <AlertCircle className={cn(
+                          "h-5 w-5 flex-shrink-0 mt-0.5",
+                          varianceType === 'surplus' && "text-green-600",
+                          varianceType === 'shortage' && "text-red-600"
+                        )} />
+                        <div className="flex-1">
+                          <p className="font-semibold text-base">
+                            {varianceType === 'surplus' && 'Hay un sobrante de efectivo'}
+                            {varianceType === 'shortage' && 'Hay un faltante de efectivo'}
+                          </p>
+                          <p className="mt-1">
+                            La diferencia es de <span className="font-bold">{formatCurrency(Math.abs(difference))}</span>.
+                            {varianceType === 'surplus' && (
+                              <span className="text-green-700">Este exceso se ha depositado correctamente.</span>
+                            )}
+                            {varianceType === 'shortage' && (
+                              <span className="text-red-700">Este faltante debe ser registrado y investigado.</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Zero variance - balanced message */}
+                    {difference === 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-white/50 rounded text-sm">
+                        <div className="text-green-600 font-bold">✓</div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-base">El conteo es exacto</p>
+                          <p className="mt-1">No hay variación entre el efectivo esperado y el contado.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="secondary" onClick={() => handleClose(false)} disabled={loading}>
                   Cancelar
                 </Button>

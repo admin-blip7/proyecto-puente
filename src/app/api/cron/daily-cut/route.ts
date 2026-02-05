@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
-import { getAllOpenSessions, closeCashSession, openCashSession } from "@/lib/services/cashSessionService";
+import { getAllOpenSessions, closeCashSession, openCashSession, depositToAccount } from "@/lib/services/cashSessionService";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("dailyCutCron");
 
+/**
+ * REFACTORING NOTE: Simplified Daily Cut Cron - Removed All Balance Bag Functionality
+ * 
+ * This automated endpoint now:
+ * - Closes open sessions from previous days
+ * - Opens a new session for today if none exists
+ * 
+ * Previous complexity eliminated:
+ * - Removed bag-related parameters from closeCashSession
+ * - Simplified to only use actualCashCount and optional depositAccountId
+ * - For auto-closed sessions, we skip the deposit (no account selected)
+ * 
+ * The automated process ensures:
+ * - Sessions are properly closed at end of day
+ * - Data integrity is maintained without complex bag tracking
+ */
 export async function GET() {
     try {
         const openSessions = await getAllOpenSessions();
@@ -20,14 +36,18 @@ export async function GET() {
 
             if (openedAt.getTime() < today.getTime()) {
                 // Close session
-                // Assuming perfect count for automatic close
+                // SIMPLIFICATION: Only pass actualCashCount, no deposit account for auto-close
+                // Auto-closed sessions don't perform actual deposits - they're just closed in the system
                 const actualCashCount = session.expectedCashInDrawer;
 
                 await closeCashSession(
                     session,
                     "SYSTEM",
                     "Sistema Automático",
-                    actualCashCount
+                    actualCashCount,
+                    // SIMPLIFICATION: No deposit account for auto-close - sessions are closed without actual deposit
+                    // This maintains data integrity without requiring user interaction
+                    "" // Empty depositAccountId to skip deposit for auto-closed sessions
                 );
                 sessionsClosed++;
             }
@@ -40,10 +60,12 @@ export async function GET() {
 
         if (!existingSession) {
             // Open new session for today
+            // SIMPLIFICATION: Only pass starting float, removed bagsStartAmounts
             await openCashSession(
                 "SYSTEM",
                 "Sistema Automático",
-                0 // Starting float 0 for auto-opened session
+                0, // Starting float 0 for auto-opened session
+                undefined // No previous session confirmation for auto-open
             );
             sessionsOpened++;
         } else {

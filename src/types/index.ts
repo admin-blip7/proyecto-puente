@@ -373,6 +373,8 @@ export interface CashSession {
   actualCashCount?: number;
   difference?: number;
   isBalanced?: boolean;
+  // NEW: Variance type to classify surplus/shortage/balanced for clearer reporting
+  varianceType?: 'surplus' | 'shortage' | 'balanced';
   bagsStartAmounts?: Record<string, number>;
   bagsSalesAmounts?: Record<string, number>;
   bagsEndAmounts?: Record<string, number>;

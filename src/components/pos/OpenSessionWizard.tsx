@@ -1,5 +1,30 @@
 "use client"
 
+/**
+ * CASH FLOAT MANAGEMENT FEATURE: Enhanced Opening Session Wizard with Float Support
+ *
+ * This component now supports automatic float carryover from previous session:
+ * - Pre-fills starting float from previous session's closing float
+ * - User can verify or adjust the amount before confirming
+ * - Ensures change money is always available for transactions
+ *
+ * Cash Float Logic:
+ * - Previous session's closing float becomes this session's starting float
+ * - User can verify that the physical cash matches the recorded amount
+ * - Allows adjustment if physical count differs from recorded closing float
+ *
+ * Previous complexity eliminated (from refactoring):
+ * - Removed all bag input fields (recargas, mimovil, servicios)
+ * - Removed bag validation and tracking
+ * - Removed previous session bag confirmation flow
+ *
+ * The simplified workflow:
+ * - System auto-fills starting float from previous closing float
+ * - User verifies the physical cash amount
+ * - User can adjust if needed
+ * - Streamlined single-step process with float management support
+ */
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowRight, ArrowLeft, Info } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { CashSession } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -18,22 +43,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 interface OpenSessionWizardProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onConfirm: (startingFloat: number, bagsStartAmounts: Record<string, number>, previousSessionConfirmedAt?: Date) => Promise<void>;
+    onConfirm: (startingFloat: number, previousSessionConfirmedAt?: Date) => Promise<void>;
     lastClosedSession: CashSession | null;
 }
 
+// SIMPLIFICATION: Removed all bag-related fields
+// Schema now only validates starting float amount
 const formSchema = z.object({
     previousSessionConfirmed: z.boolean().default(false),
     cashStayedInDrawer: z.boolean().default(false),
     startingFloat: z.coerce.number().min(0, "El monto no puede ser negativo."),
-    bagRecargas: z.coerce.number(),
-    bagMimovil: z.coerce.number(),
-    bagServicios: z.coerce.number(),
-    correctedPreviousCash: z.coerce.number().min(0, "El monto no puede ser negativo.").default(0),
 });
 
 export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, lastClosedSession }: OpenSessionWizardProps) {
-    const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -42,10 +64,6 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
             previousSessionConfirmed: false,
             cashStayedInDrawer: false,
             startingFloat: 0,
-            bagRecargas: 0,
-            bagMimovil: 0,
-            bagServicios: 0,
-            correctedPreviousCash: 0,
         }
     });
 
@@ -53,65 +71,30 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
     const cashStayedInDrawer = watch('cashStayedInDrawer');
     const previousSessionConfirmed = watch('previousSessionConfirmed');
 
-    // Skip step 1 if no previous session
+    // CASH FLOAT MANAGEMENT: Auto-fill starting float from previous session's closing float
+    // Use cashLeftForNextSession (closing float) from previous session as default
     useEffect(() => {
-        if (isOpen && !lastClosedSession) {
-            setStep(2);
-        } else if (isOpen) {
-            setStep(1);
+        if (isOpen && lastClosedSession) {
+            // CASH FLOAT MANAGEMENT: Use the closing float from previous session as default
+            // This is the amount intended to stay in drawer for change money
+            const closingFloat = lastClosedSession.cashLeftForNextSession ?? 0;
+            setValue('startingFloat', closingFloat);
         }
-    }, [isOpen, lastClosedSession]);
+    }, [isOpen, lastClosedSession, setValue]);
 
-    // Initialize values once when lastClosedSession changes (dialog opens)
-    // This should NOT re-run when checkboxes are toggled, to preserve user edits
-    useEffect(() => {
-        if (lastClosedSession) {
-            // Pre-fill bag values from last session ending amounts
-            const bags = lastClosedSession.bagsEndAmounts || {};
-            setValue('bagRecargas', bags['recargas'] || 0);
-            setValue('bagMimovil', bags['mimovil'] || 0);
-            setValue('bagServicios', bags['servicios'] || 0);
-
-            // Should default to what was left in drawer (not total count if deposited)
-            // If balance bag was used (new system), use the amount that was deposited into the balance bag
-            // Otherwise, use cashLeftForNextSession (legacy system)
-            const initialCash = (lastClosedSession.balanceBagAmount !== undefined && lastClosedSession.balanceBagAmount > 0)
-                ? lastClosedSession.balanceBagAmount
-                : (lastClosedSession.cashLeftForNextSession !== undefined ? lastClosedSession.cashLeftForNextSession : (lastClosedSession.actualCashCount || 0));
-
-            setValue('correctedPreviousCash', initialCash);
-        }
-    }, [lastClosedSession, setValue]);
-
-    const correctedPreviousCash = watch('correctedPreviousCash');
+    const correctedPreviousCash = watch('startingFloat');
 
     useEffect(() => {
         if (cashStayedInDrawer) {
-            // Use the potentially edited value
-            setValue('startingFloat', correctedPreviousCash || 0);
+            setValue('startingFloat', correctedPreviousCash);
         }
     }, [cashStayedInDrawer, correctedPreviousCash, setValue]);
-
-    const handleNext = () => {
-        setStep(2);
-    };
-
-    const handleBack = () => {
-        setStep(1);
-    };
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setLoading(true);
         try {
-            const bagsStartAmounts = {
-                'recargas': values.bagRecargas,
-                'mimovil': values.bagMimovil,
-                'servicios': values.bagServicios
-            };
-
             const previousSessionConfirmedAt = values.previousSessionConfirmed ? new Date() : undefined;
-
-            await onConfirm(values.startingFloat, bagsStartAmounts, previousSessionConfirmedAt);
+            await onConfirm(values.startingFloat, previousSessionConfirmedAt);
         } finally {
             setLoading(false);
         }
@@ -120,105 +103,31 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
     const handleClose = (open: boolean) => {
         if (!open) {
             form.reset();
-            setStep(1);
         }
         onOpenChange(open);
     }
 
-    // Calculate Bags Expected (from UI perspective just showing what comes from prev session)
-    const prevBags = lastClosedSession?.bagsEndAmounts || {};
-
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Abrir Turno de Caja</DialogTitle>
                     <DialogDescription>
-                        {step === 1 ? "Verifica los saldos del turno anterior." : "Ingresa los montos iniciales para este turno."}
+                        Ingresa el monto inicial para el turno de caja.
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-
-                        {step === 1 && lastClosedSession && (
+                        {lastClosedSession && (
                             <div className="space-y-4 py-2">
                                 <Alert>
                                     <Info className="h-4 w-4" />
-                                    <AlertTitle>Resumen del Corte Anterior ({new Date(lastClosedSession.closedAt!).toLocaleDateString()})</AlertTitle>
+                                    <AlertTitle>Información del Turno Anterior</AlertTitle>
                                     <AlertDescription>
-                                        Revisa que estos montos coincidan con lo que encontraste.
+                                        El turno anterior dejó {formatCurrency(lastClosedSession.cashLeftForNextSession ?? 0)} como fondo de cambio.
                                     </AlertDescription>
                                 </Alert>
-
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div className="border p-3 rounded bg-muted/20">
-                                        <div className="font-semibold mb-2">Efectivo en Caja (Dejado)</div>
-                                        {/* <div className="text-2xl font-bold">{formatCurrency(lastClosedSession.actualCashCount || 0)}</div> */}
-                                        <FormField
-                                            control={control}
-                                            name="correctedPreviousCash"
-                                            render={({ field }) => (
-                                                <FormItem className="mb-0">
-                                                    <FormControl>
-                                                        <Input
-                                                            {...field}
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="text-xl font-bold h-10"
-                                                        />
-                                                    </FormControl>
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="border p-3 rounded bg-muted/20">
-                                        <div className="font-semibold mb-2">Saldos Electrónicos</div>
-                                        <div className="flex justify-between items-center py-1 border-b border-dashed gap-2">
-                                            <span>Recargas:</span>
-                                            {/* <span>{formatCurrency(prevBags['recargas'] || 0)}</span> */}
-                                            <FormField
-                                                control={control}
-                                                name="bagRecargas"
-                                                render={({ field }) => (
-                                                    <FormItem className="w-24 mb-0 space-y-0">
-                                                        <FormControl>
-                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
-                                                        </FormControl>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between items-center py-1 border-b border-dashed gap-2">
-                                            <span>MiMovil:</span>
-                                            <FormField
-                                                control={control}
-                                                name="bagMimovil"
-                                                render={({ field }) => (
-                                                    <FormItem className="w-24 mb-0 space-y-0">
-                                                        <FormControl>
-                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
-                                                        </FormControl>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between items-center py-1 gap-2">
-                                            <span>Servicios:</span>
-                                            <FormField
-                                                control={control}
-                                                name="bagServicios"
-                                                render={({ field }) => (
-                                                    <FormItem className="w-24 mb-0 space-y-0">
-                                                        <FormControl>
-                                                            <Input {...field} type="number" step="0.01" className="h-7 text-right px-2" />
-                                                        </FormControl>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
 
                                 <FormField
                                     control={control}
@@ -233,10 +142,10 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
                                             </FormControl>
                                             <div className="space-y-1 leading-none">
                                                 <FormLabel>
-                                                    Confirmar Saldos Anteriores
+                                                    Confirmar Cierre Anterior
                                                 </FormLabel>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Marque esta casilla si verificó que los montos físicos/reales coinciden con el sistema.
+                                                    Marque esta casilla si verificó que el monto coincide con lo físico.
                                                 </p>
                                             </div>
                                         </FormItem>
@@ -259,111 +168,55 @@ export default function OpenSessionWizard({ isOpen, onOpenChange, onConfirm, las
                                                     ¿El efectivo se quedó en caja?
                                                 </FormLabel>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Si marca esto, el Efectivo Inicial del nuevo turno será igual al cierre anterior ({formatCurrency(correctedPreviousCash || 0)}).
+                                                    Si marca esto, el fondo inicial será igual al cierre anterior ({formatCurrency(correctedPreviousCash || 0)}).
                                                 </p>
                                             </div>
                                         </FormItem>
                                     )}
                                 />
+
+                                <Separator />
                             </div>
                         )}
 
-                        {step === 2 && (
-                            <div className="space-y-4 py-2">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={control}
-                                        name="startingFloat"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Fondo de Caja (Efectivo)</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                                                        <Input className="pl-7" type="number" step="0.01" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                        <div className="space-y-4 py-2">
+                            <FormField
+                                control={control}
+                                name="startingFloat"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Fondo de Caja Inicial (Efectivo)</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                                <Input className="pl-7" type="number" step="0.01" {...field} />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                                    <FormField
-                                        control={control}
-                                        name="bagRecargas"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Saldo Inicial Recargas</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                                                        <Input className="pl-7" type="number" step="0.01" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={control}
-                                        name="bagMimovil"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Saldo Inicial MiMovil</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                                                        <Input className="pl-7" type="number" step="0.01" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={control}
-                                        name="bagServicios"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Saldo Inicial Servicios</FormLabel>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                                                        <Input className="pl-7" type="number" step="0.01" {...field} />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                <Alert variant="default" className="bg-blue-50 border-blue-200">
-                                    <Info className="h-4 w-4 text-blue-600" />
-                                    <AlertTitle className="text-blue-800">Nota</AlertTitle>
-                                    <AlertDescription className="text-blue-700">
-                                        Estos saldos serán el punto de partida para calcular el corte final del día.
-                                    </AlertDescription>
-                                </Alert>
-                            </div>
-                        )}
+                            <Alert variant="default" className="bg-amber-50 border-amber-200">
+                                <Info className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800">Nota</AlertTitle>
+                                <AlertDescription className="text-amber-700">
+                                    Este monto será el punto de partida para calcular el corte final del turno.
+                                    Se han simplificado los procesos eliminando el seguimiento de bolsas de saldo.
+                                    <br />
+                                    <strong className="text-amber-900">El fondo de cambio (float) se retiene entre turnos para facilitar las transacciones.</strong>
+                                </AlertDescription>
+                            </Alert>
+                        </div>
 
                         <DialogFooter className="gap-2 sm:gap-0">
-                            {step === 2 && lastClosedSession && (
-                                <Button type="button" variant="outline" onClick={handleBack} className="mr-auto">
-                                    <ArrowLeft className="mr-2 h-4 w-4" /> Atrás
-                                </Button>
-                            )}
-
                             <Button type="button" variant="secondary" onClick={() => handleClose(false)} disabled={loading}>
                                 Cancelar
                             </Button>
 
-                            {step === 1 && lastClosedSession ? (
-                                <Button type="button" onClick={handleNext} disabled={!previousSessionConfirmed}>
-                                    Siguiente <ArrowRight className="ml-2 h-4 w-4" />
+                            {lastClosedSession ? (
+                                <Button type="button" onClick={form.handleSubmit(onSubmit)} disabled={!previousSessionConfirmed || loading}>
+                                    {loading ? <><Loader2 className="animate-spin mr-2" /> Abriendo...</> : "Confirmar y Abrir Turno"}
                                 </Button>
                             ) : (
                                 <Button type="submit" disabled={loading}>

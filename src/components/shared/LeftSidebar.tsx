@@ -51,6 +51,7 @@ export default function LeftSidebar() {
         { label: "Inventario", href: "/admin", icon: Archive },
         { label: "Kardex", href: "/admin/kardex", icon: FileDocument },
         { label: "Entrada Stock", href: "/admin/stock-entry", icon: DownloadPackage },
+        { label: "Quick PO", href: "/admin/inventory/quick-po-intake", icon: ShoppingBag02 },
         { label: "Ventas", href: "/admin/sales", icon: ShoppingBag01 },
         { label: "Reparaciones", href: "/admin/repairs", icon: EditPencil01 },
         { label: "Garantías", href: "/admin/warranties", icon: CoolShieldCheck },

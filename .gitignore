@@ -1,5 +1,7 @@
-# Supabase migration secrets
+# Supabase
 firebase-to-supabase/**/supabase-service.json
+supabase/.temp/
+supabase/functions/*/node_modules/
 
 # Dependencies
 node_modules/
@@ -30,6 +32,12 @@ build/
 *.swp
 *.swo
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # OS
 Thumbs.db
@@ -84,6 +92,14 @@ public/worker-*.js.map
 .temp/
 .swc/
 .vercel
+.agent/
+.claude/
+.kilocode/
+.genkit/
+.eslintcache
+.prettiercache
+*.orig
+*.bak
 
 # Local Netlify folder
 .netlify

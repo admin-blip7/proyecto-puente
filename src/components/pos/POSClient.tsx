@@ -404,10 +404,22 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }, [isOpeningDrawer]);
 
-  const handleOpenDrawer = async (startingFloat: number, bagsStartAmounts: Record<string, number>, previousSessionConfirmedAt?: Date) => {
+  /**
+   * REFACTORING NOTE: Simplified handleOpenDrawer - Removed all bag-related parameters
+   * 
+   * Now only requires:
+   * - startingFloat: Initial cash amount in drawer
+   * - previousSessionConfirmedAt: Optional timestamp when previous session was confirmed
+   * 
+   * Removed complexity:
+   * - No more bagsStartAmounts parameter
+   * - No more tracking individual bag balances
+   */
+  const handleOpenDrawer = async (startingFloat: number, previousSessionConfirmedAt?: Date) => {
     if (!userProfile) return;
     try {
-      const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat, bagsStartAmounts, previousSessionConfirmedAt);
+      // SIMPLIFICATION: Pass only starting float, removed bagsStartAmounts
+      const newSession = await openCashSession(userProfile.uid, userProfile.name, startingFloat, previousSessionConfirmedAt);
       setActiveSession(newSession);
       setOpeningDrawer(false);
       toast({ title: "Turno Abierto", description: "La caja está lista para registrar ventas." })
@@ -416,20 +428,43 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }
 
-  const handleCloseDrawer = async (actualCash: number, bagsSalesAmounts: Record<string, number> = {}, bagsActualEndAmounts: Record<string, number> = {}, depositAccountId?: string, cashLeftForNextSession: number = 0, balanceBagAccountId?: string, dailySalesAccountId?: string) => {
+  /**
+   * CASH FLOAT MANAGEMENT FEATURE: Enhanced handleCloseDrawer with float support
+   *
+   * Now requires:
+   * - actualCash: Total cash counted in drawer
+   * - depositAccountId: Target account for deposit
+   * - closingFloat: Amount to leave in drawer for next shift (float money)
+   *
+   * CASH FLOAT MANAGEMENT ADDED BACK:
+   * - closingFloat parameter to retain change money between shifts
+   * - Only net amount (actualCash - closingFloat) is deposited
+   * - Float money stays in drawer and is NOT deposited
+   *
+   * Removed complexity (from refactoring):
+   * - No more bagsSalesAmounts tracking
+   * - No more bagsActualEndAmounts calculations
+   * - No more balanceBagAccountId (single deposit account)
+   * - No more dailySalesAccountId (consolidated into deposit)
+   *
+   * The process with float management:
+   * - User enters total cash counted
+   * - User enters amount to leave for next shift (closing float)
+   * - User selects target deposit account
+   * - Only net amount (actualCash - closingFloat) is deposited to account
+   */
+  const handleCloseDrawer = async (actualCash: number, depositAccountId: string, closingFloat: number) => {
     if (!userProfile || !activeSession) return;
 
     console.log('🔄 [SESSION] handleCloseDrawer called with actualCash:', actualCash);
-    console.log('🔄 [SESSION] Bag Sales:', bagsSalesAmounts);
-    console.log('🔄 [SESSION] Bag Actual Ends:', bagsActualEndAmounts);
-    console.log('🔄 [SESSION] Leftover Cash:', cashLeftForNextSession);
-    console.log('🔄 [SESSION] Balance Bag Account:', balanceBagAccountId);
-    console.log('🔄 [SESSION] Daily Sales Account:', dailySalesAccountId);
+    console.log('🔄 [SESSION] Closing float:', closingFloat);
+    console.log('🔄 [SESSION] Deposit Account:', depositAccountId);
     console.log('🔄 [SESSION] Active session:', activeSession.sessionId);
 
     try {
       console.log('🔄 [SESSION] Closing cash session...');
-      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, bagsSalesAmounts, bagsActualEndAmounts, depositAccountId, cashLeftForNextSession, balanceBagAccountId, dailySalesAccountId);
+      // CASH FLOAT MANAGEMENT: Pass closing float to persist amount left for next shift
+      const closedSession = await closeCashSession(activeSession, userProfile.uid, userProfile.name, actualCash, depositAccountId, closingFloat);
       console.log('✅ [SESSION] Cash session closed:', closedSession.sessionId);
 
       setActiveSession(null);
@@ -437,31 +472,10 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
       setClosedSessionData(closedSession);
 
-      // Parse balance bag accounts to show detailed message
-      let message: string;
-      try {
-        if (balanceBagAccountId) {
-          const balanceBagAccounts = JSON.parse(balanceBagAccountId);
-          const activeBags = Object.entries(balanceBagAccounts)
-            .filter(([_, accountId]) => !!accountId)
-            .map(([bagType, _]) => bagType.toUpperCase());
-
-          if (activeBags.length > 0 && cashLeftForNextSession > 0) {
-            message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará como registro para el siguiente turno (${activeBags.join(', ')}).`;
-          } else if (cashLeftForNextSession > 0) {
-            message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará como registro para el siguiente turno.`;
-          } else {
-            message = `Turno cerrado sin dinero a dejar.`;
-          }
-        } else if (cashLeftForNextSession > 0) {
-          message = `Turno cerrado. El dinero a dejar (${formatCurrency(cashLeftForNextSession)}) se guardará para el siguiente turno.`;
-        } else {
-          message = `Turno cerrado.`;
-        }
-      } catch {
-        // If parsing fails, use simple message
-        message = `Turno cerrado.`;
-      }
+      // CASH FLOAT MANAGEMENT: Include float information in success message
+      const message = closingFloat > 0
+        ? `Turno cerrado. ${formatCurrency(actualCash - closingFloat)} depositados. ${formatCurrency(closingFloat)} dejados como fondo de cambio.`
+        : `Turno cerrado. ${formatCurrency(actualCash)} depositados en cuenta seleccionada.`;
 
       toast({
         title: "✅ Turno Cerrado",

@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 import { formatCurrency } from "@/lib/utils";
 import { getIncomesBySession } from "@/lib/services/incomeService";
 import { useEffect, useState } from "react";
+import { calculateNetCashSales } from "@/lib/utils/cashCalculations";
 
 interface CashCloseTicketProps {
   session: CashSession;
@@ -228,11 +229,28 @@ export default function CashCloseTicket({
             <span>{session.difference >= 0 ? '+' : '-'}{formatCurrency(Math.abs(session.difference))}</span>
           </div>
         )}
+
+        {/* CASH FLOAT MANAGEMENT: Float Management Section */}
         {session.cashLeftForNextSession !== undefined && session.cashLeftForNextSession > 0 && (
-          <div className="flex justify-between font-bold">
-            <span>Efectivo Dejado en Caja:</span>
-            <span>{formatCurrency(session.cashLeftForNextSession)}</span>
-          </div>
+          <>
+            <hr className="border-double border-black my-2" />
+            <div className="space-y-1 mb-3">
+              <p className="font-bold text-amber-700">GESTIÓN DE FONDO DE CAMBIO:</p>
+              <div className="flex justify-between font-bold text-base">
+                <span>Cambio Dejado:</span>
+                <span className="text-amber-700">{formatCurrency(session.cashLeftForNextSession)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground italic mt-1">
+                * Este monto se quedó en caja para dar cambio en el siguiente turno
+              </p>
+              {session.startingFloat !== undefined && (
+                <div className="flex justify-between mt-1">
+                  <span className="text-sm">Cambio Encontrado:</span>
+                  <span className="text-sm font-semibold">{formatCurrency(session.startingFloat)}</span>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -273,6 +291,20 @@ export default function CashCloseTicket({
 
       {/* Totals */}
       <div className="space-y-1 mb-4">
+        {/* CASH FLOAT MANAGEMENT: Calculate and display net cash sales */}
+        {session.actualCashCount !== undefined && session.startingFloat !== undefined && (
+          <div className="flex justify-between font-bold text-base bg-blue-50 border-t border-dashed border-blue-300 pt-1 p-1 rounded">
+            <span className="text-blue-800">VENTAS NETAS DE EFECTIVO:</span>
+            <span className="text-blue-900">
+              {formatCurrency(calculateNetCashSales(
+                session.actualCashCount,
+                session.startingFloat,
+                session.cashLeftForNextSession ?? 0
+              ))}
+            </span>
+          </div>
+        )}
+
         <div className="flex justify-between font-bold text-base border-t border-dashed border-black pt-1">
           <span>TOTAL VENTAS DEL DÍA:</span>
           <span>{formatCurrency((session.totalCashSales ?? 0) + (session.totalCardSales ?? 0))}</span>
