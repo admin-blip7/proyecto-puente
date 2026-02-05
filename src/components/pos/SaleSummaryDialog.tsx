@@ -8,8 +8,7 @@ import { useRef, useState, useEffect } from "react";
 import { Sale, TicketSettings, Product } from "@/types";
 import { getTicketSettings } from "@/lib/services/settingsService";
 import PrintableTicket from "../admin/settings/PrintableTicket";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { generateTicketPdf } from "@/lib/services/ticketPdfService";
 import ChangeProductDialog from "./ChangeProductDialog";
 import { getProducts } from "@/lib/services/productService";
 import { getSaleChanges, createProductChange } from "@/lib/services/salesChangeService";
@@ -64,113 +63,32 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale, products
   };
 
   const createTicketPdf = async () => {
-    const ticketElement = printAreaRef.current?.querySelector('.ticket-preview');
-    if (!ticketElement || !settings) {
-      console.error("No se encontró el elemento del ticket para generar el PDF.");
-      return null;
-    }
-
-    const canvas = await html2canvas(ticketElement as HTMLElement, {
-      scale: 2,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const pdfWidth = 58;
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: [pdfWidth, pdfHeight]
-    });
-
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    return pdf.output('blob');
+    if (!settings) return null;
+    return generateTicketPdf({ sale, settings });
   };
 
   const handlePrintTicket = async () => {
     setIsGeneratingPdf(true);
     try {
-      const ticketElement = printAreaRef.current?.querySelector('.ticket-preview');
-      if (!ticketElement || !settings) {
-        console.error("No se encontró el elemento del ticket para imprimir.");
-        toast({ title: "Error", description: "No se encontró el ticket para imprimir.", variant: "destructive" });
+      if (!settings) {
+        toast({ title: "Error", description: "Configuración no disponible.", variant: "destructive" });
         return;
       }
 
-      // Capture ticket as image using html2canvas
-      const canvas = await html2canvas(ticketElement as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
+      const pdfBlob = await generateTicketPdf({ sale, settings });
+      const pdfUrl = URL.createObjectURL(pdfBlob);
 
-      const imgData = canvas.toDataURL('image/png');
-
-      // Create a new popup window - smaller size to look like a popup
-      const printWindow = window.open('', 'PrintTicket', 'width=320,height=500,left=100,top=100,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes');
-      if (!printWindow) {
-        toast({ title: "Error", description: "No se pudo abrir la ventana de impresión. Desactiva el bloqueador de popups.", variant: "destructive" });
-        return;
+      const printWindow = window.open(pdfUrl, '_blank');
+      if (printWindow) {
+        // Note: Automatic printing from PDF blob URL might vary by browser.
+        // Usually user has to click print in the PDF viewer.
+        // Alternatively, we can use an iframe to print, but opening in new tab is reliable.
+        printWindow.onload = () => {
+          // printWindow.print(); // Often blocked for PDFs in new tabs
+        };
+      } else {
+        toast({ title: "Error", description: "No se pudo abrir la ventana de impresión.", variant: "destructive" });
       }
-
-      // Write the print page with the ticket image - auto prints on load
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Imprimir Ticket</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              background: white;
-              display: flex;
-              justify-content: center;
-              align-items: flex-start;
-              padding: 0;
-              margin: 0;
-            }
-            .ticket-img {
-              width: 58mm;
-              max-width: 100%;
-              height: auto;
-              display: block;
-            }
-            @media print {
-              @page { 
-                size: 58mm auto; 
-                margin: 0; 
-              }
-              body {
-                margin: 0;
-                padding: 0;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <img src="${imgData}" alt="Ticket" class="ticket-img" />
-          <script>
-            // Auto-print when loaded
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 100);
-            };
-            // Close window after print (or cancel)
-            window.onafterprint = function() {
-              window.close();
-            };
-            // Also close on escape key
-            document.onkeydown = function(e) {
-              if (e.key === 'Escape') window.close();
-            };
-          <\/script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
 
     } catch (error) {
       console.error("Error al imprimir el ticket:", error);

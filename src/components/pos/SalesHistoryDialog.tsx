@@ -14,6 +14,10 @@ import ChangeProductDialog from "./ChangeProductDialog";
 import { createProductChange } from "@/lib/services/salesChangeService";
 import { getSales } from "@/lib/services/salesService";
 import { Card } from "@/components/ui/card";
+import { Printer } from "lucide-react";
+import { generateTicketPdf } from "@/lib/services/ticketPdfService";
+import { getTicketSettings } from "@/lib/services/settingsService";
+import { useToast } from "@/hooks/use-toast";
 
 // Helper type extending Sale to include UI-specific needs if any
 // but we just use Sale for now
@@ -36,6 +40,8 @@ export default function SalesHistoryDialog({
     const [searchQuery, setSearchQuery] = useState("");
     const [page, setPage] = useState(0);
     const [selectedDate, setSelectedDate] = useState<string>("");
+    const [isPrinting, setIsPrinting] = useState<string | null>(null);
+    const { toast } = useToast();
     const limit = 20;
 
     // Reset or set initial date when dialog opens
@@ -90,6 +96,57 @@ export default function SalesHistoryDialog({
         // For now we'll just close the dialogs
         setChangeDialogSale(null);
         onOpenChange(false);
+    };
+
+    const handlePrintTicket = async (sale: Sale) => {
+        setIsPrinting(sale.id);
+
+        // Open a popup window immediately to avoid popup blockers
+        const width = 450;
+        const height = 650;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+
+        const printWindow = window.open(
+            'about:blank',
+            'ImprimirTicket',
+            `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=no,location=no,toolbar=no,menubar=no`
+        );
+
+        if (!printWindow) {
+            toast({
+                title: "Popup bloqueado",
+                description: "Por favor permite los popups para imprimir el ticket.",
+                variant: "destructive"
+            });
+            setIsPrinting(null);
+            return;
+        }
+
+        try {
+            // Put a loading message in the window
+            printWindow.document.write('<html><head><title>Generando Ticket...</title></head><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><div>Generando PDF del ticket... por favor espere.</div></body></html>');
+
+            const settings = await getTicketSettings();
+
+            if (!settings) {
+                toast({ title: "Error", description: "No se encontró la configuración del ticket.", variant: "destructive" });
+                printWindow.close();
+                return;
+            }
+
+            const pdfBlob = await generateTicketPdf({ sale, settings });
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+
+            // Redirect the already opened window to the PDF
+            printWindow.location.href = pdfUrl;
+        } catch (error) {
+            console.error("[handlePrintTicket] Error:", error);
+            toast({ title: "Error", description: "No se pudo generar el ticket.", variant: "destructive" });
+            printWindow.close();
+        } finally {
+            setIsPrinting(null);
+        }
     };
 
     return (
@@ -191,6 +248,18 @@ export default function SalesHistoryDialog({
                                                         >
                                                             <RefreshCcw className="mr-2 h-4 w-4" />
                                                             <span>Cambiar Producto</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            disabled={sale.status === 'cancelled' || !!isPrinting}
+                                                            onClick={() => handlePrintTicket(sale)}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            {isPrinting === sale.id ? (
+                                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Printer className="mr-2 h-4 w-4" />
+                                                            )}
+                                                            <span>Reimprimir Ticket</span>
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>

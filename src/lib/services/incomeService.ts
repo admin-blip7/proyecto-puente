@@ -319,11 +319,26 @@ export const getIncomesBySession = async (
     try {
         const supabase = getSupabaseServerClient();
 
-        // Try to fetch by session_id first if the column exists (it should after migration)
+        let targetSessionId = sessionId;
+
+        // Try to resolve sessionId to UUID if it's a human-readable ID (CS-XXXX)
+        if (!uuidValidate(sessionId)) {
+            const { data: sessionData } = await supabase
+                .from("cash_sessions")
+                .select("id")
+                .eq("session_number", sessionId)
+                .maybeSingle();
+
+            if (sessionData?.id) {
+                targetSessionId = sessionData.id;
+            }
+        }
+
+        // Try to fetch by session_id first
         const { data, error } = await supabase
             .from(INCOMES_TABLE)
             .select("*")
-            .eq("session_id", sessionId)
+            .eq("session_id", targetSessionId)
             .order("paymentDate", { ascending: false });
 
         if (!error && data && data.length > 0) {

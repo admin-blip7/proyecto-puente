@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 
     const { error: updateError } = await supabase
       .from("sales")
-      .update({ sessionId: activeSession.sessionId })
+      .update({ session_id: activeSession.sessionId })
       .eq("id", result.id);
 
     if (updateError) {

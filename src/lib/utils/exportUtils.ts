@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateReportPdf } from '../services/pdfReportService';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -66,93 +65,68 @@ const getPaymentMethodLabel = (method: string) => {
   return labels[method] || method;
 };
 
-export const exportToPDF = (data: ConsignorSalesData, filters?: {
+export const exportToPDF = async (data: ConsignorSalesData, filters?: {
   startDate?: string;
   endDate?: string;
   searchTerm?: string;
   paymentMethodFilter?: string;
 }) => {
-  const doc = new jsPDF();
-
-  // Header
-  doc.setFontSize(20);
-  doc.text('Reporte de Ventas por Consignador', 20, 20);
-
-  doc.setFontSize(14);
-  doc.text(`Consignador: ${data.consignor.name}`, 20, 35);
-
-  doc.setFontSize(10);
-  doc.text(`Generado el: ${formatDate(new Date().toISOString())}`, 20, 45);
-
-  // Filters applied
+  const details: string[] = [];
   if (filters) {
-    let filtersText = 'Filtros aplicados: ';
-    const appliedFilters = [];
-
-    if (filters.startDate) appliedFilters.push(`Desde: ${formatDate(filters.startDate)}`);
-    if (filters.endDate) appliedFilters.push(`Hasta: ${formatDate(filters.endDate)}`);
-    if (filters.searchTerm) appliedFilters.push(`Búsqueda: ${filters.searchTerm}`);
-    if (filters.paymentMethodFilter) appliedFilters.push(`Método: ${getPaymentMethodLabel(filters.paymentMethodFilter)}`);
-
-    if (appliedFilters.length > 0) {
-      filtersText += appliedFilters.join(', ');
-      doc.text(filtersText, 20, 55);
-    }
+    if (filters.startDate) details.push(`Desde: ${formatDate(filters.startDate)}`);
+    if (filters.endDate) details.push(`Hasta: ${formatDate(filters.endDate)}`);
+    if (filters.searchTerm) details.push(`Búsqueda: ${filters.searchTerm}`);
+    if (filters.paymentMethodFilter) details.push(`Método: ${getPaymentMethodLabel(filters.paymentMethodFilter)}`);
   }
 
-  // Summary section
-  const summaryY = filters && (filters.startDate || filters.endDate || filters.searchTerm || filters.paymentMethodFilter) ? 70 : 60;
+  const summary = [
+    { label: 'Total de Ventas', value: data.summary.totalSales.toString() },
+    { label: 'Ingresos Totales', value: formatCurrency(data.summary.totalRevenue) },
+    { label: 'Productos Vendidos', value: data.summary.totalQuantity.toString() },
+    { label: 'Promedio por Venta', value: formatCurrency(data.summary.averageSaleAmount) }
+  ];
 
-  doc.setFontSize(12);
-  doc.text('Resumen:', 20, summaryY);
-
-  doc.setFontSize(10);
-  doc.text(`Total de Ventas: ${data.summary.totalSales}`, 20, summaryY + 10);
-  doc.text(`Ingresos Totales: ${formatCurrency(data.summary.totalRevenue)}`, 20, summaryY + 20);
-  doc.text(`Productos Vendidos: ${data.summary.totalQuantity}`, 20, summaryY + 30);
-  doc.text(`Promedio por Venta: ${formatCurrency(data.summary.averageSaleAmount)}`, 20, summaryY + 40);
-
-  // Sales table
-  const tableStartY = summaryY + 55;
-
-  const tableData = data.sales.map(sale => [
+  const headers = ['Fecha', 'ID Venta', 'Cliente', 'Productos', 'Cant', 'Total', 'Método'];
+  const rows = data.sales.map(sale => [
     formatDate(sale.createdAt),
     sale.id.slice(0, 8) + '...',
-    sale.client?.name || 'Cliente General',
-    sale.items.map(item => `${item.productName} (${item.quantity})`).join(', '),
+    sale.client?.name || 'General',
+    sale.items.map(item => `${item.productName.substring(0, 20)} (${item.quantity})`).join(', '),
     sale.totalQuantity.toString(),
     formatCurrency(sale.total),
     getPaymentMethodLabel(sale.payment_method)
   ]);
 
-  autoTable(doc, {
-    head: [['Fecha', 'ID Venta', 'Cliente', 'Productos', 'Cantidad', 'Total', 'Método de Pago']],
-    body: tableData,
-    startY: tableStartY,
-    styles: {
-      fontSize: 8,
-      cellPadding: 2,
-    },
-    headStyles: {
-      fillColor: [59, 130, 246],
-      textColor: 255,
-      fontStyle: 'bold',
-    },
-    columnStyles: {
-      0: { cellWidth: 25 }, // Fecha
-      1: { cellWidth: 20 }, // ID
-      2: { cellWidth: 30 }, // Cliente
-      3: { cellWidth: 50 }, // Productos
-      4: { cellWidth: 15 }, // Cantidad
-      5: { cellWidth: 25 }, // Total
-      6: { cellWidth: 25 }, // Método
-    },
-    margin: { top: 20, right: 20, bottom: 20, left: 20 },
-  });
+  // Approximate column weights
+  const columnWidths = [15, 12, 18, 25, 8, 12, 10];
 
-  // Save the PDF
-  const fileName = `reporte-ventas-${data.consignor.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-  doc.save(fileName);
+  try {
+    const pdfBlob = await generateReportPdf({
+      title: 'Reporte de Ventas',
+      subtitle: `Consignador: ${data.consignor.name}`,
+      details,
+      summary,
+      table: {
+        headers,
+        rows,
+        columnWidths
+      },
+      filename: `reporte-ventas-${data.consignor.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+    });
+
+    // Trigger download
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reporte-ventas-${data.consignor.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error("Error generating PDF report:", error);
+  }
 };
 
 export const exportToExcel = (data: ConsignorSalesData, filters?: {

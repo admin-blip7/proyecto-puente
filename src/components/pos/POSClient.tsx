@@ -35,14 +35,13 @@ import CloseCashDrawerDialog from "./CloseCashDrawerDialog";
 import CashDepositVerificationDialog from "./CashDepositVerificationDialog";
 
 import { getSales } from "@/lib/services/salesService";
-import CashCloseTicket from "./CashCloseTicket";
+
 import { Skeleton } from "../ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 import { getProducts } from "@/lib/services/productService";
 import CodeScannerDialog from "./CodeScannerDialog";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+
 import { getReadyRepairs } from "@/lib/services/repairService";
 import { RepairOrder } from "@/types";
 import SalesHistoryDialog from "./SalesHistoryDialog";
@@ -92,11 +91,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
   const [showRepairsDialog, setShowRepairsDialog] = useState(false);
-  const [printTicketSession, setPrintTicketSession] = useState<CashSession | null>(null);
-  const [ticketExpenses, setTicketExpenses] = useState<Expense[]>([]);
-  const [ticketIncomes, setTicketIncomes] = useState<Income[]>([]);
-  const [ticketSales, setTicketSales] = useState<Sale[]>([]);
-  const [ticketReady, setTicketReady] = useState(false);
+
   const [showDailySales, setShowDailySales] = useState(false);
   const [showRecargasDialog, setShowRecargasDialog] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
@@ -203,7 +198,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       description: `Orden #${repair.orderId} agregada al carrito.`
     });
   };
-  const [ticketElement, setTicketElement] = useState<HTMLDivElement | null>(null);
+
 
   // Function to refresh products from the database
   const refreshProducts = useCallback(async () => {
@@ -235,20 +230,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
   }, [userProfile]);
 
-  useEffect(() => {
-    if (printTicketSession) {
-      console.log('🔄 [TICKET] printTicketSession changed, waiting for render...');
-      // Allow time for the hidden div to be rendered in the DOM
-      const timeoutId = setTimeout(() => {
-        console.log('✅ [TICKET] Setting ticketReady to true');
-        setTicketReady(true);
-      }, 500); // Increased to 500ms to be safe
 
-      return () => clearTimeout(timeoutId);
-    } else {
-      setTicketReady(false);
-    }
-  }, [printTicketSession]);
 
 
   const addToCart = (product: Product, quantity: number = 1) => {
@@ -498,202 +480,72 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
 
 
+  /* 
+   * NEW IMPLIES @libpdf/core 
+   */
   const printCashCloseTicket = async (session: CashSession) => {
+    if (printOperationRef.current.isActive) return;
+    printOperationRef.current.isActive = true;
+
     console.log('🔄 [TICKET] Preparing ticket for session:', session.sessionId);
-
-    // Fetch expenses and sales for this session
-    try {
-      const expenses = await getExpensesBySession(
-        session.sessionId,
-        session.openedAt ? new Date(session.openedAt) : undefined,
-        session.closedAt ? new Date(session.closedAt) : new Date()
-      );
-      console.log('✅ [TICKET] Expenses fetched:', expenses.length);
-      setTicketExpenses(expenses);
-
-      const incomes = await getIncomesBySession(
-        session.sessionId,
-        session.openedAt ? new Date(session.openedAt) : undefined,
-        session.closedAt ? new Date(session.closedAt) : new Date()
-      );
-      console.log('✅ [TICKET] Incomes fetched:', incomes.length);
-      setTicketIncomes(incomes);
-
-      const sales = await getSalesBySession(
-        session.sessionId,
-        session.openedBy,
-        session.openedAt ? new Date(session.openedAt) : undefined,
-        session.closedAt ? new Date(session.closedAt) : new Date()
-      );
-      console.log('✅ [TICKET] Sales fetched:', sales.length);
-      setTicketSales(sales);
-    } catch (error) {
-      console.error('❌ [TICKET] Error fetching data:', error);
-      setTicketExpenses([]);
-      setTicketSales([]);
-    }
-
     toast({
       title: "Generando ticket...",
       description: "Por favor espere..."
     });
 
-    setPrintTicketSession(session);
-    // Let the useEffect handle setTicketReady(true) after render
-    // setTicketReady(true);
-  };
+    try {
+      const expenses = await getExpensesBySession(
+        session.id,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
 
-  // Effect to create and print ticket
-  useEffect(() => {
-    const conditions = {
-      ticketReady,
-      hasSession: !!printTicketSession,
-      sessionId: printTicketSession?.sessionId,
-      hasElement: !!ticketElement,
-      isPrinting: printOperationRef.current.isActive
-    };
+      const incomes = await getIncomesBySession(
+        session.id,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
 
-    console.log('🔄 [TICKET] Print effect checking conditions:', JSON.stringify(conditions));
+      const sales = await getSalesBySession(
+        session.id,
+        session.openedBy,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
 
-    if (ticketReady && printTicketSession && !printOperationRef.current.isActive) {
-      // Check element existence (ref or DOM)
-      const el = ticketElement || document.getElementById('cash-close-ticket');
+      await generateAndPrintPdf({ session, sales, expenses, incomes });
 
-      if (el) {
-        console.log('✅ [TICKET] Conditions met, starting print flow...');
-        printOperationRef.current.isActive = true;
-
-        // Wait for a frame to ensure the effect has completed
-        setTimeout(() => {
-          console.log('✅ [TICKET] Timeout reached. Checking element again...');
-          // Re-acquire element to be safe
-          const finalEl = ticketElement || document.getElementById('cash-close-ticket');
-
-          if (finalEl) {
-            console.log('✅ [TICKET] Element found, calling generateAndPrintPdf');
-            generateAndPrintPdf(finalEl as HTMLElement);
-          } else {
-            console.error('❌ [TICKET] Element lost after timeout!');
-            printOperationRef.current.isActive = false;
-          }
-        }, 500);
-      } else {
-        console.warn('⚠️ [TICKET] Ready to print but element missing (DOM/Ref). Waiting...');
-      }
-
-      return () => {
-        // cleanup if needed
-      };
-    } else {
-      if (printOperationRef.current.isActive) {
-        console.log('ℹ️ [TICKET] Skipping: Already printing');
-      } else if (!ticketReady) {
-        console.log('ℹ️ [TICKET] Skipping: Ticket not ready');
-      }
-    }
-  }, [ticketReady, printTicketSession, ticketElement, toast]);
-
-  const generateAndPrintPdf = async (element: HTMLElement) => {
-    console.log('🔄 [TICKET] Starting generateAndPrintPdf...');
-    if (!element) {
-      console.error('❌ [TICKET] Ticket element not found');
+    } catch (error) {
+      console.error('❌ [TICKET] Error fetching data:', error);
       toast({
-        title: "Error de impresión",
-        description: "No se encontró el contenido del ticket.",
+        title: "Error",
+        description: "No se pudieron obtener los datos para el ticket",
         variant: "destructive"
       });
-      return;
+    } finally {
+      printOperationRef.current.isActive = false;
     }
+  };
 
+  const generateAndPrintPdf = async (data: { session: CashSession, sales: any[], expenses: any[], incomes: any[] }) => {
     try {
-      console.log('🔄 [TICKET] Generating canvas with html2canvas...');
+      console.log('🔄 [TICKET] Generando PDF programático...');
+      const { generateCashClosePdf } = await import('@/lib/services/cashClosePdfService');
 
-      // Create a temporary clone of the element for better thermal printer compatibility
-      const tempElement = element.cloneNode(true) as HTMLElement;
-      
-      // Force inline styles for thermal printing
-      tempElement.style.backgroundColor = '#FFFFFF';
-      tempElement.style.color = '#000000';
-      
-      // Force all text elements to be black for thermal printing
-      const allTextElements = tempElement.querySelectorAll('*');
-      allTextElements.forEach(el => {
-        const htmlEl = el as HTMLElement;
-        // Get computed styles to preserve font properties
-        const computedStyles = window.getComputedStyle(el as Element);
-        htmlEl.style.color = '#000000';
-        htmlEl.style.fontWeight = computedStyles.fontWeight;
-        htmlEl.style.fontFamily = computedStyles.fontFamily;
-      });
+      const pdfBlob = await generateCashClosePdf(data);
+      const blobUrl = URL.createObjectURL(pdfBlob);
 
-      document.body.appendChild(tempElement);
-
-      const canvas = await html2canvas(tempElement, {
-        scale: 3, // Increased scale for better quality on thermal printers
-        useCORS: true,
-        logging: false,
-        windowWidth: 350,
-        backgroundColor: '#ffffff', // Explicit white background
-        // Options for better thermal printer rendering
-        onclone: (clonedDoc) => {
-          // Ensure the cloned document has white background
-          const clonedEl = clonedDoc.getElementById(tempElement.id);
-          if (clonedEl) {
-            clonedEl.style.backgroundColor = '#ffffff';
-            clonedEl.style.color = '#000000';
-          }
-        }
-      });
-
-      // Remove temporary element
-      document.body.removeChild(tempElement);
-      
-      console.log('✅ [TICKET] Canvas generated');
-
-      // Use JPEG instead of PNG for better thermal printer compatibility
-      // JPEG with quality 1.0 produces solid black text that works better on thermal
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const imgProps = new jsPDF().getImageProperties(imgData);
-
-      // Calculate PDF height based on aspect ratio (width fixed at 80mm)
-      const pdfWidth = 80;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      // Create PDF with exact height
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [pdfWidth, Math.max(pdfHeight, 10)] // ensure min height
-      });
-
-      // Add the image to PDF
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-
-      // Add auto-print script
-      pdf.autoPrint();
-
-      const blob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(blob);
-      console.log('✅ [TICKET] Blob URL created:', blobUrl);
-
-      // Log success and toast
-      toast({
-        title: "🖨️ Imprimiendo ticket...",
-        description: "Se ha enviado el documento a la impresora."
-      });
-
-      // Use iframe to print (better compatibility than window.open)
+      // Use iframe to print
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       iframe.src = blobUrl;
       document.body.appendChild(iframe);
 
-      // Wait a moment for the blob to load in the iframe
       setTimeout(() => {
         if (iframe.contentWindow) {
           iframe.contentWindow.print();
         }
-      }, 1000);
+      }, 500);
 
       // Cleanup
       setTimeout(() => {
@@ -701,17 +553,18 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
           document.body.removeChild(iframe);
         }
         URL.revokeObjectURL(blobUrl);
-        setPrintTicketSession(null);
-        printOperationRef.current.isActive = false;
-        console.log('✅ [TICKET] Cleanup done');
-      }, 5000); // 5s to allow user to interact with print dialog
+      }, 5000);
 
     } catch (error) {
       console.error('❌ [TICKET] Error generating PDF:', error);
-      toast({ variant: 'destructive', title: "Error", description: "No se pudo generar el ticket." });
-      printOperationRef.current.isActive = false;
+      toast({
+        title: "Error al generar ticket",
+        description: "Hubo un problema al crear el PDF.",
+        variant: "destructive"
+      });
     }
   };
+
 
   // Helper to format currency
   const formatCurrencyVal = (value: number | undefined) => {
@@ -728,29 +581,13 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     return new Date(dateString).toLocaleString('es-ES');
   };
 
-  // createTicketHtml removed as we now use direct component capture via html2canvas
+
 
 
   // Create a DOM element directly for printing
 
 
-  const downloadPdf = (pdf: jsPDF, filename: string) => {
-    try {
-      pdf.save(filename);
-      console.log('✅ [TICKET] PDF downloaded successfully:', filename);
-      toast({
-        title: '📥 PDF descargado',
-        description: `Archivo guardado: ${filename}`,
-      });
-    } catch (error) {
-      console.error('❌ [TICKET] Error downloading PDF:', error);
-      toast({
-        title: '❌ Error al descargar',
-        description: 'No se pudo descargar el PDF',
-        variant: 'destructive',
-      });
-    }
-  };
+
 
   const sanitize = (s: string) => s.toLowerCase().replace(/[\s\-_.]/g, "");
 
@@ -869,19 +706,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
             }}
           />
         )}
-        {
-          printTicketSession && (
-            <div ref={setTicketElement} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
-              <CashCloseTicket
-                id="cash-close-ticket"
-                session={printTicketSession}
-                sales={ticketSales}
-                expenses={ticketExpenses}
-                incomes={ticketIncomes}
-              />
-            </div>
-          )
-        }
+
       </>
     )
   }
@@ -1089,19 +914,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
         session={activeSession}
         onConfirm={handleCloseDrawer}
       />
-      {
-        printTicketSession && (
-          <div ref={setTicketElement} style={{ position: 'absolute', left: '-9999px', top: '0', width: '80mm' }}>
-            <CashCloseTicket
-              id="cash-close-ticket"
-              session={printTicketSession}
-              sales={ticketSales}
-              expenses={ticketExpenses}
-              incomes={ticketIncomes}
-            />
-          </div>
-        )
-      }
+
       <RepairsDialog
         isOpen={showRepairsDialog}
         onOpenChange={setShowRepairsDialog}

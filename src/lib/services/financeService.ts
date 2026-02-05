@@ -32,7 +32,7 @@ const mapExpense = (row: any): Expense => {
     paidFromAccountId: row?.paidFromAccountId ?? "",
     paymentDate: toDate(row?.paymentDate),
     receiptUrl: row?.receiptUrl ?? undefined,
-    sessionId: row?.sessionId ?? undefined,
+    sessionId: row?.session_id ?? row?.sessionId ?? undefined,
   };
 };
 
@@ -84,17 +84,40 @@ export const getExpensesBySession = async (
   try {
     const supabase = getSupabaseServerClient();
 
-    // Since the expenses table doesn't seem to have a sessionId column yet,
-    // we MUST use the date range fallback.
+    let targetSessionId = sessionId;
 
+    // Try to resolve sessionId to UUID if it's a human-readable ID (CS-XXXX)
+    if (!uuidValidate(sessionId)) {
+      const { data: sessionData } = await supabase
+        .from("cash_sessions")
+        .select("id")
+        .eq("session_number", sessionId)
+        .maybeSingle();
+
+      if (sessionData?.id) {
+        targetSessionId = sessionData.id;
+      }
+    }
+
+    // 1. Try to fetch by session_id first
+    const { data: sessionExpenses, error: sessionError } = await supabase
+      .from(EXPENSES_TABLE)
+      .select("*")
+      .eq("session_id", targetSessionId)
+      .order("paymentDate", { ascending: false });
+
+    if (!sessionError && sessionExpenses && sessionExpenses.length > 0) {
+      return sessionExpenses.map(mapExpense);
+    }
+
+    // 2. Fallback to date range if sessionId lookup returns nothing
     if (startDate && endDate) {
       // Fetch expenses within the session time range
-      // We use a limit to avoid fetching too many, and filter in memory for safety
       const { data, error } = await supabase
         .from(EXPENSES_TABLE)
         .select("*")
         .order("paymentDate", { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (error) {
         throw error;
@@ -109,7 +132,6 @@ export const getExpensesBySession = async (
       });
     }
 
-    // If no dates provided, return empty (cannot link by ID)
     return [];
   } catch (error) {
     log.error("Error fetching expenses by session", error);
@@ -310,7 +332,7 @@ export const addExpense = async (
     paidFromAccountId: expenseData.paidFromAccountId,
     paymentDate,
     receiptUrl: receiptUrl ?? null,
-    sessionId: activeSession ? activeSession.id : (expenseData.sessionId || null),
+    session_id: activeSession ? activeSession.id : (expenseData.sessionId || null),
   };
 
   const { data: insertedExpense, error: insertError } = await supabase

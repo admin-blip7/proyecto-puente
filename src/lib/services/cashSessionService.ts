@@ -189,9 +189,9 @@ export const getSessionForDate = async (date: Date): Promise<CashSession | null>
     const { data, error } = await supabase
       .from(CASH_SESSIONS_TABLE)
       .select("*")
-      .gte("openedAt", startOfDay.toISOString())
-      .lte("openedAt", endOfDay.toISOString())
-      .order("openedAt", { ascending: false })
+      .gte("opened_at", startOfDay.toISOString())
+      .lte("opened_at", endOfDay.toISOString())
+      .order("opened_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -374,7 +374,7 @@ export const closeCashSession = async (
     // CASH FLOAT MANAGEMENT: Now storing closing_float (cash_left_for_next_session)
     // VARIANCE CLASSIFICATION: Calculate and store variance type (surplus/shortage/balanced)
     const varianceType = difference === 0 ? 'balanced' : (difference > 0 ? 'surplus' : 'shortage');
-    
+
     const updatePayload: any = {
       status: "Cerrado",
       closed_by: userId,

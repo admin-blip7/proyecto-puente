@@ -1,7 +1,7 @@
 "use server";
 
 import { Sale, CartItem } from "@/types";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, validate as uuidValidate } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
@@ -45,6 +45,7 @@ const mapSale = (row: any): Sale => ({
   discountCode: row?.discount_code ?? undefined,
   discountAmount: row?.discount_amount ? Number(row.discount_amount) : undefined,
   discountPercentage: row?.discount_percentage ? Number(row.discount_percentage) : undefined,
+  sessionId: row?.session_id ?? undefined,
 });
 
 export const getSales = async (
@@ -132,11 +133,28 @@ export const getSalesBySession = async (
     const supabase = getSupabaseServerClient();
     let allSales: any[] = [];
 
-    // 1. Fetch by session_id (Primary source)
+    let targetSessionId = sessionId;
+
+    // 1. Resolve sessionId to UUID if it's a human-readable ID (CS-XXXX)
+    if (!uuidValidate(sessionId)) {
+      const { data: sessionData, error: lookupError } = await supabase
+        .from("cash_sessions")
+        .select("id")
+        .eq("session_number", sessionId)
+        .maybeSingle();
+
+      if (sessionData?.id) {
+        targetSessionId = sessionData.id;
+      } else if (lookupError) {
+        log.error("Error resolving session ID:", lookupError);
+      }
+    }
+
+    // 2. Fetch by session_id (Primary source)
     const { data: sessionSales, error: sessionError } = await supabase
       .from(SALES_TABLE)
       .select("*, sale_items(*)")
-      .eq("session_id", sessionId)
+      .eq("session_id", targetSessionId)
       .order("created_at", { ascending: false });
 
     if (sessionError) {
@@ -294,7 +312,7 @@ export const addSaleAndUpdateStock = async (
           // Obtener el balance actual del consignador
           const { data: currentBalance, error: balanceError } = await supabase
             .from('consignors')
-            .select('balanceDue')
+            .select('balance_due')
             .eq('id', item.consignorId)
             .single();
 
@@ -303,12 +321,12 @@ export const addSaleAndUpdateStock = async (
             continue;
           }
 
-          const newBalance = (parseFloat(currentBalance?.balanceDue || 0) || 0) + consignorCost;
+          const newBalance = (parseFloat(currentBalance?.balance_due || 0) || 0) + consignorCost;
 
           await supabase
             .from('consignors')
             .update({
-              balanceDue: newBalance,
+              balance_due: newBalance,
               updated_at: now
             })
             .eq('id', item.consignorId);
@@ -385,12 +403,15 @@ export const addSaleAndUpdateStock = async (
             .from(INVENTORY_LOGS_TABLE)
             .insert([{
               product_id: item.id,
-              change_type: 'sale',
-              quantity_change: -item.quantity,
-              previous_stock: currentStock,
-              new_stock: newStock,
-              reference_id: saleId,
-              notes: `Venta: ${item.name} x${item.quantity}`,
+              product_name: item.name,
+              change: -item.quantity,
+              reason: `Venta: ${item.name} x${item.quantity}`,
+              metadata: {
+                change_type: 'sale',
+                previous_stock: currentStock,
+                new_stock: newStock,
+                reference_id: saleId,
+              },
               created_at: now
             }]);
 
