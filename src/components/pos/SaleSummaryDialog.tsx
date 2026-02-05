@@ -78,17 +78,27 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale, products
       const pdfBlob = await generateTicketPdf({ sale, settings });
       const pdfUrl = URL.createObjectURL(pdfBlob);
 
-      const printWindow = window.open(pdfUrl, '_blank');
-      if (printWindow) {
-        // Note: Automatic printing from PDF blob URL might vary by browser.
-        // Usually user has to click print in the PDF viewer.
-        // Alternatively, we can use an iframe to print, but opening in new tab is reliable.
-        printWindow.onload = () => {
-          // printWindow.print(); // Often blocked for PDFs in new tabs
-        };
-      } else {
-        toast({ title: "Error", description: "No se pudo abrir la ventana de impresión.", variant: "destructive" });
-      }
+      // Use iframe to print for better control over page dimensions and to avoid viewer UI
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = pdfUrl;
+      document.body.appendChild(iframe);
+
+      iframe.onload = () => {
+        setTimeout(() => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.print();
+          }
+        }, 300);
+      };
+
+      // Cleanup after a delay
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+        URL.revokeObjectURL(pdfUrl);
+      }, 5000);
 
     } catch (error) {
       console.error("Error al imprimir el ticket:", error);

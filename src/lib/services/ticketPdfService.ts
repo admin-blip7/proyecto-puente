@@ -31,14 +31,15 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
     const paperWidthMm = 80;
     const paperWidthPt = paperWidthMm * MM_TO_PT;
 
-    // Base height estimation - "lo que sea de largo"
-    let estimatedHeightMm = 60; // Base margin + Header space
-    estimatedHeightMm += (sale.items?.length || 0) * 12; // ~12mm per item (including potential unit price)
-    if (settings.header.showLogo) estimatedHeightMm += 35;
-    if (settings.footer.showQrCode) estimatedHeightMm += 45;
-    estimatedHeightMm += 40; // Footer space + thank you message
+    // Base height estimation - calculate more space to avoid clipping
+    let estimatedHeightMm = 55; // Header margin + space
+    estimatedHeightMm += (sale.items?.length || 0) * 15; // Increased per item space
+    if (settings.header.showLogo) estimatedHeightMm += 40;
+    if (settings.footer.showQrCode) estimatedHeightMm += 50;
+    estimatedHeightMm += 50; // Footer space + messages
 
-    const pageHeightPt = Math.max(300, estimatedHeightMm * MM_TO_PT);
+    // Convert to points and set a reasonable minimum for short receipts
+    const pageHeightPt = Math.max(350, estimatedHeightMm * MM_TO_PT);
 
     // Use Standard14Font for metrics and drawing
     const helveticaFont = Standard14Font.of(StandardFonts.Helvetica);
@@ -47,15 +48,13 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
     console.log(`[generateTicketPdf] Paper Width: ${paperWidthPt}pt, Height: ${pageHeightPt}pt`);
 
     // Create page and force size (to avoid library default falling back to A4)
-    const page = pdf.addPage([paperWidthPt, pageHeightPt] as any) as any;
-    if (page.setSize) {
-        page.setSize(paperWidthPt, pageHeightPt);
-    } else if (page.setWidth && page.setHeight) {
-        page.setWidth(paperWidthPt);
-        page.setHeight(pageHeightPt);
-    }
+    // Create page and force size
+    // For thermal printers, width is fixed, height is variable.
+    const page = pdf.addPage([paperWidthPt, pageHeightPt] as any);
 
-    const fontSize = settings.body.fontSize === 'xs' ? 9 : settings.body.fontSize === 'sm' ? 10.5 : 12;
+    // Base font sizes for 80mm thermal paper
+    // A bit larger for better readability on thermal prints
+    const fontSize = settings.body.fontSize === 'xs' ? 10 : settings.body.fontSize === 'sm' ? 12 : 14;
     const headerFontSize = fontSize + 4;
     const smallFontSize = fontSize - 2;
     const lineHeight = fontSize * 1.35;
