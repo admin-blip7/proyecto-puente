@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { CashSession, Expense } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, DollarSign, TrendingDown, TrendingUp, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowUpDown, DollarSign, TrendingDown, TrendingUp, Calendar as CalendarIcon, Printer, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -42,6 +42,7 @@ interface CashHistoryClientProps {
 export default function CashHistoryClient({ initialSessions }: CashHistoryClientProps) {
   const [sessions, setSessions] = useState<CashSession[]>(initialSessions);
   const [sortConfig, setSortConfig] = useState<{ key: keyof CashSession | 'difference'; direction: 'asc' | 'desc' } | null>(null);
+  const [isReprinting, setIsReprinting] = useState<string | null>(null);
 
   // Financial Dashboard State
   const currentDate = new Date();
@@ -256,6 +257,66 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
     });
   };
 
+  const handleReprint = async (session: CashSession) => {
+    if (isReprinting) return;
+    setIsReprinting(session.id);
+    try {
+      const { getExpensesBySession } = await import("@/lib/services/financeService");
+      const { getIncomesBySession } = await import("@/lib/services/incomeService");
+      const { getSalesBySession } = await import("@/lib/services/salesService");
+
+      // Fetch detailed data for the session
+      const expenses = await getExpensesBySession(
+        session.id,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+
+      const incomes = await getIncomesBySession(
+        session.id,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+
+      const sales = await getSalesBySession(
+        session.id,
+        session.openedBy,
+        session.openedAt ? new Date(session.openedAt) : undefined,
+        session.closedAt ? new Date(session.closedAt) : new Date()
+      );
+
+      const { generateCashClosePdf } = await import('@/lib/services/cashClosePdfService');
+      const pdfBlob = await generateCashClosePdf({ session, sales, expenses, incomes });
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      // Use iframe to print
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.print();
+        }
+      }, 500);
+
+      // Cleanup with extended timeout
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
+
+    } catch (error) {
+      console.error("Error reprinting ticket:", error);
+      alert("Error al generar el ticket.");
+    } finally {
+      setIsReprinting(null);
+    }
+  };
+
   const months = [
     { value: "0", label: "Enero" },
     { value: "1", label: "Febrero" },
@@ -454,9 +515,27 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                           {row.session ? row.session.sessionId : 'Sin sesión'}
                         </div>
                       </div>
-                      <Badge variant={row.session ? "default" : "secondary"}>
-                        {row.session ? "Cerrado" : "Sin Datos"}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant={row.session ? "default" : "secondary"}>
+                          {row.session ? "Cerrado" : "Sin Datos"}
+                        </Badge>
+                        {row.session && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2"
+                            onClick={() => row.session && handleReprint(row.session)}
+                            disabled={!!isReprinting}
+                          >
+                            {isReprinting === row.session.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Printer className="h-3 w-3 mr-1" />
+                            )}
+                            <span className="text-xs">Reimprimir</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2 text-sm">
@@ -496,31 +575,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                         </div>
                       ) : null}
 
-                      {row.session?.balanceBagAmount && row.session.balanceBagAmount > 0 ? (
-                        <div className="flex justify-between items-center bg-purple-50 -mx-4 px-4 py-2 border-y border-purple-200">
-                          <span className="text-muted-foreground text-xs">Bolsa de Saldo:</span>
-                          <span className="font-semibold text-purple-700">{formatCurrency(row.session.balanceBagAmount)}</span>
-                        </div>
-                      ) : null}
 
-                      {row.session && (
-                        <div className="mt-2 pt-2 border-t border-dashed">
-                          <span className="text-xs font-semibold text-muted-foreground mb-1 block">Bolsas (Venta / Saldo)</span>
-                          {['recargas', 'mimovil', 'servicios'].map(key => {
-                            const sale = (row.session!.bagsSalesAmounts as any)?.[key] || 0;
-                            const end = (row.session!.bagsEndAmounts as any)?.[key] || 0;
-                            if (sale === 0 && end === 0) return null;
-                            return (
-                              <div key={key} className="flex justify-between text-xs py-0.5">
-                                <span className="capitalize text-muted-foreground">{key}:</span>
-                                <span>
-                                  <span className="text-blue-600">{formatCurrency(sale)}</span> / <span className="font-medium">{formatCurrency(end)}</span>
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
 
                       <div className="flex justify-between items-center pt-2 mt-2 border-t bg-muted/20 -mx-4 px-4 py-2">
                         <span className="font-medium">Diferencia:</span>

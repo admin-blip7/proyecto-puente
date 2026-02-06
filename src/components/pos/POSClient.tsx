@@ -553,7 +553,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
           document.body.removeChild(iframe);
         }
         URL.revokeObjectURL(blobUrl);
-      }, 5000);
+      }, 60000);
 
     } catch (error) {
       console.error('❌ [TICKET] Error generating PDF:', error);

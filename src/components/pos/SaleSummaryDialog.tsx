@@ -98,7 +98,7 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale, products
           document.body.removeChild(iframe);
         }
         URL.revokeObjectURL(pdfUrl);
-      }, 5000);
+      }, 60000);
 
     } catch (error) {
       console.error("Error al imprimir el ticket:", error);

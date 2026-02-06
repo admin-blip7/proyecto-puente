@@ -38,13 +38,14 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     );
 
     const pdf = await PDF.create();
-    const font = Standard14Font.of(StandardFonts.Courier); // Use Courier for monospace look like original
-    const fontBold = Standard14Font.of(StandardFonts.CourierBold);
+    const font = Standard14Font.of(StandardFonts.Helvetica);
+    const fontBold = Standard14Font.of(StandardFonts.HelveticaBold);
 
     // Estimates
     const receiptWidthMm = 80;
     const receiptWidthPt = receiptWidthMm * MM_TO_PT;
-    const marginPt = 10;
+    const marginMm = 10;
+    const marginPt = marginMm * MM_TO_PT;
     const contentWidth = receiptWidthPt - (marginPt * 2);
 
     // Helper calculation logic (grouped products)
@@ -166,7 +167,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         soldList.forEach(item => {
             // Left: Qty x Name
             // Right: Total
-            const leftText = `${item.quantity}x ${item.name}`.substring(0, 28);
+            const leftText = `${item.quantity}x ${item.name}`.substring(0, 20);
             drawText(leftText, marginPt, 'left');
             drawText(formatCurrency(item.total), 0, 'right');
             y -= lineHeight;
@@ -179,7 +180,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         drawText('DETALLE DE GASTOS:', marginPt, 'left', fontBold);
         y -= lineHeight;
         expenses.forEach((exp: any) => {
-            const desc = (exp.description || exp.category).substring(0, 25);
+            const desc = (exp.description || exp.category).substring(0, 18);
             drawText(desc, marginPt, 'left');
             drawText(formatCurrency(exp.amount), 0, 'right');
             y -= lineHeight;
@@ -212,7 +213,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         drawText('DETALLE DE INGRESOS:', marginPt, 'left', fontBold);
         y -= lineHeight;
         displayIncomes.forEach((inc: any) => {
-            const desc = (inc.description || inc.category).substring(0, 25);
+            const desc = (inc.description || inc.category).substring(0, 18);
             drawText(desc, marginPt, 'left');
             drawText(formatCurrency(inc.amount), 0, 'right');
             y -= lineHeight;
@@ -256,43 +257,12 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         }
     }
 
-    drawLine();
 
-    // --- Bag Balances ---
-    drawText('SALDOS DE BOLSAS:', marginPt, 'left', fontBold);
-    y -= lineHeight;
-    ['recargas', 'mimovil', 'servicios'].forEach(key => {
-        const start = (session.bagsStartAmounts as any)?.[key] || 0;
-        const sale = (session.bagsSalesAmounts as any)?.[key] || 0;
-        const expectedEnd = start - sale;
-        const actualEnd = (session.bagsEndAmounts as any)?.[key] ?? expectedEnd;
-        const diff = actualEnd - expectedEnd;
-
-        drawText(`${key.toUpperCase()}:`, marginPt, 'left');
-        y -= lineHeight;
-        drawText(`Ini: ${formatCurrency(start)} - Vta: ${formatCurrency(sale)}`, marginPt + 5, 'left');
-        y -= lineHeight;
-
-        drawText(`Esperado: ${formatCurrency(expectedEnd)}`, marginPt + 5, 'left');
-        y -= lineHeight;
-
-        drawText('Saldo:', marginPt + 5, 'left', fontBold);
-        drawText(formatCurrency(actualEnd), 0, 'right', fontBold);
-        y -= lineHeight;
-
-        if (diff !== 0) {
-            drawText(`Dif: ${diff > 0 ? '+' : ''}${formatCurrency(diff)}`, marginPt + 5, 'left', fontBold);
-            y -= lineHeight;
-        }
-        y -= 2; // spacing
-    });
-
-    drawLine();
 
     // --- Totals ---
     if (session.actualCashCount !== undefined && session.startingFloat !== undefined) {
         const netCash = calculateNetCashSales(session.actualCashCount, session.startingFloat, session.cashLeftForNextSession ?? 0);
-        drawText('VENTAS NETAS DE EFECTIVO:', marginPt, 'left', fontBold);
+        drawText('Ventas Netas Efectivo:', marginPt, 'left', fontBold);
         drawText(formatCurrency(netCash), 0, 'right', fontBold);
         y -= lineHeight + 5;
     }

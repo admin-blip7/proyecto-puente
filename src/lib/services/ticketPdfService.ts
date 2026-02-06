@@ -59,7 +59,7 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
     const lineHeight = fontSize * 1.35;
 
     // Fixed margins for 80mm thermal paper
-    const marginMm = 6;
+    const marginMm = 10;
     const marginPt = marginMm * MM_TO_PT;
     const contentWidthPt = paperWidthPt - (marginPt * 2);
 
