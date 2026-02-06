@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
+import { registerKardexMovement } from "@/lib/services/kardexService";
 
 interface InventoryHistoryPoint {
   date: string;
@@ -17,6 +18,90 @@ const log = getLogger("productService");
 const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 const PRODUCT_VARIANTS_TABLE = "product_variants";
+
+interface StockMovementContext {
+  userId?: string | null;
+  source?: string;
+  reason?: string;
+  reference?: string | null;
+  notes?: string | null;
+  skipInventoryLog?: boolean;
+}
+
+const registerStockMovementLogs = async (
+  productId: string,
+  previousStock: number,
+  newStock: number,
+  unitCost: number,
+  context: StockMovementContext = {}
+) => {
+  const delta = Number(newStock) - Number(previousStock);
+  if (delta === 0) return;
+
+  const supabase = getSupabaseServerClient();
+  const quantity = Math.abs(delta);
+  const movementType = delta > 0 ? "INGRESO" : "SALIDA";
+  const reason = context.reason || "Ajuste de stock";
+  const source = context.source || "unknown";
+
+  try {
+    await registerKardexMovement({
+      productoId: productId,
+      tipo: movementType,
+      concepto: reason,
+      cantidad: quantity,
+      stockAnterior: previousStock,
+      precioUnitario: Number(unitCost || 0),
+      referencia: context.reference ?? null,
+      usuarioId: context.userId ?? null,
+      notas: context.notes ?? `Origen: ${source}`,
+    });
+  } catch (kardexError) {
+    log.warn("Could not register kardex movement", {
+      productId,
+      delta,
+      source,
+      kardexError
+    });
+  }
+
+  if (!context.skipInventoryLog) {
+    try {
+      const { error: inventoryLogError } = await supabase
+        .from(INVENTORY_LOGS_TABLE)
+        .insert({
+          product_id: productId,
+          quantity_change: delta,
+          change_type: reason,
+          updated_by: context.userId ?? null,
+          created_at: nowIso(),
+          metadata: {
+            source,
+            previous_stock: previousStock,
+            new_stock: newStock,
+            reference: context.reference ?? null,
+            reason,
+          },
+        });
+
+      if (inventoryLogError) {
+        log.warn("Could not register inventory movement log", {
+          productId,
+          delta,
+          source,
+          inventoryLogError
+        });
+      }
+    } catch (inventoryLogError) {
+      log.warn("Inventory movement logging failed", {
+        productId,
+        delta,
+        source,
+        inventoryLogError
+      });
+    }
+  }
+};
 
 // Helper function to verify consignor existence
 const resolveConsignorId = async (consignorId: string | undefined): Promise<string | null> => {
@@ -288,6 +373,52 @@ export const updateProduct = async (
   return mapProduct(updatedRow, 0);
 };
 
+export const updateProductStockWithKardex = async (
+  productId: string,
+  stock: number,
+  context: StockMovementContext = {}
+): Promise<Product> => {
+  const supabase = getSupabaseServerClient();
+  const existingRow = await fetchProductRow(productId);
+  if (!existingRow) {
+    throw new Error("Product not found");
+  }
+
+  const previousStock = Number(existingRow.stock ?? 0);
+  const nextStock = Math.max(0, Math.floor(Number(stock ?? 0)));
+
+  const { error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .update({ stock: nextStock })
+    .eq("id", productId);
+
+  if (error) {
+    log.error("Error updating product stock", error);
+    throw new Error("Failed to update product stock.");
+  }
+
+  await registerStockMovementLogs(
+    productId,
+    previousStock,
+    nextStock,
+    Number(existingRow.cost ?? 0),
+    {
+      userId: context.userId ?? null,
+      source: context.source || "product-service/update-stock",
+      reason: context.reason || "Ajuste de stock",
+      reference: context.reference ?? null,
+      notes: context.notes ?? null,
+    }
+  );
+
+  const updatedRow = await fetchProductRow(productId);
+  if (!updatedRow) {
+    throw new Error("Product not found after stock update.");
+  }
+
+  return mapProduct(updatedRow, 0);
+};
+
 export const processStockEntry = async (
   entryItems: StockEntryItem[],
   userId: string
@@ -339,6 +470,8 @@ export const processStockEntry = async (
       let productId = item.productId;
       let isNewProduct = false;
       let row = null;
+      let previousStockForMovement = 0;
+      let newStockForMovement = 0;
 
       // Si tenemos productId, buscar el producto
       if (productId) {
@@ -386,6 +519,8 @@ export const processStockEntry = async (
             item.productId = productId;
             isNewProduct = true;
             row = { id: productId }; // Asignar para el log
+            previousStockForMovement = 0;
+            newStockForMovement = Number(item.quantity ?? 0);
             log.info(`Successfully created new product: ${productId}`);
           } catch (addError: any) {
             // Si falla por SKU duplicado, buscarlo nuevamente
@@ -411,6 +546,8 @@ export const processStockEntry = async (
       // Actualizar stock si no es nuevo producto
       if (!isNewProduct && row) {
         const currentStock = Number(row.stock ?? 0);
+        previousStockForMovement = currentStock;
+        newStockForMovement = currentStock + Number(item.quantity ?? 0);
 
         // Resolve consignor ID to proper PostgreSQL UUID for updates
         const resolvedConsignorId = await resolveConsignorId(item.consignorId);
@@ -455,6 +592,21 @@ export const processStockEntry = async (
         }
       }
 
+      await registerStockMovementLogs(
+        String(productId),
+        Number(previousStockForMovement),
+        Number(newStockForMovement),
+        Number(item.cost ?? 0),
+        {
+          userId,
+          source: "stock-entry/normal",
+          reason: isNewProduct ? "Creación de Producto" : "Ingreso de Mercancía",
+          reference: item.sku || String(productId),
+          notes: `Ingreso desde flujo de stock (${item.name})`,
+          skipInventoryLog: true
+        }
+      );
+
       // Registrar en el log de inventario
       const logData = {
         product_id: productId,
@@ -465,7 +617,8 @@ export const processStockEntry = async (
         metadata: {
           cost: item.cost,
           ownership_type: item.ownershipType,
-          is_new_product: isNewProduct
+          is_new_product: isNewProduct,
+          source: "stock-entry/normal"
         },
       };
 
@@ -499,14 +652,17 @@ export const processStockEntry = async (
   }
 };
 
-export const deleteProducts = async (productIds: string[]): Promise<void> => {
+export const deleteProducts = async (
+  productIds: string[],
+  context: StockMovementContext = {}
+): Promise<void> => {
   if (!productIds.length) return;
   const supabase = getSupabaseServerClient();
 
   // First, get the actual id and name for the products to be deleted
   const { data: productsToDelete, error: fetchError } = await supabase
     .from(PRODUCTS_TABLE)
-    .select('id, name')
+    .select('id, name, stock, cost, sku')
     .in('id', productIds);
 
   if (fetchError) {
@@ -541,6 +697,25 @@ export const deleteProducts = async (productIds: string[]): Promise<void> => {
     const remainingCount = productIds.length - deletedCount;
     log.warn(`Some products (${remainingCount}) could not be deleted, possibly due to dependencies`);
     throw new Error(`No se pudieron eliminar ${remainingCount} producto(s). Es posible que tengan dependencias como ventas o registros asociados.`);
+  }
+
+  for (const product of productsToDelete) {
+    const previousStock = Number(product.stock ?? 0);
+    if (previousStock <= 0) continue;
+
+    await registerStockMovementLogs(
+      product.id,
+      previousStock,
+      0,
+      Number(product.cost ?? 0),
+      {
+        userId: context.userId ?? null,
+        source: context.source || "product-service/delete-products",
+        reason: context.reason || "Eliminación de producto",
+        reference: context.reference ?? `delete:${product.id}`,
+        notes: context.notes ?? `Producto eliminado (${product.name || product.sku || product.id})`
+      }
+    );
   }
 
   log.info(`Successfully deleted ${deletedCount} products`, {

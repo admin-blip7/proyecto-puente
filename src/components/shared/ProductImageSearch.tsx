@@ -128,7 +128,7 @@ export function ProductImageSearch({
         setIsDownloading(result.original);
 
         try {
-            const response = await downloadAndSaveImageAction(result.original, searchQuery);
+            const response = await downloadAndSaveImageAction(result.original, searchQuery, result.thumbnail);
 
             if (response.success && response.file) {
                 // Convert base64 to File

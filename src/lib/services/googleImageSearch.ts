@@ -145,51 +145,91 @@ export async function searchProductImages(
  */
 export async function downloadAndStandardizeImage(
     imageUrl: string,
-    productName: string
+    productName: string,
+    fallbackImageUrls: string[] = []
 ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
 
-    // Fetch with timeout and retry logic
     const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 10000; // 10 seconds
+    const TIMEOUT_MS = 10000;
+    const candidateUrls = Array.from(
+        new Set([imageUrl, ...fallbackImageUrls].filter(url => typeof url === 'string' && url.trim().length > 0))
+    );
 
+    if (candidateUrls.length === 0) {
+        throw new Error('No image URL provided');
+    }
+
+    let downloadedBuffer: Buffer | null = null;
     let lastError: Error | null = null;
-    let response: Response | null = null;
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    for (const candidateUrl of candidateUrls) {
+        const userAgentHeaders = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15'
+        ];
+        const candidateOrigin = (() => {
+            try {
+                return new URL(candidateUrl).origin;
+            } catch {
+                return '';
+            }
+        })();
 
-            response = await fetch(imageUrl, {
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+                const response = await fetch(candidateUrl, {
+                    signal: controller.signal,
+                    headers: {
+                        'User-Agent': userAgentHeaders[(attempt - 1) % userAgentHeaders.length],
+                        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                        ...(candidateOrigin ? { 'Referer': candidateOrigin } : {})
+                    }
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    lastError = new Error(`Failed to download image (${response.status} ${response.statusText})`);
+                    if (attempt < MAX_RETRIES) {
+                        await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+                    }
+                    continue;
                 }
-            });
 
-            clearTimeout(timeoutId);
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType && !contentType.toLowerCase().includes('image')) {
+                    lastError = new Error(`Downloaded content is not an image (${contentType})`);
+                    break;
+                }
 
-            if (response.ok) {
-                break; // Success, exit retry loop
+                const arrayBuffer = await response.arrayBuffer();
+                downloadedBuffer = Buffer.from(arrayBuffer);
+                break;
+            } catch (error: any) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                console.warn(`Image download attempt ${attempt}/${MAX_RETRIES} failed for ${candidateUrl}:`, lastError.message);
+                if (attempt < MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+                }
             }
+        }
 
-            lastError = new Error(`Failed to download image: ${response.statusText}`);
-        } catch (error: any) {
-            lastError = error;
-            console.warn(`Image download attempt ${attempt}/${MAX_RETRIES} failed:`, error.message);
-
-            if (attempt < MAX_RETRIES) {
-                // Wait before retry (exponential backoff)
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            }
+        if (downloadedBuffer) {
+            break;
         }
     }
 
-    if (!response || !response.ok) {
-        throw lastError || new Error('Failed to download image after retries');
+    if (!downloadedBuffer) {
+        throw lastError || new Error('Failed to download image after trying all candidate URLs');
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer = downloadedBuffer.buffer.slice(
+        downloadedBuffer.byteOffset,
+        downloadedBuffer.byteOffset + downloadedBuffer.byteLength
+    );
     const inputBuffer = Buffer.from(arrayBuffer);
 
     // Resize and standardize using Sharp

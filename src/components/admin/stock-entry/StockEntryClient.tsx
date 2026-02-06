@@ -12,10 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Zap, Barcode, Camera, Wand2, Check, Package, ScanLine, XCircle, Grid, Image as ImageIcon } from "lucide-react";
+import { PlusCircle, Trash2, Loader2, Printer, Mic, MicOff, Zap, Barcode, Camera, Wand2, Check, Package, ScanLine, XCircle, Grid, Image as ImageIcon, Search, Images } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
-import { processStockEntry, searchProducts, updateProduct, uploadProductImage } from "@/lib/services/productService";
+import { deleteProducts, processStockEntry, searchProducts, updateProduct, updateProductStockWithKardex, uploadProductImage } from "@/lib/services/productService";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,13 +32,38 @@ import CategoryAttributes from "@/components/admin/inventory/CategoryAttributes"
 import { StockItemImageManager } from "./StockItemImageManager";
 import { uploadStockEntryImage } from "@/lib/services/stockImageService";
 import { ProductImageSearch } from "@/components/shared/ProductImageSearch";
-import { Search } from "lucide-react";
+import { downloadAndSaveImageAction } from "@/lib/actions/imageSearchActions";
+import {
+    BulkProductImageSearch,
+    BulkProductImageSelection
+} from "@/components/shared/BulkProductImageSearch";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog";
 
 
 interface StockEntryClientProps {
     allProducts: Product[];
     labelSettings: LabelSettings;
 }
+
+type QuickUpdateImageFilter = "all" | "missing" | "with";
+type QuickUpdateCategoryFilter = "all" | "missing";
 
 export default function StockEntryClient({ allProducts: initialProducts, labelSettings }: StockEntryClientProps) {
     const [entryList, setEntryList] = useState<StockEntryItem[]>([]);
@@ -84,9 +109,18 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     // Bulk Actions State
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isBulkImageMode, setIsBulkImageMode] = useState(false);
+    const [showBulkImageSearch, setShowBulkImageSearch] = useState(false);
+    const [isApplyingBulkSearchImages, setIsApplyingBulkSearchImages] = useState(false);
+    const [showDeleteProductsConfirm, setShowDeleteProductsConfirm] = useState(false);
+    const [isDeletingProducts, setIsDeletingProducts] = useState(false);
+    const [showBulkStockDialog, setShowBulkStockDialog] = useState(false);
+    const [bulkStockValue, setBulkStockValue] = useState('');
+    const [isUpdatingBulkStock, setIsUpdatingBulkStock] = useState(false);
 
     // Barcode Scanning State
     const [scanningForSkuId, setScanningForSkuId] = useState<string | null>(null);
+    const [quickUpdateImageFilter, setQuickUpdateImageFilter] = useState<QuickUpdateImageFilter>("all");
+    const [quickUpdateCategoryFilter, setQuickUpdateCategoryFilter] = useState<QuickUpdateCategoryFilter>("all");
 
     // Quick Update Handlers
     const handleDirectUpdate = async (product: Product, updates: Partial<Product>) => {
@@ -128,6 +162,105 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             toast({ variant: "destructive", title: "Error", description: "Falló la carga de imagen." });
         }
     };
+
+    const convertBase64ToFile = useCallback((base64: string, fileName: string, mimeType: string) => {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        return new File([byteArray], fileName, { type: mimeType });
+    }, []);
+
+    const handleBulkImageSearchApply = useCallback(async (selections: BulkProductImageSelection[]) => {
+        if (!isQuickUpdateMode || selections.length === 0) return;
+
+        if (selections.length > 20) {
+            toast({
+                variant: "destructive",
+                title: "Límite excedido",
+                description: "La búsqueda masiva permite máximo 20 productos por operación."
+            });
+            return;
+        }
+
+        setIsApplyingBulkSearchImages(true);
+        setIsLoading(true);
+        toast({
+            title: "Aplicando imágenes",
+            description: `Procesando ${selections.length} producto${selections.length !== 1 ? "s" : ""}...`
+        });
+
+        const failedProducts: string[] = [];
+        let successCount = 0;
+
+        try {
+            for (const selection of selections) {
+                try {
+                    const downloadResponse = await downloadAndSaveImageAction(
+                        selection.imageUrl,
+                        selection.productName,
+                        selection.thumbnailUrl
+                    );
+                    if (!downloadResponse.success || !downloadResponse.file) {
+                        throw new Error(downloadResponse.error || "No se pudo descargar la imagen");
+                    }
+
+                    const imageFile = convertBase64ToFile(
+                        downloadResponse.file.base64,
+                        downloadResponse.file.name,
+                        downloadResponse.file.type
+                    );
+
+                    const uploadedUrl = await uploadStockEntryImage(imageFile, userProfile?.uid || 'unknown');
+                    const product = quickUpdateResults.find(item => item.id === selection.productId);
+                    const currentImages = product?.imageUrls || [];
+                    const nextImages = [uploadedUrl, ...currentImages.filter(url => url !== uploadedUrl)];
+
+                    await updateProduct(selection.productId, { imageUrls: nextImages });
+
+                    setQuickUpdateResults(prev => prev.map(item => {
+                        if (item.id !== selection.productId) return item;
+                        const previous = item.imageUrls || [];
+                        return {
+                            ...item,
+                            imageUrls: [uploadedUrl, ...previous.filter(url => url !== uploadedUrl)]
+                        };
+                    }));
+
+                    successCount += 1;
+                } catch (error) {
+                    console.error("Bulk image apply error for product", selection.productId, error);
+                    failedProducts.push(selection.productName);
+                }
+            }
+
+            if (successCount > 0) {
+                toast({
+                    title: "Imágenes actualizadas",
+                    description: `${successCount} producto${successCount !== 1 ? "s" : ""} actualizado${successCount !== 1 ? "s" : ""}.`
+                });
+            }
+
+            if (failedProducts.length > 0) {
+                toast({
+                    variant: "destructive",
+                    title: "Algunas imágenes fallaron",
+                    description: `${failedProducts.length} producto${failedProducts.length !== 1 ? "s" : ""} no se pudieron actualizar.`
+                });
+            }
+
+            if (successCount > 0) {
+                setShowBulkImageSearch(false);
+            }
+        } finally {
+            setIsApplyingBulkSearchImages(false);
+            setIsLoading(false);
+        }
+    }, [convertBase64ToFile, isQuickUpdateMode, quickUpdateResults, toast, userProfile?.uid]);
 
     const handleBulkDirectImageUpdate = async (file: File) => {
         if (selectedItems.size === 0) return;
@@ -206,6 +339,115 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         }
     };
 
+    const handleDeleteSelectedProducts = async () => {
+        if (!isQuickUpdateMode) return;
+
+        const productIds = Array.from(selectedItems).filter(id => quickUpdateById.has(id));
+        if (productIds.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Sin productos",
+                description: "Selecciona productos válidos para eliminar."
+            });
+            setShowDeleteProductsConfirm(false);
+            return;
+        }
+
+        try {
+            setIsDeletingProducts(true);
+            setIsLoading(true);
+            await deleteProducts(productIds, {
+                userId: userProfile?.uid || null,
+                source: "stock-entry/quick-update",
+                reason: "Eliminación de producto",
+                reference: "quick-update-delete"
+            });
+
+            setQuickUpdateResults(prev => prev.filter(product => !productIds.includes(product.id)));
+            setSelectedItems(prev => {
+                const next = new Set(prev);
+                productIds.forEach(id => next.delete(id));
+                return next;
+            });
+
+            toast({
+                title: "Productos eliminados",
+                description: `Se eliminaron ${productIds.length} producto${productIds.length !== 1 ? "s" : ""}.`
+            });
+            setShowDeleteProductsConfirm(false);
+        } catch (error: any) {
+            console.error("Delete products error", error);
+            toast({
+                variant: "destructive",
+                title: "No se pudo eliminar",
+                description: error?.message || "Algunos productos no se pudieron eliminar por dependencias."
+            });
+        } finally {
+            setIsDeletingProducts(false);
+            setIsLoading(false);
+        }
+    };
+
+    const handleBulkStockUpdate = async () => {
+        if (!isQuickUpdateMode) return;
+        if (selectedItems.size === 0) return;
+
+        const parsedStock = Number(bulkStockValue);
+        if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+            toast({
+                variant: "destructive",
+                title: "Stock inválido",
+                description: "Ingresa un número válido mayor o igual a 0."
+            });
+            return;
+        }
+
+        const stock = Math.floor(parsedStock);
+        const targetIds = Array.from(selectedItems).filter(id => quickUpdateById.has(id));
+        if (targetIds.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Sin productos",
+                description: "Selecciona productos válidos para actualizar stock."
+            });
+            return;
+        }
+
+        setIsUpdatingBulkStock(true);
+        setIsLoading(true);
+        try {
+            setQuickUpdateResults(prev => prev.map(product =>
+                targetIds.includes(product.id) ? { ...product, stock } : product
+            ));
+
+            await Promise.all(targetIds.map(id =>
+                updateProductStockWithKardex(id, stock, {
+                    userId: userProfile?.uid || null,
+                    source: "stock-entry/quick-update",
+                    reason: "Ajuste manual de stock",
+                    reference: "quick-update-stock"
+                })
+            ));
+
+            toast({
+                title: "Stock actualizado",
+                description: `Se actualizó el stock de ${targetIds.length} producto${targetIds.length !== 1 ? "s" : ""}.`
+            });
+            setShowBulkStockDialog(false);
+            setBulkStockValue('');
+        } catch (error) {
+            console.error("Bulk stock update error", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "No se pudo actualizar el stock en todos los productos."
+            });
+        } finally {
+            setIsUpdatingBulkStock(false);
+            setIsLoading(false);
+        }
+    };
+
     // Initialize quick update results with all products
     useEffect(() => {
         if (isQuickUpdateMode && quickUpdateResults.length === 0 && initialProducts.length > 0) {
@@ -221,17 +463,46 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         }
         return map;
     }, [quickUpdateResults]);
+
+    const selectedQuickUpdateProducts = useMemo(() => {
+        if (!isQuickUpdateMode || selectedItems.size === 0) return [];
+        return Array.from(selectedItems)
+            .map(id => quickUpdateById.get(id))
+            .filter((product): product is Product => !!product);
+    }, [isQuickUpdateMode, quickUpdateById, selectedItems]);
+
     const filteredQuickUpdateResults = useMemo(() => {
         if (!isQuickUpdateMode) return quickUpdateResults;
-        const query = deferredQuickUpdateSearch.trim().toLowerCase();
-        if (!query) return quickUpdateResults;
 
-        return quickUpdateResults.filter(p =>
+        let filtered = quickUpdateResults;
+
+        if (quickUpdateImageFilter === "missing") {
+            filtered = filtered.filter(product => !(product.imageUrls?.[0]));
+        } else if (quickUpdateImageFilter === "with") {
+            filtered = filtered.filter(product => !!product.imageUrls?.[0]);
+        }
+
+        if (quickUpdateCategoryFilter === "missing") {
+            filtered = filtered.filter(product => !product.category || product.category.trim().length === 0);
+        }
+
+        const query = deferredQuickUpdateSearch.trim().toLowerCase();
+        if (!query) return filtered;
+
+        return filtered.filter(p =>
             p.name.toLowerCase().includes(query) ||
             p.sku.toLowerCase().includes(query) ||
             (p.category && p.category.toLowerCase().includes(query))
         );
-    }, [deferredQuickUpdateSearch, isQuickUpdateMode, quickUpdateResults]);
+    }, [deferredQuickUpdateSearch, isQuickUpdateMode, quickUpdateCategoryFilter, quickUpdateImageFilter, quickUpdateResults]);
+
+    const selectedInFilteredResultsCount = useMemo(
+        () => filteredQuickUpdateResults.reduce((count, product) => count + (selectedItems.has(product.id) ? 1 : 0), 0),
+        [filteredQuickUpdateResults, selectedItems]
+    );
+
+    const allFilteredResultsSelected = filteredQuickUpdateResults.length > 0
+        && selectedInFilteredResultsCount === filteredQuickUpdateResults.length;
 
     const QUICK_UPDATE_ROW_HEIGHT = 120;
     const QUICK_UPDATE_OVERSCAN = 8;
@@ -281,7 +552,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
             container.scrollTop = 0;
         }
         setQuickUpdateScrollTop(0);
-    }, [deferredQuickUpdateSearch, isQuickUpdateMode]);
+    }, [deferredQuickUpdateSearch, isQuickUpdateMode, quickUpdateCategoryFilter, quickUpdateImageFilter]);
 
     useEffect(() => {
         return () => {
@@ -584,15 +855,28 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     };
 
     const toggleSelection = (id: string) => {
+        let limitReached = false;
         setSelectedItems(prev => {
             const newSelected = new Set(prev);
             if (newSelected.has(id)) {
                 newSelected.delete(id);
             } else {
+                if (isQuickUpdateMode && quickUpdateImageFilter === "missing" && newSelected.size >= 20) {
+                    limitReached = true;
+                    return prev;
+                }
                 newSelected.add(id);
             }
             return newSelected;
         });
+
+        if (limitReached) {
+            toast({
+                variant: "destructive",
+                title: "Límite de selección",
+                description: "Con el filtro Sin imagen/foto solo puedes seleccionar hasta 20 productos."
+            });
+        }
     };
 
     const toggleAll = () => {
@@ -601,6 +885,30 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         } else {
             setSelectedItems(new Set(entryList.map(i => i.id)));
         }
+    };
+
+    const openBulkImageSearchDialog = () => {
+        if (!isQuickUpdateMode) return;
+
+        if (selectedQuickUpdateProducts.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Sin selección",
+                description: "Selecciona al menos un producto para búsqueda masiva."
+            });
+            return;
+        }
+
+        if (selectedQuickUpdateProducts.length > 20) {
+            toast({
+                variant: "destructive",
+                title: "Límite excedido",
+                description: "La búsqueda masiva permite máximo 20 productos al mismo tiempo."
+            });
+            return;
+        }
+
+        setShowBulkImageSearch(true);
     };
 
     const handleBulkImageSelect = (file: File, url: string) => {
@@ -690,6 +998,95 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                 }
                 onImageSelect={handleBulkImageSelect}
             />
+            <BulkProductImageSearch
+                open={showBulkImageSearch}
+                onOpenChange={setShowBulkImageSearch}
+                products={selectedQuickUpdateProducts.slice(0, 20).map(product => ({
+                    id: product.id,
+                    name: product.name,
+                    sku: product.sku,
+                    imageUrl: product.imageUrls?.[0]
+                }))}
+                onApplySelections={handleBulkImageSearchApply}
+            />
+            <AlertDialog open={showDeleteProductsConfirm} onOpenChange={setShowDeleteProductsConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Eliminar productos seleccionados</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción eliminará {selectedQuickUpdateProducts.length} producto{selectedQuickUpdateProducts.length !== 1 ? "s" : ""}.
+                            No se puede deshacer y puede fallar si el producto tiene dependencias (ventas u otros registros).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingProducts}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(event) => {
+                                event.preventDefault();
+                                handleDeleteSelectedProducts();
+                            }}
+                            disabled={isDeletingProducts}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isDeletingProducts ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Eliminando...
+                                </>
+                            ) : (
+                                "Eliminar"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <Dialog open={showBulkStockDialog} onOpenChange={setShowBulkStockDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar stock de productos</DialogTitle>
+                        <DialogDescription>
+                            Se actualizará el stock de {selectedQuickUpdateProducts.length} producto{selectedQuickUpdateProducts.length !== 1 ? "s" : ""} seleccionados.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="bulk-stock-value">Nuevo stock</Label>
+                        <Input
+                            id="bulk-stock-value"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={bulkStockValue}
+                            onChange={(e) => setBulkStockValue(e.target.value)}
+                            placeholder="Ejemplo: 10"
+                            disabled={isUpdatingBulkStock}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowBulkStockDialog(false)}
+                            disabled={isUpdatingBulkStock}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleBulkStockUpdate}
+                            disabled={isUpdatingBulkStock || bulkStockValue.trim().length === 0}
+                        >
+                            {isUpdatingBulkStock ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Actualizando...
+                                </>
+                            ) : (
+                                "Guardar stock"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <div className="space-y-6">
                 {/* Toggle Header */}
@@ -701,7 +1098,13 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                 setIsQuickUpdateMode(checked);
                                 setProductToUpdate(null);
                                 setQuickUpdateSearch('');
+                                setQuickUpdateImageFilter("all");
+                                setQuickUpdateCategoryFilter("all");
                                 setSelectedItems(new Set());
+                                setShowBulkImageSearch(false);
+                                setShowDeleteProductsConfirm(false);
+                                setShowBulkStockDialog(false);
+                                setBulkStockValue('');
                             }}
                         />
                         <Label className="cursor-pointer font-medium">
@@ -736,10 +1139,45 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                     setShowImageSearch(true);
                                 }}
                                 className="flex items-center gap-2"
+                                disabled={isApplyingBulkSearchImages}
                             >
                                 <ImageIcon className="h-4 w-4" />
                                 Asignar Imagen
                             </Button>
+                            {isQuickUpdateMode && (
+                                <>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={openBulkImageSearchDialog}
+                                        className="flex items-center gap-2"
+                                        disabled={isApplyingBulkSearchImages}
+                                    >
+                                        <Images className="h-4 w-4" />
+                                        Búsqueda Masiva
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => setShowDeleteProductsConfirm(true)}
+                                        className="flex items-center gap-2"
+                                        disabled={isApplyingBulkSearchImages || isDeletingProducts || selectedQuickUpdateProducts.length === 0}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Eliminar Productos
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setShowBulkStockDialog(true)}
+                                        className="flex items-center gap-2"
+                                        disabled={isUpdatingBulkStock || selectedQuickUpdateProducts.length === 0}
+                                    >
+                                        <Barcode className="h-4 w-4" />
+                                        Editar Stock
+                                    </Button>
+                                </>
+                            )}
                             <div className="h-4 w-px bg-primary-foreground/30" />
                             <Select
                                 onValueChange={(value) => handleBulkCategoryUpdate(value)}
@@ -767,23 +1205,71 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                 {isQuickUpdateMode ? (
                     <div className="space-y-4 animate-in slide-in-from-top-4 duration-300">
                         {/* Search Bar - Fixed at top */}
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                            <Input
-                                value={quickUpdateSearch}
-                                onChange={(e) => setQuickUpdateSearch(e.target.value)}
-                                placeholder="Filtrar productos por nombre o SKU..."
-                                className="h-12 text-lg pl-12 shadow-sm bg-background"
-                                autoFocus
-                            />
-                            {quickUpdateSearch && (
-                                <button
-                                    onClick={() => setQuickUpdateSearch('')}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        <div className="space-y-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input
+                                    value={quickUpdateSearch}
+                                    onChange={(e) => setQuickUpdateSearch(e.target.value)}
+                                    placeholder="Filtrar productos por nombre o SKU..."
+                                    className="h-12 text-lg pl-12 shadow-sm bg-background"
+                                    autoFocus
+                                />
+                                {quickUpdateSearch && (
+                                    <button
+                                        onClick={() => setQuickUpdateSearch('')}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <XCircle className="h-5 w-5" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={quickUpdateImageFilter === "all" ? "default" : "outline"}
+                                    onClick={() => setQuickUpdateImageFilter("all")}
                                 >
-                                    <XCircle className="h-5 w-5" />
-                                </button>
-                            )}
+                                    Todos
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={quickUpdateImageFilter === "missing" ? "default" : "outline"}
+                                    onClick={() => setQuickUpdateImageFilter("missing")}
+                                >
+                                    Sin imagen/foto
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={quickUpdateImageFilter === "with" ? "default" : "outline"}
+                                    onClick={() => setQuickUpdateImageFilter("with")}
+                                >
+                                    Con imagen
+                                </Button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={quickUpdateCategoryFilter === "all" ? "default" : "outline"}
+                                    onClick={() => setQuickUpdateCategoryFilter("all")}
+                                >
+                                    Todas categorías
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={quickUpdateCategoryFilter === "missing" ? "default" : "outline"}
+                                    onClick={() => setQuickUpdateCategoryFilter("missing")}
+                                >
+                                    Sin categoría
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Fixed Table Container */}
@@ -795,12 +1281,45 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                         <TableRow>
                                             <TableHead className="w-[50px] text-center">
                                                 <Checkbox
-                                                    checked={filteredQuickUpdateResults.length > 0 && selectedItems.size === filteredQuickUpdateResults.length}
+                                                    checked={
+                                                        allFilteredResultsSelected
+                                                            ? true
+                                                            : (selectedInFilteredResultsCount > 0 ? "indeterminate" : false)
+                                                    }
                                                     onCheckedChange={() => {
-                                                        if (selectedItems.size === filteredQuickUpdateResults.length) {
-                                                            setSelectedItems(new Set());
-                                                        } else {
-                                                            setSelectedItems(new Set(filteredQuickUpdateResults.map(i => i.id)));
+                                                        let limitReached = false;
+                                                        setSelectedItems(prev => {
+                                                            const next = new Set(prev);
+
+                                                            if (allFilteredResultsSelected) {
+                                                                filteredQuickUpdateResults.forEach(item => next.delete(item.id));
+                                                            } else {
+                                                                if (quickUpdateImageFilter === "missing") {
+                                                                    const missingNotSelectedIds = filteredQuickUpdateResults
+                                                                        .map(item => item.id)
+                                                                        .filter(id => !next.has(id));
+                                                                    const availableSlots = Math.max(0, 20 - next.size);
+                                                                    const idsToAdd = missingNotSelectedIds.slice(0, availableSlots);
+
+                                                                    idsToAdd.forEach(id => next.add(id));
+
+                                                                    if (missingNotSelectedIds.length > idsToAdd.length) {
+                                                                        limitReached = true;
+                                                                    }
+                                                                } else {
+                                                                    filteredQuickUpdateResults.forEach(item => next.add(item.id));
+                                                                }
+                                                            }
+
+                                                            return next;
+                                                        });
+
+                                                        if (limitReached) {
+                                                            toast({
+                                                                variant: "destructive",
+                                                                title: "Límite de selección",
+                                                                description: "Con el filtro Sin imagen/foto solo puedes seleccionar hasta 20 productos."
+                                                            });
                                                         }
                                                     }}
                                                 />
@@ -957,6 +1476,9 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                             </div>
                             <div className="bg-muted/30 p-2 text-xs text-center text-muted-foreground border-t">
                                 Mostrando {filteredQuickUpdateResults.length} productos
+                                {quickUpdateImageFilter === "missing" && " sin imagen/foto"}
+                                {quickUpdateImageFilter === "with" && " con imagen"}
+                                {quickUpdateCategoryFilter === "missing" && " sin categoría"}
                             </div>
                         </div>
                     </div>
