@@ -3,6 +3,8 @@
 import {
   TicketSettings,
   TicketSettingsSchema,
+  PrintRoutingSettings,
+  PrintRoutingSettingsSchema,
   LabelSettings,
   LabelSettingsSchema,
   ContractTemplateSettings,
@@ -27,6 +29,7 @@ const TICKET_SETTINGS_DOC_ID = "ticket_design";
 const LABEL_SETTINGS_DOC_ID_BASE = "label_design";
 const CONTRACT_TEMPLATE_DOC_ID = "contract_template";
 const DISCOUNT_SETTINGS_DOC_ID = "discount_settings";
+const PRINT_ROUTING_SETTINGS_DOC_ID = "print_routing";
 
 
 // --- TICKET SETTINGS ---
@@ -206,6 +209,42 @@ export const saveTicketSettings = async (settings: TicketSettings): Promise<void
   } catch (error) {
     log.error("Error saving ticket settings", error);
     throw new Error("Failed to save ticket settings.");
+  }
+};
+
+// --- PRINT ROUTING SETTINGS ---
+
+const defaultPrintRoutingSettings: PrintRoutingSettings = {
+  useQzTray: false,
+  ticketPrinterName: "",
+  labelPrinterName: "",
+};
+
+export const getPrintRoutingSettings = async (): Promise<PrintRoutingSettings> => {
+  try {
+    const { row } = await fetchSettingsDoc(PRINT_ROUTING_SETTINGS_DOC_ID);
+    if (row) {
+      const parsed = PrintRoutingSettingsSchema.safeParse(stripMeta(row));
+      if (parsed.success) {
+        return parsed.data;
+      }
+      log.warn("Invalid print routing settings in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(PRINT_ROUTING_SETTINGS_DOC_ID, defaultPrintRoutingSettings);
+    }
+  } catch (error) {
+    log.error("Error fetching print routing settings", error);
+  }
+  return defaultPrintRoutingSettings;
+};
+
+export const savePrintRoutingSettings = async (settings: PrintRoutingSettings): Promise<void> => {
+  try {
+    const validated = PrintRoutingSettingsSchema.parse(settings);
+    await upsertSettingsDoc(PRINT_ROUTING_SETTINGS_DOC_ID, validated);
+  } catch (error) {
+    log.error("Error saving print routing settings", error);
+    throw new Error("Failed to save print routing settings.");
   }
 };
 

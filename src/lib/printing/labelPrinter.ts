@@ -8,6 +8,7 @@ import { getLogger } from '../../lib/logger';
 import { getLabelSettings } from '../../lib/services/settingsService';
 import { normalizeVisualEditorData, VisualEditorData, VisualElement } from './visualLayoutTypes';
 import { generateLabelPdf } from './labelPdfGenerator';
+import { routePdfToPrinter } from './printRouter';
 
 const log = getLogger('labelPrinter');
 
@@ -289,36 +290,11 @@ export const generateAndPrintLabels = async (
   }
 
   try {
-    // Generate PDF and open in new window for printing
+    // Generate PDF and route to configured printer (QZ Tray) or browser fallback.
     const pdfBlob = await generateLabelPdf(items, settings, {
       returnBlob: true
     }) as Blob;
-
-    // Create object URL and open in new window for printing
-    const url = URL.createObjectURL(pdfBlob);
-    const printWindow = window.open(url, '_blank');
-
-    if (printWindow) {
-      printWindow.onload = () => {
-        // Auto-print disabled to prevent window opening/closing issues
-        // printWindow.print();
-      };
-    } else {
-      // If popup is blocked, fallback to download
-      const filename = `etiquetas-${new Date().toISOString().split('T')[0]}.pdf`;
-      const downloadUrl = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      if (document.body.contains(a)) {
-        document.body.removeChild(a);
-      }
-      URL.revokeObjectURL(downloadUrl);
-
-      alert('La ventana de impresión fue bloqueada. El PDF se ha descargado automáticamente.');
-    }
+    await routePdfToPrinter('label', pdfBlob, { fallbackToBrowser: true });
   } catch (error) {
     log.error('Error al generar PDF de etiquetas:', error);
     alert(`Error al generar PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);

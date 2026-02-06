@@ -17,6 +17,7 @@ import { SalesChange } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { routePdfToPrinter } from "@/lib/printing/printRouter";
 
 interface SaleSummaryDialogProps {
   isOpen: boolean;
@@ -76,29 +77,7 @@ export default function SaleSummaryDialog({ isOpen, onOpenChange, sale, products
       }
 
       const pdfBlob = await generateTicketPdf({ sale, settings });
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-
-      // Use iframe to print for better control over page dimensions and to avoid viewer UI
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = pdfUrl;
-      document.body.appendChild(iframe);
-
-      iframe.onload = () => {
-        setTimeout(() => {
-          if (iframe.contentWindow) {
-            iframe.contentWindow.print();
-          }
-        }, 300);
-      };
-
-      // Cleanup after a delay
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-        URL.revokeObjectURL(pdfUrl);
-      }, 60000);
+      await routePdfToPrinter("ticket", pdfBlob, { fallbackToBrowser: true });
 
     } catch (error) {
       console.error("Error al imprimir el ticket:", error);

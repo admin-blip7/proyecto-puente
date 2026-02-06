@@ -4,3 +4,4 @@
 declare module '@types/jsbarcode';
 declare module 'react-qrcode-logo';
 declare module 'jspdf-autotable';
+declare module 'qz-tray';

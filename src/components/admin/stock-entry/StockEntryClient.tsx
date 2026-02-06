@@ -116,6 +116,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
     const [showBulkStockDialog, setShowBulkStockDialog] = useState(false);
     const [bulkStockValue, setBulkStockValue] = useState('');
     const [isUpdatingBulkStock, setIsUpdatingBulkStock] = useState(false);
+    const [printTwoLabelsPerProductOnly, setPrintTwoLabelsPerProductOnly] = useState(false);
 
     // Barcode Scanning State
     const [scanningForSkuId, setScanningForSkuId] = useState<string | null>(null);
@@ -840,7 +841,7 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                     cost: p.cost,
                     ownershipType: p.ownershipType,
                 },
-                quantity: p.quantity,
+                quantity: printTwoLabelsPerProductOnly ? 2 : p.quantity,
             }));
 
             await generateAndPrintLabels(labelsToPrint, labelSettings);
@@ -1989,7 +1990,17 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                     )}
                                 </div>
                             </CardContent>
-                            <CardFooter className="justify-end">
+                            <CardFooter className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="print-two-labels"
+                                        checked={printTwoLabelsPerProductOnly}
+                                        onCheckedChange={(checked) => setPrintTwoLabelsPerProductOnly(checked === true)}
+                                    />
+                                    <Label htmlFor="print-two-labels" className="text-sm text-muted-foreground cursor-pointer">
+                                        Imprimir solo 2 etiquetas por producto
+                                    </Label>
+                                </div>
                                 <Button size="lg" className="w-full sm:w-auto" onClick={handleProcessEntry} disabled={isLoading || entryList.length === 0}>
                                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                                     Confirmar y Procesar Ingreso

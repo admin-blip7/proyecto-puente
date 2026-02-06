@@ -12,6 +12,7 @@ import { generateLabelPdf, previewLabelsPdf } from "@/lib/printing/labelPdfGener
 import { getProducts } from "@/lib/services/productService";
 import { getConsignors } from "@/lib/services/consignorService";
 import { getSuppliers } from "@/lib/services/supplierService";
+import { routePdfToPrinter } from "@/lib/printing/printRouter";
 
 interface PrintPreviewProps {
   settings: LabelSettings;
@@ -212,51 +213,7 @@ export default function PrintPreview({ settings, onOpenChange, labelType = 'prod
 
       const pdfBlob = await generateLabelPdf(printItems, settings, { returnBlob: true }) as Blob;
 
-      // Create object URL and open in new window for printing
-      const url = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(url, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-
-      if (printWindow) {
-        // Wait for the window to fully load before attempting to print
-        const checkLoaded = () => {
-          try {
-            if (printWindow.document.readyState === 'complete') {
-              printWindow.print();
-              // Clean up after printing
-              setTimeout(() => {
-                printWindow.close();
-                URL.revokeObjectURL(url);
-              }, 1000); // Give more time for print dialog to appear
-            } else {
-              setTimeout(checkLoaded, 100);
-            }
-          } catch (error) {
-            console.error('Error checking window state:', error);
-            // Fallback: try to print anyway
-            setTimeout(() => {
-              printWindow.print();
-              printWindow.close();
-              URL.revokeObjectURL(url);
-            }, 1000);
-          }
-        };
-
-        // Start checking after a short delay to ensure window is initialized
-        setTimeout(checkLoaded, 500);
-      } else {
-        // Fallback: download the PDF instead
-        const filename = `etiquetas-${new Date().toISOString().split('T')[0]}.pdf`;
-        const downloadUrl = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
-
-        alert('No se pudo abrir la ventana de impresión. El PDF se ha descargado automáticamente.');
-      }
+      await routePdfToPrinter("label", pdfBlob, { fallbackToBrowser: true });
     } catch (error) {
       console.error("Error printing PDF:", error);
       alert(`Error al imprimir PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);

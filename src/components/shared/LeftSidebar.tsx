@@ -74,6 +74,7 @@ export default function LeftSidebar() {
         { label: "Reimprimir Etiquetas", href: "/admin/labels", icon: Printer },
         { label: "Diseño de Tickets", href: "/admin/settings?tab=tickets", icon: TicketVoucher },
         { label: "Diseño de Etiquetas", href: "/admin/settings?tab=labels", icon: CoolTag },
+        { label: "Impresoras", href: "/admin/settings?tab=printers", icon: Printer },
         { label: "Gestión de Categorías", href: "/admin/settings?tab=categories", icon: Folder },
     ];
 

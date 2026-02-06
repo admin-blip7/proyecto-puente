@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getExpensesByDateRange, getDailySalesStats } from "@/lib/services/financeService";
+import { routePdfToPrinter } from "@/lib/printing/printRouter";
 
 interface CashHistoryClientProps {
   initialSessions: CashSession[];
@@ -287,27 +288,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
 
       const { generateCashClosePdf } = await import('@/lib/services/cashClosePdfService');
       const pdfBlob = await generateCashClosePdf({ session, sales, expenses, incomes });
-      const blobUrl = URL.createObjectURL(pdfBlob);
-
-      // Use iframe to print
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = blobUrl;
-      document.body.appendChild(iframe);
-
-      setTimeout(() => {
-        if (iframe.contentWindow) {
-          iframe.contentWindow.print();
-        }
-      }, 500);
-
-      // Cleanup with extended timeout
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-        URL.revokeObjectURL(blobUrl);
-      }, 60000);
+      await routePdfToPrinter("ticket", pdfBlob, { fallbackToBrowser: true });
 
     } catch (error) {
       console.error("Error reprinting ticket:", error);

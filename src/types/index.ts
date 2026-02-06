@@ -428,6 +428,14 @@ export const TicketSettingsSchema = z.object({
 
 export type TicketSettings = z.infer<typeof TicketSettingsSchema>;
 
+export const PrintRoutingSettingsSchema = z.object({
+  useQzTray: z.boolean().default(false),
+  ticketPrinterName: z.string().default(""),
+  labelPrinterName: z.string().default(""),
+});
+
+export type PrintRoutingSettings = z.infer<typeof PrintRoutingSettingsSchema>;
+
 export const labelTypes = ["product", "repair"] as const;
 export type LabelType = typeof labelTypes[number];
 

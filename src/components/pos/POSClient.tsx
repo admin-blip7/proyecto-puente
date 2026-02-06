@@ -41,6 +41,7 @@ import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 import { getProducts } from "@/lib/services/productService";
 import CodeScannerDialog from "./CodeScannerDialog";
+import { routePdfToPrinter } from "@/lib/printing/printRouter";
 
 import { getReadyRepairs } from "@/lib/services/repairService";
 import { RepairOrder } from "@/types";
@@ -533,27 +534,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       const { generateCashClosePdf } = await import('@/lib/services/cashClosePdfService');
 
       const pdfBlob = await generateCashClosePdf(data);
-      const blobUrl = URL.createObjectURL(pdfBlob);
-
-      // Use iframe to print
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = blobUrl;
-      document.body.appendChild(iframe);
-
-      setTimeout(() => {
-        if (iframe.contentWindow) {
-          iframe.contentWindow.print();
-        }
-      }, 500);
-
-      // Cleanup
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-        URL.revokeObjectURL(blobUrl);
-      }, 60000);
+      await routePdfToPrinter("ticket", pdfBlob, { fallbackToBrowser: true });
 
     } catch (error) {
       console.error('❌ [TICKET] Error generating PDF:', error);

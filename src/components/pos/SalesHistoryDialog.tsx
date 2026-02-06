@@ -18,6 +18,7 @@ import { Printer } from "lucide-react";
 import { generateTicketPdf } from "@/lib/services/ticketPdfService";
 import { getTicketSettings } from "@/lib/services/settingsService";
 import { useToast } from "@/hooks/use-toast";
+import { routePdfToPrinter } from "@/lib/printing/printRouter";
 
 // Helper type extending Sale to include UI-specific needs if any
 // but we just use Sale for now
@@ -101,49 +102,19 @@ export default function SalesHistoryDialog({
     const handlePrintTicket = async (sale: Sale) => {
         setIsPrinting(sale.id);
 
-        // Open a popup window immediately to avoid popup blockers
-        const width = 450;
-        const height = 650;
-        const left = (window.screen.width / 2) - (width / 2);
-        const top = (window.screen.height / 2) - (height / 2);
-
-        const printWindow = window.open(
-            'about:blank',
-            'ImprimirTicket',
-            `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=no,location=no,toolbar=no,menubar=no`
-        );
-
-        if (!printWindow) {
-            toast({
-                title: "Popup bloqueado",
-                description: "Por favor permite los popups para imprimir el ticket.",
-                variant: "destructive"
-            });
-            setIsPrinting(null);
-            return;
-        }
-
         try {
-            // Put a loading message in the window
-            printWindow.document.write('<html><head><title>Generando Ticket...</title></head><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><div>Generando PDF del ticket... por favor espere.</div></body></html>');
-
             const settings = await getTicketSettings();
 
             if (!settings) {
                 toast({ title: "Error", description: "No se encontró la configuración del ticket.", variant: "destructive" });
-                printWindow.close();
                 return;
             }
 
             const pdfBlob = await generateTicketPdf({ sale, settings });
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-
-            // Redirect the already opened window to the PDF
-            printWindow.location.href = pdfUrl;
+            await routePdfToPrinter("ticket", pdfBlob, { fallbackToBrowser: true });
         } catch (error) {
             console.error("[handlePrintTicket] Error:", error);
             toast({ title: "Error", description: "No se pudo generar el ticket.", variant: "destructive" });
-            printWindow.close();
         } finally {
             setIsPrinting(null);
         }
