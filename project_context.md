@@ -309,6 +309,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
      - Descripción: Se agregó el registro de movimientos de tipo "SALIDA" en el kardex cuando se realiza una venta (salesService.ts) y "INGRESO" cuando se cancela una venta (api/sales/cancel/route.ts). Anteriormente el kardex solo registraba ingresos por entrada de stock.
 
 
+49. **Variantes de Producto (Padre/Hijo)** - Colores, Capacidad, Batería
+     - Estado: Completado
+     - Fecha: 2026-02-15
+     - Agente: Antigravity
+     - Descripción: Implementado sistema de productos padre/hijo en BD (`parent_id`) y Backend. Storefront actualizado con selectores dinámicos de variantes y herramienta Admin (`ProductGrouper`) para agrupar inventario existente.
+
 ---
 
 ## Payload CMS
