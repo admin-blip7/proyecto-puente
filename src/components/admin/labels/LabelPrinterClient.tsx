@@ -239,7 +239,7 @@ export default function LabelPrinterClient({ allProducts, settings, consignors, 
                                         </div>
                                     )}
                                     {filteredProducts.length > 0 ? (
-                                        filteredProducts.slice(0, 50).map(product => (
+                                        filteredProducts.map(product => (
                                             <button
                                                 key={getStableProductKey(product, filteredProducts.indexOf(product))}
                                                 // 🔥 FIX #8: Optimized mouse event handling

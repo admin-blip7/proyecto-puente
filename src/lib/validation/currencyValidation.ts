@@ -1,13 +1,22 @@
+import {
+  DEFAULT_APP_PREFERENCES,
+  formatCurrencyWithPreferences,
+  getCurrencyLabel,
+  getRuntimeAppPreferences,
+} from "@/lib/appPreferences";
+
 /**
- * Validaciones de moneda para asegurar que todas las transacciones se procesen en MXN
+ * Validaciones de moneda para asegurar consistencia con la configuración global.
  */
 
-export const ALLOWED_CURRENCY = 'MXN';
-export const CURRENCY_SYMBOL = '$';
-export const CURRENCY_NAME = 'Peso Mexicano';
+export const ALLOWED_CURRENCY = DEFAULT_APP_PREFERENCES.currency;
+export const CURRENCY_SYMBOL = "$";
+export const CURRENCY_NAME = getCurrencyLabel(ALLOWED_CURRENCY);
+
+const getConfiguredCurrency = () => getRuntimeAppPreferences().currency;
 
 /**
- * Valida que un monto sea válido para transacciones en MXN
+ * Valida que un monto sea válido para transacciones monetarias.
  */
 export const validateMXNAmount = (amount: number): { isValid: boolean; error?: string } => {
   if (typeof amount !== 'number') {
@@ -36,27 +45,35 @@ export const validateMXNAmount = (amount: number): { isValid: boolean; error?: s
   }
 
   // Validar límite máximo razonable para transacciones
-  const MAX_TRANSACTION_AMOUNT = 999999999.99; // 999 millones de pesos
+  const MAX_TRANSACTION_AMOUNT = 999999999.99;
   if (normalizedAmount > MAX_TRANSACTION_AMOUNT) {
-    return { isValid: false, error: `El monto no puede exceder $${MAX_TRANSACTION_AMOUNT.toLocaleString('es-MX')} MXN` };
+    const locale = getRuntimeAppPreferences().locale;
+    const currency = getConfiguredCurrency();
+    return {
+      isValid: false,
+      error: `El monto no puede exceder ${MAX_TRANSACTION_AMOUNT.toLocaleString(locale)} ${currency}`,
+    };
   }
 
   return { isValid: true };
 };
 
 /**
- * Valida que una transacción esté en la moneda correcta (MXN)
+ * Valida que una transacción esté en la moneda global configurada.
  */
 export const validateTransactionCurrency = (currency?: string): { isValid: boolean; error?: string } => {
+  const configuredCurrency = getConfiguredCurrency();
+  const configuredCurrencyName = getCurrencyLabel(configuredCurrency);
+
   if (!currency) {
-    // Si no se especifica moneda, asumimos MXN por defecto
+    // Si no se especifica moneda, asumimos la moneda global configurada.
     return { isValid: true };
   }
 
-  if (currency !== ALLOWED_CURRENCY) {
-    return { 
-      isValid: false, 
-      error: `Solo se permiten transacciones en ${CURRENCY_NAME} (${ALLOWED_CURRENCY}). Moneda recibida: ${currency}` 
+  if (currency !== configuredCurrency) {
+    return {
+      isValid: false,
+      error: `Solo se permiten transacciones en ${configuredCurrencyName} (${configuredCurrency}). Moneda recibida: ${currency}`,
     };
   }
 
@@ -121,11 +138,8 @@ export const sanitizeMXNAmount = (input: string | number): number => {
 export const formatMXNAmount = (amount: number): string => {
   const validation = validateMXNAmount(amount);
   if (!validation.isValid) {
-    return '$0.00 MXN';
+    return formatCurrencyWithPreferences(0);
   }
 
-  return new Intl.NumberFormat('es-MX', { 
-    style: 'currency', 
-    currency: ALLOWED_CURRENCY 
-  }).format(amount);
+  return formatCurrencyWithPreferences(amount);
 };

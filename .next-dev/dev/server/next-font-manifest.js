@@ -1,0 +1,1 @@
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/brayan/Documents/proyecto-puente-firebase/src/app/layout\":[\"static/media/e4af272ccee01ff0-s.p.woff2\"],\"/Users/brayan/Documents/proyecto-puente-firebase/src/app/(tienda)/layout\":[\"static/media/e4af272ccee01ff0-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"

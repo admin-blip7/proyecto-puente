@@ -36,9 +36,9 @@ import {
   ArrowLeftIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { exportToPDF, exportToExcel } from '@/lib/utils/exportUtils';
 import { useRouter } from 'next/navigation';
+import { formatCurrencyWithPreferences, getDateFnsLocale } from '@/lib/appPreferences';
 
 interface SaleItem {
   productId: string;
@@ -184,11 +184,7 @@ export default function ConsignorSalesReportPage() {
   }) || [];
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrencyWithPreferences(amount);
   };
 
   const formatDate = (dateString: any) => {
@@ -216,7 +212,7 @@ export default function ConsignorSalesReportPage() {
       return 'Fecha inválida';
     }
 
-    return format(date, 'dd/MM/yyyy HH:mm', { locale: es });
+    return format(date, 'dd/MM/yyyy HH:mm', { locale: getDateFnsLocale() });
   };
 
   const getPaymentMethodBadge = (method: string) => {

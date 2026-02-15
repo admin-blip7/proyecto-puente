@@ -35,7 +35,7 @@ import { updateWarranty } from "@/lib/services/warrantyService";
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 interface EditWarrantyDialogProps {
   isOpen: boolean;
@@ -141,7 +141,7 @@ export default function EditWarrantyDialog({
                     </div>
                     <div>
                         <p className="text-sm font-medium text-muted-foreground">Fecha de Reporte</p>
-                        <p className="font-semibold">{format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: es })}</p>
+                        <p className="font-semibold">{format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}</p>
                     </div>
                     <div>
                         <p className="text-sm font-medium text-muted-foreground">Motivo de la Garantía</p>

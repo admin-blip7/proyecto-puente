@@ -3,10 +3,12 @@
 
 import { Product, StockEntryItem, BulkUpdateData, ProductVariant } from "@/types";
 import { v4 as uuidv4 } from "uuid";
+import sharp from "sharp";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 import { registerKardexMovement } from "@/lib/services/kardexService";
+import { removeBackgroundWithBackgroundErase } from "@/lib/services/backgroundEraseService";
 
 interface InventoryHistoryPoint {
   date: string;
@@ -18,6 +20,10 @@ const log = getLogger("productService");
 const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
 const PRODUCT_VARIANTS_TABLE = "product_variants";
+const PRODUCT_IMAGE_BUCKET = "products";
+const OPTIMIZED_IMAGE_WIDTH = 960;
+const OPTIMIZED_IMAGE_HEIGHT = 960;
+const OPTIMIZED_IMAGE_PIPELINE = "backgrounderase-v1";
 
 interface StockMovementContext {
   userId?: string | null;
@@ -175,6 +181,367 @@ const mapProduct = (row: any, index: number): Product => ({
   imageUrls: Array.isArray(row?.image_urls) ? row.image_urls : [],
 });
 
+const optimizeImageBuffer = async (sourceUrl: string): Promise<Buffer> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const response = await fetch(sourceUrl, {
+    cache: "no-store",
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) {
+    throw new Error(`Could not download image (${response.status})`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const inputBuffer = Buffer.from(arrayBuffer);
+  const hasBackgroundEraseKey = Boolean(process.env.BACKGROUNDERASE_API_KEY);
+
+  let backgroundEraseBuffer: Buffer | null = null;
+  if (hasBackgroundEraseKey) {
+    try {
+      backgroundEraseBuffer = await removeBackgroundWithBackgroundErase(inputBuffer, `source-${Date.now()}.png`);
+    } catch (error) {
+      log.warn("BackgroundErase optimization failed, falling back to Sharp-only pipeline", {
+        sourceUrl,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const bufferForProcessing = backgroundEraseBuffer ?? inputBuffer;
+  const shouldKeepAlpha = Boolean(backgroundEraseBuffer);
+
+  let transformer = sharp(bufferForProcessing)
+    .rotate()
+    .resize(OPTIMIZED_IMAGE_WIDTH, OPTIMIZED_IMAGE_HEIGHT, {
+      fit: "contain",
+      background: shouldKeepAlpha
+        ? { r: 248, g: 250, b: 252, alpha: 0 }
+        : { r: 248, g: 250, b: 252, alpha: 1 },
+      withoutEnlargement: true,
+    })
+    .sharpen();
+
+  if (!shouldKeepAlpha) {
+    transformer = transformer.flatten({ background: "#f8fafc" });
+  }
+
+  return transformer.webp({ quality: 88, effort: 5 }).toBuffer();
+};
+
+const uploadOptimizedBuffer = async (productId: string, buffer: Buffer): Promise<string> => {
+  const supabase = getSupabaseServerClient();
+  const filePath = `optimized/${productId}-${Date.now()}.webp`;
+
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGE_BUCKET)
+    .upload(filePath, buffer, {
+      contentType: "image/webp",
+      upsert: false,
+      cacheControl: "3600",
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(filePath);
+
+  return publicUrl;
+};
+
+const getOptimizedSourceFromAttributes = (attributes: Record<string, any> | null | undefined): string | null => {
+  if (!attributes || typeof attributes !== "object") return null;
+  const source = attributes.optimizedSource;
+  return typeof source === "string" && source.length > 0 ? source : null;
+};
+
+const getOptimizedImageUrlFromAttributes = (attributes: Record<string, any> | null | undefined): string | null => {
+  if (!attributes || typeof attributes !== "object") return null;
+  const url = attributes.optimizedImageUrl;
+  return typeof url === "string" && url.length > 0 ? url : null;
+};
+
+const getOptimizedPipelineFromAttributes = (attributes: Record<string, any> | null | undefined): string | null => {
+  if (!attributes || typeof attributes !== "object") return null;
+  const pipeline = attributes.optimizedPipeline;
+  return typeof pipeline === "string" && pipeline.length > 0 ? pipeline : null;
+};
+
+const ensureOptimizedProductImage = async (row: any): Promise<any> => {
+  const imageUrls = Array.isArray(row?.image_urls) ? row.image_urls : [];
+  const sourceImage = imageUrls[0];
+
+  if (!sourceImage || typeof sourceImage !== "string") {
+    return row;
+  }
+
+  const existingAttributes = row?.attributes && typeof row.attributes === "object" ? row.attributes : {};
+  const currentOptimizedSource = getOptimizedSourceFromAttributes(existingAttributes);
+  const currentOptimizedImageUrl = getOptimizedImageUrlFromAttributes(existingAttributes);
+  const currentOptimizedPipeline = getOptimizedPipelineFromAttributes(existingAttributes);
+  const pipelineIsCurrent = currentOptimizedPipeline === OPTIMIZED_IMAGE_PIPELINE;
+
+  if (currentOptimizedImageUrl && currentOptimizedSource === sourceImage && pipelineIsCurrent) {
+    return row;
+  }
+
+  try {
+    const optimizedBuffer = await optimizeImageBuffer(sourceImage);
+    const optimizedImageUrl = await uploadOptimizedBuffer(row.id, optimizedBuffer);
+    const nextAttributes = {
+      ...existingAttributes,
+      optimizedImageUrl,
+      optimizedSource: sourceImage,
+      optimizedAt: nowIso(),
+      optimizedPipeline: OPTIMIZED_IMAGE_PIPELINE,
+    };
+
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from(PRODUCTS_TABLE)
+      .update({ attributes: nextAttributes })
+      .eq("id", row.id);
+
+    if (error) {
+      log.warn("Failed to persist optimized image URL", { productId: row.id, error });
+      return row;
+    }
+
+    return {
+      ...row,
+      attributes: nextAttributes,
+    };
+  } catch (error) {
+    log.warn("Failed to optimize product image", {
+      productId: row.id,
+      sourceImage,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return row;
+  }
+};
+
+type ProductImageBackfillResult = {
+  processed: number;
+  optimized: number;
+  skipped: number;
+  failed: number;
+};
+
+type ProductImageOptimizationItemResult = {
+  id: string;
+  name: string;
+  status: "optimized" | "skipped" | "failed" | "not_found" | "no_image";
+  optimizedImageUrl?: string | null;
+  reason?: string;
+};
+
+export const optimizeProductImagesByIds = async (
+  productIds: string[]
+): Promise<{
+  requested: number;
+  processed: number;
+  optimized: number;
+  skipped: number;
+  failed: number;
+  items: ProductImageOptimizationItemResult[];
+}> => {
+  const normalizedIds = Array.from(
+    new Set(
+      (productIds ?? [])
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    )
+  );
+
+  if (normalizedIds.length === 0) {
+    return {
+      requested: 0,
+      processed: 0,
+      optimized: 0,
+      skipped: 0,
+      failed: 0,
+      items: [],
+    };
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select("id,name,image_urls,attributes")
+    .in("id", normalizedIds);
+
+  if (error) {
+    log.error("Error fetching products for targeted optimization", error);
+    throw new Error("Failed to fetch products for targeted optimization.");
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  const rowsById = new Map(rows.map((row) => [String(row.id), row]));
+
+  const items: ProductImageOptimizationItemResult[] = [];
+  let optimized = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const id of normalizedIds) {
+    const row = rowsById.get(id);
+    if (!row) {
+      failed += 1;
+      items.push({
+        id,
+        name: "",
+        status: "not_found",
+        reason: "Product not found",
+      });
+      continue;
+    }
+
+    const name = String(row.name ?? "");
+    const imageUrls = Array.isArray(row?.image_urls) ? row.image_urls : [];
+    const sourceImage = imageUrls[0];
+
+    if (!sourceImage || typeof sourceImage !== "string") {
+      skipped += 1;
+      items.push({
+        id,
+        name,
+        status: "no_image",
+        reason: "No source image",
+      });
+      continue;
+    }
+
+    const beforeSource = getOptimizedSourceFromAttributes(row?.attributes);
+    const beforeUrl = getOptimizedImageUrlFromAttributes(row?.attributes);
+    const beforePipeline = getOptimizedPipelineFromAttributes(row?.attributes);
+    const alreadyOptimized =
+      beforeUrl && beforeSource === sourceImage && beforePipeline === OPTIMIZED_IMAGE_PIPELINE;
+
+    if (alreadyOptimized) {
+      skipped += 1;
+      items.push({
+        id,
+        name,
+        status: "skipped",
+        optimizedImageUrl: beforeUrl,
+        reason: "Already optimized with current pipeline",
+      });
+      continue;
+    }
+
+    try {
+      const optimizedRow = await ensureOptimizedProductImage(row);
+      const afterSource = getOptimizedSourceFromAttributes(optimizedRow?.attributes);
+      const afterUrl = getOptimizedImageUrlFromAttributes(optimizedRow?.attributes);
+
+      if (afterUrl && afterSource === sourceImage) {
+        optimized += 1;
+        items.push({
+          id,
+          name,
+          status: "optimized",
+          optimizedImageUrl: afterUrl,
+        });
+      } else {
+        failed += 1;
+        items.push({
+          id,
+          name,
+          status: "failed",
+          reason: "Optimization did not return a valid URL",
+        });
+      }
+    } catch (optimizationError) {
+      failed += 1;
+      items.push({
+        id,
+        name,
+        status: "failed",
+        reason:
+          optimizationError instanceof Error
+            ? optimizationError.message
+            : String(optimizationError),
+      });
+    }
+  }
+
+  return {
+    requested: normalizedIds.length,
+    processed: normalizedIds.length,
+    optimized,
+    skipped,
+    failed,
+    items,
+  };
+};
+
+export const backfillOptimizedProductImages = async (limit?: number): Promise<ProductImageBackfillResult> => {
+  const supabase = getSupabaseServerClient();
+  let query = supabase
+    .from(PRODUCTS_TABLE)
+    .select("id,image_urls,attributes,created_at")
+    .order("created_at", { ascending: false });
+
+  if (typeof limit === "number" && limit > 0) {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    log.error("Error fetching products for image backfill", error);
+    throw new Error("Failed to fetch products for image backfill.");
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  const result: ProductImageBackfillResult = {
+    processed: 0,
+    optimized: 0,
+    skipped: 0,
+    failed: 0,
+  };
+
+  for (const row of rows) {
+    result.processed += 1;
+    const imageUrls = Array.isArray(row?.image_urls) ? row.image_urls : [];
+    const sourceImage = imageUrls[0];
+
+    if (!sourceImage || typeof sourceImage !== "string") {
+      result.skipped += 1;
+      continue;
+    }
+
+    const beforeSource = getOptimizedSourceFromAttributes(row?.attributes);
+    const beforeUrl = getOptimizedImageUrlFromAttributes(row?.attributes);
+    const beforePipeline = getOptimizedPipelineFromAttributes(row?.attributes);
+    const alreadyOptimized =
+      beforeUrl && beforeSource === sourceImage && beforePipeline === OPTIMIZED_IMAGE_PIPELINE;
+
+    if (alreadyOptimized) {
+      result.skipped += 1;
+      continue;
+    }
+
+    const optimizedRow = await ensureOptimizedProductImage(row);
+    const afterSource = getOptimizedSourceFromAttributes(optimizedRow?.attributes);
+    const afterUrl = getOptimizedImageUrlFromAttributes(optimizedRow?.attributes);
+
+    if (afterUrl && afterSource === sourceImage) {
+      result.optimized += 1;
+    } else {
+      result.failed += 1;
+    }
+  }
+
+  return result;
+};
+
 const fetchProductRow = async (productId: string) => {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
@@ -322,7 +689,8 @@ export const addProduct = async (
     throw new Error("Failed to add product.");
   }
 
-  return mapProduct(data, 0);
+  const optimizedRow = await ensureOptimizedProductImage(data);
+  return mapProduct(optimizedRow, 0);
 };
 
 export const updateProduct = async (
@@ -370,7 +738,8 @@ export const updateProduct = async (
     throw new Error("Product not found after update.");
   }
 
-  return mapProduct(updatedRow, 0);
+  const optimizedRow = await ensureOptimizedProductImage(updatedRow);
+  return mapProduct(optimizedRow, 0);
 };
 
 export const updateProductStockWithKardex = async (
@@ -561,6 +930,9 @@ export const processStockEntry = async (
           }
         }
 
+        const existingAttributes = row?.attributes && typeof row.attributes === "object" ? row.attributes : {};
+        const incomingAttributes = item.attributes && typeof item.attributes === "object" ? item.attributes : {};
+
         const updateData: any = {
           stock: currentStock + item.quantity,
           cost: item.cost,
@@ -568,7 +940,10 @@ export const processStockEntry = async (
           ownership_type: item.ownershipType,
           consignor_id: resolvedConsignorId,
           category: item.category ?? null,
-          attributes: item.attributes ?? {},
+          attributes: {
+            ...existingAttributes,
+            ...incomingAttributes,
+          },
         };
 
         if (updatedImageUrls) {
@@ -589,6 +964,11 @@ export const processStockEntry = async (
         if (updateError) {
           log.error("Error updating existing product:", updateError);
           throw new Error(`Error al actualizar producto "${item.name}": ${updateError.message}`);
+        }
+
+        const updatedRowForOptimization = await fetchProductRow(String(row.id));
+        if (updatedRowForOptimization) {
+          await ensureOptimizedProductImage(updatedRowForOptimization);
         }
       }
 

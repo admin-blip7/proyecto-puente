@@ -1,9 +1,9 @@
 import { PDF, rgb, StandardFonts, Standard14Font } from '@libpdf/core';
 import { TicketSettings, Sale } from '@/types';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import QRCode from 'qrcode';
 import { getLogger } from '@/lib/logger';
+import { formatCurrencyWithPreferences, getDateFnsLocale } from '@/lib/appPreferences';
 
 const log = getLogger('ticketPdfService');
 
@@ -14,13 +14,6 @@ interface PdfTicketOptions {
     sale: Sale;
     settings: TicketSettings;
 }
-
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-    }).format(amount);
-};
 
 export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): Promise<Blob> => {
     // 1. Setup Document
@@ -155,7 +148,7 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
 
     // Sale Info
     const infoSize = smallFontSize + 0.5;
-    const dateStr = format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: es });
+    const dateStr = format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() });
 
     drawLeftText(`Folio: ${sale.saleId || sale.id.substring(0, 8)}`, infoSize, currentY);
     moveDown(lineHeight);
@@ -186,7 +179,7 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
         const qty = item.quantity;
         const name = item.name;
         const total = qty * item.priceAtSale;
-        const totalText = formatCurrency(total);
+        const totalText = formatCurrencyWithPreferences(total);
         const totalWidth = (helveticaBold as any).widthOfTextAtSize(totalText, fontSize);
         const qtyPrefix = `${qty} x `;
         const prefixWidth = (helveticaFont as any).widthOfTextAtSize(qtyPrefix, fontSize);
@@ -231,7 +224,7 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
         }
 
         if (settings.body.showUnitPrice && qty > 1) {
-            drawLeftText(`   (${formatCurrency(item.priceAtSale)} c/u)`, smallFontSize, currentY);
+            drawLeftText(`   (${formatCurrencyWithPreferences(item.priceAtSale)} c/u)`, smallFontSize, currentY);
             moveDown(lineHeight);
         }
         moveDown(4); // Extra space between items
@@ -252,23 +245,23 @@ export const generateTicketPdf = async ({ sale, settings }: PdfTicketOptions): P
 
     if (settings.footer.showSubtotal) {
         drawLeftText("Subtotal:", fontSize, currentY);
-        drawRightText(formatCurrency(subtotal), fontSize, currentY);
+        drawRightText(formatCurrencyWithPreferences(subtotal), fontSize, currentY);
         moveDown(lineHeight);
     }
 
     drawLeftText("TOTAL:", headerFontSize, currentY, helveticaBold);
-    drawRightText(formatCurrency(total), headerFontSize, currentY, helveticaBold);
+    drawRightText(formatCurrencyWithPreferences(total), headerFontSize, currentY, helveticaBold);
     moveDown(lineHeight + 10);
 
     if (sale.amountPaid !== undefined) {
         drawLeftText(`Pago (${sale.paymentMethod}):`, fontSize, currentY);
-        drawRightText(formatCurrency(sale.amountPaid), fontSize, currentY);
+        drawRightText(formatCurrencyWithPreferences(sale.amountPaid), fontSize, currentY);
         moveDown(lineHeight);
     }
 
     if (sale.changeGiven !== undefined) {
         drawLeftText("Cambio:", fontSize, currentY);
-        drawRightText(formatCurrency(sale.changeGiven), fontSize, currentY);
+        drawRightText(formatCurrencyWithPreferences(sale.changeGiven), fontSize, currentY);
         moveDown(lineHeight);
     }
 

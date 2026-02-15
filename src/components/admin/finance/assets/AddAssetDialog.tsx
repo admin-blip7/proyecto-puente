@@ -36,7 +36,7 @@ import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { Calendar } from "@/components/ui/calendar";
 import { IconPicker } from "@/components/shared/IconPicker";
 
@@ -193,7 +193,7 @@ export default function AddAssetDialog({
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP", { locale: es })
+                            format(field.value, "PPP", { locale: getDateFnsLocale() })
                           ) : (
                             <span>Elige una fecha</span>
                           )}

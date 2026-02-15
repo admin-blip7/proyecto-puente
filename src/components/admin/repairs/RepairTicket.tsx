@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { RepairOrder } from "@/types";
 import { Printer, Download, X } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 interface RepairTicketProps {
   isOpen: boolean;
@@ -220,7 +220,7 @@ export const RepairTicket: FC<RepairTicketProps> = ({
             <div className="flex justify-between items-center mb-2">
               <span className="font-bold text-sm">Fecha:</span>
               <span className="text-sm">
-                {repairOrder?.createdAt ? format(new Date(repairOrder.createdAt), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"}
+                {repairOrder?.createdAt ? format(new Date(repairOrder.createdAt), "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() }) : "N/A"}
               </span>
             </div>
             <div className="flex justify-between items-center">

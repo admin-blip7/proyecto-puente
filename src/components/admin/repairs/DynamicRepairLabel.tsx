@@ -1,6 +1,5 @@
 import { RepairOrder, LabelSettings } from "@/types";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { normalizeVisualEditorData, VisualElement } from "@/lib/printing/visualLayoutTypes";
 import JsBarcode from 'jsbarcode';
 import { useEffect, useRef } from "react";

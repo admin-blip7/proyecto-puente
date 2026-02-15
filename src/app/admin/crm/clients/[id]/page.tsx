@@ -20,11 +20,11 @@ import {
     CheckSquare
 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { CRMClient, CRMInteraction, CRMTask } from "@/types";
 import { getCRMClientById, getCRMInteractions, getCRMTasks } from "@/lib/services/crmClientService";
 import CRMClientForm from "@/components/admin/crm/CRMClientForm";
+import { formatCurrencyWithPreferences, getDateFnsLocale } from "@/lib/appPreferences";
 
 export default function CRMClientDetailPage() {
     const params = useParams();
@@ -84,10 +84,7 @@ export default function CRMClientDetailPage() {
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("es-MX", {
-            style: "currency",
-            currency: "MXN"
-        }).format(amount);
+        return formatCurrencyWithPreferences(amount);
     };
 
     const getInteractionTypeLabel = (type: string) => {
@@ -300,7 +297,7 @@ export default function CRMClientDetailPage() {
                             <div>
                                 <p className="text-sm text-muted-foreground">Fecha de Registro</p>
                                 <p className="font-medium">
-                                    {format(new Date(client.registrationDate), 'dd/MM/yyyy', { locale: es })}
+                                    {format(new Date(client.registrationDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                 </p>
                             </div>
                         </div>
@@ -310,7 +307,7 @@ export default function CRMClientDetailPage() {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Último Contacto</p>
                                     <p className="font-medium">
-                                        {format(new Date(client.lastContactDate), 'dd/MM/yyyy', { locale: es })}
+                                        {format(new Date(client.lastContactDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                     </p>
                                 </div>
                             </div>
@@ -365,7 +362,7 @@ export default function CRMClientDetailPage() {
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">
-                                                    {format(new Date(interaction.interactionDate), 'dd/MM/yyyy HH:mm', { locale: es })}
+                                                    {format(new Date(interaction.interactionDate), 'dd/MM/yyyy HH:mm', { locale: getDateFnsLocale() })}
                                                 </p>
                                                 {interaction.metadata && Object.keys(interaction.metadata).length > 0 && (
                                                     <div className="mt-2 text-xs text-muted-foreground">
@@ -420,7 +417,7 @@ export default function CRMClientDetailPage() {
                                                 )}
                                                 {task.dueDate && (
                                                     <p className="text-sm text-muted-foreground mt-2">
-                                                        Vencimiento: {format(new Date(task.dueDate), 'dd/MM/yyyy', { locale: es })}
+                                                        Vencimiento: {format(new Date(task.dueDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                                     </p>
                                                 )}
                                             </div>

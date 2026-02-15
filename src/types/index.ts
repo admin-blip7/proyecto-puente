@@ -27,6 +27,7 @@ export interface Product {
   status?: string;
   updatedAt?: Date;
   attributes?: Record<string, any>; // Atributos específicos por categoría
+  parentId?: string; // ID del producto padre si es una variante
   imageUrls?: string[];
 }
 
@@ -117,6 +118,18 @@ export interface Sale {
   discountCode?: string;
   discountAmount?: number;
   discountPercentage?: number;
+  // Customer & Shipping
+  userId?: string;
+  shippingInfo?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    notes?: string;
+  };
+  deliveryStatus?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  trackingNumber?: string;
 }
 
 export interface SalesChange {
@@ -197,7 +210,7 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Cajero';
+  role: 'Admin' | 'Cajero' | 'Cliente';
 }
 
 export interface CartItem extends Product {
@@ -435,6 +448,40 @@ export const PrintRoutingSettingsSchema = z.object({
 });
 
 export type PrintRoutingSettings = z.infer<typeof PrintRoutingSettingsSchema>;
+
+export const appSupportedCurrencies = ["MXN", "USD", "EUR", "COP"] as const;
+export type AppSupportedCurrency = typeof appSupportedCurrencies[number];
+
+export const appSupportedLanguages = ["es", "en"] as const;
+export type AppSupportedLanguage = typeof appSupportedLanguages[number];
+
+export const appSupportedLocales = ["es-MX", "en-US"] as const;
+export type AppSupportedLocale = typeof appSupportedLocales[number];
+
+export const AppPreferencesSchema = z
+  .object({
+    currency: z.enum(appSupportedCurrencies).default("MXN"),
+    language: z.enum(appSupportedLanguages).default("es"),
+    locale: z.enum(appSupportedLocales).default("es-MX"),
+  })
+  .superRefine((val, ctx) => {
+    if (val.language === "es" && val.locale !== "es-MX") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El locale debe coincidir con el idioma seleccionado.",
+        path: ["locale"],
+      });
+    }
+    if (val.language === "en" && val.locale !== "en-US") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El locale debe coincidir con el idioma seleccionado.",
+        path: ["locale"],
+      });
+    }
+  });
+
+export type AppPreferences = z.infer<typeof AppPreferencesSchema>;
 
 export const labelTypes = ["product", "repair"] as const;
 export type LabelType = typeof labelTypes[number];

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, Tag } from "lucide-react";
 import { RepairOrder, TicketSettings, LabelSettings } from "@/types";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { DynamicRepairLabel } from "./DynamicRepairLabel";
 import { createRoot } from "react-dom/client";
 
@@ -41,7 +41,7 @@ export default function PrintRepairDocumentsDialog({
           ${header.show.website ? `<p>${header.website}</p>` : ''}
         </div>
         <p>Folio: ${order.orderId}</p>
-        <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+        <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}</p>
         <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
         <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
         <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>

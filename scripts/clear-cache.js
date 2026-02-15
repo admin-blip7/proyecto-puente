@@ -5,6 +5,7 @@ const path = require('path');
 function clearCache() {
   const cacheDirs = [
     '.next',
+    '.next-dev',
     'node_modules/.cache',
     'dist'
   ];

@@ -1,0 +1,8 @@
+<svg width="200" height="200" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Monogram / App Icon Variant -->
+    <rect width="40" height="40" rx="4" fill="#000000"/>
+    <rect x="6" y="10" width="16" height="4" rx="1" fill="#FFFFFF"/>
+    <rect x="6" y="18" width="20" height="4" rx="1" fill="#FFFFFF"/>
+    <rect x="6" y="26" width="12" height="4" rx="1" fill="#FFD600"/>
+    <circle cx="32" cy="18" r="3" fill="#FFD600"/>
+</svg>

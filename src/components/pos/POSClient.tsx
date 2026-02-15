@@ -46,6 +46,7 @@ import { routePdfToPrinter } from "@/lib/printing/printRouter";
 import { getReadyRepairs } from "@/lib/services/repairService";
 import { RepairOrder } from "@/types";
 import SalesHistoryDialog from "./SalesHistoryDialog";
+import { formatCurrencyWithPreferences, formatDateTimeWithPreferences } from "@/lib/appPreferences";
 
 
 // Helper for category icons
@@ -549,17 +550,14 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
   // Helper to format currency
   const formatCurrencyVal = (value: number | undefined) => {
-    if (value === undefined || value === null) return '$0.00';
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    }).format(value);
+    if (value === undefined || value === null) return formatCurrencyWithPreferences(0);
+    return formatCurrencyWithPreferences(value);
   };
 
   // Helper to format date
   const formatDateVal = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('es-ES');
+    return formatDateTimeWithPreferences(dateString);
   };
 
 
@@ -716,7 +714,14 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
           <div className="flex-shrink-0 px-8 py-6 bg-surface-light dark:bg-sidebar-bg border-b border-border-light dark:border-border flex justify-between items-center z-10 transition-colors">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Checkout Order</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {formatDateTimeWithPreferences(new Date(), {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
             </div>
             <div className="flex items-center gap-6">
               {/* Optional: Add header actions here if needed */}

@@ -14,7 +14,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { Button } from "@/components/ui/button";
 import { Edit, Plus } from "lucide-react";
 import EditWarrantyDialog from "./EditWarrantyDialog";
@@ -79,7 +79,7 @@ export default function WarrantyClient({ initialWarranties }: WarrantyClientProp
                         </TableCell>
                         <TableCell className="max-w-[250px] truncate">{warranty.reason}</TableCell>
                         <TableCell>
-                            {format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                            {format(warranty.reportedAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}
                         </TableCell>
                         <TableCell>
                             <Badge variant={getWarrantyStatusVariant(warranty.status)}>

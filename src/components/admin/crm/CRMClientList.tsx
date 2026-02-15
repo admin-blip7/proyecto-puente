@@ -9,12 +9,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Plus, User, Phone, Mail, Calendar, Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { CRMClient, ClientType, CRMClientStatus } from "@/types";
 import { getCRMClients, deleteCRMClient } from "@/lib/services/crmClientService";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import { formatCurrencyWithPreferences, getDateFnsLocale } from "@/lib/appPreferences";
 
 interface ClientFilters {
     searchTerm: string;
@@ -129,10 +129,7 @@ export default function CRMClientList() {
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("es-MX", {
-            style: "currency",
-            currency: "MXN"
-        }).format(amount);
+        return formatCurrencyWithPreferences(amount);
     };
 
     const filteredClients = clients; // Already filtered on server side
@@ -319,11 +316,11 @@ export default function CRMClientList() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="text-sm">
-                                                {format(new Date(client.registrationDate), 'dd/MM/yyyy', { locale: es })}
+                                                {format(new Date(client.registrationDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                             </div>
                                             {client.lastContactDate && (
                                                 <div className="text-xs text-muted-foreground">
-                                                    Contacto: {format(new Date(client.lastContactDate), 'dd/MM/yyyy', { locale: es })}
+                                                    Contacto: {format(new Date(client.lastContactDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                                 </div>
                                             )}
                                         </TableCell>

@@ -25,6 +25,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import { KardexEntry, KardexMovementType, Product } from "@/types";
 import { CalendarRange, Filter, RefreshCcw } from "lucide-react";
+import { formatDateTimeWithPreferences, formatNumberWithPreferences } from "@/lib/appPreferences";
 
 interface KardexClientProps {
   product: Product;
@@ -39,19 +40,10 @@ interface KardexClientProps {
 }
 
 const formatDateTime = (value: Date | string) => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatDateTimeWithPreferences(value);
 };
 
-const formatQuantity = (value: number) =>
-  new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 }).format(value);
+const formatQuantity = (value: number) => formatNumberWithPreferences(value);
 
 export default function KardexClient({
   product,

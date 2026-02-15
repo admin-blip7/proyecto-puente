@@ -23,6 +23,8 @@ const formSchema = z.object({
   laborCost: z.number(),
   totalCost: z.number(),
   profit: z.number(),
+  deposit: z.number().optional(),
+  devicePassword: z.string().optional(),
 });
 
 export async function createRepairOrder(formData: FormData) {
@@ -41,6 +43,8 @@ export async function createRepairOrder(formData: FormData) {
       laborCost: parseFloat(formData.get('laborCost') as string || '0'),
       totalCost: parseFloat(formData.get('totalCost') as string || '0'),
       profit: parseFloat(formData.get('profit') as string || '0'),
+      deposit: parseFloat(formData.get('deposit') as string || '0'),
+      devicePassword: formData.get('devicePassword') as string || '',
     };
 
     console.log('Raw form data:', rawData);
@@ -49,10 +53,13 @@ export async function createRepairOrder(formData: FormData) {
     const validatedData = formSchema.parse(rawData);
 
     // Create the repair order
+    // Create the repair order
     const newOrder = await addRepairOrder({
       ...validatedData,
       deviceSerialIMEI: validatedData.deviceSerialIMEI || '',
-      partsUsed: validatedData.partsUsed || []
+      partsUsed: validatedData.partsUsed || [],
+      deposit: validatedData.deposit || 0,
+      devicePassword: validatedData.devicePassword || ''
     });
 
     // Return success response with order data

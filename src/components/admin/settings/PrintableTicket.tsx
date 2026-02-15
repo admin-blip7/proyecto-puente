@@ -4,7 +4,7 @@ import { TicketSettings, Sale } from "@/types";
 import Image from "next/image";
 import { QRCode } from "react-qrcode-logo";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { formatCurrency } from "@/lib/utils";
 
 interface PrintableTicketProps {
@@ -106,7 +106,7 @@ export default function PrintableTicket({ settings, sale }: PrintableTicketProps
             </div>
             <div className="flex justify-between">
               <span className="text-black/60">Fecha:</span>
-              <span className="font-bold">{format(displaySale.createdAt, "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
+              <span className="font-bold">{format(displaySale.createdAt, "dd/MM/yyyy, hh:mm a", { locale: getDateFnsLocale() })}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-black/60">Cajero:</span>

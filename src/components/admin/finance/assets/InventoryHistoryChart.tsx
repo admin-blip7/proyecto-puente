@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMXNAmount } from "@/lib/validation/currencyValidation";
+import { formatDateTimeWithPreferences } from "@/lib/appPreferences";
 
 interface InventoryHistoryChartProps {
     data: { date: string; value: number }[];
@@ -20,7 +21,7 @@ export default function InventoryHistoryChart({ data, currentValue }: InventoryH
     const chartData = useMemo(() => {
         return data.map((item) => ({
             ...item,
-            formattedDate: new Date(item.date).toLocaleDateString("es-MX", { day: "numeric", month: "short" }),
+            formattedDate: formatDateTimeWithPreferences(item.date, { day: "numeric", month: "short" }),
         }));
     }, [data]);
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { getLogger } from "@/lib/logger";
 import { nowIso } from "@/lib/supabase/utils";
+import { registerKardexMovement } from "@/lib/services/kardexService";
 
 const log = getLogger("cancelSalesAPI");
 
@@ -99,6 +100,27 @@ export async function POST(request: Request) {
 
             if (updateError) {
               log.error(`Error updating stock for product ${item.productId}:`, updateError);
+            }
+
+            // Register Kardex movement for the cancellation (INGRESO - returning stock)
+            try {
+              const kardexResult = await registerKardexMovement({
+                productoId: item.productId,
+                tipo: "INGRESO",
+                concepto: `Cancelación Venta #${saleId}`,
+                cantidad: item.quantity,
+                stockAnterior: currentStock,
+                precioUnitario: item.priceAtSale ?? null,
+                referencia: saleId,
+                usuarioId: userId,
+                notas: `Cancelación: ${item.name} x${item.quantity} por ${userName}`
+              });
+              
+              if (kardexResult.error) {
+                log.warn(`Failed to register kardex for product ${item.productId} during cancellation: ${kardexResult.error}`);
+              }
+            } catch (kardexError) {
+              log.warn(`Error registering kardex for product ${item.productId} during cancellation:`, kardexError);
             }
 
             // Log inventory change

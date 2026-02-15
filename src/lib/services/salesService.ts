@@ -8,6 +8,7 @@ import { toDate, nowIso } from "@/lib/supabase/utils";
 import { getLogger } from "@/lib/logger";
 import { registerSaleInCRM } from "@/lib/utils/crmUtils";
 import { depositSaleToAccount } from "./financeService";
+import { registerKardexMovement } from "@/lib/services/kardexService";
 
 const log = getLogger("salesService");
 
@@ -25,6 +26,7 @@ const mapSale = (row: any): Sale => ({
       name: it.product_name,
       quantity: it.quantity,
       priceAtSale: Number(it.price_at_sale),
+      costAtSale: Number(it.cost_at_sale ?? 0),
       consignorId: it.consignor_id
     }))
     : [],
@@ -46,6 +48,10 @@ const mapSale = (row: any): Sale => ({
   discountAmount: row?.discount_amount ? Number(row.discount_amount) : undefined,
   discountPercentage: row?.discount_percentage ? Number(row.discount_percentage) : undefined,
   sessionId: row?.session_id ?? undefined,
+  userId: row?.user_id ?? undefined,
+  shippingInfo: row?.shipping_info ?? undefined,
+  deliveryStatus: row?.delivery_status ?? undefined,
+  trackingNumber: row?.tracking_number ?? undefined,
 });
 
 export const getSales = async (
@@ -54,7 +60,8 @@ export const getSales = async (
   limit: number = 50,
   searchQuery: string = "",
   startDate: string = "", // YYYY-MM-DD
-  endDate: string = ""    // YYYY-MM-DD
+  endDate: string = "",   // YYYY-MM-DD
+  userId?: string
 ): Promise<{ sales: Sale[], total: number }> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -68,6 +75,11 @@ export const getSales = async (
       query = query.eq('status', 'cancelled');
     } else if (includeStatus !== 'all') {
       query = query.or('status.is.null,status.eq.completed');
+    }
+
+    // User Filter
+    if (userId) {
+      query = query.eq('user_id', userId);
     }
 
     const { data: allData, error, count } = await query;
@@ -196,13 +208,14 @@ export const addSaleAndUpdateStock = async (
       saleData.items.map(async (item) => {
         const { data: product, error: productError } = await supabase
           .from(PRODUCTS_TABLE)
-          .select('consignor_id, name')
+          .select('consignor_id, name, cost')
           .eq('id', item.productId)
           .single();
 
         return {
           ...item,
           consignorId: product?.consignor_id || null,
+          costAtSale: Number(product?.cost || 0),
           name: product?.name || item.name || 'Producto sin nombre'
         };
       })
@@ -248,6 +261,10 @@ export const addSaleAndUpdateStock = async (
       session_id: finalSessionId,
       discount_code: (saleData as any).discountCode || null,
       discount_amount: (saleData as any).discountAmount || null,
+      user_id: saleData.userId || null,
+      shipping_info: saleData.shippingInfo || null,
+      delivery_status: saleData.deliveryStatus || 'pending',
+      tracking_number: saleData.trackingNumber || null,
     };
 
     // Insertar la venta
@@ -267,6 +284,7 @@ export const addSaleAndUpdateStock = async (
       product_name: item.name,
       quantity: item.quantity,
       price_at_sale: item.priceAtSale,
+      cost_at_sale: item.costAtSale,
       consignor_id: item.consignorId
     }));
 
@@ -395,6 +413,27 @@ export const addSaleAndUpdateStock = async (
           log.error(`Error updating stock for product ${item.id}`, updateError);
         } else {
           log.info(`Updated stock for ${item.name}: ${currentStock} -> ${newStock}`);
+        }
+
+        // Register Kardex movement for the sale (SALIDA)
+        try {
+          const kardexResult = await registerKardexMovement({
+            productoId: item.id,
+            tipo: "SALIDA",
+            concepto: `Venta #${saleId}`,
+            cantidad: item.quantity,
+            stockAnterior: currentStock,
+            precioUnitario: item.price,
+            referencia: saleId,
+            usuarioId: saleData.cashierId ?? null,
+            notas: `Venta: ${item.name} x${item.quantity}`
+          });
+          
+          if (kardexResult.error) {
+            log.warn(`Failed to register kardex for product ${item.id}: ${kardexResult.error}`);
+          }
+        } catch (kardexError) {
+          log.warn(`Error registering kardex for product ${item.id}:`, kardexError);
         }
 
         // Registrar en inventory_logs si la tabla existe

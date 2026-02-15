@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { RepairOrder } from "@/types";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 interface RepairLabelProps {
     repair: RepairOrder;
@@ -70,7 +70,7 @@ export const RepairLabel = ({ repair }: RepairLabelProps) => {
 
                     <div className="flex items-center gap-2">
                         <span className="opacity-70 text-[10px]">📅</span>
-                        <span>FECHA: {format(new Date(repair.createdAt), "dd/MM/yyyy", { locale: es })}</span>
+                        <span>FECHA: {format(new Date(repair.createdAt), "dd/MM/yyyy", { locale: getDateFnsLocale() })}</span>
                     </div>
 
                     <div className="flex items-center gap-2">

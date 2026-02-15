@@ -44,7 +44,7 @@ import { updateRepairOrder, addPartToRepairOrder } from "@/lib/services/repairSe
 import Image from "next/image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { Loader2, PlusCircle, Trash2, Printer } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
 import { DynamicRepairLabel } from "./DynamicRepairLabel";
@@ -236,7 +236,7 @@ export default function EditRepairDialog({
                   ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
                   </div>
                   <p>Folio: ${order.orderId}</p>
-                  <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                  <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}</p>
                   <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
                   <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
                   <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>
@@ -315,7 +315,7 @@ export default function EditRepairDialog({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Fecha de Recepción</p>
-                    <p className="font-semibold">{format(order.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}</p>
+                    <p className="font-semibold">{format(order.createdAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Problema Reportado</p>

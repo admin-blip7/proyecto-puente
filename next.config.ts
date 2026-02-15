@@ -2,6 +2,9 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Use a dedicated output dir in development to avoid collisions
+  // when other commands clean `.next` while `next dev` is running.
+  distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -69,6 +72,31 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.backmarket.es',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.backmarket.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'd2e6ccujb3mkqf.cloudfront.net',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.icons8.com',
+        pathname: '/**',
       }
     ],
   },
@@ -94,9 +122,6 @@ const nextConfig: NextConfig = {
 
     // Mejorar configuración para desarrollo
     if (dev && !isServer) {
-      // Optimizar HMR y source maps para desarrollo
-      config.devtool = 'eval-cheap-module-source-map';
-
       // Configuración para mejor HMR
       config.watchOptions = {
         ...config.watchOptions,
@@ -120,11 +145,6 @@ const nextConfig: NextConfig = {
         }
         return rule;
       });
-    }
-
-    // Optimizar source maps para producción
-    if (!dev) {
-      config.devtool = 'hidden-source-map';
     }
 
     return config;

@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getLogger } from "@/lib/logger";
 import { formatCurrency } from "@/lib/utils";
+import { formatDateTimeWithPreferences } from "@/lib/appPreferences";
 const log = getLogger("SupplierDetailClient");
 
 interface SupplierDetailClientProps {
@@ -118,7 +119,7 @@ export default function SupplierDetailClient({ supplier: initialSupplier }: Supp
   function formatDate(timestamp: any): any {
     if (!timestamp) return "N/A";
     const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('es-CO', {
+    return formatDateTimeWithPreferences(date, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

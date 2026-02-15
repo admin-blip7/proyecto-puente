@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { getLogger } from "@/lib/logger";
 import { formatCurrency } from "@/lib/utils";
+import { formatDateTimeWithPreferences } from "@/lib/appPreferences";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 const log = getLogger("PurchaseOrdersClient");
 
@@ -222,7 +223,7 @@ export default function PurchaseOrdersClient() {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('es-ES', {
+    return formatDateTimeWithPreferences(date, {
       year: 'numeric',
       month: 'short',
       day: 'numeric'

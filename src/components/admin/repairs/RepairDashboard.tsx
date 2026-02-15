@@ -11,7 +11,7 @@ import AddRepairDialog from "./AddRepairDialog";
 import EditRepairDialog from "./EditRepairDialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { formatCurrency, getStatusVariant } from "@/lib/utils";
 import PrintRepairDocumentsDialog from "./PrintRepairDocumentsDialog";
 import RepairDetailsDialog from "./RepairDetailsDialog";
@@ -139,7 +139,7 @@ export default function RepairDashboard({ initialOrders, allSpareParts, ticketSe
                   ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
                   </div>
                   <p>Folio: ${order.orderId}</p>
-                  <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                  <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}</p>
                   <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
                   <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
                   <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>

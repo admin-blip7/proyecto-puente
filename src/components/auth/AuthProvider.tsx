@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useState, useEffect, ReactNode } from "react";
-import type { User } from "@supabase/supabase-js";
+import { createContext, useState, useEffect, ReactNode, useRef } from "react";
+import type { Session, User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,6 +9,37 @@ import { UserProfile } from "@/types";
 import { getLogger } from "@/lib/logger";
 
 const log = getLogger("AuthProvider");
+
+// Track if we've already redirected to login to avoid loops
+let hasRedirectedToLogin = false;
+const ADMIN_ACCESS_TOKEN_COOKIE = "tienda_admin_access_token";
+
+const syncAdminAccessCookie = (session: Session | null) => {
+  if (typeof document === "undefined") return;
+
+  if (!session?.access_token) {
+    document.cookie = `${ADMIN_ACCESS_TOKEN_COOKIE}=; path=/; max-age=0; samesite=lax`;
+    return;
+  }
+
+  document.cookie = `${ADMIN_ACCESS_TOKEN_COOKIE}=${encodeURIComponent(
+    session.access_token
+  )}; path=/; max-age=28800; samesite=lax`;
+};
+
+const getPostLoginRedirect = (role?: string) => {
+  if (typeof window === "undefined") return "/pos";
+  const nextParam = new URLSearchParams(window.location.search).get("next");
+  if (nextParam && nextParam.startsWith("/")) {
+    return nextParam;
+  }
+
+  if (role === 'Cliente') {
+    return "/tienda/cuenta/perfil";
+  }
+
+  return "/pos";
+};
 
 interface AuthContextType {
   user: User | null;
@@ -23,8 +54,11 @@ const buildUserProfile = (user: User | null): UserProfile | null => {
   if (!user) return null;
   const metadata = user.user_metadata ?? {};
   const name = (metadata.name as string) || (metadata.full_name as string) || user.email?.split("@")[0] || "Usuario";
-  const metaRole = (metadata.role as string) || "Admin";
-  const role: UserProfile["role"] = metaRole === "Cajero" ? "Cajero" : "Admin";
+  const metaRole = (metadata.role as string) || "Admin"; // Keep default as Admin for legacy/dev users safety
+  let role: UserProfile["role"] = "Admin";
+
+  if (metaRole === "Cajero") role = "Cajero";
+  if (metaRole === "Cliente") role = "Cliente";
 
   return {
     uid: user.id,
@@ -38,52 +72,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const authCheckDone = useRef(false);
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 2;
+
+  // Public paths that don't require authentication
+  const isPublicPath = pathname === "/login" ||
+    pathname === "/reset-password" ||
+    pathname === "/" ||
+    pathname.startsWith("/products/");
 
   useEffect(() => {
     if (!supabase) {
       log.error("Supabase client is not configured");
       setLoading(false);
+      setConnectionError(true);
       return;
     }
 
     const syncSession = async () => {
+      if (authCheckDone.current && retryCount.current >= MAX_RETRIES) {
+        return;
+      }
+
       if (!supabase) {
         log.error("Supabase client is not available");
         setLoading(false);
+        setConnectionError(true);
         return;
       }
+
       setLoading(true);
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        log.error("Error fetching session", error);
+      setConnectionError(false);
 
-        // Si hay error de refresh token, limpiar la sesión
-        if (error.message?.includes("Invalid Refresh Token") || error.message?.includes("Refresh Token Not Found")) {
-          await supabase.auth.signOut({ scope: "local" });
+      try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          log.error("Error fetching session", error);
+          syncAdminAccessCookie(null);
+
+          // Si hay error de refresh token o de conexión, limpiar la sesión localmente
+          if (error.message?.includes("Invalid Refresh Token") ||
+            error.message?.includes("Refresh Token Not Found") ||
+            error.message?.includes("Failed to fetch")) {
+            // Solo limpiar storage local, no hacer logout en el servidor si no hay conexión
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem(`sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https?:\/\//, '').replace(/\..*$/, '')}-auth-token`);
+            }
+          }
+
+          setUser(null);
+          setUserProfile(null);
+          retryCount.current++;
+
+          // Solo redirigir si no es un path público y no hemos redirigido ya
+          if (!isPublicPath && !hasRedirectedToLogin) {
+            hasRedirectedToLogin = true;
+            router.push("/login");
+          }
+        } else {
+          const currentSession = data.session ?? null;
+          const supabaseUser = currentSession?.user ?? null;
+          syncAdminAccessCookie(currentSession);
+          setUser(supabaseUser);
+          setUserProfile(buildUserProfile(supabaseUser));
+          setConnectionError(false);
+
+          if (supabaseUser && pathname === "/login") {
+            const profile = buildUserProfile(supabaseUser);
+            router.push(getPostLoginRedirect(profile?.role));
+          }
+          // Solo redirigir si no hay usuario, no es path público, y no hemos redirigido
+          else if (!supabaseUser && !isPublicPath && !hasRedirectedToLogin) {
+            hasRedirectedToLogin = true;
+            router.push("/login");
+          }
         }
-
-        setUser(null);
-        setUserProfile(null);
+      } catch (err) {
+        log.error("Unexpected error during session sync", err);
+        setConnectionError(true);
+      } finally {
         setLoading(false);
-        if (pathname !== "/login" && pathname !== "/reset-password") {
-          router.push("/login");
-        }
-        return;
-      }
-
-      const currentSession = data.session ?? null;
-      const supabaseUser = currentSession?.user ?? null;
-      setUser(supabaseUser);
-      setUserProfile(buildUserProfile(supabaseUser));
-      setLoading(false);
-
-      if (supabaseUser && pathname === "/login") {
-        router.push("/pos");
-      }
-      if (!supabaseUser && pathname !== "/login" && pathname !== "/reset-password" && pathname !== "/" && !pathname.startsWith("/products/")) {
-        router.push("/login");
+        authCheckDone.current = true;
       }
     };
 
@@ -93,28 +167,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Debounce the auth state change handler to prevent rapid calls
+    let authChangeTimeout: NodeJS.Timeout;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      const supabaseUser = newSession?.user ?? null;
-      setUser(supabaseUser);
-      setUserProfile(buildUserProfile(supabaseUser));
-      setLoading(false);
+      clearTimeout(authChangeTimeout);
+      authChangeTimeout = setTimeout(() => {
+        const supabaseUser = newSession?.user ?? null;
+        syncAdminAccessCookie(newSession ?? null);
+        setUser(supabaseUser);
+        setUserProfile(buildUserProfile(supabaseUser));
+        setConnectionError(false);
 
-      // Si Supabase inicia una sesión de recuperación de contraseña, redirigimos a la página de restablecer
-      if (_event === "PASSWORD_RECOVERY") {
-        router.push("/reset-password");
-        return;
-      }
-
-      if (supabaseUser) {
-        if (pathname === "/login") {
-          router.push("/pos");
+        // Si Supabase inicia una sesión de recuperación de contraseña, redirigimos a la página de restablecer
+        if (_event === "PASSWORD_RECOVERY") {
+          router.push("/reset-password");
+          return;
         }
-      } else if (pathname !== "/login" && pathname !== "/reset-password" && pathname !== "/" && !pathname.startsWith("/products/")) {
-        router.push("/login");
-      }
+
+        if (supabaseUser) {
+          hasRedirectedToLogin = false;
+          if (pathname === "/login") {
+            const profile = buildUserProfile(supabaseUser);
+            router.push(getPostLoginRedirect(profile?.role));
+          }
+        } else if (!isPublicPath && !hasRedirectedToLogin) {
+          hasRedirectedToLogin = true;
+          router.push("/login");
+        }
+      }, 100);
     });
 
     return () => {
+      clearTimeout(authChangeTimeout);
       subscription?.unsubscribe();
     };
   }, [router, pathname]);

@@ -16,7 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddAssetDialog from "./AddAssetDialog";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { Badge } from "@/components/ui/badge";
 import { runAnnualDepreciation, getAssets } from "@/lib/services/assetService";
 import { useToast } from "@/hooks/use-toast";
@@ -131,7 +131,7 @@ export default function AssetClient({ initialAssets, inventoryValue, historyData
                           </div>
                         </TableCell>
                         <TableCell><Badge variant="secondary">{asset.category}</Badge></TableCell>
-                        <TableCell>{format(asset.purchaseDate, "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell>{format(asset.purchaseDate, "dd MMM yyyy", { locale: getDateFnsLocale() })}</TableCell>
                         <TableCell className="text-right font-semibold">{formatMXNAmount(asset.purchaseCost ?? 0)}</TableCell>
                         <TableCell className="text-right font-bold text-primary">{formatMXNAmount(asset.currentValue ?? 0)}</TableCell>
                         <TableCell className="text-right text-destructive">-{formatMXNAmount(annualDepreciation ?? 0)}</TableCell>

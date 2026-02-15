@@ -5,6 +5,8 @@ import {
   TicketSettingsSchema,
   PrintRoutingSettings,
   PrintRoutingSettingsSchema,
+  AppPreferences,
+  AppPreferencesSchema,
   LabelSettings,
   LabelSettingsSchema,
   ContractTemplateSettings,
@@ -30,6 +32,7 @@ const LABEL_SETTINGS_DOC_ID_BASE = "label_design";
 const CONTRACT_TEMPLATE_DOC_ID = "contract_template";
 const DISCOUNT_SETTINGS_DOC_ID = "discount_settings";
 const PRINT_ROUTING_SETTINGS_DOC_ID = "print_routing";
+const APP_PREFERENCES_DOC_ID = "app_preferences";
 
 
 // --- TICKET SETTINGS ---
@@ -220,6 +223,12 @@ const defaultPrintRoutingSettings: PrintRoutingSettings = {
   labelPrinterName: "",
 };
 
+const defaultAppPreferences: AppPreferences = {
+  currency: "MXN",
+  language: "es",
+  locale: "es-MX",
+};
+
 export const getPrintRoutingSettings = async (): Promise<PrintRoutingSettings> => {
   try {
     const { row } = await fetchSettingsDoc(PRINT_ROUTING_SETTINGS_DOC_ID);
@@ -245,6 +254,36 @@ export const savePrintRoutingSettings = async (settings: PrintRoutingSettings): 
   } catch (error) {
     log.error("Error saving print routing settings", error);
     throw new Error("Failed to save print routing settings.");
+  }
+};
+
+// --- APP PREFERENCES ---
+
+export const getAppPreferences = async (): Promise<AppPreferences> => {
+  try {
+    const { row } = await fetchSettingsDoc(APP_PREFERENCES_DOC_ID);
+    if (row) {
+      const parsed = AppPreferencesSchema.safeParse(stripMeta(row));
+      if (parsed.success) {
+        return parsed.data;
+      }
+      log.warn("Invalid app preferences in Supabase, returning defaults.", parsed.error);
+    } else {
+      await upsertSettingsDoc(APP_PREFERENCES_DOC_ID, defaultAppPreferences);
+    }
+  } catch (error) {
+    log.error("Error fetching app preferences", error);
+  }
+  return defaultAppPreferences;
+};
+
+export const saveAppPreferences = async (preferences: AppPreferences): Promise<void> => {
+  try {
+    const validated = AppPreferencesSchema.parse(preferences);
+    await upsertSettingsDoc(APP_PREFERENCES_DOC_ID, validated);
+  } catch (error) {
+    log.error("Error saving app preferences", error);
+    throw new Error("Failed to save app preferences.");
   }
 };
 

@@ -1,6 +1,6 @@
 import { PDF, rgb, StandardFonts, Standard14Font, PDFPage } from '@libpdf/core';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 const MM_TO_PT = 2.83465;
 
@@ -82,7 +82,7 @@ export const generateReportPdf = async (reportData: ReportData): Promise<Blob> =
         currentY -= 15;
     }
 
-    drawText(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}`, marginPt, currentY, { size: 10 });
+    drawText(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: getDateFnsLocale() })}`, marginPt, currentY, { size: 10 });
     currentY -= 20;
 
     // --- Details/Filters ---

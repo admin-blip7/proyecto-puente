@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { formatCurrency, getStatusVariant } from "@/lib/utils";
 import PrintRepairDocumentsDialog from "./PrintRepairDocumentsDialog";
 import {
@@ -127,7 +127,7 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
                 ${header.show.phone ? `<p>Tel: ${header.phone}</p>` : ''}
                 </div>
                 <p>Folio: ${order.orderId}</p>
-                <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                <p>Fecha: ${format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}</p>
                 <p>Cliente: ${order.customerName} (${order.customerPhone})</p>
                 <hr style="border-top: 1px dashed black; margin: 0.5rem 0;" />
                 <p><strong>Dispositivo:</strong> ${order.deviceBrand} ${order.deviceModel}</p>
@@ -207,7 +207,7 @@ export default function RepairClient({ initialOrders, allSpareParts, ticketSetti
                         <p className="font-medium">{order.deviceBrand} {order.deviceModel}</p>
                         <p className="text-sm text-muted-foreground font-mono">{order.deviceSerialIMEI}</p>
                       </TableCell>
-                      <TableCell>{format(order.createdAt, "dd MMM yyyy", { locale: es })}</TableCell>
+                      <TableCell>{format(order.createdAt, "dd MMM yyyy", { locale: getDateFnsLocale() })}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(order.status)}>
                           {order.status}

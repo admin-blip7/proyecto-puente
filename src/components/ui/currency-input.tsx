@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { validateMXNAmount, sanitizeMXNAmount, formatMXNAmount } from '@/lib/validation/currencyValidation';
 import { cn } from '@/lib/utils';
+import { getCurrencyLabel, getRuntimeAppPreferences } from '@/lib/appPreferences';
 
 interface CurrencyInputProps {
   id?: string;
@@ -38,6 +39,23 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   const [displayValue, setDisplayValue] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isFocused, setIsFocused] = useState(false);
+  const appPreferences = getRuntimeAppPreferences();
+  const currencyCode = appPreferences.currency;
+  const currencyLabel = getCurrencyLabel(currencyCode);
+  const currencySymbol = useMemo(() => {
+    try {
+      return (
+        new Intl.NumberFormat(appPreferences.locale, {
+          style: 'currency',
+          currency: currencyCode,
+        })
+          .formatToParts(0)
+          .find((part) => part.type === 'currency')?.value ?? currencyCode
+      );
+    } catch {
+      return currencyCode;
+    }
+  }, [appPreferences.locale, currencyCode]);
 
   // Actualizar el valor mostrado cuando cambie el valor prop
   useEffect(() => {
@@ -71,12 +89,12 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
 
     // Validar límites mínimo y máximo
     if (sanitizedAmount < min) {
-      setError(`El monto mínimo es $${min.toFixed(2)}`);
+      setError(`El monto mínimo es ${currencySymbol}${min.toFixed(2)}`);
       return;
     }
 
     if (max && sanitizedAmount > max) {
-      setError(`El monto máximo es $${max.toFixed(2)}`);
+      setError(`El monto máximo es ${currencySymbol}${max.toFixed(2)}`);
       return;
     }
 
@@ -110,7 +128,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           {label}
           {showCurrencyLabel && (
             <span className="text-xs text-muted-foreground font-normal">
-              (MXN - Pesos Mexicanos)
+              ({currencyCode} - {currencyLabel})
             </span>
           )}
           {required && <span className="text-red-500">*</span>}
@@ -119,7 +137,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
       
       <div className="relative">
         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none">
-          $
+          {currencySymbol}
         </div>
         <Input
           id={id}
@@ -137,7 +155,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           style={{ paddingLeft: '2rem' }}
         />
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-          MXN
+          {currencyCode}
         </div>
       </div>
 

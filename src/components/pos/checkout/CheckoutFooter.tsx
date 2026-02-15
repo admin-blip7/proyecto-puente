@@ -2,6 +2,7 @@
 
 import { ShieldCheck, Loader2, ChevronRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatCurrencyWithPreferences } from "@/lib/appPreferences";
 
 interface CheckoutFooterProps {
     totalAmount: number;
@@ -30,8 +31,9 @@ export function CheckoutFooter({
                 <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Total a Pagar</p>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-black text-zinc-900 dark:text-zinc-100">$</span>
-                        <span className="text-5xl font-black text-zinc-900 dark:text-zinc-100 antialiased">{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-5xl font-black text-zinc-900 dark:text-zinc-100 antialiased">
+                            {formatCurrencyWithPreferences(totalAmount)}
+                        </span>
                     </div>
                 </div>
                 <div className="text-right">

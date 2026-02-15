@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/hooks";
 import { Expense, Account, ExpenseCategory, Income, IncomeCategory, Transfer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import Link from "next/link";
 import { DateRange } from "react-day-picker";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -229,11 +229,11 @@ export default function FinanceManagerClient({
                                 {date?.from ? (
                                     date.to ? (
                                         <>
-                                            {format(date.from, "LLL dd, y", { locale: es })} -{" "}
-                                            {format(date.to, "LLL dd, y", { locale: es })}
+                                            {format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })} -{" "}
+                                            {format(date.to, "LLL dd, y", { locale: getDateFnsLocale() })}
                                         </>
                                     ) : (
-                                        format(date.from, "LLL dd, y", { locale: es })
+                                        format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })
                                     )
                                 ) : (
                                     <span>Seleccionar fechas</span>
@@ -422,7 +422,7 @@ export default function FinanceManagerClient({
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">
-                                                        {format(new Date(tx.paymentDate), "dd MMM, yyyy", { locale: es })}
+                                                        {format(new Date(tx.paymentDate), "dd MMM, yyyy", { locale: getDateFnsLocale() })}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">

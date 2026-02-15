@@ -1,7 +1,7 @@
 import { generateReportPdf } from '../services/pdfReportService';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { formatCurrencyWithPreferences, getDateFnsLocale } from '@/lib/appPreferences';
 
 interface SaleItem {
   productId: string;
@@ -44,15 +44,11 @@ interface ConsignorSalesData {
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-  }).format(amount);
+  return formatCurrencyWithPreferences(amount);
 };
 
 const formatDate = (dateString: string) => {
-  return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: es });
+  return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: getDateFnsLocale() });
 };
 
 const getPaymentMethodLabel = (method: string) => {

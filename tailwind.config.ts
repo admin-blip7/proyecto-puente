@@ -28,11 +28,11 @@ export default {
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
-        // Metallic Blue Custom Colors
-        "primary-dark": "#0284C7",
-        "sidebar-bg": "#0F172A",
-        "sidebar-hover": "#1E293B",
-        "accent-blue": "#38BDF8",
+        // 22 Design helper colors
+        "primary-dark": "#E6C100",
+        "sidebar-bg": "#050505",
+        "sidebar-hover": "#1A1A1A",
+        "accent-blue": "#3B82F6",
 
         card: {
           DEFAULT: 'hsl(var(--card))',
@@ -82,36 +82,82 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
-        "background-light": "#f8f9fa",
-        "background-dark": "#0f172a",
-        "surface-light": "#ffffff",
-        "surface-dark": "#1e293b",
-        "text-light": "#1f2937",
-        "text-dark": "#f3f4f6",
-        "muted-light": "#6b7280",
-        "muted-dark": "#9ca3af",
+        // 22 Design direct tokens
+        "primary-22": "#FFD600",
+        "secondary-22": "#050505",
+        "background-light": "#FFFFFF",
+        "background-dark": "#050505",
+        "surface-light": "#FFFFFF",
+        "surface-dark": "#111111",
+        "brand-blue": "#3B82F6",
+
+        // Legacy/Compatibility tokens (mapped to new palette where possible)
+        "text-light": "#050505",
+        "text-dark": "#FAFAFA",
+        "muted-light": "#6B7280",
+        "muted-dark": "#A3A3A3",
+        "card-light": "#FFFFFF",
+        "card-dark": "#111111",
+        "text-secondary": "#6B7280",
+
+        // 22 Electronic Palette
+        brand: {
+          black: {
+            DEFAULT: '#000000', // Pure Black
+            rich: '#0A0A0A',    // Rich Black
+            soft: '#111111',    // Soft Black (Modals)
+            elevated: '#171717', // Elevated (Cards)
+            surface: '#1A1A1A', // Card Surface
+          },
+          white: {
+            DEFAULT: '#FFFFFF', // Pure White
+            off: '#F5F5F5',     // Off White
+            hover: '#EDEDED',   // Hover/Light Gray
+          },
+          gray: {
+            950: '#171717',
+            900: '#1A1A1A',
+            800: '#262626',
+            700: '#3A3A3A',
+            600: '#525252',
+            500: '#6B6B6B',
+            400: '#8A8A8A',
+            300: '#A3A3A3',
+            200: '#D4D4D4',
+            100: '#EDEDED',
+            50: '#F5F5F5',
+            123: '#F5F5F5',
+          },
+          gold: {
+            DEFAULT: '#DBC095',
+            light: '#E8D4B0',
+            dark: '#C4A676',
+          },
+          green: {
+            deep: '#062C21',
+            mid: '#0D3D2E',
+          },
+          semantic: {
+            danger: '#E8453C',
+            success: '#2ECC71',
+            warning: '#F39C12',
+          },
+        },
       },
       keyframes: {
         'accordion-down': {
-          from: {
-            height: '0',
-          },
-          to: {
-            height: 'var(--radix-accordion-content-height)',
-          },
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
-          from: {
-            height: 'var(--radix-accordion-content-height)',
-          },
-          to: {
-            height: '0',
-          },
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },

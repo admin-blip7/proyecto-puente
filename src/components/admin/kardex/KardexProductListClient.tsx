@@ -19,22 +19,22 @@ import {
 } from "@/components/ui/table";
 import { Search, ArrowDownCircle, ArrowUpCircle, Clock } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { formatDateTimeWithPreferences, formatNumberWithPreferences } from "@/lib/appPreferences";
 
 interface KardexProductListClientProps {
   products: Product[];
   recentMovements?: RecentKardexEntry[];
 }
 
-const formatQuantity = (value: number) =>
-  new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 }).format(value);
+const formatQuantity = (value: number) => formatNumberWithPreferences(value);
 
 const formatDate = (date: Date) =>
-  new Intl.DateTimeFormat("es-MX", {
+  formatDateTimeWithPreferences(date, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
+  });
 
 export default function KardexProductListClient({ products, recentMovements = [] }: KardexProductListClientProps) {
   const [search, setSearch] = useState("");

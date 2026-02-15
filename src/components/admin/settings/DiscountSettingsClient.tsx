@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { saveDiscountSettings } from "@/lib/services/settingsService";
 import { Loader2, Plus, Trash2, Save, Percent, Tag } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import { formatDateTimeWithPreferences } from "@/lib/appPreferences";
 
 interface DiscountSettingsClientProps {
     initialSettings: DiscountSettings;
@@ -117,7 +118,7 @@ export default function DiscountSettingsClient({ initialSettings }: DiscountSett
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("es-MX", {
+        return formatDateTimeWithPreferences(new Date(dateString), {
             year: "numeric",
             month: "short",
             day: "numeric",

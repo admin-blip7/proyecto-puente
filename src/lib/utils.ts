@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import { RepairStatus, Warranty, CreditAccountStatus } from "@/types";
 import { formatMXNAmount, validateMXNAmount, normalizeMXNAmount } from "@/lib/validation/currencyValidation";
 import { getLogger } from "@/lib/logger";
+import { formatCurrencyWithPreferences } from "@/lib/appPreferences";
 
 const log = getLogger("utils");
 
@@ -14,16 +15,16 @@ export const formatCurrency = (value: number) => {
   // Manejar valores negativos convirtiéndolos a positivos y agregando prefijo
   const isNegative = value < 0;
   const absoluteValue = Math.abs(value);
-  
+
   // Normalizar primero para manejar problemas de precisión de punto flotante
   const normalizedValue = normalizeMXNAmount(absoluteValue);
   const validation = validateMXNAmount(normalizedValue);
-  
+
   if (!validation.isValid) {
     log.warn(`Intento de formatear monto inválido: ${value} (normalizado: ${normalizedValue}). Error: ${validation.error}`);
-    return "$0.00 MXN";
+    return formatCurrencyWithPreferences(0);
   }
-  
+
   const formattedAmount = formatMXNAmount(normalizedValue);
   return isNegative ? `-${formattedAmount}` : formattedAmount;
 };
@@ -78,3 +79,16 @@ export const getCreditStatusVariant = (
       return "outline";
   }
 };
+
+/**
+ * Formats a category slug-like string into a Title Case string with spaces.
+ * Example: "equipos-de-sonido" -> "Equipos De Sonido"
+ */
+export function formatCategoryLabel(text: string): string {
+  if (!text) return "";
+
+  return text
+    .split(/[-_ ]+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}

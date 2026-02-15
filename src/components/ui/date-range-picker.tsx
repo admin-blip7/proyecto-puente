@@ -12,7 +12,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { es } from "date-fns/locale"
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 interface DatePickerWithRangeProps {
     className?: string
@@ -41,11 +41,11 @@ export function DatePickerWithRange({
                         {date?.from ? (
                             date.to ? (
                                 <>
-                                    {format(date.from, "LLL dd, y", { locale: es })} -{" "}
-                                    {format(date.to, "LLL dd, y", { locale: es })}
+                                    {format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })} -{" "}
+                                    {format(date.to, "LLL dd, y", { locale: getDateFnsLocale() })}
                                 </>
                             ) : (
-                                format(date.from, "LLL dd, y", { locale: es })
+                                format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })
                             )
                         ) : (
                             <span>Seleccionar un rango</span>

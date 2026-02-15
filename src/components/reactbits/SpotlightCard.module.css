@@ -1,0 +1,25 @@
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid var(--spotlight-border, rgba(148, 163, 184, 0.18));
+  background: var(--spotlight-bg, transparent);
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  --spotlight-color: rgba(255, 255, 255, 0.18);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  background: radial-gradient(500px circle at var(--mouse-x) var(--mouse-y), var(--spotlight-color), transparent 55%);
+}
+
+.card:hover::before,
+.card:focus-within::before {
+  opacity: 1;
+}

@@ -1,0 +1,567 @@
+.headerWrap {
+  --nav-green: #1c3a13;
+  --nav-cream: #fcfcf7;
+  --nav-glass: #ffffff;
+  --nav-line: rgba(28, 58, 19, 0.18);
+  --nav-soft-line: rgba(28, 58, 19, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  padding: 0.65rem 0.75rem 0.85rem;
+  background: #ffffff;
+  font-family: "Gilroy", "Seed Sans", Helvetica, sans-serif;
+}
+
+.noticeStrip {
+  align-items: center;
+  color: var(--nav-green);
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: 500;
+  justify-content: space-between;
+  line-height: 1.2;
+  margin: 0 auto 0.55rem;
+  max-width: 1280px;
+}
+
+.noticeLead {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.noticeDot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+  background: #95dd58;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.noticeShipping {
+  display: none;
+}
+
+.pillWrapper {
+  margin: 0 auto;
+  max-width: 1280px;
+}
+
+.navPill {
+  align-items: center;
+  background: var(--nav-glass);
+  border: 1px solid var(--nav-line);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: flex;
+  gap: 0.8rem;
+  min-height: 3.65rem;
+  padding: 0.4rem 0.65rem;
+  position: relative;
+}
+
+.brand {
+  color: var(--nav-green);
+  font-size: clamp(1.45rem, 1.8vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  text-decoration: none;
+}
+
+.brandDot {
+  color: #79cb4d;
+}
+
+.desktopTabs {
+  display: none;
+}
+
+.tabButton,
+.tabLink {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--nav-green);
+  display: inline-flex;
+  font-size: 0.9rem;
+  font-weight: 500;
+  gap: 0.35rem;
+  line-height: 1;
+  padding: 0.6rem 0.95rem;
+  text-decoration: none;
+  text-transform: capitalize;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.tabButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.tabButton:hover,
+.tabButton:focus-visible,
+.tabLink:hover,
+.tabLink:focus-visible {
+  background: rgba(28, 58, 19, 0.09);
+  color: var(--nav-green);
+  outline: none;
+}
+
+.tabChevron {
+  height: 0.95rem;
+  width: 0.95rem;
+}
+
+.dropdownGroup {
+  position: relative;
+}
+
+.dropdownPanel {
+  background: rgba(28, 58, 19, 0.8);
+  backdrop-filter: blur(34px);
+  border: 1px solid rgba(252, 252, 247, 0.12);
+  border-radius: 1.55rem;
+  left: 0;
+  max-height: min(70vh, 34rem);
+  opacity: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem;
+  pointer-events: none;
+  position: absolute;
+  scrollbar-width: none;
+  top: calc(100% + 0.8rem);
+  transform: translateY(10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  width: min(90vw, 24.5rem);
+  z-index: 95;
+}
+
+.dropdownPanel::-webkit-scrollbar {
+  display: none;
+}
+
+.dropdownGroup:hover .dropdownPanel,
+.dropdownGroup:focus-within .dropdownPanel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.dropdownBody + * {
+  margin-block-start: 0.85rem;
+}
+
+.dropdownList {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dropdownItem {
+  border-radius: 1rem;
+  padding: 0.6rem;
+  transition: background-color 0.18s ease;
+}
+
+@media (hover: hover) {
+  .dropdownItem:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.dropdownLink {
+  align-items: center;
+  color: var(--nav-cream);
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto 1fr;
+  text-decoration: none;
+}
+
+.dropdownImage {
+  border-radius: 1rem;
+  color: transparent;
+  display: block;
+  object-fit: cover;
+}
+
+.dropdownImageFallback {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(252, 252, 247, 0.22), rgba(252, 252, 247, 0.06));
+  border: 1px solid rgba(252, 252, 247, 0.24);
+  border-radius: 1rem;
+  color: var(--nav-cream);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 700;
+  height: 75px;
+  justify-content: center;
+  letter-spacing: 0.03em;
+  width: 75px;
+}
+
+.dropdownBadge {
+  align-items: center;
+  background: #d3fa99;
+  border-radius: 999px;
+  color: var(--nav-green);
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  padding: 0.45rem 0.6rem;
+}
+
+.dropdownCode {
+  color: var(--nav-cream);
+  font-size: 0.82rem;
+  font-weight: 400;
+  margin: 0;
+  opacity: 0.72;
+}
+
+.dropdownSymbol {
+  color: currentcolor;
+}
+
+.dropdownTitle {
+  color: var(--nav-cream);
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 0.12rem 0 0;
+}
+
+.dropdownPrice {
+  color: rgba(252, 252, 247, 0.88);
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0;
+}
+
+.dropdownEmpty {
+  border: 1px dashed rgba(252, 252, 247, 0.24);
+  border-radius: 1rem;
+  color: rgba(252, 252, 247, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 1rem;
+}
+
+.dropdownFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dropdownFooterLink {
+  align-items: center;
+  color: var(--nav-cream);
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 500;
+  gap: 0.45rem;
+  line-height: 1;
+  position: relative;
+  text-decoration: none;
+}
+
+.dropdownFooterLink::after {
+  background: currentcolor;
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.22rem);
+}
+
+.footerArrow {
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.actions {
+  display: none;
+}
+
+.cartButton {
+  color: var(--nav-green);
+  position: relative;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.cartButton:hover,
+.cartButton:focus-visible {
+  color: #2f5f1f;
+  outline: none;
+}
+
+.cartIcon {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.cartBadge {
+  align-items: center;
+  background: #e8453c;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.58rem;
+  font-weight: 700;
+  height: 0.95rem;
+  justify-content: center;
+  min-width: 0.95rem;
+  position: absolute;
+  right: -0.35rem;
+  top: -0.32rem;
+}
+
+.preferencesWrap {
+  display: none;
+}
+
+.preferencesControl {
+  display: none;
+}
+
+.loginButton,
+.ctaButton,
+.posButton {
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.72rem 1rem;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.loginButton {
+  background: rgba(28, 58, 19, 0.08);
+  color: var(--nav-green);
+}
+
+.loginButton:hover,
+.loginButton:focus-visible {
+  background: rgba(28, 58, 19, 0.16);
+  outline: none;
+}
+
+.ctaButton {
+  background: var(--nav-green);
+  color: var(--nav-cream);
+}
+
+.ctaButton:hover,
+.ctaButton:focus-visible {
+  background: #163010;
+  outline: none;
+}
+
+.posButton {
+  background: rgba(28, 58, 19, 0.03);
+  border: 1px solid var(--nav-soft-line);
+  color: var(--nav-green);
+}
+
+.posButton:hover,
+.posButton:focus-visible {
+  background: rgba(28, 58, 19, 0.09);
+  outline: none;
+}
+
+.mobileMenu {
+  margin-left: auto;
+  position: relative;
+}
+
+.mobileToggle {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--nav-green);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.84rem;
+  font-weight: 600;
+  gap: 0.4rem;
+  line-height: 1;
+  list-style: none;
+  padding: 0.68rem 0.95rem;
+  transition: background-color 0.2s ease;
+}
+
+.mobileToggle:hover {
+  background: rgba(28, 58, 19, 0.08);
+}
+
+.mobileToggle::-webkit-details-marker {
+  display: none;
+}
+
+.mobileMenu[open] .mobileToggle {
+  background: rgba(28, 58, 19, 0.1);
+}
+
+.mobileMenuIcon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.mobilePanel {
+  background: rgba(252, 252, 247, 0.97);
+  border: 1px solid var(--nav-line);
+  border-radius: 1.2rem;
+  box-shadow: 0 16px 36px rgba(22, 36, 71, 0.16);
+  display: grid;
+  gap: 0.32rem;
+  margin-top: 0.58rem;
+  padding: 0.45rem;
+  position: absolute;
+  right: 0;
+  width: min(84vw, 18.5rem);
+  z-index: 96;
+}
+
+.mobileLink {
+  border-radius: 0.8rem;
+  color: var(--nav-green);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.66rem 0.78rem;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.mobileLink:hover,
+.mobileLink:focus-visible {
+  background: rgba(28, 58, 19, 0.08);
+  outline: none;
+}
+
+.mobileCta {
+  background: var(--nav-green);
+  color: var(--nav-cream);
+}
+
+.mobileCta:hover,
+.mobileCta:focus-visible {
+  background: #163010;
+}
+
+.screenReaderOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+@media (min-width: 48em) {
+  .noticeStrip {
+    font-size: 0.8rem;
+  }
+
+  .noticeShipping {
+    display: block;
+  }
+}
+
+@media (min-width: 64em) {
+  .headerWrap {
+    padding: 0.82rem 1.2rem 1rem;
+  }
+
+  .navPill {
+    gap: 1rem;
+    min-height: 4rem;
+    padding: 0.44rem 0.78rem;
+  }
+
+  .desktopTabs {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.22rem;
+    margin-left: 0.45rem;
+  }
+
+  .actions {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.45rem;
+    margin-left: auto;
+  }
+
+  .mobileMenu {
+    display: none;
+  }
+}
+
+@media (min-width: 75em) {
+  .actions {
+    gap: 0.58rem;
+  }
+
+  .posButton {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 80em) {
+  .preferencesWrap {
+    display: block;
+  }
+
+  .preferencesControl {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 30em) {
+  .noticeShipping {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noticeDot {
+    animation: none;
+  }
+
+  .dropdownPanel,
+  .tabButton,
+  .tabLink,
+  .mobileToggle,
+  .mobileLink,
+  .loginButton,
+  .ctaButton,
+  .posButton,
+  .cartButton {
+    transition: none;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, startOfMonth, endOfMonth, subDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -187,7 +187,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
 
   const formatDateTime = (date?: Date) => {
     if (!date) return 'N/A';
-    return format(date, "dd MMM yyyy, HH:mm", { locale: es });
+    return format(date, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() });
   }
 
   const getDailySalesForSession = (sessionDate?: Date) => {
@@ -355,11 +355,11 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                 {dateRange?.from ? (
                   dateRange.to ? (
                     <>
-                      {format(dateRange.from, "dd MMM y", { locale: es })} -{" "}
-                      {format(dateRange.to, "dd MMM y", { locale: es })}
+                      {format(dateRange.from, "dd MMM y", { locale: getDateFnsLocale() })} -{" "}
+                      {format(dateRange.to, "dd MMM y", { locale: getDateFnsLocale() })}
                     </>
                   ) : (
-                    format(dateRange.from, "dd MMM y", { locale: es })
+                    format(dateRange.from, "dd MMM y", { locale: getDateFnsLocale() })
                   )
                 ) : (
                   <span>Selecciona un rango</span>
@@ -374,7 +374,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                 selected={dateRange}
                 onSelect={setDateRange}
                 numberOfMonths={2}
-                locale={es}
+                locale={getDateFnsLocale()}
               />
             </PopoverContent>
           </Popover>
@@ -490,7 +490,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="font-bold text-lg">
-                          {row.session ? formatDateTime(row.session.closedAt) : format(row.dateObj, "dd MMM yyyy", { locale: es })}
+                          {row.session ? formatDateTime(row.session.closedAt) : format(row.dateObj, "dd MMM yyyy", { locale: getDateFnsLocale() })}
                         </div>
                         <div className="text-sm text-muted-foreground font-mono">
                           {row.session ? row.session.sessionId : 'Sin sesión'}

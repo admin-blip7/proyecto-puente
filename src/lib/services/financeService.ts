@@ -6,6 +6,7 @@ import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { getLogger } from "@/lib/logger";
 import { uploadFile } from "./documentService";
 import { toDate, nowIso } from "@/lib/supabase/utils";
+import { formatCurrencyWithPreferences, formatDateTimeWithPreferences } from "@/lib/appPreferences";
 
 const log = getLogger("financeService");
 
@@ -208,57 +209,54 @@ export const getCOGSByDateRange = async (startDate: Date, endDate: Date): Promis
   try {
     const supabase = getSupabaseServerClient();
 
-    // Fetch all sales (filtering client-side)
-    // FIX: Use snake_case
+    // 1. Fetch sales that are completed and within range to get their IDs
     const { data: sales, error: salesError } = await supabase
       .from("sales")
-      .select("items, status, created_at");
+      .select("id, status, created_at")
+      .or('status.is.null,status.eq.completed');
 
     if (salesError) throw salesError;
 
-    // Filter by status (completed or null) AND date range
-    const filteredSales = (sales || []).filter((sale: any) => {
-      const createdAt = toDate(sale.created_at);
-      const inDateRange = createdAt >= startDate && createdAt <= endDate;
-      return inDateRange && (sale.status === 'completed' || !sale.status);
-    });
+    // Filter by date range
+    const filteredSalesIds = (sales || [])
+      .filter((sale: any) => {
+        const createdAt = toDate(sale.created_at);
+        return createdAt >= startDate && createdAt <= endDate;
+      })
+      .map(s => s.id);
 
-    // Collect all unique product IDs
-    const productIds = new Set<string>();
-    filteredSales.forEach((sale: any) => {
-      if (Array.isArray(sale.items)) {
-        sale.items.forEach((item: any) => {
-          if (item.productId) productIds.add(item.productId);
-        });
-      }
-    });
+    if (filteredSalesIds.length === 0) return 0;
 
-    if (productIds.size === 0) return 0;
+    // 2. Fetch all sale_items for these sales to get cost_at_sale
+    const { data: saleItems, error: itemsError } = await supabase
+      .from("sale_items")
+      .select("quantity, cost_at_sale, product_id")
+      .in("sale_id", filteredSalesIds);
 
-    // Fetch product costs
-    const { data: products, error: productsError } = await supabase
-      .from("products")
-      .select("id, cost")
-      .in("id", Array.from(productIds));
+    if (itemsError) throw itemsError;
 
-    if (productsError) throw productsError;
+    // 3. Collect product IDs with 0 cost for fallback
+    const itemsWithNoCost = (saleItems || []).filter(item => !item.cost_at_sale || Number(item.cost_at_sale) === 0);
+    const fallbackProductIds = [...new Set(itemsWithNoCost.map(it => it.product_id).filter(Boolean))];
 
-    // Create product cost map
     const costMap = new Map<string, number>();
-    (products || []).forEach((p: any) => {
-      costMap.set(p.id, Number(p.cost) || 0);
-    });
+    if (fallbackProductIds.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, cost")
+        .in("id", fallbackProductIds);
 
-    // Calculate total COGS
+      (products || []).forEach((p: any) => costMap.set(p.id, Number(p.cost) || 0));
+    }
+
+    // 4. Calculate total COGS
     let totalCOGS = 0;
-    filteredSales.forEach((sale: any) => {
-      if (Array.isArray(sale.items)) {
-        sale.items.forEach((item: any) => {
-          const cost = costMap.get(item.productId) || 0;
-          const quantity = item.quantity || 1;
-          totalCOGS += cost * quantity;
-        });
-      }
+    (saleItems || []).forEach((item: any) => {
+      const cost = (Number(item.cost_at_sale) > 0)
+        ? Number(item.cost_at_sale)
+        : (costMap.get(item.product_id) || 0);
+
+      totalCOGS += cost * (item.quantity || 1);
     });
 
     return totalCOGS;
@@ -556,13 +554,13 @@ export async function generateContract(
       "{{CLIENT_NAME}}": clientName,
       "{{CLIENT_ADDRESS}}": clientAddress,
       "{{CLIENT_PHONE}}": clientPhone,
-      "{{CREDIT_LIMIT}}": `$${creditLimit.toFixed(2)} MXN`,
+      "{{CREDIT_LIMIT}}": formatCurrencyWithPreferences(creditLimit),
       "{{INTEREST_RATE}}": `${interestRate || 0}%`,
       "{{PAYMENT_DUE_DAY}}": paymentDueDate.getDate().toString(),
       "{{STORE_NAME}}": "Storefront Swift",
       "{{STORE_ADDRESS}}": "Dirección de la Tienda",
       "{{STORE_CITY}}": "Tu Ciudad",
-      "{{CURRENT_DATE}}": new Date().toLocaleDateString("es-ES", {
+      "{{CURRENT_DATE}}": formatDateTimeWithPreferences(new Date(), {
         day: "numeric",
         month: "long",
         year: "numeric",

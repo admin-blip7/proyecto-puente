@@ -11,7 +11,7 @@ import { Account } from "@/types";
 import { getAccountTransactions, AccountTransaction } from "@/lib/services/financeService";
 import { Loader2, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 
 interface AccountTransactionsDialogProps {
     isOpen: boolean;
@@ -70,7 +70,7 @@ export default function AccountTransactionsDialog({ isOpen, onOpenChange, accoun
                                     {transactions.map((tx, index) => (
                                         <TableRow key={tx.id || `tx-${index}-${tx.date}`}>
                                             <TableCell className="whitespace-nowrap">
-                                                {format(new Date(tx.date), "dd MMM yyyy", { locale: es })}
+                                                {format(new Date(tx.date), "dd MMM yyyy", { locale: getDateFnsLocale() })}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">

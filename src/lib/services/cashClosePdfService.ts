@@ -1,8 +1,8 @@
 import { PDF, rgb, StandardFonts, Standard14Font } from '@libpdf/core';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { CashSession, Income, Expense, Sale } from '@/types/index';
 import { calculateNetCashSales } from '@/lib/utils/cashCalculations';
+import { formatCurrencyWithPreferences, getDateFnsLocale } from '@/lib/appPreferences';
 
 const MM_TO_PT = 72 / 25.4; // Precise conversion: 1 inch = 72 pt, 1 inch = 25.4 mm
 
@@ -108,14 +108,6 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         y -= 8;
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
-
     // --- Header ---
     if (storeName) {
         drawText(storeName, marginPt, 'center', fontBold, 12);
@@ -139,7 +131,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     y -= 12;
     drawText(`Folio: ${session.sessionId}`, marginPt, 'center');
     y -= 12;
-    drawText(`Fecha: ${format(new Date(session.closedAt || session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}`, marginPt, 'center');
+    drawText(`Fecha: ${format(new Date(session.closedAt || session.openedAt), "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}`, marginPt, 'center');
     y -= 12;
 
     drawLine();
@@ -147,12 +139,12 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     // --- Session Info ---
     drawText('Turno:', marginPt, 'left', fontBold);
     y -= lineHeight;
-    drawText(`  Apertura: ${format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: es })}`, marginPt);
+    drawText(`  Apertura: ${format(new Date(session.openedAt), "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}`, marginPt);
     y -= lineHeight;
     drawText(`  Cajero: ${session.openedByName}`, marginPt);
     y -= lineHeight;
     if (session.closedAt) {
-        drawText(`  Cierre: ${format(new Date(session.closedAt), "dd/MM/yyyy HH:mm", { locale: es })}`, marginPt);
+        drawText(`  Cierre: ${format(new Date(session.closedAt), "dd/MM/yyyy HH:mm", { locale: getDateFnsLocale() })}`, marginPt);
         y -= lineHeight;
         drawText(`  Cierra: ${session.closedByName || ''}`, marginPt);
         y -= lineHeight;
@@ -169,7 +161,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
             // Right: Total
             const leftText = `${item.quantity}x ${item.name}`.substring(0, 20);
             drawText(leftText, marginPt, 'left');
-            drawText(formatCurrency(item.total), 0, 'right');
+            drawText(formatCurrencyWithPreferences(item.total), 0, 'right');
             y -= lineHeight;
         });
         drawLine();
@@ -182,7 +174,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         expenses.forEach((exp: any) => {
             const desc = (exp.description || exp.category).substring(0, 18);
             drawText(desc, marginPt, 'left');
-            drawText(formatCurrency(exp.amount), 0, 'right');
+            drawText(formatCurrencyWithPreferences(exp.amount), 0, 'right');
             y -= lineHeight;
         });
         drawLine();
@@ -194,7 +186,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
 
     const summaryRow = (label: string, val: number) => {
         drawText(label, marginPt, 'left');
-        drawText(formatCurrency(val), 0, 'right');
+        drawText(formatCurrencyWithPreferences(val), 0, 'right');
         y -= lineHeight;
     };
 
@@ -215,7 +207,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         displayIncomes.forEach((inc: any) => {
             const desc = (inc.description || inc.category).substring(0, 18);
             drawText(desc, marginPt, 'left');
-            drawText(formatCurrency(inc.amount), 0, 'right');
+            drawText(formatCurrencyWithPreferences(inc.amount), 0, 'right');
             y -= lineHeight;
         });
         drawLine();
@@ -232,7 +224,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     }
     if (session.difference !== undefined) {
         const diffLabel = 'Diferencia:';
-        const diffVal = (session.difference >= 0 ? '+' : '-') + formatCurrency(Math.abs(session.difference));
+        const diffVal = (session.difference >= 0 ? '+' : '-') + formatCurrencyWithPreferences(Math.abs(session.difference));
         drawText(diffLabel, marginPt, 'left', fontBold);
         drawText(diffVal, 0, 'right', fontBold);
         y -= lineHeight;
@@ -244,7 +236,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
         drawText('GESTIÓN DE FOLIO DE CAMBIO:', marginPt, 'left', fontBold);
         y -= lineHeight;
         drawText('Cambio Dejado:', marginPt, 'left', fontBold);
-        drawText(formatCurrency(session.cashLeftForNextSession), 0, 'right', fontBold);
+        drawText(formatCurrencyWithPreferences(session.cashLeftForNextSession), 0, 'right', fontBold);
         y -= lineHeight;
         // Note text
         drawText('* Este monto se quedó en caja', marginPt, 'left', font, 8);
@@ -252,7 +244,7 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
 
         if (session.startingFloat !== undefined) {
             drawText('Cambio Encontrado:', marginPt, 'left');
-            drawText(formatCurrency(session.startingFloat), 0, 'right');
+            drawText(formatCurrencyWithPreferences(session.startingFloat), 0, 'right');
             y -= lineHeight;
         }
     }
@@ -263,12 +255,12 @@ export const generateCashClosePdf = async (options: CashClosePdfOptions): Promis
     if (session.actualCashCount !== undefined && session.startingFloat !== undefined) {
         const netCash = calculateNetCashSales(session.actualCashCount, session.startingFloat, session.cashLeftForNextSession ?? 0);
         drawText('Ventas Netas Efectivo:', marginPt, 'left', fontBold);
-        drawText(formatCurrency(netCash), 0, 'right', fontBold);
+        drawText(formatCurrencyWithPreferences(netCash), 0, 'right', fontBold);
         y -= lineHeight + 5;
     }
 
     drawText('TOTAL VENTAS DEL DÍA:', marginPt, 'left', fontBold);
-    drawText(formatCurrency((session.totalCashSales ?? 0) + (session.totalCardSales ?? 0)), 0, 'right', fontBold);
+    drawText(formatCurrencyWithPreferences((session.totalCashSales ?? 0) + (session.totalCardSales ?? 0)), 0, 'right', fontBold);
     y -= lineHeight + 10;
 
     // --- Footer ---

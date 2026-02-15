@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { RepairOrder, RepairStatus } from "@/types";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { formatCurrency, getStatusVariant } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -92,7 +92,7 @@ export default function RepairDetailsDialog({
     try {
       const dateObj = typeof date === 'string' ? new Date(date) : date;
       if (isNaN(dateObj.getTime())) return "Fecha inválida";
-      return format(dateObj, formatStr, { locale: es });
+      return format(dateObj, formatStr, { locale: getDateFnsLocale() });
     } catch (error) {
       console.error("Error formatting date:", error);
       return "Error en fecha";

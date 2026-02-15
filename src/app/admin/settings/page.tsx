@@ -3,25 +3,40 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import TicketDesignerClient from "@/components/admin/settings/TicketDesignerClient";
-import { getTicketSettings, getLabelSettings, getDiscountSettings, getPrintRoutingSettings } from "@/lib/services/settingsService";
+import {
+    getTicketSettings,
+    getLabelSettings,
+    getDiscountSettings,
+    getPrintRoutingSettings,
+    getAppPreferences,
+} from "@/lib/services/settingsService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LabelDesignerClient from "@/components/admin/settings/LabelDesignerClient";
 import CategoryManagerClient from '@/components/admin/settings/CategoryManagerClient';
 import DiscountSettingsClient from "@/components/admin/settings/DiscountSettingsClient";
 import PrinterRoutingSettingsClient from "@/components/admin/settings/PrinterRoutingSettingsClient";
+import AppPreferencesSettingsClient from "@/components/admin/settings/AppPreferencesSettingsClient";
 
 export default async function SettingsPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     const searchParams = await props.searchParams;
-    const tab = typeof searchParams.tab === 'string' ? searchParams.tab : 'tickets';
+    const tab = typeof searchParams.tab === 'string' ? searchParams.tab : 'general';
 
-    const [initialTicketSettings, initialLabelSettings, initialCategories, initialDiscountSettings, initialPrintRoutingSettings] = await Promise.all([
+    const [
+        initialTicketSettings,
+        initialLabelSettings,
+        initialCategories,
+        initialDiscountSettings,
+        initialPrintRoutingSettings,
+        initialAppPreferences,
+    ] = await Promise.all([
         getTicketSettings(),
         getLabelSettings("product"), // Load product settings by default
         import("@/lib/services/categoryService").then(m => m.getProductCategories()),
         getDiscountSettings(),
         getPrintRoutingSettings(),
+        getAppPreferences(),
     ]);
 
     return (
@@ -44,13 +59,17 @@ export default async function SettingsPage(props: {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
                 <Tabs defaultValue={tab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-6">
+                        <TabsTrigger value="general">General</TabsTrigger>
                         <TabsTrigger value="tickets">Diseño de Tickets</TabsTrigger>
                         <TabsTrigger value="labels">Diseño de Etiquetas</TabsTrigger>
                         <TabsTrigger value="printers">Impresoras</TabsTrigger>
                         <TabsTrigger value="categories">Categorías</TabsTrigger>
                         <TabsTrigger value="discounts">Descuentos</TabsTrigger>
                     </TabsList>
+                    <TabsContent value="general" className="mt-6">
+                        <AppPreferencesSettingsClient initialPreferences={initialAppPreferences} />
+                    </TabsContent>
                     <TabsContent value="tickets" className="mt-6">
                         <TicketDesignerClient initialSettings={initialTicketSettings} />
                     </TabsContent>

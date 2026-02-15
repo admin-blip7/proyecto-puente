@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,6 +37,7 @@ export default function LoginClient() {
   const [resetEmail, setResetEmail] = useState("");
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -118,7 +119,8 @@ export default function LoginClient() {
         }
       }
 
-      router.push("/");
+      const nextPath = searchParams.get("next");
+      router.push(nextPath || "/");
     } catch (error: any) {
       toast({
         variant: "destructive",

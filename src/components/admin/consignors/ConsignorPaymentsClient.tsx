@@ -9,7 +9,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Download, Calendar, User, DollarSign } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { useToast } from "@/hooks/use-toast";
 import { ConsignorPayment, Consignor } from "@/types";
 import { getAllConsignorPayments } from "@/lib/services/paymentService";
@@ -169,7 +169,7 @@ export default function ConsignorPaymentsClient() {
                     consignor?.name || 'Desconocido',
                     `$${payment.amountPaid.toFixed(2)}`,
                     payment.paymentMethod,
-                    format(new Date(payment.paymentDate), 'dd/MM/yyyy', { locale: es }),
+                    format(new Date(payment.paymentDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() }),
                     payment.proofOfPaymentUrl ? 'Realizado' : 'Guardado',
                     `"${payment.notes || ''}"`
                 ].join(',');
@@ -347,7 +347,7 @@ export default function ConsignorPaymentsClient() {
                                             <Badge variant="outline">{payment.paymentMethod}</Badge>
                                         </TableCell>
                                         <TableCell>
-                                            {format(new Date(payment.paymentDate), 'dd/MM/yyyy', { locale: es })}
+                                            {format(new Date(payment.paymentDate), 'dd/MM/yyyy', { locale: getDateFnsLocale() })}
                                         </TableCell>
                                         <TableCell>
                                             {getStatusBadge(payment)}

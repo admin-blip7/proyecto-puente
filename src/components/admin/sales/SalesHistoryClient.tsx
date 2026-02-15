@@ -14,7 +14,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFnsLocale } from "@/lib/appPreferences";
 import { DollarSign, MoreHorizontal, ShieldPlus, TrendingUp, ChevronDown, ChevronRight, Hash, ChevronUp, ArrowUpDown, BarChart3, Trash2, Loader2, Printer } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -738,7 +738,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                           </TableCell>
                           <TableCell className="font-medium">{sale.saleId}</TableCell>
                           <TableCell>
-                            {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: es })}
+                            {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}
                           </TableCell>
                           <TableCell>
                             <div className="font-medium">{sale.customerName || 'N/A'}</div>
