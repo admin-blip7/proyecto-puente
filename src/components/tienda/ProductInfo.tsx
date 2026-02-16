@@ -1,6 +1,7 @@
 import type { Product } from '@/lib/services/tiendaProductService'
 import { Badge } from '@/components/ui/badge'
 import { Star, Check } from 'lucide-react'
+import { TIENDA_SOCIO_PACKAGE_QTY } from '@/lib/tiendaPricing'
 
 interface ProductInfoProps {
   product: Product
@@ -8,10 +9,8 @@ interface ProductInfoProps {
 
 export function ProductInfo({ product }: ProductInfoProps) {
   const isInStock = (product.stock || 0) > 0
-  const hasDiscount = product.cost && product.cost > product.price
-  const discountPercentage = hasDiscount
-    ? Math.round(((product.cost - product.price) / product.cost) * 100)
-    : 0
+  const regularPrice = product.regularPrice ?? product.price
+  const socioPrice = product.socioPrice ?? product.price
 
   return (
     <div className="space-y-6">
@@ -61,20 +60,26 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       {/* Price */}
-      <div className="flex items-baseline gap-3">
-        {hasDiscount && (
-          <span className="text-lg text-muted-foreground line-through">
-            ${product.cost?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+      <div className="space-y-2">
+        <div className="flex items-baseline gap-3">
+          <span className="text-4xl font-bold">
+            ${regularPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </span>
-        )}
-        <span className="text-4xl font-bold">
-          ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-        </span>
-        {discountPercentage > 0 && (
-          <span className="text-sm font-medium text-green-600">
-            Ahorras {discountPercentage}%
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            Precio regular
           </span>
-        )}
+        </div>
+        <div className="flex items-baseline gap-3">
+          <span className="text-2xl font-semibold text-accent">
+            ${socioPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          </span>
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            Precio socio ({TIENDA_SOCIO_PACKAGE_QTY} piezas exactas)
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          El precio regular se respeta sin cambios. El precio socio se calcula sobre costo + 15% y solo aplica en paquetes exactos de {TIENDA_SOCIO_PACKAGE_QTY}.
+        </p>
       </div>
 
       {/* Stock Status */}

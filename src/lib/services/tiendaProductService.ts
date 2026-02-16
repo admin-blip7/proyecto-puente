@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
 import { formatCategoryLabel } from '@/lib/utils'
+import { calculateRegularUnitPrice, calculateSocioUnitPrice } from '@/lib/tiendaPricing'
 
 const PRODUCT_IMAGE_BUCKET = 'products'
 
@@ -18,8 +19,22 @@ export interface Product {
   attributes: Record<string, any>
   parent_id?: string | null
   image_urls?: string[]
+  regularPrice?: number
+  socioPrice?: number
   created_at: string
   updated_at: string
+}
+
+function withTiendaPricing(product: Product): Product {
+  const regularPrice = product.price
+  const socioBasePrice = calculateRegularUnitPrice(product.cost, product.price)
+  const socioPrice = calculateSocioUnitPrice(socioBasePrice)
+
+  return {
+    ...product,
+    regularPrice,
+    socioPrice,
+  }
 }
 
 export function getProductImageUrl(imagePath: string): string {
@@ -112,7 +127,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Paginat
   }
 
   return {
-    products: (data || []) as Product[],
+    products: ((data || []) as Product[]).map(withTiendaPricing),
     total: count || 0,
     page: Math.floor(offset / limit) + 1,
     pageSize: limit,
@@ -137,7 +152,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     return null
   }
 
-  return data as Product | null
+  return data ? withTiendaPricing(data as Product) : null
 }
 
 /**
@@ -157,7 +172,7 @@ export async function getProductBySKU(sku: string): Promise<Product | null> {
     return null
   }
 
-  return data as Product | null
+  return data ? withTiendaPricing(data as Product) : null
 }
 
 /**
@@ -178,7 +193,7 @@ export async function getProductVariants(parentId: string): Promise<Product[]> {
     return []
   }
 
-  return (data || []) as Product[]
+  return ((data || []) as Product[]).map(withTiendaPricing)
 }
 
 /**
@@ -239,7 +254,7 @@ export async function getFeaturedProducts(limit = 8): Promise<Product[]> {
     return []
   }
 
-  return (data || []) as Product[]
+  return ((data || []) as Product[]).map(withTiendaPricing)
 }
 
 /**
@@ -268,7 +283,7 @@ export async function getRelatedProducts(
     return []
   }
 
-  return (data || []) as Product[]
+  return ((data || []) as Product[]).map(withTiendaPricing)
 }
 
 /**

@@ -1,4 +1,5 @@
 import { Truck, Package, Clock, Check, Shield, Crown, MapPin, Box } from 'lucide-react'
+import { TIENDA_FREE_SHIPPING_THRESHOLD, TIENDA_SOCIO_PACKAGE_QTY } from '@/lib/tiendaPricing'
 
 export const metadata = {
   title: 'Politica de Envios - 22 Electronic',
@@ -64,7 +65,7 @@ export default function EnviosPage() {
                 <p className="text-2xl font-bold text-accent mb-2">1-3 dias habiles</p>
                 <p className="text-sm text-muted-foreground">$150 MXN</p>
                 <p className="text-xs text-muted-foreground mt-3 bg-base p-2 rounded">
-                  GRATIS en compras mayores a $2,500 MXN
+                  GRATIS solo en pedidos que superen ${TIENDA_FREE_SHIPPING_THRESHOLD.toLocaleString('es-MX')} MXN
                 </p>
               </div>
               <div className="bg-accent/10 rounded-xl p-6 border border-accent/30 hover:border-accent transition-colors">
@@ -73,7 +74,7 @@ export default function EnviosPage() {
                 <p className="text-2xl font-bold text-accent mb-2">Al dia siguiente</p>
                 <p className="text-sm text-muted-foreground">$250 MXN</p>
                 <p className="text-xs text-muted-foreground mt-3 bg-base p-2 rounded">
-                  GRATIS en compras mayores a $5,000 MXN
+                  GRATIS solo en pedidos que superen ${TIENDA_FREE_SHIPPING_THRESHOLD.toLocaleString('es-MX')} MXN
                 </p>
               </div>
             </div>
@@ -123,30 +124,22 @@ export default function EnviosPage() {
               y accede a precios especiales exclusivos para mayoristas.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="bg-secondary/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Box className="h-5 w-5 text-accent" />
-                  <span className="font-semibold text-sm">5+ piezas</span>
+                  <span className="font-semibold text-sm">Paquete exacto de {TIENDA_SOCIO_PACKAGE_QTY}</span>
                 </div>
-                <p className="text-2xl font-bold text-accent">10% OFF</p>
-                <p className="text-xs text-muted-foreground">Descuento en tu pedido</p>
-              </div>
-              <div className="bg-secondary/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Box className="h-5 w-5 text-accent" />
-                  <span className="font-semibold text-sm">10+ piezas</span>
-                </div>
-                <p className="text-2xl font-bold text-accent">15% OFF</p>
-                <p className="text-xs text-muted-foreground">Descuento en tu pedido</p>
+                <p className="text-2xl font-bold text-accent">Precio Socio</p>
+                <p className="text-xs text-muted-foreground">Solo aplica cuando la cantidad por producto es exactamente {TIENDA_SOCIO_PACKAGE_QTY}</p>
               </div>
               <div className="bg-accent/20 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Crown className="h-5 w-5 text-accent" />
-                  <span className="font-semibold text-sm">20+ piezas</span>
+                  <span className="font-semibold text-sm">Precio base</span>
                 </div>
-                <p className="text-2xl font-bold text-accent">20% OFF</p>
-                <p className="text-xs text-muted-foreground">Precio mayorista especial</p>
+                <p className="text-2xl font-bold text-accent">Costo + 15%</p>
+                <p className="text-xs text-muted-foreground">El descuento socio se calcula sobre ese precio base en tienda en linea</p>
               </div>
             </div>
 
@@ -159,7 +152,7 @@ export default function EnviosPage() {
                 </li>
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span>Envio gratis ilimitado en pedidos mayoristas</span>
+                  <span>Envio gratis solo en pedidos que superen ${TIENDA_FREE_SHIPPING_THRESHOLD.toLocaleString('es-MX')} MXN</span>
                 </li>
                 <li className="flex gap-2">
                   <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />

@@ -3,9 +3,9 @@ import Image from 'next/image'
 
 export function CommunityLove() {
     return (
-        <section id="reviews" className="py-20 lg:py-32 border-b bg-secondary/30">
+        <section id="reviews" className="py-12 lg:py-16 bg-secondary/30">
             <div className="container mx-auto px-4 lg:px-8">
-                <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+                <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
                     <div>
                         <span className="text-accent font-mono text-xs tracking-widest block mb-2 font-bold">
               /// SOCIAL

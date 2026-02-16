@@ -53,6 +53,7 @@ export function FavoritosClient() {
         name: item.product.name,
         sku: item.product.sku,
         price: item.product.price,
+        socioPrice: item.product.socioPrice,
         quantity: 1,
         category: item.product.category,
       })

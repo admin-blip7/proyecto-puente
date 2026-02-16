@@ -315,7 +315,37 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
      - Agente: Antigravity
      - Descripción: Implementado sistema de productos padre/hijo en BD (`parent_id`) y Backend. Storefront actualizado con selectores dinámicos de variantes y herramienta Admin (`ProductGrouper`) para agrupar inventario existente.
 
----
+
+50. **Fix Netlify Deploy (React 18)** - Compatibilidad con react-day-picker
+     - Estado: Completado
+     - Fecha: 2026-02-15
+     - Agente: Kilo
+     - Descripción: Degradado React y React DOM de 19.2.4 a 18.2.0 para resolver conflicto de peer-dependency con react-day-picker@8.10.1 que solo acepta React ^16.8.0 || ^17.0.0 || ^18.0.0
+
+51. **Mejora de Diseño de Tienda - UI/UX Premium**
+     - Estado: Completado
+     - Fecha: 2026-02-15
+     - Agente: OpenCode
+     - Descripción: Rediseño completo de componentes visuales principales de la tienda:
+       - HeroBanner: Animaciones premium con orbes flotantes, efectos de parallax, badges de confianza y CTAs mejorados
+       - TiendaProductCard: Nuevo diseño con hover effects, badges Premium/Descuento, indicadores de stock animados y botones de acción mejorados
+       - TiendaHeader: Efecto glassmorphism dinámico, dropdowns animados, transiciones suaves y mejor navegación
+       - FeaturesSection: Grid moderno con gradientes de color, iconos animados y CTA de soporte
+       - CategoriesSlider: Nuevo diseño de tarjetas con indicadores de progreso y efectos hover mejorados
+       - Ajuste de espaciado: Reducido padding entre secciones para mejor flujo visual (py-20→py-12, etc)
+
+52. **Precio socio por paquete exacto de 5 + envío gratis > $15,000 (solo tienda online)**
+     - Estado: Completado
+     - Fecha: 2026-02-15
+     - Agente: Codex
+     - Descripción: Implementada lógica central de pricing en `src/lib/tiendaPricing.ts` conservando precio regular sin cambios; precio socio calculado sobre base `costo + 15%` y aplicado solo cuando la cantidad por producto es exactamente 5; envío gratis únicamente cuando el subtotal supera $15,000 MXN; UI de tienda actualizada para mostrar precio regular/socio en catálogo, detalle, carrito y checkout.
+
+53. **Ajuste de fórmula de precio socio (sin descuento adicional)**
+     - Estado: Completado
+     - Fecha: 2026-02-15
+     - Agente: Codex
+     - Descripción: Corregida la función `calculateSocioUnitPrice` en `src/lib/tiendaPricing.ts` para quitar el descuento extra que producía valores como `19.55`; ahora el precio socio respeta exactamente la base `costo + 15%` (ejemplo: costo 20 => socio 23.00), manteniendo la condición de paquete exacto de 5.
+
 
 ## Payload CMS
 ### Estado

@@ -5,6 +5,10 @@ import { X, Plus, Minus, ShoppingCart, Trash2, Check } from 'lucide-react'
 import Link from 'next/link'
 import { useCart } from './CartProvider'
 import { Button } from '@/components/ui/button'
+import {
+  calculateTiendaLinePricing,
+  TIENDA_FREE_SHIPPING_THRESHOLD,
+} from '@/lib/tiendaPricing'
 
 interface CartDrawerProps {
   isOpen: boolean
@@ -12,7 +16,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
-  const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart()
+  const { items, subtotal, regularSubtotal, savingsTotal, updateQuantity, removeItem, clearCart } = useCart()
 
   return (
     <>
@@ -81,8 +85,11 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </div>
               ) : (
                 <ul className="space-y-4">
-                  {items.map((item) => (
-                    <motion.li
+                  {items.map((item) => {
+                    const linePricing = calculateTiendaLinePricing(item.price, item.quantity, item.socioPrice)
+
+                    return (
+                      <motion.li
                       key={item.productId}
                       layout
                       initial={{ opacity: 0, y: 10 }}
@@ -111,9 +118,20 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           )}
                         </div>
                         <div className="flex items-end justify-between">
-                          <p className="font-semibold">
-                            ${item.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                          </p>
+                          <div>
+                            <p className="font-semibold">
+                              ${linePricing.effectiveUnitPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </p>
+                            {linePricing.isSocioApplied ? (
+                              <p className="text-[10px] text-green-600 font-medium">
+                                Precio socio activo (paquete exacto de 5)
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-muted-foreground">
+                                Socio disponible solo en 5 piezas exactas
+                              </p>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             {/* Quantity Controls */}
                             <div className="flex items-center rounded-lg border border-border">
@@ -143,8 +161,9 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           </div>
                         </div>
                       </div>
-                    </motion.li>
-                  ))}
+                      </motion.li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -163,6 +182,20 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 {/* Summary */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal regular</span>
+                    <span className="font-medium">
+                      ${regularSubtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {savingsTotal > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Ahorro socio</span>
+                      <span className="font-medium">
+                        -${savingsTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-medium">
                       ${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
@@ -170,7 +203,9 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Envío</span>
-                    <span className="font-medium text-muted-foreground">Calcular al checkout</span>
+                    <span className="font-medium text-muted-foreground">
+                      Gratis solo si supera ${TIENDA_FREE_SHIPPING_THRESHOLD.toLocaleString('es-MX')}
+                    </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-border">
                     <span className="font-semibold">Total</span>

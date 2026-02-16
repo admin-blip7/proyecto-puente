@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { useCart } from './cart/CartProvider'
 import { Button } from '@/components/ui/button'
 import type { Product } from '@/lib/services/tiendaProductService'
+import { calculateTiendaLinePricing } from '@/lib/tiendaPricing'
 
 interface AddToCartButtonProps {
   product: Product
@@ -19,6 +20,7 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
 
   const isInStock = (product.stock || 0) > 0
   const maxQuantity = product.stock || 99
+  const linePricing = calculateTiendaLinePricing(product.price, quantity, product.socioPrice)
 
   const handleAddToCart = () => {
     if (!isInStock || isAdding) return
@@ -29,9 +31,10 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
       name: product.name,
       sku: product.sku,
       price: product.price,
+      socioPrice: product.socioPrice,
       image: undefined,
       category: product.category,
-    })
+    }, quantity)
 
     // Show added state
     setTimeout(() => {
@@ -124,9 +127,20 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
 
       {/* Subtotal Preview */}
       {quantity > 1 && (
-        <p className="text-center text-sm text-muted-foreground">
-          Subtotal: ${(product.price * quantity).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-        </p>
+        <div className="text-center text-sm text-muted-foreground space-y-1">
+          <p>
+            Subtotal: ${linePricing.finalLineTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          </p>
+          {linePricing.isSocioApplied ? (
+            <p className="text-green-600 font-medium">
+              Precio socio aplicado por paquete exacto de 5
+            </p>
+          ) : (
+            <p>
+              Precio socio disponible solo con cantidad exacta de 5 piezas
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

@@ -1,12 +1,14 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { calculateTiendaLinePricing } from '@/lib/tiendaPricing'
 
 export interface CartItem {
   productId: string
   name: string
   sku: string | null
   price: number
+  socioPrice?: number
   quantity: number
   image?: string
   category?: string
@@ -16,7 +18,9 @@ export interface CartContextType {
   items: CartItem[]
   itemCount: number
   subtotal: number
-  addItem: (item: Omit<CartItem, 'quantity'>) => void
+  regularSubtotal: number
+  savingsTotal: number
+  addItem: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
   removeItem: (productId: string) => void
   updateQuantity: (productId: string, quantity: number) => void
   clearCart: () => void
@@ -60,17 +64,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, isInitialized])
 
-  const addItem = (item: Omit<CartItem, 'quantity'>) => {
+  const addItem = (item: Omit<CartItem, 'quantity'>, quantity = 1) => {
+    const quantityToAdd = Math.max(1, Math.floor(quantity))
+
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === item.productId)
       if (existing) {
         return prev.map((i) =>
           i.productId === item.productId
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...i, quantity: i.quantity + quantityToAdd }
             : i
         )
       }
-      return [...prev, { ...item, quantity: 1 }]
+      return [...prev, { ...item, quantity: quantityToAdd }]
     })
     setIsOpen(true)
   }
@@ -96,7 +102,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const regularSubtotal = items.reduce((sum, item) => {
+    return sum + calculateTiendaLinePricing(item.price, item.quantity, item.socioPrice).regularLineTotal
+  }, 0)
+  const subtotal = items.reduce((sum, item) => {
+    return sum + calculateTiendaLinePricing(item.price, item.quantity, item.socioPrice).finalLineTotal
+  }, 0)
+  const savingsTotal = regularSubtotal - subtotal
 
   return (
     <CartContext.Provider
@@ -104,6 +116,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items,
         itemCount,
         subtotal,
+        regularSubtotal,
+        savingsTotal,
         addItem,
         removeItem,
         updateQuantity,

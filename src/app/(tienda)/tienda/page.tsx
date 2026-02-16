@@ -18,7 +18,7 @@ async function FeaturedProducts() {
   }
 
   return (
-    <section className="py-12 lg:py-20">
+    <section className="py-8 lg:py-12">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex justify-between items-end mb-8">
           <div>
@@ -49,7 +49,7 @@ export default function TiendaPage() {
   const settingsPromise = getTiendaCmsSettings()
 
   return (
-    <main className="relative min-h-screen">
+    <main className="relative">
       {/* Hero Section */}
       <Suspense fallback={<div className="h-[70vh]" />}>
         <HeroFromCms settingsPromise={settingsPromise} />

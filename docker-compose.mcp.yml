@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  supabase-mcp:
+    image: node:20-alpine
+    container_name: supabase-mcp
+    command: npx -y @supabase/mcp-server-supabase@latest --access-token "sbp_4e514bbdffadb1558a4d4016481e854de7b9f6e7"
+    stdin_open: true
+    tty: true

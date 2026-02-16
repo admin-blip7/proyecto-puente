@@ -32,3 +32,17 @@
 - Si el origen del warning esta en rutas marcadas como "NO MODIFICAR" (`(web)`/`(pos)`), dejar constancia explicita del bloqueo en `tasks/todo.md` y no aplicar cambios ahi sin confirmacion.
 - Si un carrusel mobile no desplaza, validar que los items no puedan encogerse (`flex-none`) y usar un track interno `w-max` para forzar overflow horizontal real.
 - Si en mobile el swipe de un carrusel mueve la pagina en lugar del track, agregar deteccion de pan horizontal con listeners `touchmove` no pasivos y aplicar `preventDefault` solo cuando `|deltaX| > |deltaY|`.
+
+## 2026-02-15 - Regla de precio base en tienda online
+- Cuando el usuario especifique fórmula de pricing, no inferir porcentajes adicionales: usar exactamente la fórmula indicada (en este caso, precio base = costo + 15%).
+- Si existe "precio socio", aplicar cualquier descuento socio sobre ese precio base explícito y condicionar su activación exactamente como lo pida el usuario (aquí: cantidad exacta de 5 piezas).
+- Mantener reglas de envío y pricing en una utilidad central para evitar divergencias entre catálogo, carrito, checkout y páginas informativas.
+
+## 2026-02-15 - Corrección sobre precio regular
+- Si el usuario indica explícitamente "no tocar precio regular", nunca sobrescribir `product.price` en servicios ni usar una fórmula para reemplazarlo.
+- Separar claramente conceptos: `precio regular` (fuente original) y `precio socio` (calculado con reglas adicionales).
+- Al corregir una suposición, ajustar también textos/UI y documentación operativa (`tasks/todo.md`, `project_context.md`) para evitar contradicciones.
+
+## 2026-02-15 - Corrección de fórmula de precio socio
+- No aplicar un descuento adicional automático al precio socio si el usuario no lo pidió explícitamente.
+- Si la regla declarada es `precio socio = costo + 15%`, el resultado debe ser exacto (ejemplo: costo 20 => socio 23.00), sin multiplicadores extra.

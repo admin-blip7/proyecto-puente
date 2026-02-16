@@ -530,9 +530,9 @@ body {
   height: 100%;
   -webkit-text-size-adjust: 100%;
   scrollbar-gutter: stable both-edges;
-  /* Asegurar scroll en móviles */
-  overflow: auto !important;
-  -webkit-overflow-scrolling: touch !important;
+  /* Asegurar scroll en móviles - Solo cuando no sea tienda */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 9) Mejoras específicas para navegación móvil */
@@ -540,10 +540,10 @@ body {
 
   /* Asegurar que el body principal siempre permita scroll */
   body {
-    position: static !important;
-    overflow: auto !important;
-    height: auto !important;
-    width: auto !important;
+    position: static;
+    overflow: auto;
+    height: auto;
+    width: auto;
   }
 
   /* Sidebar móvil - asegurar scroll interno */

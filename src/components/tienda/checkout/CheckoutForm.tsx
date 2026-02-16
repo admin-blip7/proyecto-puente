@@ -11,15 +11,21 @@ import { addSaleAndUpdateStock } from '@/lib/services/salesService'
 import { useAuth } from '@/lib/hooks'
 import { Sale, CartItem as ServiceCartItem } from '@/types'
 import { useToast } from '@/hooks/use-toast'
+import {
+  calculateTiendaLinePricing,
+  qualifiesForFreeShipping,
+  TIENDA_FREE_SHIPPING_THRESHOLD,
+  TIENDA_SHIPPING_FLAT_RATE,
+} from '@/lib/tiendaPricing'
 
 export function CheckoutForm() {
-  const { items, subtotal, clearCart } = useCart()
+  const { items, subtotal, regularSubtotal, savingsTotal, clearCart } = useCart()
   const { user } = useAuth()
   const { toast } = useToast()
   const [step, setStep] = useState<'shipping' | 'payment' | 'confirmation'>('shipping')
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const shipping = subtotal >= 2500 ? 0 : 150
+  const shipping = qualifiesForFreeShipping(subtotal) ? 0 : TIENDA_SHIPPING_FLAT_RATE
   const total = subtotal + shipping
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,13 +47,17 @@ export function CheckoutForm() {
       // Create sale object
       // Note: We are mocking some fields like cashierId since this is online
       const saleData: Omit<Sale, "id" | "saleId" | "createdAt"> = {
-        items: items.map(item => ({
-          productId: item.productId,
-          name: item.name,
-          quantity: item.quantity,
-          priceAtSale: item.price,
-          // Consignor ID handled by server
-        })),
+        items: items.map(item => {
+          const linePricing = calculateTiendaLinePricing(item.price, item.quantity, item.socioPrice)
+
+          return {
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            priceAtSale: linePricing.effectiveUnitPrice,
+            // Consignor ID handled by server
+          }
+        }),
         totalAmount: total,
         paymentMethod: 'Tarjeta de Crédito', // Mocked for now
         cashierId: 'ONLINE',
@@ -63,19 +73,23 @@ export function CheckoutForm() {
       }
 
       // Convert to service CartItem (cast as we only need id and quantity for stock update)
-      const serviceCartItems = items.map(item => ({
-        id: item.productId,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        // Mock required fields to satisfy type
-        sku: item.sku || '',
-        cost: 0,
-        stock: 0,
-        createdAt: new Date(),
-        type: 'Venta',
-        ownershipType: 'Propio'
-      })) as unknown as ServiceCartItem[]
+      const serviceCartItems = items.map(item => {
+        const linePricing = calculateTiendaLinePricing(item.price, item.quantity, item.socioPrice)
+
+        return {
+          id: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: linePricing.effectiveUnitPrice,
+          // Mock required fields to satisfy type
+          sku: item.sku || '',
+          cost: 0,
+          stock: 0,
+          createdAt: new Date(),
+          type: 'Venta',
+          ownershipType: 'Propio'
+        }
+      }) as unknown as ServiceCartItem[]
 
       await addSaleAndUpdateStock(saleData, serviceCartItems, null, true)
 
@@ -250,6 +264,50 @@ export function CheckoutForm() {
         <p className="mt-4 text-xs text-muted-foreground">
           <span className="text-accent">🔒</span> Tu pago es procesado de forma segura con encriptación de 256 bits.
         </p>
+      </div>
+
+      {/* Order Summary */}
+      <div className="bg-secondary/30 rounded-2xl p-6 border border-border">
+        <h2 className="font-semibold text-lg mb-4">Resumen del Pedido</h2>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Subtotal regular</span>
+            <span className="font-medium">
+              ${regularSubtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          {savingsTotal > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Ahorro socio</span>
+              <span className="font-medium">
+                -${savingsTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Subtotal final</span>
+            <span className="font-medium">
+              ${subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Envío</span>
+            <span className={`font-medium ${shipping === 0 ? 'text-green-600' : ''}`}>
+              {shipping === 0
+                ? 'Gratis'
+                : `$${shipping.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Envío gratis solo para pedidos que superen ${TIENDA_FREE_SHIPPING_THRESHOLD.toLocaleString('es-MX')}.
+          </p>
+          <div className="flex justify-between pt-2 border-t border-border text-base">
+            <span className="font-semibold">Total</span>
+            <span className="font-bold">
+              ${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Submit Button */}
