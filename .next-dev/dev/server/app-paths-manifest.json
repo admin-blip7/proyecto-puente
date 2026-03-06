@@ -1,8 +1,3 @@
 {
-  "/admin/repairs/page": "app/admin/repairs/page.js",
-  "/admin/kardex/page": "app/admin/kardex/page.js",
-  "/admin/labels/page": "app/admin/labels/page.js",
-  "/admin/finance/cash-history/page": "app/admin/finance/cash-history/page.js",
-  "/admin/compatibility/page": "app/admin/compatibility/page.js",
-  "/(tienda)/tienda/page": "app/(tienda)/tienda/page.js"
+  "/admin/sales/page": "app/admin/sales/page.js"
 }
