@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
   },
   // Empty turbopack config to silence warnings in Next.js 16
   turbopack: {},
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/tienda',
+        permanent: false, // Keep false while in active development
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
@@ -122,6 +131,14 @@ const nextConfig: NextConfig = {
 
     // Mejorar configuración para desarrollo
     if (dev && !isServer) {
+      // Avoid bundling server-only optional deps from @libpdf/core in client chunks
+      config.resolve = config.resolve || {};
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        "@google-cloud/kms": false,
+        "@google-cloud/secret-manager": false,
+      };
+
       // Configuración para mejor HMR
       config.watchOptions = {
         ...config.watchOptions,

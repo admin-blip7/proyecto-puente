@@ -51,13 +51,13 @@ export default async function SalesPage() {
                             <Menu className="h-6 w-6" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-24">
+                    <SheetContent side="left" className="p-0 w-[280px] border-r-0">
                         <SheetTitle className="sr-only">Sales Menu</SheetTitle>
                         <LeftSidebar />
                     </SheetContent>
                 </Sheet>
             </div>
-            <main className="flex-1 overflow-hidden p-4 md:p-6 md:pt-12">
+            <main className="flex-1 overflow-y-auto w-full md:overflow-hidden p-4 md:p-6 md:pt-12">
                 <SalesHistoryClient
                     initialSales={initialSales}
                     products={products}

@@ -33,23 +33,25 @@ export function DatePickerWithRange({
                         id="date"
                         variant={"outline"}
                         className={cn(
-                            "w-[300px] justify-start text-left font-normal",
+                            "w-full sm:w-[300px] justify-start text-left font-normal",
                             !date && "text-muted-foreground"
                         )}
                     >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                            date.to ? (
-                                <>
-                                    {format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })} -{" "}
-                                    {format(date.to, "LLL dd, y", { locale: getDateFnsLocale() })}
-                                </>
+                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                        <span className="truncate">
+                            {date?.from ? (
+                                date.to ? (
+                                    <>
+                                        {format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })} -{" "}
+                                        {format(date.to, "LLL dd, y", { locale: getDateFnsLocale() })}
+                                    </>
+                                ) : (
+                                    format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })
+                                )
                             ) : (
-                                format(date.from, "LLL dd, y", { locale: getDateFnsLocale() })
-                            )
-                        ) : (
-                            <span>Seleccionar un rango</span>
-                        )}
+                                <span>Seleccionar un rango</span>
+                            )}
+                        </span>
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">

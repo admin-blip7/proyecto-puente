@@ -467,36 +467,8 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
     }
   };
 
-  // Debug: Log sales data to check for invalid keys and duplicates
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      // Check for sales with invalid IDs
-      const invalidSales = sales.filter(sale => !sale.id && !sale.saleId);
-      if (invalidSales.length > 0) {
-        console.warn('Sales with invalid IDs found:', invalidSales.length);
-      }
+  // Debug removed
 
-      // Check for duplicate saleIds
-      const saleIds = sales.map(s => s.saleId).filter(Boolean);
-      const duplicateIds = saleIds.filter((id, index) => saleIds.indexOf(id) !== index);
-      if (duplicateIds.length > 0) {
-        console.warn('Duplicate saleIds found:', [...new Set(duplicateIds)]);
-      }
-
-      console.log('Total sales state length:', sales.length);
-      console.log('Filtered sales length:', filteredSales.length);
-
-      // Debug: Check specifically for SALE-950C941D
-      const targetSale = filteredSales.find(s => s.saleId === 'SALE-950C941D');
-      if (targetSale) {
-        console.log('DEBUG: SALE-950C941D is present in filteredSales:', targetSale);
-      } else {
-        console.warn('DEBUG: SALE-950C941D is MISSING from filteredSales. Check filters.');
-      }
-
-      console.log('Current filtered saleIds:', filteredSales.map(s => s.saleId));
-    }
-  }, [sales, filteredSales]);
 
   // Reset sort when sales data changes significantly
   React.useEffect(() => {
@@ -527,9 +499,9 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold tracking-tight">Historial de Ventas</h1>
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+        <h1 className="text-2xl font-bold tracking-tight pl-10 md:pl-0">Historial de Ventas</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Button
             variant="outline"
             onClick={() => router.push('/admin/sales/consignor-reports')}
@@ -548,16 +520,20 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 border rounded-lg bg-card text-card-foreground shadow-sm">
         <div className="flex flex-col gap-2">
           <Label>Rango de Fechas</Label>
-          <div className="flex gap-2">
-            <DatePickerWithRange date={dateRange} setDate={setDateRange} />
-            <Button onClick={handleFilterByDate} disabled={isFiltering || !dateRange?.from}>
-              {isFiltering ? <Loader2 className="h-4 w-4 animate-spin" /> : "Filtrar"}
-            </Button>
-            {dateRange && (
-              <Button variant="ghost" onClick={clearDateFilter} size="icon">
-                <Trash2 className="h-4 w-4" />
+          <div className="flex flex-wrap sm:flex-nowrap gap-2">
+            <div className="w-full sm:w-auto">
+              <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button onClick={handleFilterByDate} disabled={isFiltering || !dateRange?.from} className="flex-1 sm:flex-none">
+                {isFiltering ? <Loader2 className="h-4 w-4 animate-spin" /> : "Filtrar"}
               </Button>
-            )}
+              {dateRange && (
+                <Button variant="ghost" onClick={clearDateFilter} size="icon">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -568,7 +544,7 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
             setSortField(field as keyof Sale);
             setSortDirection(dir as 'asc' | 'desc');
           }}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full md:w-[200px]">
               <SelectValue placeholder="Seleccionar orden..." />
             </SelectTrigger>
             <SelectContent>
@@ -674,14 +650,132 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <CardTitle>Transacciones Recientes ({filteredSales.length})</CardTitle>
           <div className="text-sm text-muted-foreground italic">
             Mostrando {filteredSales.length} de {sales.length} cargadas
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="border rounded-md m-4 overflow-y-auto" style={{ height: '300px' }}>
+          {/* Mobile Card View */}
+          <div className="md:hidden">
+            <div className="w-full p-4">
+              <div className="space-y-4 pb-12">
+                {filteredSales.length === 0 ? (
+                  <div className="text-center p-8 text-muted-foreground border rounded-lg border-dashed">No se encontraron ventas</div>
+                ) : filteredSales.map((sale, index) => {
+                  const uniqueKey = `sale-mobile-${sale.saleId}-${sale.id || index}`;
+                  return (
+                    <Card key={uniqueKey} className="overflow-hidden shadow-sm">
+                      <div
+                        className="p-4 flex flex-col gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => toggleCollapsible(uniqueKey)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedSaleIds.has(sale.saleId)}
+                              onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
+                              aria-label={`Seleccionar venta ${sale.saleId}`}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div>
+                              <div className="font-bold flex items-center gap-2">
+                                {sale.saleId.split('-')[1] || sale.saleId}
+                                <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'} className="text-[10px] h-5">
+                                  {sale.paymentMethod}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right flex flex-col items-end">
+                            <div className="font-bold text-lg text-primary">{formatCurrency(sale.totalAmount)}</div>
+                            <div className="text-xs text-muted-foreground">{sale.items.reduce((acc, item) => acc + item.quantity, 0)} items</div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm bg-muted/30 p-2 rounded-md gap-2">
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-xs text-muted-foreground">Cliente</span>
+                            <span className="font-medium truncate">{sale.customerName || 'N/A'}</span>
+                          </div>
+                          <div className="flex flex-col items-end min-w-0 flex-shrink-0 max-w-[50%]">
+                            <span className="text-xs text-muted-foreground">Cajero</span>
+                            <span className="font-medium truncate">{sale.cashierName}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-border">
+                          <Button variant="ghost" size="sm" className="h-8 gap-1 p-0 px-2 text-muted-foreground" onClick={(e) => { e.stopPropagation(); toggleCollapsible(uniqueKey); }}>
+                            {openCollapsibles[uniqueKey] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            <span className="text-xs">Detalles</span>
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-8 bg-white dark:bg-card" onClick={(e) => { e.stopPropagation(); }}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
+                                <ShieldPlus className="mr-2 h-4 w-4" />
+                                <span>Registrar Garantía</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReprintTicket(sale); }}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                <span>Reimprimir Ticket</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={sale.status === 'cancelled'}
+                                onClick={(e) => { e.stopPropagation(); handleChangeProduct(sale); }}
+                              >
+                                <TrendingUp className="mr-2 h-4 w-4" />
+                                <span>Cambiar Producto</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+
+                      {openCollapsibles[uniqueKey] && (
+                        <div className="p-0 border-t bg-muted/10">
+                          <div className="p-3">
+                            <h4 className="font-semibold text-sm mb-2 text-muted-foreground">Artículos Vendidos ({sale.items.length})</h4>
+                            <div className="space-y-2">
+                              {sale.items.map((item, idx) => {
+                                return (
+                                  <div key={idx} className="flex justify-between items-start text-sm bg-white dark:bg-card p-3 rounded-md border border-border shadow-sm">
+                                    <div className="flex flex-col flex-1 pr-2">
+                                      <span className="font-medium">{item.name}</span>
+                                      <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                                        <span>Cant: {item.quantity}</span>
+                                        <span>•</span>
+                                        <span>Unit: {formatCurrency(item.priceAtSale)}</span>
+                                      </div>
+                                      <div className="mt-1.5">{renderSerials(item, sale.saleId)}</div>
+                                    </div>
+                                    <div className="font-bold text-right pl-2 border-l border-border/50">
+                                      {formatCurrency(item.quantity * item.priceAtSale)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block border rounded-md m-4 overflow-y-auto h-[500px] 2xl:h-[700px]">
             <Table>
               <TableHeader className="sticky top-0 bg-background shadow-sm z-10">
                 <TableRow>
@@ -715,118 +809,118 @@ export default function SalesHistoryClient({ initialSales, products, dailyCost, 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                  {filteredSales.map((sale, index) => {
-                    // Create a robust unique key
-                    const uniqueKey = `sale-${sale.saleId}-${sale.id || index}`;
-                    const collapsibleKey = uniqueKey;
+                {filteredSales.map((sale, index) => {
+                  // Create a robust unique key
+                  const uniqueKey = `sale-${sale.saleId}-${sale.id || index}`;
+                  const collapsibleKey = uniqueKey;
 
-                    return (
-                      <Fragment key={uniqueKey}>
-                        <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selectedSaleIds.has(sale.saleId)}
-                              onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
-                              aria-label={`Seleccionar venta ${sale.saleId}`}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon">
-                              {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              <span className="sr-only">Toggle details</span>
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">{sale.saleId}</TableCell>
-                          <TableCell>
-                            {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{sale.customerName || 'N/A'}</div>
-                            <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
-                          </TableCell>
-                          <TableCell>{sale.cashierName}</TableCell>
-                          <TableCell>
-                            <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
-                              {sale.paymentMethod}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(sale.totalAmount)}</TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                                  <span className="sr-only">Abrir menú</span>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
-                                  <ShieldPlus className="mr-2 h-4 w-4" />
-                                  <span>Registrar Garantía</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReprintTicket(sale); }}>
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  <span>Reimprimir Ticket</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  disabled={sale.status === 'cancelled'}
-                                  onClick={(e) => { e.stopPropagation(); handleChangeProduct(sale); }}
-                                >
-                                  <TrendingUp className="mr-2 h-4 w-4" />
-                                  <span>Cambiar Producto</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                  return (
+                    <Fragment key={uniqueKey}>
+                      <TableRow className="cursor-pointer" onClick={() => toggleCollapsible(collapsibleKey)}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedSaleIds.has(sale.saleId)}
+                            onCheckedChange={(checked) => handleSelectSale(sale.saleId, checked as boolean)}
+                            aria-label={`Seleccionar venta ${sale.saleId}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon">
+                            {openCollapsibles[collapsibleKey] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <span className="sr-only">Toggle details</span>
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">{sale.saleId}</TableCell>
+                        <TableCell>
+                          {format(sale.createdAt, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{sale.customerName || 'N/A'}</div>
+                          <div className="text-sm text-muted-foreground">{sale.customerPhone}</div>
+                        </TableCell>
+                        <TableCell>{sale.cashierName}</TableCell>
+                        <TableCell>
+                          <Badge variant={sale.paymentMethod === 'Efectivo' ? 'secondary' : 'default'}>
+                            {sale.paymentMethod}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(sale.totalAmount)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                                <span className="sr-only">Abrir menú</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWarrantyDialog(sale); }}>
+                                <ShieldPlus className="mr-2 h-4 w-4" />
+                                <span>Registrar Garantía</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleReprintTicket(sale); }}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                <span>Reimprimir Ticket</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={sale.status === 'cancelled'}
+                                onClick={(e) => { e.stopPropagation(); handleChangeProduct(sale); }}
+                              >
+                                <TrendingUp className="mr-2 h-4 w-4" />
+                                <span>Cambiar Producto</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                      {openCollapsibles[collapsibleKey] && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="p-0 border-0">
+                            <div className="p-4 bg-muted/50">
+                              <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Series/IMEIs</TableHead>
+                                    <TableHead className="text-right">Cantidad</TableHead>
+                                    <TableHead className="text-right">Precio Unit.</TableHead>
+                                    <TableHead className="text-right">Costo Unit.</TableHead>
+                                    <TableHead className="text-right">Ganancia</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {sale.items.map((item, itemIndex) => {
+                                    const product = getProduct(item.productId);
+                                    const cost = product?.cost || 0;
+                                    const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
+                                    return (
+                                      <TableRow key={`${uniqueKey}-item-${itemIndex}-${item.productId}-${item.serials?.join('-') || 'no-serials'}`}>
+                                        <TableCell>{item.name}</TableCell>
+                                        <TableCell>{renderSerials(item, sale.saleId)}</TableCell>
+                                        <TableCell className="text-right">{item.quantity}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
+                                        <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
+                                          {formatCurrency(profit)}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </TableCell>
                         </TableRow>
-                        {openCollapsibles[collapsibleKey] && (
-                          <TableRow>
-                            <TableCell colSpan={9} className="p-0 border-0">
-                              <div className="p-4 bg-muted/50">
-                                <h4 className="font-semibold mb-2">Detalle de la Venta</h4>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Producto</TableHead>
-                                      <TableHead>Series/IMEIs</TableHead>
-                                      <TableHead className="text-right">Cantidad</TableHead>
-                                      <TableHead className="text-right">Precio Unit.</TableHead>
-                                      <TableHead className="text-right">Costo Unit.</TableHead>
-                                      <TableHead className="text-right">Ganancia</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {sale.items.map((item, itemIndex) => {
-                                      const product = getProduct(item.productId);
-                                      const cost = product?.cost || 0;
-                                      const profit = product?.ownershipType === 'Familiar' ? 0 : (item.priceAtSale - cost) * item.quantity;
-                                      return (
-                                        <TableRow key={`${uniqueKey}-item-${itemIndex}-${item.productId}-${item.serials?.join('-') || 'no-serials'}`}>
-                                          <TableCell>{item.name}</TableCell>
-                                          <TableCell>{renderSerials(item, sale.saleId)}</TableCell>
-                                          <TableCell className="text-right">{item.quantity}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(item.priceAtSale)}</TableCell>
-                                          <TableCell className="text-right">{formatCurrency(cost)}</TableCell>
-                                          <TableCell className={cn("text-right font-medium", profit > 0 ? "text-green-600" : "text-red-600")}>
-                                            {formatCurrency(profit)}
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Confirmation dialog for canceling sales */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
