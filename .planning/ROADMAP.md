@@ -19,3 +19,24 @@ Plans:
 - REQ-005: Link de acceso a registro de socios desde la tienda visible para usuarios no autenticados
 - REQ-006: Validación de campos en el frontend (email válido, contraseña segura, campos requeridos)
 - REQ-007: Manejo de errores (email duplicado, contraseña débil, etc.)
+
+### Phase 2: Notificaciones WhatsApp al Corte de Caja
+**Goal:** Al realizar el corte de caja, el sistema envía automáticamente un resumen de ventas vía WhatsApp al número configurado por el socio de cada sucursal.
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — DB migrations: whatsapp_number + whatsapp_apikey on branches, whatsapp_notification_log table
+- [ ] 02-02-PLAN.md — Service layer: buildCorteMessage() pure function + unit tests
+- [ ] 02-03-PLAN.md — API route POST /api/whatsapp/corte (Callmebot GET fetch, log result)
+- [ ] 02-04-PLAN.md — Settings UI: Notificaciones tab with per-branch WhatsApp config + server action
+- [ ] 02-05-PLAN.md — POSClient fire-and-forget trigger after printCashCloseTicket
+
+#### Requirements
+- REQ-008: Campo de número WhatsApp configurable en el perfil/settings de cada socio por sucursal
+- REQ-009: Integración con la API de WhatsApp (WhatsApp Business API o Twilio/Twilio Sandbox) para envío de mensajes
+- REQ-010: Al cerrar una sesión de caja (corte), disparar envío automático al número del socio
+- REQ-011: Mensaje de WhatsApp incluye: fecha/hora del corte, cajero, ventas en efectivo, ventas con tarjeta, total del día y detalle de productos vendidos
+- REQ-012: UI en configuraciones de socio para guardar y verificar número WhatsApp (con formato internacional)
+- REQ-013: Manejo de errores si el envío falla (no bloquea el flujo del corte, solo notifica en toast)
+- REQ-014: Historial/log de notificaciones enviadas (opcional, visible en dashboard del socio)
