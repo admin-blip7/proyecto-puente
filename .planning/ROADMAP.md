@@ -8,7 +8,7 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Registration form component and page at /socio/registro
+- [x] 01-01-PLAN.md — Registration form component and page at /socio/registro
 - [ ] 01-02-PLAN.md — AuthProvider public path + TiendaHeader Socio link
 
 #### Requirements
