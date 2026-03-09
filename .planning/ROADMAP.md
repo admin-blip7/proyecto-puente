@@ -27,7 +27,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — DB migrations: whatsapp_number + whatsapp_apikey on branches, whatsapp_notification_log table
-- [ ] 02-02-PLAN.md — Service layer: buildCorteMessage() pure function + unit tests
+- [x] 02-02-PLAN.md — Service layer: buildCorteMessage() pure function + unit tests
 - [ ] 02-03-PLAN.md — API route POST /api/whatsapp/corte (Callmebot GET fetch, log result)
 - [ ] 02-04-PLAN.md — Settings UI: Notificaciones tab with per-branch WhatsApp config + server action
 - [ ] 02-05-PLAN.md — POSClient fire-and-forget trigger after printCashCloseTicket
