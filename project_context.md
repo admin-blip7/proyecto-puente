@@ -11,6 +11,10 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Registro de Socios — AuthProvider public path + TiendaHeader Soy Socio link** (09-Mar-2026, Claude Sonnet 4.6)
+  - `src/components/auth/AuthProvider.tsx`: añadido `pathname === "/socio/registro"` a `isPublicPath` — usuarios no autenticados ya no son redirigidos a /login al visitar /socio/registro.
+  - `src/components/tienda/layout/TiendaHeader.tsx`: importado `useAuth`, desestructurado `userProfile`, y añadido enlace condicional "Soy Socio" → `/socio/registro` en área de botones desktop y menú móvil (visible solo cuando no hay sesión activa).
+
 - [x] **Registro de Socios — Formulario y Página /socio/registro** (09-Mar-2026, Claude Sonnet 4.6)
   - Creado `src/components/socio/SocioRegisterForm.tsx`: componente "use client" con validación Zod (nombre, email, contraseña, teléfono, nombreNegocio), llamada a `supabase.auth.signUp` con `role: 'Socio'` en `options.data`, manejo de ambos flujos (sesión directa vs confirmación de email), y toast destructivo en error.
   - Creado `src/app/socio/registro/page.tsx`: RSC shell que centra el formulario en pantalla completa, sin "use client", con metadata SEO.
