@@ -11,6 +11,9 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Notificaciones WhatsApp — API Route POST /api/whatsapp/corte** (09-Mar-2026, Claude Sonnet 4.6)
+  - Creado `src/app/api/whatsapp/corte/route.ts`: recibe `{ sessionId, branchId }`, obtiene credenciales `whatsapp_number` y `whatsapp_apikey` de tabla `branches` server-side (nunca expuestas al cliente), llama `buildCorteMessage()`, envía vía Callmebot GET fetch, inserta fila en `whatsapp_notification_log` con status `sent` o `failed`. Nunca retorna HTTP 500 — todos los errores retornan HTTP 200 con `{ ok: false }`.
+
 - [x] **Registro de Socios — AuthProvider public path + TiendaHeader Soy Socio link** (09-Mar-2026, Claude Sonnet 4.6)
   - `src/components/auth/AuthProvider.tsx`: añadido `pathname === "/socio/registro"` a `isPublicPath` — usuarios no autenticados ya no son redirigidos a /login al visitar /socio/registro.
   - `src/components/tienda/layout/TiendaHeader.tsx`: importado `useAuth`, desestructurado `userProfile`, y añadido enlace condicional "Soy Socio" → `/socio/registro` en área de botones desktop y menú móvil (visible solo cuando no hay sesión activa).
