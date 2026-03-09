@@ -7,7 +7,145 @@
 Implementar tienda online 22 Electronic con integración a Supabase existente.
 
 ## Estado General
-**Completado ✅**
+**En progreso 🔄** — Optimizaciones continuas en módulos Admin/POS/Tienda
+## Tienda Online (22 Electronic)
+### Completados
+
+- [x] **Registro de Socios — Formulario y Página /socio/registro** (09-Mar-2026, Claude Sonnet 4.6)
+  - Creado `src/components/socio/SocioRegisterForm.tsx`: componente "use client" con validación Zod (nombre, email, contraseña, teléfono, nombreNegocio), llamada a `supabase.auth.signUp` con `role: 'Socio'` en `options.data`, manejo de ambos flujos (sesión directa vs confirmación de email), y toast destructivo en error.
+  - Creado `src/app/socio/registro/page.tsx`: RSC shell que centra el formulario en pantalla completa, sin "use client", con metadata SEO.
+  - AuthProvider redirige automáticamente a `/socio/dashboard` tras registro exitoso — no se usa `router.push` en el formulario.
+
+- [x] **Solución de errores en ProductDetailClient y route-handler-api** (09-Mar-2026, Antigravity)
+  - Corregida sintaxis de operador ternario en `labels` useMemo de `ProductDetailClient.tsx` que causaba errores de tipo masivos.
+  - Resueltas colisiones de nombres exportados (`GET`, `POST`) en `route-handler-api.ts`.
+  - Limpieza de bloques de comentarios mal cerrados y errores de sintaxis en plantillas de API.
+
+### Completados
+
+- [x] **Guardado automatico de todos los dispositivos escaneados** (08-Mar-2026, Codex)
+  - El escaneo de `/api/diagnostics/scan` ahora persiste automaticamente cada lectura exitosa en la tabla `device_diagnostics`.
+  - Nuevo modulo `src/lib/diagnostics/persistence.ts` para convertir `DeviceResult` a fila historica y guardar `raw_data` completo.
+  - La persistencia se aplica tanto a escaneo individual por UDID como a `Escanear todos`.
+  - Validado con el dispositivo conectado (`00008150-000A4D2A2252401C`): fila nueva visible en Supabase con `serial_number: K90KPVC3JV`, `model_name: iPhone 17 Pro Max` y `product_id: null`.
+
+- [x] **Eliminación completa de go-ios del diagnóstico** (08-Mar-2026, Codex)
+  - Removida la integración opcional `go-ios` en backend y frontend para dejar el módulo únicamente con `libimobiledevice`.
+  - Eliminados archivos: `src/lib/diagnostics/goios.ts` y `src/app/api/diagnostics/goios/route.ts`.
+  - UI `/admin/diagnostico` limpiada: se retiró comparador, botón `Comparar go-ios` y visor de bloques raw.
+  - Validado en local: `/api/diagnostics/scan` responde `200` y `/api/diagnostics/goios` responde `404`.
+
+- [x] **Ajuste final de storage vs iPhone Storage real** (08-Mar-2026, Codex)
+  - Cálculo de almacenamiento actualizado para alinear el scanner con lo que muestra Ajustes > iPhone Storage.
+  - `used_gb` ahora prioriza `TotalDataCapacity`; `available_gb` se deriva como `TotalDiskCapacity - used` con fallback robusto cuando faltan claves.
+  - Estrategia replicada en `go-ios` para evitar discrepancia entre el scanner principal y el comparador lateral.
+  - Validado con dispositivo conectado (`00008150-000A4D2A2252401C`): `storage_gb: 256`, `used_gb: 237.3`, `available_gb: 18.7` (coherente con captura de Ajustes `237.92/256`).
+
+- [x] **Comparador lateral libimobiledevice vs go-ios** (08-Mar-2026, Codex)
+  - Nuevo endpoint `GET /api/diagnostics/goios?udid=...` para ejecutar `go-ios` (`ios`) y normalizar datos de modelo, iOS, RAM, batería y almacenamiento.
+  - UI de `/admin/diagnostico` actualizada con botón `Comparar go-ios` por dispositivo y panel lado a lado para contrastar resultados.
+  - Fallback robusto implementado cuando `go-ios` no está instalado: respuesta `go_ios_missing` y aviso claro en la tarjeta sin romper el escaneo principal.
+  - Parseo best-effort para salida de `go-ios` (JSON o texto) y exposición de datos comparables por UDID.
+
+- [x] **Instalación local de go-ios (`ios`) y verificación API** (08-Mar-2026, Codex)
+  - `go-ios` instalado vía `go install github.com/danielpaulus/go-ios@latest`.
+  - Binario de compatibilidad `ios` habilitado en PATH mediante symlink a `/opt/homebrew/bin/ios`.
+  - Verificado `ios --help` y detección USB con `idevice_id -l`.
+  - Verificado endpoint `GET /api/diagnostics/goios?udid=00008150-000A4D2A2252401C` respondiendo `available: true`.
+
+- [x] **Extracción extendida de go-ios (máximo posible por USB)** (08-Mar-2026, Codex)
+  - `src/lib/diagnostics/goios.ts` actualizado para ejecutar una batería extendida de comandos de solo lectura (28 probes) y consolidar datos.
+  - Parser reforzado para salida NDJSON de `go-ios` (warnings + payload), con fallback `--nojson`.
+  - `raw` ahora incluye por comando: estado, comando ejecutado, `stderr` y datos parseados/truncados para auditoría.
+  - UI de `/admin/diagnostico` mejorada con visor `Ver raw go-ios (N bloques)` dentro del comparador.
+
+- [x] **Corrección go-ios: salud/ciclos, piezas y color comercial** (08-Mar-2026, Codex)
+  - Comparador `go-ios` ahora completa batería con fallback USB nativo (`idevicediagnostics AppleSmartBattery`) cuando `go-ios` entrega valores en cero.
+  - Se exponen correctamente `battery_health_percent` y `battery_cycle_count` en `go-ios fields`.
+  - Estado de piezas agregado en panel `go-ios`:
+    - `replacement_detected` cuando hay alerta explícita.
+    - `no_alerts` con leyenda `100% original (USB)` cuando no se detectan alertas por USB.
+  - Color corregido por modelo: `iPhone18,2` código `1` se muestra como `Naranja`.
+  - Validado con dispositivo conectado (`00008150-000A4D2A2252401C`): salud `100`, ciclos `105`, color `Naranja`, piezas `no_alerts`.
+
+- [x] **Verificación de alcance real de go-ios en iOS 26** (08-Mar-2026, Codex)
+  - Comandos validados como funcionales por USB directo: `lockdown get` (general + dominios), `diagnostics list`, `batterycheck`, `batteryregistry`, `apps --all --list`, `profile list`, `devmode get`.
+  - Comandos bloqueados sin preparación adicional: `info display` y `file ls` (requieren `ios tunnel start` en iOS 17+), `ps --apps` (requiere Developer Image montada).
+  - `ios tunnel ls` confirmó que no hay túnel activo (conexión rechazada al agente local).
+  - Detectado bug de `go-ios` en `rsd ls` (panic/segfault en versión local `v1.0.204`).
+
+- [x] **UI de bloques go-ios (28) visibles por bloque** (08-Mar-2026, Codex)
+  - El comparador en `/admin/diagnostico` ahora muestra los 28 bloques de `go-ios` de forma individual (no solo JSON completo).
+  - Cada bloque muestra nombre, estado (`OK`/`ERROR`) y contenido en tarjeta con scroll.
+  - Verificación por API: `raw` contiene 28 claves (`apps_all_list` ... `zoom`).
+
+- [x] **UI no técnica de bloques go-ios (lectura para cualquier usuario)** (08-Mar-2026, Codex)
+  - Los 28 bloques de `go-ios` ahora se muestran con título en español + descripción simple de qué es cada bloque.
+  - Cada bloque incluye resumen legible (modelo, ciclos, nivel, cantidad de apps/perfiles, etc.) en lugar de JSON crudo.
+  - Se mantiene badge de estado `OK/ERROR` por bloque para identificar rápidamente qué comandos respondieron.
+
+- [x] **Reinstalación y verificación de ideviceinfo extendido** (08-Mar-2026, Codex)
+  - Homebrew actualizado y `libimobiledevice` reinstalado para asegurar binarios actuales.
+  - Verificado `ideviceinfo 1.4.0` con soporte `-x` (XML plist) y dominios Lockdown extendidos.
+  - Validado en dispositivo conectado (`00008150-000A4D2A2252401C`):
+    - `ideviceinfo -q com.apple.disk_usage -x` responde plist XML.
+    - `ideviceinfo -q com.apple.mobile.battery` responde datos de batería.
+
+- [x] **Migración a libimobiledevice nativo (sin Python)** (08-Mar-2026, Codex)
+  - Eliminada la dependencia del microservicio FastAPI en `localhost:8765` para el escaneo.
+  - Nuevo módulo server `src/lib/diagnostics/libimobiledevice.ts` para ejecutar `idevice*` directo desde Next.js.
+  - API actualizada: `/api/diagnostics/devices` y `/api/diagnostics/scan` ahora leen USB de forma nativa y reportan `missing_tools`.
+  - UI `/admin/diagnostico` actualizada para mostrar estado de scanner local y herramientas faltantes.
+  - Instalador/guía actualizados a flujo `libimobiledevice` (sin Python/FastAPI) en `SetupGuide` y `/api/diagnostics/download`.
+  - Scripts locales `iphone-diagnostic-service/install.sh` y `start.sh` migrados a verificación USB nativa sin entorno Python.
+  - Compatibilidad de inventario ajustada para batería (`full_charge_capacity` y `full_charge_mah`).
+  - Validación ejecutada: comandos `idevice*` disponibles, endpoints de diagnóstico respondiendo `200` en `localhost:9003`.
+
+- [x] **Corrección de batería/almacenamiento/color en iOS 26** (08-Mar-2026, Codex)
+  - Salud de batería corregida para no usar `BatteryCurrentCapacity` (carga actual) como vida útil.
+  - Lectura de ciclos/vida real desde plist XML de `AppleSmartBattery` usando extracción por clave (`plutil -extract`).
+  - Almacenamiento corregido usando dominio `com.apple.disk_usage` en base decimal (GB iOS) con cálculo real de usado (`TotalDiskCapacity - TotalDataAvailable`).
+  - Ajuste de color en UI para códigos numéricos ambiguos por modelo; override aplicado para `iPhone18,2` código `1` => `Naranja`.
+  - Validado con iPhone conectado: ciclos visibles, salud visible y almacenamiento total/usado/disponible visible en `/admin/diagnostico`.
+
+- [x] **Fix de almacenamiento + RAM visible en scanner** (08-Mar-2026, Codex)
+  - Reforzada la lectura de almacenamiento usando `ideviceinfo -x -q com.apple.disk_usage` y extracción por clave (`plutil`) para evitar estados “No disponible”.
+  - Ajustado mapping de modelo para `iPhone18,2` => `iPhone 17 Pro Max`.
+  - Agregado campo de RAM por modelo (`ProductType`) en el backend de diagnóstico; `iPhone18,2` mapeado a `12 GB`.
+  - UI actualizada para mostrar RAM en resumen y en sección Hardware.
+  - Corrección de temperatura de batería en UI (`raw/100`) para evitar valores inválidos.
+  - Se añadió estado `parts_status` con marca `no_alerts` cuando no hay evidencia de piezas reemplazadas por USB.
+  - Se agregó caché de última lectura de batería por UDID para estabilidad de salud/ciclos ante lecturas USB intermitentes.
+  - Nota de piezas actualizada: Apple no expone verificación completa de piezas OEM por USB en iOS 26.
+
+- [x] **Módulo Diagnóstico iPhone** (08-Mar-2026, Claude)
+  - Microservicio Python FastAPI (`iphone-diagnostic-service/`) con libimobiledevice
+  - Scanner de dispositivos USB con polling cada 4s
+  - Lectura de batería (salud, ciclos, mAh), modelo, serial, IMEI, iOS, storage, estado iCloud
+  - Auto-agregar dispositivo escaneado al inventario como "Celular Seminuevo"
+  - Guía de instalación interactiva con comandos copiables (`/admin/diagnostico` tab Configuración)
+  - Tabla `device_diagnostics` en Supabase (migración aplicada)
+  - API proxy Next.js: `/api/diagnostics/devices`, `/api/diagnostics/scan`, `/api/diagnostics/add-to-inventory`
+  - Enlace "Diagnóstico" agregado al LeftSidebar
+
+---
+
+## POS / Navegacion
+### Completados
+
+- [x] **Estabilización de mayoreo quitando imports cliente a `use server`** (08-Mar-2026, Codex)
+  - `src/app/(pos)/pos/mayoreo-config/WholesaleConfigClient.tsx` dejó de importar mutaciones directamente desde `src/lib/services/wholesaleProfitService.ts`.
+  - Nueva API route `src/app/api/wholesale-profit/route.ts` para `POST` y `DELETE` de configuraciones de mayoreo.
+  - El cliente ahora usa `fetch` y tipos cliente-safe, reduciendo una frontera frágil de Next 16 en la ruta `/pos/mayoreo-config`.
+  - Validado con compilación TypeScript de la route y del cliente de mayoreo.
+
+- [x] **Hotfix mayoreo: error runtime al entrar a `/pos/mayoreo-config`** (08-Mar-2026, Codex)
+  - Corregida la composicion del sidebar persistente para items con submenu.
+  - `src/components/shared/LeftSidebar.tsx` ahora usa `DropdownMenuTrigger asChild` cuando un item tiene `subItems`.
+  - Se eliminaron retornos inconsistentes para items de navegacion simples, dejando claves estables en reconciliacion.
+  - Validado en local: `/pos/mayoreo-config` responde `200` y `LeftSidebar.tsx` compila sin errores.
+
+---
 
 ---
 
@@ -1080,6 +1218,95 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
        - Fase 3 (Tablas): Módulos de Ventas e Inventario migrados a Responsive Cards en móvil, manteniendo `Table` en desktop.
        - Fase 4 (Modales): Diálogos críticos (Abrir/Cerrar Caja, Gastos, Resumen Venta) transformados a Bottom Sheets responsivos nativos para evitar rotura de UI por teclado.
 
+120. **Hotfix Socio - Restauración de `/socio/dashboard` y flujo de sucursal**
+     - Estado: Completado
+     - Fecha: 2026-03-07
+     - Agente: Codex
+     - Descripción: Se corrigió el 404 de la vista de socios y se reactivó el flujo operativo básico del módulo Socio.
+       - CAUSA RAÍZ: la ruta `src/app/socio/dashboard/page.tsx` no existía en el árbol actual.
+       - ACTUALIZADO: `src/components/auth/AuthProvider.tsx` para reconocer rol `Socio`, mapear `partner_id`/`branch_id` y redirigir post-login a `/socio/dashboard`.
+       - ACTUALIZADO: `src/types/index.ts` (`UserProfile`) para incluir rol `Socio` y campos de partner/sucursal.
+       - NUEVO: rutas `src/app/socio/page.tsx`, `src/app/socio/dashboard/page.tsx`, `src/app/socio/seleccionar-sucursal/page.tsx`.
+       - ACTUALIZADO: `src/contexts/BranchContext.tsx` para cargar sucursales desde Supabase (`branches`) y persistir selección activa por usuario.
+       - VALIDADO: `GET /socio/dashboard` y `GET /socio/seleccionar-sucursal` responden HTTP `200` en `localhost:9003`.
+
+121. **Hotfix Delivery - Restauración de `/admin/delivery/routes`**
+     - Estado: Completado
+     - Fecha: 2026-03-07
+     - Agente: Codex
+     - Descripción: Se corrigió el 404 del módulo de rutas y entregas en Admin, restaurando navegación y páginas base.
+       - CAUSA RAÍZ: no existía el árbol `src/app/admin/delivery`, por lo que la ruta devolvía 404.
+       - NUEVO: `src/app/admin/delivery/page.tsx` (redirect a `/admin/delivery/routes`).
+       - NUEVO: `src/app/admin/delivery/routes/page.tsx` con layout admin + sidebar móvil.
+       - NUEVO: `src/components/admin/delivery/DeliveryRoutesDashboard.tsx` (filtros, métricas, listado y creación básica de rutas).
+       - NUEVO: `src/app/admin/delivery/reports/page.tsx` y `src/app/admin/delivery/route/[id]/page.tsx` para evitar rutas colgantes del módulo.
+       - ACTUALIZADO: `src/lib/services/deliveryRouteService.ts` con funciones `getRoutes`, `getRouteById`, `createRoute`, `getRoutesTodayCount` y manejo defensivo de errores.
+       - VALIDADO: `GET /admin/delivery/routes`, `GET /admin/delivery/reports`, `GET /admin/delivery`, `GET /admin/delivery/route/test-id` responden HTTP `200` en `localhost:9003`.
+
+122. **Delivery E2E - Repartidor Único + Venta con Dirección + WhatsApp**
+     - Estado: Completado
+     - Fecha: 2026-03-07
+     - Agente: Codex
+     - Descripción: Se implementó el flujo completo solicitado para logística de entrega con repartidor único y envío por WhatsApp.
+       - NUEVO: `src/lib/deliveryDriverConfig.ts` para centralizar repartidor único (nombre/teléfono WhatsApp).
+       - ACTUALIZADO: `src/components/pos/CheckoutDialog.tsx` con captura de entrega en venta (dirección, fecha, hora, notas) y opción “Enviar por WhatsApp”.
+       - ACTUALIZADO: checkout POS con selector de repartidor (única opción activa) al momento de la venta.
+       - ACTUALIZADO: `src/lib/services/salesService.ts` para auto-asignar ventas de entrega a una ruta diaria del repartidor único, vincular `route_id/route_stop_id`, crear paradas/items (best-effort) y generar enlace WhatsApp con artículos y monto a cobrar.
+       - ACTUALIZADO: `src/lib/services/deliveryRouteService.ts` para operar rutas solo del repartidor único y construir/emitir enlace de WhatsApp por ruta con detalle de entregas.
+       - ACTUALIZADO: `src/components/admin/delivery/DeliveryRoutesDashboard.tsx` agregando acciones “Página del repartidor” y “Enviar por WhatsApp”.
+       - ACTUALIZADO: `src/app/admin/delivery/route/[id]/page.tsx` con detalle de entregas y envío por WhatsApp.
+       - NUEVO: `src/app/mobile/delivery/[routeId]/page.tsx` como página del repartidor con dirección, hora, artículos y cobro por entrega.
+       - ACTUALIZADO: `src/types/index.ts` ampliando `Sale`/`shippingInfo` para metadata de ruta y WhatsApp.
+       - VALIDADO: `GET /admin/delivery/routes`, `GET /admin/delivery/route/test-id` y `GET /mobile/delivery/test-id` responden HTTP `200` en `localhost:9003`.
+
+123. **Mayoreo Config por Categoría**
+     - Estado: Completado
+     - Fecha: 2026-03-08
+     - Agente: Codex
+     - Descripción: Se creó el módulo de configuración de porcentaje de ganancia de mayoreo por categoría dentro del POS, exclusivo para Admin.
+       - NUEVO: `supabase/migrations/wholesale_profit_settings.sql` con tabla `wholesale_profit_settings`, FK a `product_categories(value)`, constraint única por categoría y policy idempotente restringida a `Admin` vía JWT.
+       - APLICADO: SQL ejecutado en Supabase usando `DATABASE_URL` para dejar el esquema operativo.
+       - NUEVO: `src/lib/services/wholesaleProfitService.ts` con lectura, upsert, eliminación y consulta puntual por categoría usando `getSupabaseServerClient()`, manejo de errores y guard de Admin para operaciones del módulo.
+       - NUEVO: `src/app/(pos)/pos/mayoreo-config/page.tsx` y `src/app/(pos)/pos/mayoreo-config/WholesaleConfigClient.tsx` con guard server-side, carga inicial por `Promise.all`, búsqueda, badges, edición inline, confirmación de eliminación, toasts y skeletons.
+       - NUEVO: `src/lib/hooks/useWholesaleProfit.ts` para lectura cliente por categoría con actualización en tiempo real.
+       - ACTUALIZADO: `src/components/shared/LeftSidebar.tsx` agregando `Mayoreo Config` y corrigiendo `masterAdminItems` para que solo se muestre a `role === 'Admin'`.
+       - ACTUALIZADO: `src/types/index.ts` agregando `WholesaleProfitSetting`.
+       - VALIDADO: la respuesta RSC de `/pos/mayoreo-config` sin sesión devuelve `NEXT_REDIRECT;replace;/pos;307;`.
+       - VALIDADO: CRUD transitorio en PostgreSQL sobre una categoría real (`accesorios`) completó insert, update y delete correctamente.
+
+124. **Conexión de Mayoreo por Categoría en Tienda Online**
+     - Estado: Completado
+     - Fecha: 2026-03-08
+     - Agente: Codex
+     - Descripción: Se conectó la configuración de mayoreo por categoría a la lógica de precios de la tienda online (`/tienda`) sin impactar POS.
+       - ACTUALIZADO: `src/lib/tiendaPricing.ts` para aceptar margen configurable y mantener fallback al porcentaje por defecto.
+       - ACTUALIZADO: `src/lib/services/tiendaProductService.ts` para leer `wholesale_profit_settings` en server y calcular `socioPrice` por `category_id`.
+       - NUEVO EN PRODUCT MODEL: `socioProfitPercentage` para exponer en frontend el porcentaje aplicado por categoría.
+       - ACTUALIZADO: `src/components/tienda/TiendaProductCard.tsx` y `src/components/tienda/ProductInfo.tsx` para mostrar porcentaje por categoría en lugar de `+15%` fijo.
+       - ACTUALIZADO: `src/app/(tienda)/tienda/envios/page.tsx` para documentar que el porcentaje de mayoreo es configurable por categoría (con fallback por defecto).
+       - VALIDADO: `GET /tienda`, `GET /tienda/categorias` y `GET /tienda/envios` responden HTTP `200` en `localhost:9003`.
+
+125. **Tienda Online - Ocultar fórmula de mayoreo en UI**
+     - Estado: Completado
+     - Fecha: 2026-03-08
+     - Agente: Codex
+     - Descripción: Se eliminó del frontend de tienda la exposición del texto de cálculo `costo + porcentaje`, manteniendo intacta la lógica automática por categoría.
+       - ACTUALIZADO: `src/app/(tienda)/tienda/envios/page.tsx` reemplazando copy de fórmula por texto neutral (`Precio mayoreo` / `Calculado por categoria`).
+       - VALIDADO: no quedan referencias visibles de fórmula de mayoreo (`Costo +`, `% por categoria`, `Base socio`) en storefront.
+       - VALIDADO: `typescript.transpileModule` OK en `TiendaProductCard.tsx`, `ProductInfo.tsx` y `envios/page.tsx`.
+
+126. **Sistema de Gestión de iPhones Seminuevos Tienda y Admin**
+     - Estado: Completado
+     - Fecha: 2026-03-08
+     - Agente: Codex / Antigravity
+     - Descripción: Se implementó todo el flujo de modelos y unidades para la venta de iPhones Seminuevos.
+       - MIGRACIÓN: Nuevos campos en `products` (`condition_grade`, `diagnostic_id`, `cosmetic_notes`) y nuevas vistas de BD.
+       - BACKEND: `productService.ts` refactorizado para soportar productos tipo "Padre" (Modelos) e "Hijos" (Unidades vinculadas al inventario).
+       - API: `POST /api/seminuevo/create` enlazada al UI.
+       - ADMIN: Nuevo `AddToInventoryModal` dentro del diagnóstico USB para asignar Precio y Propiedad a unidades escaneadas.
+       - TIENDA: Vistas de catálogo por Modelo (`/tienda/seminuevos`) y vista de unidades en stock por Modelo (`/tienda/seminuevos/[modelId]`) con filtros avanzados.
+       - POS: Se ocultaron lógicamente los Modelos Base de la página principal del POS y Admin list usando un filtro en memoria local en las funciones core, garantizando ventas directas sólo para unidades con número de serie único.
+
 ---
 
 ## Pendientes / En Progreso
@@ -1198,3 +1425,22 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 - No usar Payload CMS en esta arquitectura
 - No modificar rutas `(pos)` ni `(web)`
 - El branding debe mantener consistencia con 22 Electronic
+
+  81. **Mejora de diseño y layout de Menú Lateral (LeftSidebar) en móvil**
+      - Estado: Completado
+      - Fecha: 2026-03-09
+      - Agente: Antigravity
+      - Descripción: Refactorización profunda de componentes compartidos para mejorar uso en dispositivos móviles:
+        - ACTUALIZADO: Corregido bug donde todos los layouts como `admin/page.tsx` y `pos/page.tsx` forzaban el Sidebar a un ancho `w-24` que lo hacía ilegible en teléfonos, cambiando a un estándar responsivo `w-[280px]`.
+        - ACTUALIZADO: Modificado `src/components/shared/LeftSidebar.tsx` reemplazando los `DropdownMenu` que volaban hacia la derecha por un estilo de acordeón `Collapsible` que empuja contenidos hacia abajo.
+        - INSTALADO: Nuevo componente base `Collapsible` de shadcn/ui.
+        - ACTUALIZADO: `tailwind.config.ts` ajustado con las keyframes para animaciones de acordeón correspondientes.
+
+  82. **Corrección de error 404 en Auditoría de Productos**
+      - Estado: Completado
+      - Fecha: 2026-03-09
+      - Agente: Antigravity
+      - Descripción: Se solucionó el error 404 reportado en la ruta `/admin/auditoria-productos`.
+        - CREADO: `src/app/admin/auditoria-productos/page.tsx` para servir la página.
+        - CREADO: `src/components/admin/AuditClient.tsx` componente principal de la interfaz de auditoría.
+        - INTEGRACIÓN: Se conectó con `InventoryValidationService` para permitir la detección y corrección de discrepancias de stock y logs.
