@@ -16,6 +16,8 @@ import CategoryManagerClient from '@/components/admin/settings/CategoryManagerCl
 import DiscountSettingsClient from "@/components/admin/settings/DiscountSettingsClient";
 import PrinterRoutingSettingsClient from "@/components/admin/settings/PrinterRoutingSettingsClient";
 import AppPreferencesSettingsClient from "@/components/admin/settings/AppPreferencesSettingsClient";
+import NotificacionesSettingsClient from "@/components/admin/settings/NotificacionesSettingsClient";
+import { getBranchesWithWhatsApp } from "@/lib/services/masterService";
 
 export default async function SettingsPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -30,6 +32,7 @@ export default async function SettingsPage(props: {
         initialDiscountSettings,
         initialPrintRoutingSettings,
         initialAppPreferences,
+        initialBranchesWithWa,
     ] = await Promise.all([
         getTicketSettings(),
         getLabelSettings("product"), // Load product settings by default
@@ -37,6 +40,7 @@ export default async function SettingsPage(props: {
         getDiscountSettings(),
         getPrintRoutingSettings(),
         getAppPreferences(),
+        getBranchesWithWhatsApp(),
     ]);
 
     return (
@@ -51,7 +55,7 @@ export default async function SettingsPage(props: {
                             <Menu className="h-6 w-6" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-24">
+                    <SheetContent side="left" className="p-0 w-[280px] border-r-0">
                         <SheetTitle className="sr-only">Ajustes Menu</SheetTitle>
                         <LeftSidebar />
                     </SheetContent>
@@ -59,13 +63,14 @@ export default async function SettingsPage(props: {
             </div>
             <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
                 <Tabs defaultValue={tab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-6">
+                    <TabsList className="grid w-full grid-cols-7">
                         <TabsTrigger value="general">General</TabsTrigger>
                         <TabsTrigger value="tickets">Diseño de Tickets</TabsTrigger>
                         <TabsTrigger value="labels">Diseño de Etiquetas</TabsTrigger>
                         <TabsTrigger value="printers">Impresoras</TabsTrigger>
                         <TabsTrigger value="categories">Categorías</TabsTrigger>
                         <TabsTrigger value="discounts">Descuentos</TabsTrigger>
+                        <TabsTrigger value="notificaciones">Notificaciones</TabsTrigger>
                     </TabsList>
                     <TabsContent value="general" className="mt-6">
                         <AppPreferencesSettingsClient initialPreferences={initialAppPreferences} />
@@ -84,6 +89,9 @@ export default async function SettingsPage(props: {
                     </TabsContent>
                     <TabsContent value="discounts" className="mt-6">
                         <DiscountSettingsClient initialSettings={initialDiscountSettings} />
+                    </TabsContent>
+                    <TabsContent value="notificaciones" className="mt-6">
+                        <NotificacionesSettingsClient initialBranches={initialBranchesWithWa} />
                     </TabsContent>
                 </Tabs>
             </main>
