@@ -34,6 +34,10 @@ const getPostLoginRedirect = (role?: string) => {
     return nextParam;
   }
 
+  if (role === 'Socio') {
+    return "/socio/dashboard";
+  }
+
   if (role === 'Cliente') {
     return "/tienda/cuenta/perfil";
   }
@@ -54,17 +58,29 @@ const buildUserProfile = (user: User | null): UserProfile | null => {
   if (!user) return null;
   const metadata = user.user_metadata ?? {};
   const name = (metadata.name as string) || (metadata.full_name as string) || user.email?.split("@")[0] || "Usuario";
-  const metaRole = (metadata.role as string) || "Admin"; // Keep default as Admin for legacy/dev users safety
+  const metadataRole = String(metadata.role || "").toLowerCase();
+  const appRole = String(user.app_metadata?.role || "").toLowerCase();
+  const resolvedRole = metadataRole || appRole || "admin";
   let role: UserProfile["role"] = "Admin";
 
-  if (metaRole === "Cajero") role = "Cajero";
-  if (metaRole === "Cliente") role = "Cliente";
+  if (resolvedRole === "cajero") role = "Cajero";
+  if (resolvedRole === "cliente") role = "Cliente";
+  if (resolvedRole === "socio") role = "Socio";
+
+  const partnerId =
+    (metadata.partner_id as string | undefined) ||
+    (user.app_metadata?.partner_id as string | undefined);
+  const branchId =
+    (metadata.branch_id as string | undefined) ||
+    (user.app_metadata?.branch_id as string | undefined);
 
   return {
     uid: user.id,
     name,
     email: user.email ?? "",
     role,
+    partnerId,
+    branchId,
   };
 };
 
@@ -83,7 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isPublicPath = pathname === "/login" ||
     pathname === "/reset-password" ||
     pathname === "/" ||
-    pathname.startsWith("/products/");
+    pathname.startsWith("/products/") ||
+    pathname === "/socio/registro";
 
   useEffect(() => {
     if (!supabase) {
@@ -105,7 +122,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setLoading(true);
+      // Only show loading spinner on the very first auth check.
+      // On subsequent runs (e.g. pathname changes), refresh silently so the
+      // existing page content is not unmounted/remounted on every navigation.
+      if (!authCheckDone.current) {
+        setLoading(true);
+      }
       setConnectionError(false);
 
       try {
