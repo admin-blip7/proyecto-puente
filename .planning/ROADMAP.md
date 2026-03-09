@@ -9,7 +9,7 @@
 
 Plans:
 - [x] 01-01-PLAN.md — Registration form component and page at /socio/registro
-- [ ] 01-02-PLAN.md — AuthProvider public path + TiendaHeader Socio link
+- [x] 01-02-PLAN.md — AuthProvider public path + TiendaHeader Socio link
 
 #### Requirements
 - REQ-001: Página pública de registro en /socio/registro
@@ -26,7 +26,7 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — DB migrations: whatsapp_number + whatsapp_apikey on branches, whatsapp_notification_log table
+- [x] 02-01-PLAN.md — DB migrations: whatsapp_number + whatsapp_apikey on branches, whatsapp_notification_log table
 - [ ] 02-02-PLAN.md — Service layer: buildCorteMessage() pure function + unit tests
 - [ ] 02-03-PLAN.md — API route POST /api/whatsapp/corte (Callmebot GET fetch, log result)
 - [ ] 02-04-PLAN.md — Settings UI: Notificaciones tab with per-branch WhatsApp config + server action
