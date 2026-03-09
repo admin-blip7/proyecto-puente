@@ -23,7 +23,7 @@ Plans:
 ### Phase 2: Notificaciones WhatsApp al Corte de Caja
 **Goal:** Al realizar el corte de caja, el sistema envía automáticamente un resumen de ventas vía WhatsApp al número configurado por el socio de cada sucursal.
 
-**Plans:** 5 plans
+**Plans:** 6 plans
 
 Plans:
 - [ ] 02-01-PLAN.md — DB migrations: whatsapp_number + whatsapp_apikey on branches, whatsapp_notification_log table
@@ -31,6 +31,7 @@ Plans:
 - [ ] 02-03-PLAN.md — API route POST /api/whatsapp/corte (Callmebot GET fetch, log result)
 - [ ] 02-04-PLAN.md — Settings UI: Notificaciones tab with per-branch WhatsApp config + server action
 - [ ] 02-05-PLAN.md — POSClient fire-and-forget trigger after printCashCloseTicket
+- [ ] 02-06-PLAN.md — Socio dashboard: Notificaciones recientes card (REQ-014)
 
 #### Requirements
 - REQ-008: Campo de número WhatsApp configurable en el perfil/settings de cada socio por sucursal

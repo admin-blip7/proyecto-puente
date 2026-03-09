@@ -1,8 +1,53 @@
 # Phase 2: Notificaciones WhatsApp al Corte de Caja - Research
 
 **Researched:** 2026-03-10
-**Domain:** WhatsApp Business API + Next.js API Routes + Supabase branches table
+**Domain:** WhatsApp Callmebot API + Next.js API Routes + Supabase branches table
 **Confidence:** HIGH
+
+---
+
+## ⚡ APPROACH OVERRIDE: Use Callmebot (Zero Meta verification, Zero SDK)
+
+**Decision:** Use **Callmebot Free API** instead of Twilio. No Meta Business account, no SDK installation, no approval process. Just a GET request.
+
+### How Callmebot works
+1. Socio adds the Callmebot number (+34 644 65 21 69) to their contacts
+2. Sends "I allow callmebot to send me messages" once on WhatsApp
+3. Callmebot replies with a personal `apikey`
+4. Developer stores: `branches.whatsapp_number` + `branches.whatsapp_apikey`
+5. To send: `GET https://api.callmebot.com/whatsapp.php?phone=+52XXXXXXXXXX&text=MESSAGE&apikey=APIKEY`
+
+### Why Callmebot beats Twilio for this use case
+| | Callmebot | Twilio |
+|---|---|---|
+| Meta verification | ❌ Not required | ⚠️ Required for production |
+| SDK install | None — just fetch | `npm install twilio` |
+| Developer account | None | Twilio account required |
+| Cost | Free | $0.005/message |
+| Setup time | 2 min per socio | 1–2 days (production approval) |
+| Reliability | Third-party free service | Enterprise-grade |
+
+### Callmebot activation UX (in settings)
+```
+1. En WhatsApp, agrega +34 644 65 21 69 como contacto "CallMeBot"
+2. Envía el mensaje: "I allow callmebot to send me messages"
+3. Recibirás tu API Key en respuesta
+4. Pega tu número y API Key en el formulario de abajo
+```
+
+### API call (no SDK needed)
+```typescript
+// Simple fetch — no npm packages
+const encoded = encodeURIComponent(messageText);
+const url = `https://api.callmebot.com/whatsapp.php?phone=${number}&text=${encoded}&apikey=${apikey}`;
+const res = await fetch(url);
+// Success: HTTP 200 with "Message queued"
+```
+
+### Schema change
+Instead of just `whatsapp_number`, branches table needs:
+- `whatsapp_number TEXT` — socio's phone in E.164 (+521XXXXXXXXXX)
+- `whatsapp_apikey TEXT` — Callmebot API key for this number
 
 ---
 
@@ -10,11 +55,11 @@
 
 This phase sends an automatic WhatsApp summary to the socio's configured number every time a cashier runs `handleCloseDrawer` in `POSClient.tsx`. The existing corte flow already gathers all the data needed (sales, expenses, incomes, session totals) inside `printCashCloseTicket` — the WhatsApp trigger must reuse the exact same data fetch pattern and run **fire-and-forget** after the PDF print, so a failure never blocks the cashier.
 
-The socio's WhatsApp number must be stored per-branch in the existing `branches` Supabase table (one new column: `whatsapp_number`). The settings UI follows the existing tab pattern in `src/app/admin/settings/page.tsx` — a new **"Notificaciones"** tab backed by a small client component. The API transport layer uses **Twilio's Node.js SDK** via a Next.js API route (`POST /api/whatsapp/corte`), called with `fetch` (no `await` — fire-and-forget) from the client after the session close succeeds.
+The socio's WhatsApp number and Callmebot API key must be stored per-branch in the existing `branches` Supabase table (two new columns: `whatsapp_number`, `whatsapp_apikey`). The settings UI follows the existing tab pattern in `src/app/admin/settings/page.tsx` — a new **"Notificaciones"** tab backed by a small client component. The API transport layer uses **Callmebot's free GET API** (no SDK — plain `fetch`) via a Next.js API route (`POST /api/whatsapp/corte`), called with `fetch` (no `await` — fire-and-forget) from the client after the session close succeeds.
 
-For free-tier development, Twilio's sandbox is the correct choice: no Meta business account approval is needed, join code takes 30 seconds, and the Node.js SDK is `npm install twilio` (4 MB). Production graduation requires registering the business phone number with Meta through the Twilio console — no code change needed. Meta Cloud API direct is equally viable but requires a Facebook Business Account setup upfront, making it slower to start.
+For activation, the socio adds the Callmebot contact (+34 644 65 21 69) on WhatsApp, sends the opt-in message once, and receives a personal `apikey` — no Meta Business approval, no SDK installation, no developer account required.
 
-**Primary recommendation:** Use Twilio WhatsApp SDK for both dev (sandbox) and production. Store `whatsapp_number` on the `branches` table. Trigger from a Next.js API route called fire-and-forget from `handleCloseDrawer` after `printCashCloseTicket` resolves.
+**Primary recommendation:** Use Callmebot free API for both dev and production. Store `whatsapp_number` and `whatsapp_apikey` on the `branches` table. Trigger from a Next.js API route called fire-and-forget from `handleCloseDrawer` after `printCashCloseTicket` resolves.
 
 ---
 
