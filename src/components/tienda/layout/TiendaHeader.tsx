@@ -9,6 +9,7 @@ import { useCart } from '../cart/CartProvider'
 import { CartDrawer } from '../cart/CartDrawer'
 import { TiendaLogo } from './TiendaLogo'
 import type { ProductCategory } from '@/lib/services/tiendaProductService'
+import { useAuth } from '@/lib/hooks'
 
 interface CategoryWithSubs extends ProductCategory {
   subcategories?: ProductCategory[]
@@ -98,6 +99,7 @@ export function TiendaHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { itemCount } = useCart()
+  const { userProfile } = useAuth()
 
   useEffect(() => {
     if (searchParams?.get('cart') === 'open') {
@@ -138,15 +140,14 @@ export function TiendaHeader() {
 
   return (
     <>
-      <motion.header 
+      <motion.header
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${
-          isScrolled 
-            ? 'bg-background/80 backdrop-blur-xl border-border/50 shadow-lg shadow-black/5' 
+        className={`sticky top-0 z-50 w-full border-b transition-all duration-300 ${isScrolled
+            ? 'bg-background/80 backdrop-blur-xl border-border/50 shadow-lg shadow-black/5'
             : 'bg-background/50 backdrop-blur-sm border-border/30'
-        }`}
+          }`}
       >
         <div className="container mx-auto px-4 lg:px-8">
           <div className="flex h-20 items-center justify-between gap-6">
@@ -162,24 +163,30 @@ export function TiendaHeader() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1" ref={dropdownRef}>
-              <Link 
-                href="/tienda" 
+              <Link
+                href="/tienda"
                 className="px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-secondary"
               >
                 Inicio
               </Link>
-              
+
+              <Link
+                href="/tienda/seminuevos"
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-primary hover:text-primary/80 transition-colors rounded-full hover:bg-primary/10"
+              >
+                Seminuevos
+              </Link>
+
               {categories.map((cat) => (
                 <div key={cat.value} className="relative">
                   {cat.subcategories && cat.subcategories.length > 0 ? (
                     <>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === cat.value ? null : cat.value)}
-                        className={`flex items-center gap-1 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition-all rounded-full ${
-                          openDropdown === cat.value 
-                            ? 'text-foreground bg-secondary' 
+                        className={`flex items-center gap-1 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition-all rounded-full ${openDropdown === cat.value
+                            ? 'text-foreground bg-secondary'
                             : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                        }`}
+                          }`}
                       >
                         {cat.label}
                         <motion.div
@@ -189,7 +196,7 @@ export function TiendaHeader() {
                           <ChevronDown className="h-3 w-3" />
                         </motion.div>
                       </button>
-                      
+
                       <AnimatePresence>
                         {openDropdown === cat.value && (
                           <motion.div
@@ -254,8 +261,8 @@ export function TiendaHeader() {
               {/* Icon Buttons */}
               <div className="hidden sm:flex items-center gap-1">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Link 
-                    href="/tienda/favoritos" 
+                  <Link
+                    href="/tienda/favoritos"
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-background hover:border-accent/50 hover:bg-secondary/50 transition-all"
                   >
                     <Heart className="h-4 w-4" />
@@ -263,17 +270,28 @@ export function TiendaHeader() {
                 </motion.div>
 
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Link 
-                    href="/tienda/cuenta/perfil" 
+                  <Link
+                    href="/tienda/cuenta/perfil"
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-background hover:border-accent/50 hover:bg-secondary/50 transition-all"
                   >
                     <User className="h-4 w-4" />
                   </Link>
                 </motion.div>
 
+                {!userProfile && (
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link
+                      href="/socio/registro"
+                      className="flex h-11 items-center gap-2 rounded-full border border-border/50 bg-background px-3 hover:border-accent/50 hover:bg-secondary/50 transition-all text-xs font-bold uppercase tracking-wider"
+                    >
+                      Soy Socio
+                    </Link>
+                  </motion.div>
+                )}
+
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Link 
-                    href="/pos" 
+                  <Link
+                    href="/pos"
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-background hover:border-accent/50 hover:bg-secondary/50 transition-all group/pos"
                     title="Ir al POS"
                   >
@@ -293,7 +311,7 @@ export function TiendaHeader() {
                 <span className="hidden sm:inline">Carrito</span>
                 <AnimatePresence mode="wait">
                   {itemCount > 0 && (
-                    <motion.span 
+                    <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
@@ -372,7 +390,15 @@ export function TiendaHeader() {
                 >
                   Inicio
                 </Link>
-                
+
+                <Link
+                  href="/tienda/seminuevos"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-xl py-3 px-4 text-sm font-bold uppercase tracking-wider text-primary hover:bg-primary/10 transition-all"
+                >
+                  Seminuevos
+                </Link>
+
                 {categories.map((cat) => (
                   <Link
                     key={cat.value}
@@ -383,8 +409,17 @@ export function TiendaHeader() {
                     {cat.label}
                   </Link>
                 ))}
-                
+
                 <div className="pt-3 border-t border-border/30 mt-3">
+                  {!userProfile && (
+                    <Link
+                      href="/socio/registro"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-xl py-3 px-4 text-sm font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
+                    >
+                      Soy Socio
+                    </Link>
+                  )}
                   <Link
                     href="/pos"
                     onClick={() => setIsMenuOpen(false)}
