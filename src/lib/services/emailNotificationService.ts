@@ -3,8 +3,6 @@ import { CashSession, Sale } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 interface BuildCorteEmailOptions {
   session: CashSession;
   sales?: Sale[];
@@ -129,6 +127,12 @@ export async function sendCorteEmail({
   subject: string;
   html: string;
 }): Promise<{ ok: boolean; error?: string }> {
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+  if (!resendApiKey) {
+    return { ok: false, error: 'missing_resend_api_key' };
+  }
+
+  const resend = new Resend(resendApiKey);
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? 'Corte de Caja <noreply@resend.dev>',
     to,

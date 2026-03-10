@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-03-10 - Evitar fallos de build por secretos faltantes (Resend/SDKs)
+- No instanciar clientes de terceros que requieren API key (ej. `new Resend(...)`) en scope de módulo dentro de rutas o servicios importados en build.
+- Mover la inicialización al flujo de ejecución (`handler`/función) y devolver error controlado cuando falte la variable de entorno.
+- En APIs opcionales (notificaciones), la ausencia de credenciales debe degradar a `ok: false` sin romper `next build`.
+
 ## 2026-03-10 - Fechas de negocio por sucursal (no por dispositivo)
 - Si el usuario reporta desfases de día por ubicación (ej. Asia vs México), no usar la zona local del navegador para historiales operativos.
 - En módulos multi-sucursal, la fecha de negocio debe derivarse de la zona horaria de la sucursal activa (`branches.timezone`) con fallback explícito.

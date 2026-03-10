@@ -1,3 +1,29 @@
+# TODO - Fix deploy Netlify por RESEND_API_KEY faltante
+
+## Plan
+- [x] Reproducir/confirmar el error reportado de build en Netlify (`Missing API key` en `/api/email/corte`).
+- [x] Corregir el servicio de correo para que no falle en importación cuando no exista `RESEND_API_KEY`.
+- [x] Validar build local completo de Next para confirmar que `/api/email/corte` ya no rompe `collecting page data`.
+- [x] Documentar resultado y condición operativa para envío real de correos.
+
+## Review
+- Hallazgo principal:
+  - `src/lib/services/emailNotificationService.ts` creaba `new Resend(process.env.RESEND_API_KEY)` en scope de módulo.
+  - Cuando Netlify construía la app sin `RESEND_API_KEY`, la importación del módulo lanzaba excepción y abortaba el build en `/api/email/corte`.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/lib/services/emailNotificationService.ts`.
+  - Se eliminó la inicialización global de Resend.
+  - `sendCorteEmail` ahora valida `process.env.RESEND_API_KEY` en runtime:
+    - Si falta, retorna `{ ok: false, error: 'missing_resend_api_key' }` sin tirar excepción.
+    - Si existe, instancia `Resend` y envía normalmente.
+- Verificación técnica:
+  - `npm run build` completado exitosamente en local (Next 16.1.1).
+  - La ruta `/api/email/corte` aparece compilada en la salida final sin error de `Missing API key`.
+- Nota operativa:
+  - Para que el envío de correos funcione en producción, configurar en Netlify:
+    - `RESEND_API_KEY`
+    - opcional `RESEND_FROM_EMAIL`
+
 # TODO - Cerrar rama de trabajo y consolidar avances en main
 
 ## Plan

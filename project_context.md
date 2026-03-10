@@ -148,6 +148,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## POS / Navegacion
 ### Completados
 
+- [x] **Fix Netlify build en `/api/email/corte` cuando falta `RESEND_API_KEY`** (10-Mar-2026, Codex)
+  - CAUSA RAÍZ: `src/lib/services/emailNotificationService.ts` inicializaba `new Resend(process.env.RESEND_API_KEY)` en scope global; en Netlify sin esa variable explotaba durante build al evaluar la ruta API.
+  - ACTUALIZADO: se removió la inicialización global y ahora `sendCorteEmail` valida/crea el cliente en runtime.
+  - COMPORTAMIENTO NUEVO: si falta `RESEND_API_KEY`, la función responde `{ ok: false, error: 'missing_resend_api_key' }` sin tumbar compilación.
+  - VALIDADO: `npm run build` local completado y `/api/email/corte` compilada correctamente.
+
 - [x] **Consolidación de rama feature en `main` (cierre local de rama)** (10-Mar-2026, Codex)
   - Se consolidaron cambios pendientes en commit de seguridad antes de fusionar para evitar pérdida de trabajo.
   - `main` quedó actualizado localmente al commit `8a3ded7` vía fast-forward.
