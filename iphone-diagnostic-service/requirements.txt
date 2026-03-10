@@ -1,0 +1,2 @@
+# Deprecated: el flujo de diagnóstico ahora usa libimobiledevice nativo desde Next.js.
+# Este archivo se mantiene solo por compatibilidad histórica.

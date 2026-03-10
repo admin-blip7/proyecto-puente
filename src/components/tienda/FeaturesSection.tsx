@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Truck, ShieldCheck, Headphones, RotateCcw, CreditCard, Package, Sparkles } from 'lucide-react'
+import { TIENDA_SUPPORT_WHATSAPP_URL } from '@/lib/tiendaContact'
 
 const features = [
   {
@@ -170,10 +171,12 @@ export function FeaturesSection() {
             ¿Tienes alguna pregunta sobre nuestros servicios?
           </p>
           <a 
-            href="/tienda/cuenta/soporte" 
+            href={TIENDA_SUPPORT_WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-8 py-4 bg-accent text-black rounded-full font-bold text-sm uppercase tracking-wider hover:brightness-105 transition-all shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30"
           >
-            Contactar soporte
+            Contactar soporte por WhatsApp
           </a>
         </motion.div>
       </div>

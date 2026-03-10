@@ -2,6 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Product } from '@/lib/services/tiendaProductService'
+import { TIENDA_SUPPORT_WHATSAPP_URL } from '@/lib/tiendaContact'
 
 interface ProductSpecsProps {
   product: Product
@@ -108,7 +109,12 @@ export function ProductSpecs({ product }: ProductSpecsProps) {
           </div>
 
           <div className="flex gap-3">
-            <a href="/tienda/contacto" className="text-sm font-medium text-accent hover:underline">
+            <a
+              href={TIENDA_SUPPORT_WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-accent hover:underline"
+            >
               Contactar soporte
             </a>
             <a href="/tienda/terminos#garantia" className="text-sm font-medium text-accent hover:underline">

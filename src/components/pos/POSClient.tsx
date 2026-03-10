@@ -595,13 +595,21 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
       if (m) return m;
     }
 
-    // Optional: custom attributes
+    // Optional: custom attributes (barcode, imei, serial)
     try {
       match = products.find((p) => {
-        const barcode = (p as any).attributes?.barcode || (p as any).attributes?.code;
-        if (typeof barcode === 'string') {
-          return sanitize(barcode) === sanitized;
-        }
+        const attr = (p as any).attributes;
+        if (!attr) return false;
+
+        const barcode = attr.barcode || attr.code;
+        if (typeof barcode === 'string' && sanitize(barcode) === sanitized) return true;
+
+        const imei = attr.imei;
+        if (typeof imei === 'string' && sanitize(imei) === sanitized) return true;
+
+        const serial = attr.serial;
+        if (typeof serial === 'string' && sanitize(serial) === sanitized) return true;
+
         return false;
       }) || undefined;
     } catch {

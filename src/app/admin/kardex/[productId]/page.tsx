@@ -64,7 +64,7 @@ export default async function KardexDetailPage(props: {
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-24">
+          <SheetContent side="left" className="p-0 w-[280px] border-r-0">
             <SheetTitle className="sr-only">Kardex Menu</SheetTitle>
             <LeftSidebar />
           </SheetContent>

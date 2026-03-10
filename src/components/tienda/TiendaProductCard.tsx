@@ -220,9 +220,6 @@ export function TiendaProductCard({ product, categoryLabel }: TiendaProductCardP
               <span className="text-lg font-semibold tracking-tight text-accent block">
                 Socio (x{TIENDA_SOCIO_PACKAGE_QTY}): ${socioPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-[10px] text-muted-foreground block mt-1">
-                Base socio = costo + 15%
-              </span>
             </div>
 
             {/* Mobile Add Button */}

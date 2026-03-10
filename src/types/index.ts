@@ -29,6 +29,75 @@ export interface Product {
   attributes?: Record<string, any>; // Atributos específicos por categoría
   parentId?: string; // ID del producto padre si es una variante
   imageUrls?: string[];
+  conditionGrade?: ConditionGrade;
+  diagnosticId?: string;
+  cosmeticNotes?: string;
+  branchId?: string;
+  partnerId?: string;
+}
+
+// ---- iPhones Seminuevos ----
+
+/** Grados de condición con metadata visual */
+export const CONDITION_GRADES = {
+  A: {
+    label: 'Excelente',
+    description: 'Batería 85%+, sin rayones visibles',
+    color: 'green',
+    bgClass: 'bg-green-100 text-green-800',
+    dotClass: 'bg-green-500',
+  },
+  B: {
+    label: 'Bueno',
+    description: 'Batería 70-84%, desgaste leve',
+    color: 'yellow',
+    bgClass: 'bg-yellow-100 text-yellow-800',
+    dotClass: 'bg-yellow-500',
+  },
+  C: {
+    label: 'Aceptable',
+    description: 'Batería <70%, desgaste visible',
+    color: 'orange',
+    bgClass: 'bg-orange-100 text-orange-800',
+    dotClass: 'bg-orange-500',
+  },
+} as const;
+
+export type ConditionGrade = keyof typeof CONDITION_GRADES;
+
+/** Producto PADRE: agrupa unidades del mismo modelo */
+export interface SeminuevoModel {
+  modelId: string;
+  modelName: string;          // "iPhone 14 Pro"
+  imageUrls: string[];
+  unitsAvailable: number;     // cuántas unidades en stock
+  priceFrom: number;
+  priceTo: number;
+  gradesAvailable: ConditionGrade[];   // ['A', 'B']
+  storagesAvailable: string[];         // ['128GB', '256GB']
+  colorsAvailable: string[];           // ['Negro', 'Plata', 'Dorado']
+}
+
+/** Producto HIJO: unidad física individual */
+export interface SeminuevoUnit {
+  id: string;
+  name: string;               // "iPhone 14 Pro 256GB Negro Espacial"
+  price: number;
+  stock: number;              // siempre 1 si disponible
+  parentId: string;
+  conditionGrade: ConditionGrade;
+  cosmeticNotes?: string;
+  imageUrls?: string[];
+  diagnosticId?: string;
+  // Datos del diagnóstico (JOIN)
+  modelName: string;
+  storageGb: number;
+  color: string;
+  batteryHealthPercent: number;
+  batteryCtycleCount: number;
+  serialNumber?: string;
+  imei?: string;
+  iosVersion?: string;
 }
 
 
@@ -100,7 +169,7 @@ export interface Sale {
   saleId: string;
   items: SaleItem[];
   totalAmount: number;
-  paymentMethod: 'Efectivo' | 'Tarjeta de Crédito' | 'Crédito';
+  paymentMethod: 'Efectivo' | 'Tarjeta de Crédito' | 'Crédito' | 'QR/Transferencia' | 'Transferencia/QR';
   cashierId: string;
   cashierName?: string;
   customerName: string | null;
@@ -127,9 +196,22 @@ export interface Sale {
     zipCode?: string;
     country?: string;
     notes?: string;
+    deliveryAddress?: string;
+    deliveryDate?: string;
+    deliveryTime?: string;
+    deliveryDriverName?: string;
+    deliveryDriverPhone?: string;
+    sendToDriverWhatsapp?: boolean;
+    routeCode?: string;
+    routeId?: string;
+    routeStopId?: string;
+    whatsappUrl?: string;
   };
   deliveryStatus?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
+  routeId?: string;
+  routeStopId?: string;
+  deliveryWhatsappUrl?: string;
 }
 
 export interface SalesChange {
@@ -210,7 +292,18 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Cajero' | 'Cliente';
+  role: 'Admin' | 'Cajero' | 'Cliente' | 'Socio';
+  partnerId?: string;
+  branchId?: string;
+}
+
+export interface WholesaleProfitSetting {
+  id: string;
+  category_id: string;
+  category_label: string;
+  profit_percentage: number;
+  updated_at: string;
+  updated_by?: string;
 }
 
 export interface CartItem extends Product {

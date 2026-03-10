@@ -1,10 +1,7 @@
--- Migration: add WhatsApp Callmebot fields to branches table
--- REQ-008: Campo de número WhatsApp configurable por sucursal
--- REQ-009: API key for Callmebot (stored per-branch, server-side only)
+-- Migration: add notification_email to branches table
+-- REQ-008: Email de notificaciones configurable por sucursal
 
 ALTER TABLE public.branches
-  ADD COLUMN IF NOT EXISTS whatsapp_number TEXT,
-  ADD COLUMN IF NOT EXISTS whatsapp_apikey TEXT;
+  ADD COLUMN IF NOT EXISTS notification_email TEXT;
 
-COMMENT ON COLUMN public.branches.whatsapp_number IS 'E.164 phone number for Callmebot WhatsApp notifications, e.g. +5215512345678';
-COMMENT ON COLUMN public.branches.whatsapp_apikey IS 'Callmebot personal API key for this branch WhatsApp number';
+COMMENT ON COLUMN public.branches.notification_email IS 'Email address to receive automatic corte de caja notifications. NULL = notifications disabled for this branch.';

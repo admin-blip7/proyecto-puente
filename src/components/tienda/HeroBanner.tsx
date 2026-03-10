@@ -141,7 +141,7 @@ export function HeroBanner({ heroTitle, heroSubtitle }: HeroBannerProps) {
                 className="h-14 px-8 rounded-full text-sm font-bold uppercase tracking-wider border-2 hover:bg-primary hover:text-background transition-all" 
                 asChild
               >
-                <Link href="/tienda/ofertas">Ver Ofertas</Link>
+                <Link href="/tienda/seminuevos">Ver Seminuevos</Link>
               </Button>
             </motion.div>
 

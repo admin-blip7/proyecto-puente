@@ -69,7 +69,7 @@ For activation, the socio adds the Callmebot contact (+34 644 65 21 69) on Whats
 | ID | Description | Research Support |
 |----|-------------|-----------------|
 | REQ-008 | Campo de número WhatsApp configurable en el perfil/settings de cada socio por sucursal | Add `whatsapp_number TEXT` column to `branches` table; settings UI in new "Notificaciones" tab |
-| REQ-009 | Integración con API de WhatsApp para envío de mensajes | Twilio Node.js SDK (`twilio` package); `POST /api/whatsapp/corte` API route |
+| REQ-009 | Integración con API de WhatsApp para envío de mensajes | Callmebot GET fetch (no SDK); `POST /api/whatsapp/corte` API route |
 | REQ-010 | Al cerrar sesión de caja, disparar envío automático al número del socio | Fire-and-forget `fetch` call in `handleCloseDrawer` after `printCashCloseTicket` resolves |
 | REQ-011 | Mensaje incluye fecha/hora, cajero, ventas efectivo, ventas tarjeta, total, detalle productos | Build from `CashSession` + `Sale[]` data; template in `whatsappNotificationService.ts` |
 | REQ-012 | UI en configuraciones para guardar número WhatsApp con formato internacional | New `NotificacionesSettingsClient.tsx` using shadcn `Input` + E.164 validation via Zod |
@@ -81,30 +81,28 @@ For activation, the socio adds the Callmebot contact (+34 644 65 21 69) on Whats
 
 ## Standard Stack
 
-### Core
+~~**REMOVED (using Callmebot — no SDK required)**~~
+~~The original Standard Stack listed `twilio ^5.x` as the WhatsApp dispatch library. That decision was overridden by the APPROACH OVERRIDE above. Do NOT install the `twilio` package.~~
+
+### Core (Callmebot approach)
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| `twilio` | ^5.x | WhatsApp message dispatch via Twilio Messaging API | Free sandbox, no Meta business approval needed for dev; Node.js SDK maintained by Twilio |
 | `zod` | ^3.24 (already installed) | Phone number format validation in settings UI | Already used project-wide for form validation |
 
 ### Supporting
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| `@supabase/supabase-js` | ^2.45 (already installed) | Read `whatsapp_number` from `branches` table; write notification log | Already used project-wide |
+| `@supabase/supabase-js` | ^2.45 (already installed) | Read `whatsapp_number` + `whatsapp_apikey` from `branches` table; write notification log | Already used project-wide |
 | `react-hook-form` | ^7.54 (already installed) | Settings form for phone number input | Already used in registration form |
 
 ### Alternatives Considered
 | Instead of | Could Use | Tradeoff |
 |------------|-----------|----------|
-| Twilio | Meta Cloud API direct | Meta requires Facebook Business Manager setup + app review before first test message; Twilio sandbox works in 2 minutes |
-| Twilio | WAHA (self-hosted) | WAHA runs a WhatsApp Web session in Docker — no server to run, this is a Vercel/hosted Next.js app; not viable |
-| Twilio | `wa.me` deep link | A link requires the cashier to tap manually; does not satisfy REQ-010 (automatic send) |
+| Callmebot | Meta Cloud API direct | Meta requires Facebook Business Manager setup + app review before first test message |
+| Callmebot | Twilio | Requires SDK install, Meta approval for production, paid account |
+| Callmebot | WAHA (self-hosted) | WAHA runs a WhatsApp Web session in Docker — no server to run, this is a Vercel/hosted Next.js app; not viable |
+| Callmebot | `wa.me` deep link | A link requires the cashier to tap manually; does not satisfy REQ-010 (automatic send) |
 | API route | Server action | Server actions have a 30-second timeout on Vercel hobby plan; fine for fire-and-forget but API routes are more explicit and easier to test |
-
-**Installation:**
-```bash
-npm install twilio
-```
 
 ---
 
@@ -115,11 +113,11 @@ npm install twilio
 src/
 ├── app/api/whatsapp/
 │   └── corte/
-│       └── route.ts           # POST handler — calls Twilio, writes log
+│       └── route.ts           # POST handler — calls Callmebot GET, writes log
 ├── lib/services/
-│   └── whatsappNotificationService.ts  # message template builder + Twilio send
+│   └── whatsappNotificationService.ts  # message template builder
 ├── components/admin/settings/
-│   └── NotificacionesSettingsClient.tsx  # new tab — phone number form
+│   └── NotificacionesSettingsClient.tsx  # new tab — phone number + apikey form
 supabase/migrations/
 └── 20260310000000_add_whatsapp_to_branches.sql
 └── 20260310000001_create_whatsapp_notification_log.sql
@@ -155,30 +153,28 @@ try {
 }
 ```
 
-### Pattern 2: API Route — Fetch branch number, build message, send
-**What:** The route handler looks up `branches.whatsapp_number` for the given `branchId`, fetches sales/expenses/session data, builds the text message, and calls Twilio.
-**When to use:** Keeps Twilio credentials server-side; client never touches the API keys.
+### Pattern 2: API Route — Fetch branch number + apikey, build message, send via Callmebot
+**What:** The route handler looks up `branches.whatsapp_number` and `branches.whatsapp_apikey` for the given `branchId`, fetches sales/session data, builds the text message, and calls Callmebot via plain `fetch`.
+**When to use:** Keeps Callmebot apikey server-side; client never touches it.
 **Example:**
 ```typescript
 // src/app/api/whatsapp/corte/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import twilio from 'twilio';
 import { getSupabaseServerClient } from '@/lib/supabaseServerClient';
 
 export async function POST(req: NextRequest) {
   try {
     const { sessionId, branchId } = await req.json();
-
     const supabase = getSupabaseServerClient();
 
-    // 1. Get branch WhatsApp number
+    // 1. Get branch WhatsApp number + apikey
     const { data: branch } = await supabase
       .from('branches')
-      .select('whatsapp_number, name')
+      .select('whatsapp_number, whatsapp_apikey, name')
       .eq('id', branchId)
       .maybeSingle();
 
-    if (!branch?.whatsapp_number) {
+    if (!branch?.whatsapp_number || !branch?.whatsapp_apikey) {
       return NextResponse.json({ ok: false, error: 'no_number' }, { status: 200 });
     }
 
@@ -189,19 +185,16 @@ export async function POST(req: NextRequest) {
       .eq('id', sessionId)
       .single();
 
-    // 3. Build message text (see whatsappNotificationService.ts)
+    // 3. Build message text
     const { buildCorteMessage } = await import('@/lib/services/whatsappNotificationService');
     const messageBody = buildCorteMessage({ session, branchName: branch.name });
 
-    // 4. Send via Twilio
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    await client.messages.create({
-      from: `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`,
-      to: `whatsapp:${branch.whatsapp_number}`,
-      body: messageBody,
-    });
+    // 4. Send via Callmebot (plain fetch — no SDK)
+    const encoded = encodeURIComponent(messageBody);
+    const callmebotUrl = `https://api.callmebot.com/whatsapp.php?phone=${branch.whatsapp_number}&text=${encoded}&apikey=${branch.whatsapp_apikey}`;
+    await fetch(callmebotUrl);
 
-    // 5. Log notification (optional, REQ-014)
+    // 5. Log notification (REQ-014)
     await supabase.from('whatsapp_notification_log').insert({
       branch_id: branchId,
       session_id: sessionId,
@@ -285,14 +278,14 @@ export function buildCorteMessage({ session, sales = [], branchName }: BuildCort
 // NotificacionesSettingsClient.tsx renders a form per branch:
 // - Branch name (read-only label)
 // - WhatsApp number Input with placeholder "+521XXXXXXXXXX"
+// - Callmebot API key Input
 // - Save button calls server action to PATCH branches table
 ```
 
 ### Anti-Patterns to Avoid
-- **Awaiting the fetch call in handleCloseDrawer:** Makes the cashier wait for Twilio's network round-trip (~500ms–2s). REQ-013 explicitly says it must not block.
-- **Storing Twilio credentials client-side:** The API keys MUST stay in `.env.local` / Vercel env vars and never touch the browser bundle. Use an API route — never call Twilio from the client.
-- **Using a WhatsApp template (Content SID) for the corte message:** Template messages are required only for business-initiated messages OUTSIDE the 24-hour customer service window. Since this is a utility notification (not marketing), a freeform message inside a session window works. For the production sandbox → production path, register a Utility template to guarantee delivery even when no session window is open.
-- **Creating a separate `partner_whatsapp_settings` table:** The `branches` table already exists and is the natural owner of per-branch configuration. Adding a column is simpler than a join.
+- **Awaiting the fetch call in handleCloseDrawer:** Makes the cashier wait for the Callmebot network round-trip (~500ms–2s). REQ-013 explicitly says it must not block.
+- **Storing Callmebot apikey client-side:** The API key MUST stay server-side and never touch the browser bundle. Use an API route — never call Callmebot from the client directly with the apikey.
+- **Creating a separate `partner_whatsapp_settings` table:** The `branches` table already exists and is the natural owner of per-branch configuration. Adding columns is simpler than a join.
 
 ---
 
@@ -300,44 +293,32 @@ export function buildCorteMessage({ session, sales = [], branchName }: BuildCort
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| WhatsApp delivery | Custom HTTP client to WhatsApp Cloud API | `twilio` npm package | Handles retries, error codes, auth, phone format validation |
 | Phone format validation | Custom regex | Zod `z.string().regex(/^\+[1-9]\d{7,14}$/)` | Covers all E.164 edge cases |
-| Message scheduling/retry | Custom queue | Fire-and-forget is sufficient (REQ-013); Twilio handles delivery retry internally | Corte is a point-in-time event; no retry logic needed at app level |
+| Message scheduling/retry | Custom queue | Fire-and-forget is sufficient (REQ-013); Callmebot handles delivery retry internally | Corte is a point-in-time event; no retry logic needed at app level |
 
 ---
 
 ## Common Pitfalls
 
-### Pitfall 1: Sandbox join requirement
-**What goes wrong:** Twilio sandbox messages only reach phones that have opted in by texting `join <code>` to the sandbox number. In production, clients/socios will NOT have done this.
-**Why it happens:** Sandbox is a shared test environment requiring explicit consent.
-**How to avoid:** Use sandbox ONLY for development. For production, register a dedicated WhatsApp Business number via Twilio console. The socio's number must message the sandbox code during testing.
-**Warning signs:** Twilio returns `error 63016` (recipient not in sandbox).
-
-### Pitfall 2: Missing `whatsapp:` prefix on phone numbers
-**What goes wrong:** Twilio returns `error 21612` — "The 'To' number is not a valid phone number."
-**Why it happens:** Twilio requires the `whatsapp:` scheme prefix for WhatsApp messages.
-**How to avoid:** Always prepend `whatsapp:` to both `from` and `to` in the Twilio `messages.create` call. The number stored in the DB should be clean E.164 (`+521XXXXXXXXXX`); add the prefix in code, not in the DB.
-
-### Pitfall 3: Blocking the corte flow
+### Pitfall 1: Blocking the corte flow
 **What goes wrong:** `await fetch('/api/whatsapp/corte', ...)` inside `handleCloseDrawer` delays the UI and can cause a timeout error to surface to the cashier.
-**Why it happens:** Network calls to third-party APIs (Twilio) can take 500ms–3s.
+**Why it happens:** Network calls to third-party APIs (Callmebot) can take 500ms–3s.
 **How to avoid:** Use the fire-and-forget pattern (Pattern 1 above). Handle the Promise rejection with `.catch()` to show a non-blocking toast.
 
-### Pitfall 4: `branches` table not having `whatsapp_number` column
-**What goes wrong:** API route query returns `null` for `whatsapp_number`; message is silently skipped.
+### Pitfall 2: `branches` table not having `whatsapp_number` / `whatsapp_apikey` columns
+**What goes wrong:** API route query returns `null`; message is silently skipped.
 **Why it happens:** The migration was not applied.
-**How to avoid:** Wave 0 task must apply the migration. API route should log clearly when no number is configured.
+**How to avoid:** Wave 0 task must apply the migration. API route should log clearly when no number/apikey is configured.
 
-### Pitfall 5: Twilio env vars missing in production
-**What goes wrong:** `TWILIO_ACCOUNT_SID` is undefined at runtime; Twilio client throws an error; notification silently fails.
-**Why it happens:** Env vars not added to Vercel project settings.
-**How to avoid:** Add env var validation at startup using Zod or a guard in the API route. Log a clear server-side error.
-
-### Pitfall 6: `branchId` not available in POSClient
+### Pitfall 3: `branchId` not available in POSClient
 **What goes wrong:** The fire-and-forget fetch sends `branchId: null`; API route cannot look up the WhatsApp number.
 **Why it happens:** `userProfile` type has `branchId?: string` (optional). Not all users have a branch assigned.
 **How to avoid:** Read `branchId` from `userProfile.branchId` OR from the `BranchContext` (which already tracks `selectedBranch.id` for Socios). Prefer `BranchContext.selectedBranch.id` since POSClient already has the `useAuth` hook — add `useBranch()` call or pass branchId as prop.
+
+### Pitfall 4: Callmebot apikey exposed in client bundle
+**What goes wrong:** If the apikey is fetched by the client component and used directly, it appears in the browser network tab.
+**Why it happens:** Developer tries to call Callmebot from client-side code.
+**How to avoid:** Always call Callmebot from the API route (`/api/whatsapp/corte`), never from client components.
 
 ---
 
@@ -345,23 +326,14 @@ export function buildCorteMessage({ session, sales = [], branchName }: BuildCort
 
 Verified patterns from official sources and codebase inspection:
 
-### Twilio message send (server-side)
+### Callmebot message send (server-side, no SDK)
 ```typescript
-// Source: https://www.twilio.com/docs/whatsapp/api
-import twilio from 'twilio';
-
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
-
-const message = await client.messages.create({
-  from: `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`,  // e.g. whatsapp:+14155238886 (sandbox)
-  to: `whatsapp:+521XXXXXXXXXX`,
-  body: 'Your corte message here',
-});
-
-console.log(message.sid);
+// Source: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+const messageText = buildCorteMessage({ session, branchName });
+const encoded = encodeURIComponent(messageText);
+const url = `https://api.callmebot.com/whatsapp.php?phone=${whatsapp_number}&text=${encoded}&apikey=${whatsapp_apikey}`;
+const res = await fetch(url);
+// HTTP 200 response body contains "Message queued. Thank you"
 ```
 
 ### Zod phone validation for settings UI
@@ -380,21 +352,22 @@ const WhatsAppSettingsSchema = z.object({
 'use server';
 import { getSupabaseServerClient } from '@/lib/supabaseServerClient';
 
-export async function saveBranchWhatsAppNumber(branchId: string, number: string) {
+export async function saveBranchWhatsAppSettings(branchId: string, number: string, apikey: string) {
   const supabase = getSupabaseServerClient();
   const { error } = await supabase
     .from('branches')
-    .update({ whatsapp_number: number || null })
+    .update({ whatsapp_number: number || null, whatsapp_apikey: apikey || null })
     .eq('id', branchId);
   if (error) throw new Error(error.message);
 }
 ```
 
-### Migration: add column to branches
+### Migration: add columns to branches
 ```sql
 -- supabase/migrations/20260310000000_add_whatsapp_to_branches.sql
 ALTER TABLE public.branches
-  ADD COLUMN IF NOT EXISTS whatsapp_number TEXT;
+  ADD COLUMN IF NOT EXISTS whatsapp_number TEXT,
+  ADD COLUMN IF NOT EXISTS whatsapp_apikey TEXT;
 ```
 
 ### Migration: notification log table (REQ-014)
@@ -418,12 +391,12 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_log_branch_id
 
 ## Where to Store the WhatsApp Number
 
-**Decision: `branches.whatsapp_number` column (TEXT, nullable)**
+**Decision: `branches.whatsapp_number` + `branches.whatsapp_apikey` columns (TEXT, nullable)**
 
 Rationale:
 - REQ-008 says "por sucursal" — the number is per-branch, not per-user.
 - The `branches` table already exists and is read by `BranchContext`, `masterService`, and the API route.
-- Adding a nullable TEXT column is the minimum migration surface. No new table or join needed.
+- Adding nullable TEXT columns is the minimum migration surface. No new table or join needed.
 - The `settingsService` pattern (key-value in the `settings` table) is only used for app-wide configuration. Branch-specific config belongs on the `branches` row.
 
 Alternative rejected: storing in `settings` table with `id = "branch_whatsapp_{branchId}"` — works but creates non-obvious key proliferation and makes the settings page harder to reason about.
@@ -441,8 +414,7 @@ await printCashCloseTicket(closedSession);
 ```
 
 Why not a Supabase database trigger (pg function):
-- Would require a background job or Edge Function to call Twilio; adds infrastructure complexity.
-- Can't access Twilio credentials from Postgres.
+- Would require a background job or Edge Function to call Callmebot; adds infrastructure complexity.
 - Harder to debug.
 
 Why not a Server Action:
@@ -462,9 +434,9 @@ Add a 7th tab: **Notificaciones**. This requires:
 1. Changing `grid-cols-6` to `grid-cols-7` in the `TabsList` className.
 2. Adding `<TabsTrigger value="notificaciones">Notificaciones</TabsTrigger>`.
 3. Adding `<TabsContent value="notificaciones"><NotificacionesSettingsClient ... /></TabsContent>`.
-4. The server component (`settings/page.tsx`) fetches branches via `getAllBranches()` from `masterService.ts` and passes them as `initialBranches` prop.
+4. The server component (`settings/page.tsx`) fetches branches with whatsapp fields directly using the existing Supabase client already initialized in the page (do NOT create a second `getSupabaseServerClient()` call — extend the existing one or use `masterService`).
 
-The `NotificacionesSettingsClient.tsx` renders one card per branch with a phone input and save button. The save calls a server action that patches `branches.whatsapp_number`.
+The `NotificacionesSettingsClient.tsx` renders one card per branch with a phone input, apikey input, and save button. The save calls a server action that patches `branches.whatsapp_number` and `branches.whatsapp_apikey`.
 
 ---
 
@@ -472,9 +444,9 @@ The `NotificacionesSettingsClient.tsx` renders one card per branch with a phone 
 
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
-| Conversation-based WhatsApp pricing | Per-message pricing (Meta) | July 2025 | Utility messages now very cheap (~$0.001); eliminates the "24-hour window" concern for most cases |
-| Meta requires BSP (Business Solution Provider) approval | Meta Cloud API is self-serve via Meta for Developers | 2022 | Direct integration possible; Twilio still preferred for Node.js SDK quality |
-| WhatsApp sandbox needs opt-in per recipient | Still required for sandbox | Current | Important pitfall for testing with socio numbers |
+| Conversation-based WhatsApp pricing | Per-message pricing (Meta) | July 2025 | Utility messages now very cheap (~$0.001) |
+| Meta requires BSP approval | Meta Cloud API is self-serve | 2022 | Direct integration possible; Callmebot still preferred for zero-setup |
+| WhatsApp sandbox needs opt-in per recipient | Callmebot requires one-time activation per number | Current | Simple activation flow; no sandbox concept |
 
 ---
 
@@ -485,13 +457,9 @@ The `NotificacionesSettingsClient.tsx` renders one card per branch with a phone 
    - What's unclear: Whether a cashier (role=Cajero, not Socio) will have `branchId` in their profile vs. the branch context.
    - Recommendation: Pass `branchId` from `BranchContext.selectedBranch?.id` inside `POSClient` — it already imports `useAuth`, just also add `useBranch()`.
 
-2. **Does the Twilio free trial balance suffice for initial testing?**
-   - What we know: Twilio gives ~$15 in trial credit. WhatsApp sandbox messages cost ~$0.005 each. That's ~3,000 test messages.
-   - Recommendation: No issue for development. Document that production requires a paid Twilio account.
-
-3. **Should the message include sales product detail (long list) or just totals?**
+2. **Should the message include sales product detail (long list) or just totals?**
    - REQ-011 says "detalle de productos vendidos" is required.
-   - Recommendation: Include the product list but cap at 20 lines to avoid WhatsApp message length limits (~65,000 chars, not a real concern) and readability. The `buildCorteMessage` template handles this.
+   - Recommendation: Include the product list but cap at 20 lines to avoid readability issues. The `buildCorteMessage` template handles this.
 
 ---
 
@@ -511,44 +479,30 @@ The `NotificacionesSettingsClient.tsx` renders one card per branch with a phone 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
 | REQ-008 | `whatsapp_number` column persists via server action | manual smoke | `curl PATCH branches` | Wave 0 |
-| REQ-009 | Twilio send returns message SID without error | manual smoke (sandbox) | send to joined sandbox number | Wave 0 |
+| REQ-009 | Callmebot GET returns 200 without error | manual smoke | send to activated number | Wave 0 |
 | REQ-010 | Fire-and-forget fetch is called after session close | unit (mock fetch) | Wave 0 | Wave 0 |
 | REQ-011 | `buildCorteMessage` formats all required fields | unit | Wave 0 | Wave 0 |
 | REQ-012 | Phone number Zod validation rejects invalid formats | unit | Wave 0 | Wave 0 |
-| REQ-013 | API route returns `{ ok: false }` on Twilio error, does not throw 500 | unit | Wave 0 | Wave 0 |
+| REQ-013 | API route returns `{ ok: false }` on Callmebot error, does not throw 500 | unit | Wave 0 | Wave 0 |
 | REQ-014 | Log row inserted in `whatsapp_notification_log` after send | manual smoke | query Supabase | Wave 0 |
 
 ### Wave 0 Gaps
 - [ ] Install a test framework if unit tests are desired: `npm install -D vitest @vitest/ui` — covers `buildCorteMessage` unit tests
 - [ ] `src/lib/services/__tests__/whatsappNotificationService.test.ts` — covers REQ-011, REQ-012
-- [ ] Manual smoke test checklist: (1) join sandbox, (2) configure number, (3) run corte, (4) confirm receipt
+- [ ] Manual smoke test checklist: (1) activate Callmebot, (2) configure number + apikey in settings, (3) run corte, (4) confirm receipt
 
-*(Note: The project has no existing test infrastructure. The minimum viable validation for this phase is the manual smoke test against the Twilio sandbox. Unit tests for the pure `buildCorteMessage` function are low-cost to add and high-value.)*
-
----
-
-## Environment Variables Required
-
-Add to `.env.local` and Vercel project settings:
-```bash
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_WHATSAPP_FROM=+14155238886   # Sandbox number; replace with registered number in production
-```
+*(Note: The project has no existing test infrastructure. The minimum viable validation for this phase is the manual smoke test against Callmebot. Unit tests for the pure `buildCorteMessage` function are low-cost to add and high-value.)*
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Twilio WhatsApp API overview](https://www.twilio.com/docs/whatsapp/api) — message structure, `whatsapp:` prefix requirement, Node.js SDK
-- [Twilio WhatsApp Quickstart](https://www.twilio.com/docs/whatsapp/sandbox) — sandbox join flow, credential setup
+- [Callmebot WhatsApp API docs](https://www.callmebot.com/blog/free-api-whatsapp-messages/) — activation flow, GET request format, apikey issuance
 - [Meta WhatsApp Pricing (official)](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) — per-message pricing as of July 2025
 
 ### Secondary (MEDIUM confidence)
-- [Twilio + Next.js WhatsApp Integration Guide 2025](https://www.sent.dm/resources/twilio-node-js-next-js-whatsapp-integration) — API route patterns verified against official docs
 - [WhatsApp Business API Pricing 2026](https://www.flowcall.co/blog/whatsapp-business-api-pricing-2026) — utility template pricing ~$0.001
-- [Chatarmin: Twilio WhatsApp API Pricing 2026](https://chatarmin.com/en/blog/twilio-whats-app-api) — sandbox vs production distinction
 
 ### Tertiary (LOW — codebase inspection only)
 - `src/contexts/BranchContext.tsx` — confirmed `branches` table structure: `id, name, is_main, is_active, partner_id`
@@ -561,12 +515,11 @@ TWILIO_WHATSAPP_FROM=+14155238886   # Sandbox number; replace with registered nu
 ## Metadata
 
 **Confidence breakdown:**
-- Standard stack (Twilio SDK): HIGH — official docs verified, Node.js SDK widely used
+- Standard stack (Callmebot fetch): HIGH — official docs verified, plain fetch with no SDK
 - Architecture (fire-and-forget API route): HIGH — matches existing `/api/*` patterns in project
-- Database (branches column): HIGH — `branches` table confirmed via `BranchContext.tsx` and `masterService.ts`
+- Database (branches columns): HIGH — `branches` table confirmed via `BranchContext.tsx` and `masterService.ts`
 - Message template: HIGH — pure function, no external dependencies
 - Settings UI: HIGH — follows identical pattern to existing settings tabs
-- Pitfalls: HIGH — sandbox join requirement is official Twilio documented behavior
 
 **Research date:** 2026-03-10
-**Valid until:** 2026-06-10 (90 days — Twilio API is stable; Meta pricing model may change but won't affect code)
+**Valid until:** 2026-06-10 (90 days — Callmebot API is stable; activation flow unlikely to change)

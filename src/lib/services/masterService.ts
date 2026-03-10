@@ -3,6 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { getLogger } from "@/lib/logger";
 import { Product } from "@/types";
+import { sanitizeBranchTimeZone } from "@/lib/branchTimeZone";
 
 const log = getLogger("masterService");
 
@@ -134,29 +135,40 @@ export const getAllBranches = async (): Promise<BranchInfo[]> => {
     }
 };
 
-export interface BranchWhatsApp {
+export interface BranchNotificacion {
     id: string;
     name: string;
-    whatsapp_number: string | null;
-    whatsapp_apikey: string | null;
+    notification_email: string | null;
+    timezone: string;
 }
 
-export const getBranchesWithWhatsApp = async (): Promise<BranchWhatsApp[]> => {
+export const getBranchesWithNotificaciones = async (): Promise<BranchNotificacion[]> => {
     try {
         const supabase = getSupabaseServerClient();
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from("branches")
-            .select("id, name, whatsapp_number, whatsapp_apikey")
+            .select("id, name, notification_email, timezone")
             .order("name");
+
+        if (error && /timezone/i.test(error.message || "")) {
+            const fallback = await supabase
+                .from("branches")
+                .select("id, name, notification_email")
+                .order("name");
+
+            data = fallback.data;
+            error = fallback.error;
+        }
+
         if (error) throw error;
         return (data ?? []).map((row: any) => ({
             id: row.id,
             name: row.name,
-            whatsapp_number: row.whatsapp_number ?? null,
-            whatsapp_apikey: row.whatsapp_apikey ?? null,
+            notification_email: row.notification_email ?? null,
+            timezone: sanitizeBranchTimeZone(row.timezone),
         }));
     } catch (error) {
-        log.error("Error fetching branches with WhatsApp", error);
+        log.error("Error fetching branches with notificaciones", error);
         return [];
     }
 };

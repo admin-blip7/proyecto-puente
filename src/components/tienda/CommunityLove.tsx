@@ -1,5 +1,6 @@
 import { Instagram, User, Heart, MessageCircle, Send } from 'lucide-react'
 import Image from 'next/image'
+import { TIENDA_INSTAGRAM_URL } from '@/lib/tiendaContact'
 
 export function CommunityLove() {
     return (
@@ -17,12 +18,17 @@ export function CommunityLove() {
                             See how our community uses 22 Electronic products in their daily lives. Tag @22electronic to be featured.
                         </p>
                     </div>
-                    <button className="px-6 py-3 border border-border rounded-full hover:border-accent transition-colors flex items-center gap-2 group">
+                    <a
+                        href={TIENDA_INSTAGRAM_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 border border-border rounded-full hover:border-accent transition-colors flex items-center gap-2 group"
+                    >
                         <Instagram className="h-4 w-4 group-hover:text-accent transition-colors" />
                         <span className="text-xs font-bold uppercase tracking-widest">
                             Follow us
                         </span>
-                    </button>
+                    </a>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

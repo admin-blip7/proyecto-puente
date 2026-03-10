@@ -1,4 +1,16 @@
 {
+  "../node_modules/@libpdf/core/dist/index.mjs -> @google-cloud/kms": {
+    "id": "../node_modules/@libpdf/core/dist/index.mjs -> @google-cloud/kms",
+    "files": [
+      "static/chunks/_2d57.js"
+    ]
+  },
+  "../node_modules/@libpdf/core/dist/index.mjs -> @google-cloud/secret-manager": {
+    "id": "../node_modules/@libpdf/core/dist/index.mjs -> @google-cloud/secret-manager",
+    "files": [
+      "static/chunks/_58bf.js"
+    ]
+  },
   "components/admin/finance/cash-history/CashHistoryClient.tsx -> @/lib/services/cashClosePdfService": {
     "id": "components/admin/finance/cash-history/CashHistoryClient.tsx -> @/lib/services/cashClosePdfService",
     "files": [
@@ -41,14 +53,18 @@
   },
   "components/tienda/layout/TiendaHeader.tsx -> @/lib/supabaseClient": {
     "id": "components/tienda/layout/TiendaHeader.tsx -> @/lib/supabaseClient",
-    "files": [
-      "static/chunks/_app-pages-browser_src_lib_supabaseClient_ts.js"
-    ]
+    "files": []
   },
   "lib/printing/qzTrayClient.ts -> qz-tray": {
     "id": "lib/printing/qzTrayClient.ts -> qz-tray",
     "files": [
       "static/chunks/_app-pages-browser_node_modules_qz-tray_qz-tray_js.js"
+    ]
+  },
+  "lib/services/tiendaProductService.ts -> @/lib/supabaseServerClient": {
+    "id": "lib/services/tiendaProductService.ts -> @/lib/supabaseServerClient",
+    "files": [
+      "static/chunks/_app-pages-browser_src_lib_supabaseServerClient_ts.js"
     ]
   }
 }

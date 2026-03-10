@@ -11,6 +11,14 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Home tienda 100% funcional: redes reales + soporte por WhatsApp** (10-Mar-2026, Codex)
+  - NUEVO: `src/lib/tiendaContact.ts` para centralizar enlaces oficiales de portada (`instagram`, `tiktok`) y WhatsApp de soporte (`2224219292`) con helper `buildWhatsappUrl`.
+  - ACTUALIZADO: `src/components/tienda/layout/TiendaFooter.tsx` reemplazando placeholders `#` por enlaces funcionales (Instagram/TikTok/WhatsApp), agregando WhatsApp en bloque de ayuda y corrigiendo rutas rotas del footer (`/tienda/ofertas`, `/tienda/nuevos`, `/tienda/faq`, `/tienda/contacto`).
+  - ACTUALIZADO: `src/components/tienda/FeaturesSection.tsx` para que el botón `Contactar soporte` abra WhatsApp con mensaje prellenado al número `2224219292`.
+  - ACTUALIZADO: `src/components/tienda/CommunityLove.tsx` para que `Follow us` abra Instagram real.
+  - ACTUALIZADO: `src/components/tienda/HeroBanner.tsx` para reemplazar `/tienda/ofertas` (inexistente) por `/tienda/seminuevos`.
+  - ACTUALIZADO: `src/components/tienda/ProductSpecs.tsx` y `src/app/(tienda)/tienda/pagos/page.tsx` para unificar contacto de soporte por WhatsApp y evitar rutas no implementadas.
+
 - [x] **Notificaciones WhatsApp — API Route POST /api/whatsapp/corte** (09-Mar-2026, Claude Sonnet 4.6)
   - Creado `src/app/api/whatsapp/corte/route.ts`: recibe `{ sessionId, branchId }`, obtiene credenciales `whatsapp_number` y `whatsapp_apikey` de tabla `branches` server-side (nunca expuestas al cliente), llama `buildCorteMessage()`, envía vía Callmebot GET fetch, inserta fila en `whatsapp_notification_log` con status `sent` o `failed`. Nunca retorna HTTP 500 — todos los errores retornan HTTP 200 con `{ ok: false }`.
 
@@ -139,6 +147,13 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 
 ## POS / Navegacion
 ### Completados
+
+- [x] **Historial de corte por sucursal con zona horaria configurable** (10-Mar-2026, Codex)
+  - NUEVO: `src/lib/branchTimeZone.ts` con utilidades para validar zona IANA y agrupar fechas por zona (`yyyy-MM-dd`).
+  - ACTUALIZADO: `src/components/admin/finance/cash-history/CashHistoryClient.tsx` para que el historial de cortes use la zona de la sucursal seleccionada en filtros, agrupado diario y fecha/hora mostrada.
+  - ACTUALIZADO: `src/contexts/BranchContext.tsx` para cargar y exponer `timezone` por sucursal.
+  - ACTUALIZADO: Ajustes de sucursal (`NotificacionesSettingsClient` + `saveNotificacionesSettings`) para guardar correo y zona horaria por sucursal.
+  - NUEVO: migración `supabase/migrations/20260310000002_add_timezone_to_branches.sql` (columna `branches.timezone` con default `America/Mexico_City`).
 
 - [x] **Estabilización de mayoreo quitando imports cliente a `use server`** (08-Mar-2026, Codex)
   - `src/app/(pos)/pos/mayoreo-config/WholesaleConfigClient.tsx` dejó de importar mutaciones directamente desde `src/lib/services/wholesaleProfitService.ts`.

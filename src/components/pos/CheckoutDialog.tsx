@@ -15,6 +15,10 @@ import { CustomerSection } from "./checkout/CustomerSection";
 import { ProductList } from "./checkout/ProductList";
 import { PaymentMethodSection } from "./checkout/PaymentMethodSection";
 import { CheckoutFooter } from "./checkout/CheckoutFooter";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Checkbox } from "../ui/checkbox";
+import { SINGLE_DELIVERY_DRIVER } from "@/lib/deliveryDriverConfig";
 
 const log = getLogger("CheckoutDialog");
 
@@ -50,6 +54,13 @@ export default function CheckoutDialog({
     const [loading, setLoading] = useState(false);
     const [lastSale, setLastSale] = useState<Sale | null>(null);
     const [isSummaryOpen, setSummaryOpen] = useState(false);
+    const [isDelivery, setIsDelivery] = useState(false);
+    const [selectedDeliveryDriver, setSelectedDeliveryDriver] = useState(SINGLE_DELIVERY_DRIVER.name);
+    const [deliveryAddress, setDeliveryAddress] = useState("");
+    const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split("T")[0]);
+    const [deliveryTime, setDeliveryTime] = useState("");
+    const [deliveryNotes, setDeliveryNotes] = useState("");
+    const [sendDeliveryWhatsapp, setSendDeliveryWhatsapp] = useState(true);
 
     const [crmClients, setCrmClients] = useState<CRMClient[]>([]);
     const [loadingCRMClients, setLoadingCRMClients] = useState(false);
@@ -203,6 +214,15 @@ export default function CheckoutDialog({
             return;
         }
 
+        if (isDelivery && !deliveryAddress.trim()) {
+            toast({
+                variant: "destructive",
+                title: "Dirección requerida",
+                description: "Para envío a domicilio debes capturar la dirección de entrega.",
+            });
+            return;
+        }
+
         setLoading(true);
 
         const saleItems: SaleItem[] = cartItems.map(item => ({
@@ -229,6 +249,17 @@ export default function CheckoutDialog({
             discountCode: appliedDiscount?.code || null,
             discountAmount: discountAmount || null,
             discountPercentage: appliedDiscount?.percentage || null,
+            shippingInfo: isDelivery ? {
+                address: deliveryAddress,
+                deliveryAddress: deliveryAddress,
+                deliveryDate: deliveryDate || new Date().toISOString().split("T")[0],
+                deliveryTime: deliveryTime || "",
+                deliveryDriverName: selectedDeliveryDriver,
+                deliveryDriverPhone: SINGLE_DELIVERY_DRIVER.phone,
+                sendToDriverWhatsapp: sendDeliveryWhatsapp,
+                notes: deliveryNotes || "",
+            } : null,
+            deliveryStatus: isDelivery ? "pending" : "processing",
         }
 
         try {
@@ -250,6 +281,10 @@ export default function CheckoutDialog({
 
             setLastSale(result.sale);
             toast({ title: "Venta Exitosa", description: "Venta completada exitosamente" });
+            const whatsappUrl = (result?.sale?.deliveryWhatsappUrl || result?.deliveryWhatsappUrl || "") as string;
+            if (isDelivery && sendDeliveryWhatsapp && whatsappUrl) {
+                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+            }
             onSuccessfulSale();
             onOpenChange(false);
             setSummaryOpen(true);
@@ -262,6 +297,13 @@ export default function CheckoutDialog({
             setSelectedCRMClient("");
             setCrmClientSearch("");
             setShowCRMClientDropdown(false);
+            setIsDelivery(false);
+            setSelectedDeliveryDriver(SINGLE_DELIVERY_DRIVER.name);
+            setDeliveryAddress("");
+            setDeliveryDate(new Date().toISOString().split("T")[0]);
+            setDeliveryTime("");
+            setDeliveryNotes("");
+            setSendDeliveryWhatsapp(true);
 
         } catch (error) {
             log.error("Sale processing error:", error);
@@ -333,6 +375,86 @@ export default function CheckoutDialog({
                                     setAmountPaid={setAmountPaid}
                                     change={change}
                                 />
+
+                                <section className="space-y-4">
+                                    <div className="flex items-center justify-between rounded-2xl border border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                                        <div>
+                                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Entrega a domicilio</p>
+                                            <p className="text-xs text-zinc-500">Asigna esta venta a ruta del repartidor único</p>
+                                        </div>
+                                        <Checkbox checked={isDelivery} onCheckedChange={(checked) => setIsDelivery(checked === true)} />
+                                    </div>
+
+                                    {isDelivery && (
+                                        <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                                            <div className="space-y-1">
+                                                <Label htmlFor="deliveryDriver">Repartidor</Label>
+                                                <select
+                                                    id="deliveryDriver"
+                                                    className="w-full h-10 rounded-md border border-blue-200 bg-white px-3 text-sm"
+                                                    value={selectedDeliveryDriver}
+                                                    onChange={(e) => setSelectedDeliveryDriver(e.target.value)}
+                                                >
+                                                    <option value={SINGLE_DELIVERY_DRIVER.name}>
+                                                        {SINGLE_DELIVERY_DRIVER.name}
+                                                    </option>
+                                                </select>
+                                                <p className="text-xs text-blue-700">WhatsApp: {SINGLE_DELIVERY_DRIVER.phone}</p>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <Label htmlFor="deliveryAddress">Dirección de entrega</Label>
+                                                <Input
+                                                    id="deliveryAddress"
+                                                    value={deliveryAddress}
+                                                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                                                    placeholder="Calle, número, colonia, referencias"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="deliveryDate">Fecha</Label>
+                                                    <Input
+                                                        id="deliveryDate"
+                                                        type="date"
+                                                        value={deliveryDate}
+                                                        onChange={(e) => setDeliveryDate(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="deliveryTime">Hora estimada</Label>
+                                                    <Input
+                                                        id="deliveryTime"
+                                                        type="time"
+                                                        value={deliveryTime}
+                                                        onChange={(e) => setDeliveryTime(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <Label htmlFor="deliveryNotes">Notas de entrega</Label>
+                                                <Input
+                                                    id="deliveryNotes"
+                                                    value={deliveryNotes}
+                                                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                                                    placeholder="Ejemplo: casa color azul, cobrar en efectivo"
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    checked={sendDeliveryWhatsapp}
+                                                    onCheckedChange={(checked) => setSendDeliveryWhatsapp(checked === true)}
+                                                />
+                                                <span className="text-sm text-blue-900">
+                                                    Enviar resumen de ruta al WhatsApp del repartidor al confirmar
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </section>
                             </div>
                         </ScrollArea>
 
@@ -345,7 +467,8 @@ export default function CheckoutDialog({
                             onConfirm={handleProcessSale}
                             canConfirm={
                                 (paymentMethod !== 'Efectivo' || amountPaid >= totalAmount) &&
-                                (customerMode === 'existente' ? !!selectedCRMClient : !!customerName.trim())
+                                (customerMode === 'existente' ? !!selectedCRMClient : !!customerName.trim()) &&
+                                (!isDelivery || !!deliveryAddress.trim())
                             }
                             missingCustomer={customerMode === 'existente' ? !selectedCRMClient : !customerName.trim()}
                         />

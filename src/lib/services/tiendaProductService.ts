@@ -1,8 +1,15 @@
 import { supabase } from '@/lib/supabaseClient'
 import { formatCategoryLabel } from '@/lib/utils'
-import { calculateRegularUnitPrice, calculateSocioUnitPrice } from '@/lib/tiendaPricing'
+import {
+  calculateRegularUnitPrice,
+  calculateSocioUnitPrice,
+  TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT,
+} from '@/lib/tiendaPricing'
 
 const PRODUCT_IMAGE_BUCKET = 'products'
+const WHOLESALE_SETTINGS_TABLE = 'wholesale_profit_settings'
+
+type CategoryProfitMap = Map<string, number>
 
 export interface Product {
   id: string
@@ -21,19 +28,77 @@ export interface Product {
   image_urls?: string[]
   regularPrice?: number
   socioPrice?: number
+  socioProfitPercentage?: number
   created_at: string
   updated_at: string
 }
 
-function withTiendaPricing(product: Product): Product {
+type WholesaleSettingRow = {
+  category_id: string
+  profit_percentage: number | string | null
+}
+
+function resolveCategoryProfitPercentage(
+  categoryId: string | null | undefined,
+  categoryProfitMap: CategoryProfitMap,
+): number {
+  if (!categoryId) {
+    return TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT
+  }
+
+  const value = categoryProfitMap.get(categoryId)
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return value
+  }
+
+  return TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT
+}
+
+function withTiendaPricing(product: Product, categoryProfitMap: CategoryProfitMap): Product {
   const regularPrice = product.price
-  const socioBasePrice = calculateRegularUnitPrice(product.cost, product.price)
+  const socioProfitPercentage = resolveCategoryProfitPercentage(product.category, categoryProfitMap)
+  const socioBasePrice = calculateRegularUnitPrice(product.cost, product.price, socioProfitPercentage)
   const socioPrice = calculateSocioUnitPrice(socioBasePrice)
 
   return {
     ...product,
     regularPrice,
     socioPrice,
+    socioProfitPercentage,
+  }
+}
+
+async function getCategoryProfitMap(): Promise<CategoryProfitMap> {
+  if (typeof window !== 'undefined') {
+    return new Map()
+  }
+
+  try {
+    const { getSupabaseServerClient } = await import('@/lib/supabaseServerClient')
+    const supabaseServer = getSupabaseServerClient()
+
+    const { data, error } = await supabaseServer
+      .from(WHOLESALE_SETTINGS_TABLE)
+      .select('category_id, profit_percentage')
+
+    if (error) {
+      const isMissingTable = String(error.code || '') === 'PGRST205'
+      if (!isMissingTable) {
+        console.warn('Could not load wholesale_profit_settings for tienda pricing:', error.message)
+      }
+      return new Map()
+    }
+
+    return new Map(
+      ((data || []) as WholesaleSettingRow[])
+        .map((row) => [row.category_id, Number(row.profit_percentage)])
+        .filter(([categoryId, profitPercentage]) => {
+          return Boolean(categoryId) && Number.isFinite(profitPercentage) && profitPercentage >= 0
+        }),
+    )
+  } catch (error) {
+    console.warn('Unexpected error loading category wholesale profit settings:', error)
+    return new Map()
   }
 }
 
@@ -126,8 +191,10 @@ export async function getProducts(filters: ProductFilters = {}): Promise<Paginat
     throw new Error('Failed to fetch products')
   }
 
+  const categoryProfitMap = await getCategoryProfitMap()
+
   return {
-    products: ((data || []) as Product[]).map(withTiendaPricing),
+    products: ((data || []) as Product[]).map((product) => withTiendaPricing(product, categoryProfitMap)),
     total: count || 0,
     page: Math.floor(offset / limit) + 1,
     pageSize: limit,
@@ -152,7 +219,10 @@ export async function getProductById(id: string): Promise<Product | null> {
     return null
   }
 
-  return data ? withTiendaPricing(data as Product) : null
+  if (!data) return null
+
+  const categoryProfitMap = await getCategoryProfitMap()
+  return withTiendaPricing(data as Product, categoryProfitMap)
 }
 
 /**
@@ -172,7 +242,10 @@ export async function getProductBySKU(sku: string): Promise<Product | null> {
     return null
   }
 
-  return data ? withTiendaPricing(data as Product) : null
+  if (!data) return null
+
+  const categoryProfitMap = await getCategoryProfitMap()
+  return withTiendaPricing(data as Product, categoryProfitMap)
 }
 
 /**
@@ -193,7 +266,8 @@ export async function getProductVariants(parentId: string): Promise<Product[]> {
     return []
   }
 
-  return ((data || []) as Product[]).map(withTiendaPricing)
+  const categoryProfitMap = await getCategoryProfitMap()
+  return ((data || []) as Product[]).map((product) => withTiendaPricing(product, categoryProfitMap))
 }
 
 /**
@@ -254,7 +328,8 @@ export async function getFeaturedProducts(limit = 8): Promise<Product[]> {
     return []
   }
 
-  return ((data || []) as Product[]).map(withTiendaPricing)
+  const categoryProfitMap = await getCategoryProfitMap()
+  return ((data || []) as Product[]).map((product) => withTiendaPricing(product, categoryProfitMap))
 }
 
 /**
@@ -283,7 +358,8 @@ export async function getRelatedProducts(
     return []
   }
 
-  return ((data || []) as Product[]).map(withTiendaPricing)
+  const categoryProfitMap = await getCategoryProfitMap()
+  return ((data || []) as Product[]).map((product) => withTiendaPricing(product, categoryProfitMap))
 }
 
 /**

@@ -78,7 +78,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          El precio regular se respeta sin cambios. El precio socio se calcula sobre costo + 15% y solo aplica en paquetes exactos de {TIENDA_SOCIO_PACKAGE_QTY}.
+          El precio regular se respeta sin cambios. El precio socio se calcula automaticamente por categoria y solo aplica en paquetes exactos de {TIENDA_SOCIO_PACKAGE_QTY}.
         </p>
       </div>
 

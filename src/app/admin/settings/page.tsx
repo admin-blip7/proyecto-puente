@@ -17,7 +17,7 @@ import DiscountSettingsClient from "@/components/admin/settings/DiscountSettings
 import PrinterRoutingSettingsClient from "@/components/admin/settings/PrinterRoutingSettingsClient";
 import AppPreferencesSettingsClient from "@/components/admin/settings/AppPreferencesSettingsClient";
 import NotificacionesSettingsClient from "@/components/admin/settings/NotificacionesSettingsClient";
-import { getBranchesWithWhatsApp } from "@/lib/services/masterService";
+import { getBranchesWithNotificaciones } from "@/lib/services/masterService";
 
 export default async function SettingsPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -32,7 +32,7 @@ export default async function SettingsPage(props: {
         initialDiscountSettings,
         initialPrintRoutingSettings,
         initialAppPreferences,
-        initialBranchesWithWa,
+        initialBranchesWithNotificaciones,
     ] = await Promise.all([
         getTicketSettings(),
         getLabelSettings("product"), // Load product settings by default
@@ -40,7 +40,7 @@ export default async function SettingsPage(props: {
         getDiscountSettings(),
         getPrintRoutingSettings(),
         getAppPreferences(),
-        getBranchesWithWhatsApp(),
+        getBranchesWithNotificaciones(),
     ]);
 
     return (
@@ -91,7 +91,7 @@ export default async function SettingsPage(props: {
                         <DiscountSettingsClient initialSettings={initialDiscountSettings} />
                     </TabsContent>
                     <TabsContent value="notificaciones" className="mt-6">
-                        <NotificacionesSettingsClient initialBranches={initialBranchesWithWa} />
+                        <NotificacionesSettingsClient initialBranches={initialBranchesWithNotificaciones} />
                     </TabsContent>
                 </Tabs>
             </main>

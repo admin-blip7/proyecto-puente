@@ -29,7 +29,7 @@ export default async function RepairsPage() {
                             <Menu className="h-6 w-6" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-24">
+                    <SheetContent side="left" className="p-0 w-[280px] border-r-0">
                         <SheetTitle className="sr-only">Repairs Menu</SheetTitle>
                         <LeftSidebar />
                     </SheetContent>

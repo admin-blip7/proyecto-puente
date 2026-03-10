@@ -1,7 +1,8 @@
 
 'use server';
 
-import { Product, StockEntryItem, BulkUpdateData, ProductVariant } from "@/types";
+import { Product, StockEntryItem, BulkUpdateData, ProductVariant, SeminuevoModel, SeminuevoUnit, ConditionGrade } from "@/types";
+import { suggestConditionGrade, buildUnitName, extractModelLine } from "@/lib/seminuevoHelpers";
 import { v4 as uuidv4 } from "uuid";
 import sharp from "sharp";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
@@ -179,6 +180,8 @@ const mapProduct = (row: any, index: number): Product => ({
   category: row?.category ?? undefined,
   attributes: row?.attributes ?? {},
   imageUrls: Array.isArray(row?.image_urls) ? row.image_urls : [],
+  branchId: row?.branch_id ?? undefined,
+  partnerId: row?.partner_id ?? undefined,
 });
 
 const optimizeImageBuffer = async (sourceUrl: string): Promise<Buffer> => {
@@ -574,6 +577,192 @@ const fetchProductBySku = async (sku: string) => {
   return data ?? null;
 };
 
+// --- Funciones de Seminuevos ---
+
+export const getOrCreateModelParent = async (modelLine: string): Promise<Product> => {
+  const supabase = getSupabaseServerClient();
+
+  // 1. Buscar si ya existe el template
+  const { data: existing, error: searchError } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select('*')
+    .eq('category', 'Celular Seminuevo')
+    .eq('name', modelLine)
+    .filter('attributes->is_model_template', 'eq', 'true')
+    .maybeSingle();
+
+  if (searchError) throw searchError;
+  if (existing) return mapProduct(existing, 0);
+
+  // 2. Crear si no existe
+  const newId = uuidv4();
+  const payload = {
+    id: newId,
+    name: modelLine,
+    sku: `MOD-${modelLine.toUpperCase().replace(/\s+/g, '-')}`,
+    price: 0,
+    cost: 0,
+    stock: 0, // El template no tiene stock propio vendible
+    type: 'Venta',
+    ownership_type: 'Propio',
+    category: 'Celular Seminuevo',
+    attributes: {
+      model_line: modelLine,
+      is_model_template: true
+    },
+    created_at: nowIso(),
+  };
+
+  const { data: created, error: createError } = await supabase
+    .from(PRODUCTS_TABLE)
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (createError) throw createError;
+  return mapProduct(created, 0);
+};
+
+export const createProductFromDiagnostic = async (input: {
+  diagnosticId: string;
+  price: number;
+  cost: number;
+  ownershipType: 'Propio' | 'Consigna';
+  consignorId?: string;
+  notes?: string;
+}): Promise<Product> => {
+  const supabase = getSupabaseServerClient();
+
+  // 1. Obtener diagnóstico
+  const { data: diag, error: diagError } = await supabase
+    .from('device_diagnostics')
+    .select('*')
+    .eq('id', input.diagnosticId)
+    .single();
+
+  if (diagError || !diag) throw new Error('Diagnóstico no encontrado');
+
+  // 2. Extraer modelo base y buscar/crear padre
+  const modelLine = extractModelLine(diag.model_name || 'iPhone Desconocido');
+  const parentProduct = await getOrCreateModelParent(modelLine);
+
+  // 3. Preparar unidad hija
+  const grade = suggestConditionGrade(diag.battery_health_percent);
+  const fullName = buildUnitName(modelLine, diag.storage_gb, diag.color);
+  // SKU único basado en serial
+  const childSku = `SN-${diag.serial_number || uuidv4().substring(0, 8).toUpperCase()}`;
+
+  const resolvedConsignorId = await resolveConsignorId(input.consignorId);
+
+  const newId = uuidv4();
+  const payload = {
+    id: newId,
+    parent_id: parentProduct.id,
+    name: fullName,
+    sku: childSku,
+    price: input.price,
+    cost: input.cost,
+    stock: 1, // La unidad física empieza con stock 1
+    type: 'Venta',
+    ownership_type: input.ownershipType,
+    consignor_id: resolvedConsignorId,
+    category: 'Celular Seminuevo',
+    condition_grade: grade,
+    diagnostic_id: diag.id,
+    cosmetic_notes: input.notes,
+    attributes: {
+      storage: diag.storage_gb ? `${diag.storage_gb}GB` : undefined,
+      color: diag.color,
+      battery_health: diag.battery_health_percent,
+      serial: diag.serial_number,
+      imei: diag.imei,
+      is_model_template: false,
+    },
+    created_at: nowIso(),
+  };
+
+  const { data: childData, error: childError } = await supabase
+    .from(PRODUCTS_TABLE)
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (childError) throw childError;
+
+  // Actualizar diagnóstico para enlazarlo de vuelta
+  await supabase
+    .from('device_diagnostics')
+    .update({ product_id: newId })
+    .eq('id', diag.id);
+
+  // Registrar movimiento
+  await registerStockMovementLogs(newId, 0, 1, input.cost, {
+    source: 'product-service/create-seminuevo',
+    reason: 'Ingreso inicial por diagnóstico',
+  });
+
+  return mapProduct(childData, 0);
+};
+
+export const getSeminuevoModels = async (): Promise<SeminuevoModel[]> => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('seminuevo_models')
+    .select('*')
+    .order('model_name', { ascending: true });
+
+  if (error) {
+    log.error('Error fetching seminuevo models:', error);
+    return [];
+  }
+
+  return (data || []).map(row => ({
+    modelId: row.model_id,
+    modelName: row.model_name,
+    imageUrls: row.image_urls || [],
+    unitsAvailable: Number(row.units_available),
+    priceFrom: Number(row.price_from),
+    priceTo: Number(row.price_to),
+    gradesAvailable: row.grades_available || [],
+    storagesAvailable: row.storages_available || [],
+    colorsAvailable: row.colors_available || [],
+  }));
+};
+
+export const getSeminuevoUnits = async (modelId: string): Promise<SeminuevoUnit[]> => {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('seminuevo_units')
+    .select('*')
+    .eq('parent_id', modelId)
+    .gt('stock', 0); // Solo las disponibles
+
+  if (error) {
+    log.error('Error fetching seminuevo units:', error);
+    return [];
+  }
+
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    price: Number(row.price),
+    stock: Number(row.stock),
+    parentId: row.parent_id,
+    conditionGrade: row.condition_grade as ConditionGrade,
+    cosmeticNotes: row.cosmetic_notes,
+    imageUrls: row.image_urls || [],
+    diagnosticId: row.diagnostic_id,
+    modelName: row.model_name,
+    storageGb: Number(row.storage_gb),
+    color: row.color,
+    batteryHealthPercent: Number(row.battery_health_percent),
+    batteryCtycleCount: Number(row.battery_cycle_count),
+    serialNumber: row.serial_number,
+    imei: row.imei,
+    iosVersion: row.ios_version,
+  }));
+};
+
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const supabase = getSupabaseServerClient();
@@ -595,6 +784,22 @@ export const getProducts = async (): Promise<Product[]> => {
     return uniqueProducts;
   } catch (error) {
     log.error("Error fetching products:", error);
+    return [];
+  }
+};
+
+export const getProductsByBranch = async (branchId: string): Promise<Product[]> => {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(PRODUCTS_TABLE)
+      .select("*")
+      .eq("branch_id", branchId)
+      .order("name", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((row, index) => mapProduct(row, index));
+  } catch (error) {
+    log.error("Error fetching products by branch:", error);
     return [];
   }
 };
@@ -656,10 +861,32 @@ export const addProduct = async (
   // Resolve consignor ID to proper PostgreSQL UUID
   const resolvedConsignorId = await resolveConsignorId(productData.consignorId);
 
+  // Resolve branch/partner from calling user's profile if not provided
+  let branchId: string | null = productData.branchId ?? null;
+  let partnerId: string | null = productData.partnerId ?? null;
+  if (!branchId || !partnerId) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        branchId = branchId ?? (user.user_metadata?.branch_id as string | undefined) ?? null;
+        partnerId = partnerId ?? (user.user_metadata?.partner_id as string | undefined) ?? null;
+        if (!branchId || !partnerId) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("branch_id, partner_id")
+            .eq("id", user.id)
+            .maybeSingle();
+          branchId = branchId ?? (profile as any)?.branch_id ?? null;
+          partnerId = partnerId ?? (profile as any)?.partner_id ?? null;
+        }
+      }
+    } catch {
+      // Non-critical — product still saves without branch context
+    }
+  }
+
   const payload = {
     id: newId,
-    // newId is used as the ID
-
     name: productData.name,
     sku: productData.sku,
     price: Number(productData.price ?? 0),
@@ -675,6 +902,8 @@ export const addProduct = async (
     category: productData.category ?? null,
     attributes: productData.attributes ?? {},
     image_urls: productData.imageUrls ?? [],
+    branch_id: branchId,
+    partner_id: partnerId,
     created_at: createdAt,
   };
 

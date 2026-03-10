@@ -35,15 +35,27 @@ import {
 } from "@/components/ui/select";
 import { getExpensesByDateRange, getDailySalesStats } from "@/lib/services/financeService";
 import { routePdfToPrinter } from "@/lib/printing/printRouter";
+import { useBranch } from "@/contexts/BranchContext";
+import {
+  DEFAULT_BRANCH_TIME_ZONE,
+  formatDateTimeInBranchTimeZone,
+  sanitizeBranchTimeZone,
+  toDateKeyInBranchTimeZone,
+} from "@/lib/branchTimeZone";
 
 interface CashHistoryClientProps {
   initialSessions: CashSession[];
 }
 
 export default function CashHistoryClient({ initialSessions }: CashHistoryClientProps) {
+  const { selectedBranch } = useBranch();
   const [sessions, setSessions] = useState<CashSession[]>(initialSessions);
   const [sortConfig, setSortConfig] = useState<{ key: keyof CashSession | 'difference'; direction: 'asc' | 'desc' } | null>(null);
   const [isReprinting, setIsReprinting] = useState<string | null>(null);
+  const branchTimeZone = useMemo(
+    () => sanitizeBranchTimeZone(selectedBranch?.timezone ?? DEFAULT_BRANCH_TIME_ZONE),
+    [selectedBranch?.timezone]
+  );
 
   // Financial Dashboard State
   const currentDate = new Date();
@@ -103,30 +115,27 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
   const salesByDate = useMemo(() => {
     const map: Record<string, number> = {};
     rawSales.forEach(sale => {
-      const date = new Date(sale.createdAt);
-      const key = format(date, 'yyyy-MM-dd');
+      const key = toDateKeyInBranchTimeZone(sale.createdAt, branchTimeZone);
+      if (!key) return;
       map[key] = (map[key] || 0) + sale.totalAmount;
     });
     return map;
-  }, [rawSales]);
+  }, [rawSales, branchTimeZone]);
 
   // Filter sessions by date range
   const filteredSessions = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return sessions;
 
+    const fromKey = format(dateRange.from, 'yyyy-MM-dd');
+    const toKey = format(dateRange.to, 'yyyy-MM-dd');
+
     return sessions.filter(session => {
       if (!session.closedAt) return false;
-      const sessionDate = new Date(session.closedAt);
-      // Ensure we compare including the full day for 'to' date
-      const endDate = new Date(dateRange.to!);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Safety check: Ensure both dates are valid
-      if (isNaN(sessionDate.getTime())) return false;
-
-      return sessionDate >= dateRange.from! && sessionDate <= endDate;
+      const sessionDateKey = toDateKeyInBranchTimeZone(session.closedAt, branchTimeZone);
+      if (!sessionDateKey) return false;
+      return sessionDateKey >= fromKey && sessionDateKey <= toKey;
     });
-  }, [sessions, dateRange]);
+  }, [sessions, dateRange, branchTimeZone]);
 
   // Sort filtered sessions
   const sortedSessions = useMemo(() => {
@@ -187,13 +196,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
 
   const formatDateTime = (date?: Date) => {
     if (!date) return 'N/A';
-    return format(date, "dd MMM yyyy, HH:mm", { locale: getDateFnsLocale() });
-  }
-
-  const getDailySalesForSession = (sessionDate?: Date) => {
-    if (!sessionDate) return 0;
-    const dateKey = format(sessionDate, 'yyyy-MM-dd');
-    return salesByDate[dateKey] || 0;
+    return formatDateTimeInBranchTimeZone(date, branchTimeZone);
   }
 
   // Generate rows for ALL days in the date range, merging with session data
@@ -219,15 +222,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
       const sessionsForDate = filteredSessions
         .filter(s => {
           if (!s.closedAt) return false;
-          // IMPORTANT: Parse date carefully. If s.closedAt is ISO string (UTC), 
-          // new Date() converts to local. format() then uses local. 
-          // Ideally we match based on the "Session Day" concept, usually when it was closed.
-          const sessionDate = new Date(s.closedAt);
-          // Safety check for invalid dates
-          if (isNaN(sessionDate.getTime())) return false;
-
-          const sessionDateKey = format(sessionDate, 'yyyy-MM-dd');
-
+          const sessionDateKey = toDateKeyInBranchTimeZone(s.closedAt, branchTimeZone);
           return sessionDateKey === dateKey;
         })
         .sort((a, b) => {
@@ -247,7 +242,7 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
     }
 
     return rows.reverse(); // Most recent first
-  }, [dateRange, filteredSessions, salesByDate]);
+  }, [dateRange, filteredSessions, salesByDate, branchTimeZone]);
 
   const handleSort = (key: keyof CashSession | 'difference') => {
     setSortConfig(current => {
@@ -321,6 +316,9 @@ export default function CashHistoryClient({ initialSessions }: CashHistoryClient
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tablero Financiero</h1>
           <p className="text-muted-foreground">Resumen de ganancias, gastos y cortes de caja.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Zona horaria de sucursal: {branchTimeZone}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button

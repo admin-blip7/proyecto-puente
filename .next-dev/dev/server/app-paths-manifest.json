@@ -1,8 +1,6 @@
 {
-  "/admin/consignors/page": "app/admin/consignors/page.js",
-  "/admin/page": "app/admin/page.js",
+  "/(tienda)/tienda/page": "app/(tienda)/tienda/page.js",
   "/(pos)/pos/page": "app/(pos)/pos/page.js",
-  "/(web)/page": "app/(web)/page.js",
-  "/(tienda)/tienda/producto/[id]/page": "app/(tienda)/tienda/producto/[id]/page.js",
-  "/(tienda)/tienda/categoria/[slug]/page": "app/(tienda)/tienda/categoria/[slug]/page.js"
+  "/admin/sales/page": "app/admin/sales/page.js",
+  "/admin/finance/cash-history/page": "app/admin/finance/cash-history/page.js"
 }

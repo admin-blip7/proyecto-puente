@@ -9,6 +9,7 @@ import { getLogger } from "@/lib/logger";
 import { registerSaleInCRM } from "@/lib/utils/crmUtils";
 import { depositSaleToAccount } from "./financeService";
 import { registerKardexMovement } from "@/lib/services/kardexService";
+import { SINGLE_DELIVERY_DRIVER, sanitizeWhatsappPhone } from "@/lib/deliveryDriverConfig";
 
 const log = getLogger("salesService");
 
@@ -16,6 +17,260 @@ const SALES_TABLE = "sales";
 const SALE_ITEMS_TABLE = "sale_items";
 const PRODUCTS_TABLE = "products";
 const INVENTORY_LOGS_TABLE = "inventory_logs";
+
+const buildDeliveryWhatsappUrlForSale = ({
+  routeCode,
+  deliveryDate,
+  deliveryTime,
+  saleNumber,
+  customerName,
+  customerPhone,
+  address,
+  totalAmount,
+  items,
+}: {
+  routeCode: string;
+  deliveryDate: string;
+  deliveryTime: string;
+  saleNumber: string;
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  totalAmount: number;
+  items: Array<{ name: string; quantity: number; priceAtSale: number }>;
+}) => {
+  const phone = sanitizeWhatsappPhone(SINGLE_DELIVERY_DRIVER.phone);
+  if (!phone) return null;
+
+  const lines: string[] = [
+    "Nueva entrega asignada",
+    `Repartidor: ${SINGLE_DELIVERY_DRIVER.name}`,
+    `Ruta: ${routeCode}`,
+    `Fecha: ${deliveryDate || "Sin fecha"}`,
+    `Hora: ${deliveryTime || "No definida"}`,
+    "",
+    `Venta: ${saleNumber}`,
+    `Cliente: ${customerName || "Cliente"}`,
+    `Teléfono: ${customerPhone || "N/A"}`,
+    `Dirección: ${address || "No definida"}`,
+    `Cobrar: $${Number(totalAmount || 0).toFixed(2)}`,
+    "",
+    "Artículos:",
+    ...items.map((item) => `- ${item.name} x${item.quantity} ($${Number(item.priceAtSale || 0).toFixed(2)})`),
+  ];
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
+};
+
+const assignSaleToSingleDriverRoute = async ({
+  supabase,
+  saleUUID,
+  saleNumber,
+  saleData,
+  cartItems,
+}: {
+  supabase: ReturnType<typeof getSupabaseServerClient>;
+  saleUUID: string;
+  saleNumber: string;
+  saleData: Omit<Sale, "id" | "saleId" | "createdAt">;
+  cartItems: CartItem[];
+}) => {
+  const shippingInfo = (saleData as any).shippingInfo || {};
+  const deliveryAddress = shippingInfo.deliveryAddress || shippingInfo.address || "";
+  if (!deliveryAddress) {
+    return { routeId: null, routeStopId: null, routeCode: null, whatsappUrl: null };
+  }
+
+  const deliveryDate = shippingInfo.deliveryDate || new Date().toISOString().split("T")[0];
+  const deliveryTime = shippingInfo.deliveryTime || "";
+  let partnerId: string | null = null;
+  let branchId: string | null = shippingInfo.branchId || null;
+
+  try {
+    let routeId: string | null = null;
+    let routeCode: string | null = null;
+
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("partner_id, branch_id")
+        .eq("id", saleData.cashierId)
+        .maybeSingle();
+
+      partnerId = (profile as any)?.partner_id || null;
+      branchId = branchId || ((profile as any)?.branch_id || null);
+    } catch (profileError) {
+      log.warn("Could not resolve partner/branch context from profile", profileError);
+    }
+
+    let existingRouteQuery = supabase
+      .from("delivery_routes")
+      .select("id, route_code")
+      .eq("delivery_date", deliveryDate)
+      .eq("assigned_to", SINGLE_DELIVERY_DRIVER.name)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (partnerId) {
+      existingRouteQuery = existingRouteQuery.eq("partner_id", partnerId);
+    }
+    const { data: existingRoute } = await existingRouteQuery.maybeSingle();
+
+    if (existingRoute?.id) {
+      routeId = existingRoute.id;
+      routeCode = existingRoute.route_code;
+    } else {
+      const generatedRouteCode = `RUTA-${deliveryDate}-${SINGLE_DELIVERY_DRIVER.name.replace(/\s+/g, "").toUpperCase()}`;
+      const routePayload: Record<string, any> = {
+        route_code: generatedRouteCode,
+        route_name: `Ruta ${SINGLE_DELIVERY_DRIVER.name}`,
+        route_type: "standard",
+        assigned_to: SINGLE_DELIVERY_DRIVER.name,
+        delivery_date: deliveryDate,
+        departure_time: deliveryTime || null,
+        status: "pending",
+        total_orders: 0,
+        total_deliveries: 0,
+        total_failed_deliveries: 0,
+        total_amount: 0,
+      };
+      if (partnerId) routePayload.partner_id = partnerId;
+      if (branchId) routePayload.branch_id = branchId;
+
+      const { data: createdRoute, error: createRouteError } = await supabase
+        .from("delivery_routes")
+        .insert(routePayload)
+        .select("id, route_code")
+        .single();
+
+      if (createRouteError) {
+        throw createRouteError;
+      }
+
+      routeId = createdRoute?.id || null;
+      routeCode = createdRoute?.route_code || generatedRouteCode;
+    }
+
+    if (!routeId) {
+      return { routeId: null, routeStopId: null, routeCode: null, whatsappUrl: null };
+    }
+
+    // Try to create a route stop; if schema mismatch, we still keep sale linked to route.
+    let routeStopId: string | null = null;
+    try {
+      const { data: existingStops } = await supabase
+        .from("delivery_route_stops")
+        .select("stop_sequence")
+        .eq("route_id", routeId);
+
+      const nextSequence =
+        (existingStops || []).reduce((max, row: any) => Math.max(max, Number(row?.stop_sequence || 0)), 0) + 1;
+
+      const { data: createdStop, error: createStopError } = await supabase
+        .from("delivery_route_stops")
+        .insert({
+          route_id: routeId,
+          stop_sequence: nextSequence,
+          stop_type: "delivery",
+          customer_name: saleData.customerName || "Cliente",
+          address: deliveryAddress,
+          phone: saleData.customerPhone || null,
+          estimated_arrival: deliveryTime || null,
+          status: "pending",
+          partner_id: partnerId,
+          branch_id: branchId,
+        })
+        .select("id")
+        .single();
+
+      if (!createStopError) {
+        routeStopId = createdStop?.id || null;
+      }
+    } catch (stopError) {
+      log.warn("Could not create delivery stop; continuing with route assignment only", stopError);
+    }
+
+    try {
+      if (routeStopId) {
+        const itemsPayload = cartItems.map((item) => ({
+          route_id: routeId,
+          stop_id: routeStopId,
+          sale_id: saleUUID,
+          product_id: item.id,
+          product_name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          status: "pending",
+        }));
+
+        await supabase.from("delivery_items").insert(itemsPayload);
+      }
+    } catch (itemsError) {
+      log.warn("Could not create delivery items for route stop", itemsError);
+    }
+
+    const whatsappUrl = buildDeliveryWhatsappUrlForSale({
+      routeCode: routeCode || "",
+      deliveryDate,
+      deliveryTime,
+      saleNumber,
+      customerName: saleData.customerName || "Cliente",
+      customerPhone: saleData.customerPhone || "",
+      address: deliveryAddress,
+      totalAmount: saleData.totalAmount,
+      items: saleData.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        priceAtSale: item.priceAtSale,
+      })),
+    });
+
+    // Update sales link to route and stop
+    const nextShippingInfo = {
+      ...shippingInfo,
+      deliveryDriverName: SINGLE_DELIVERY_DRIVER.name,
+      deliveryDriverPhone: SINGLE_DELIVERY_DRIVER.phone,
+      deliveryDate,
+      deliveryTime,
+      routeCode: routeCode || undefined,
+      routeId: routeId || undefined,
+      routeStopId: routeStopId || undefined,
+      whatsappUrl: whatsappUrl || undefined,
+    };
+
+    await supabase
+      .from("sales")
+      .update({
+        route_id: routeId,
+        route_stop_id: routeStopId,
+        shipping_info: nextShippingInfo,
+      })
+      .eq("id", saleUUID);
+
+    // Keep route totals in sync (best effort)
+    try {
+      const { data: routeTotals } = await supabase
+        .from("delivery_routes")
+        .select("total_orders, total_amount")
+        .eq("id", routeId)
+        .maybeSingle();
+
+      await supabase
+        .from("delivery_routes")
+        .update({
+          total_orders: Number(routeTotals?.total_orders ?? 0) + 1,
+          total_amount: Number(routeTotals?.total_amount ?? 0) + Number(saleData.totalAmount ?? 0),
+        })
+        .eq("id", routeId);
+    } catch (routeTotalsError) {
+      log.warn("Could not update delivery route totals", routeTotalsError);
+    }
+
+    return { routeId, routeStopId, routeCode, whatsappUrl };
+  } catch (routeError) {
+    log.warn("Failed to auto-assign sale into delivery route", routeError);
+    return { routeId: null, routeStopId: null, routeCode: null, whatsappUrl: null };
+  }
+};
 
 const mapSale = (row: any): Sale => ({
   id: row?.id ?? "",
@@ -52,6 +307,9 @@ const mapSale = (row: any): Sale => ({
   shippingInfo: row?.shipping_info ?? undefined,
   deliveryStatus: row?.delivery_status ?? undefined,
   trackingNumber: row?.tracking_number ?? undefined,
+  routeId: row?.route_id ?? undefined,
+  routeStopId: row?.route_stop_id ?? undefined,
+  deliveryWhatsappUrl: row?.shipping_info?.whatsappUrl ?? undefined,
 });
 
 export const getSales = async (
@@ -296,6 +554,24 @@ export const addSaleAndUpdateStock = async (
       log.error("Error inserting sale items", itemsError);
     }
 
+    const deliveryAssignment = await assignSaleToSingleDriverRoute({
+      supabase,
+      saleUUID,
+      saleNumber: saleId,
+      saleData,
+      cartItems,
+    });
+
+    const nextShippingInfo = saleData.shippingInfo
+      ? {
+          ...(saleData.shippingInfo as Record<string, any>),
+          routeCode: deliveryAssignment.routeCode || (saleData.shippingInfo as any)?.routeCode,
+          routeId: deliveryAssignment.routeId || (saleData.shippingInfo as any)?.routeId,
+          routeStopId: deliveryAssignment.routeStopId || (saleData.shippingInfo as any)?.routeStopId,
+          whatsappUrl: deliveryAssignment.whatsappUrl || (saleData.shippingInfo as any)?.whatsappUrl,
+        }
+      : saleData.shippingInfo;
+
     const finalSale: Sale = {
       id: saleUUID,
       saleId: saleId,
@@ -303,6 +579,10 @@ export const addSaleAndUpdateStock = async (
       sessionId: finalSessionId,
       createdAt: new Date(now),
       items: itemsWithConsignorId,
+      routeId: deliveryAssignment.routeId || undefined,
+      routeStopId: deliveryAssignment.routeStopId || undefined,
+      shippingInfo: nextShippingInfo as any,
+      deliveryWhatsappUrl: deliveryAssignment.whatsappUrl || undefined,
     };
 
     log.info(`Sale ${saleId} inserted successfully`);

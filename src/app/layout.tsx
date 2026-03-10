@@ -8,6 +8,7 @@ import { Inter } from 'next/font/google'
 import ErrorSuppressionScript from '@/components/shared/ErrorSuppressionScript';
 import { getAppPreferences } from "@/lib/services/settingsService";
 import { AppPreferencesProvider } from "@/components/preferences/AppPreferencesProvider";
+import { BranchProvider } from "@/contexts/BranchContext";
 
 export const metadata: Metadata = {
   title: '22 Electronic Group',
@@ -28,6 +29,7 @@ export default async function RootLayout({
       <body className={`font-sans ${inter.variable} antialiased`} suppressHydrationWarning>
         <ErrorSuppressionScript />
         <AuthProvider>
+          <BranchProvider>
           <AppPreferencesProvider initialPreferences={appPreferences}>
             <ThemeProvider
               attribute="class"
@@ -39,6 +41,7 @@ export default async function RootLayout({
               <Toaster />
             </ThemeProvider>
           </AppPreferencesProvider>
+          </BranchProvider>
         </AuthProvider>
         <div id="portal-root" />
       </body>

@@ -1,13 +1,23 @@
 export const TIENDA_MARGIN_RATE = 0.15
+export const TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT = TIENDA_MARGIN_RATE * 100
 export const TIENDA_SOCIO_PACKAGE_QTY = 5
 export const TIENDA_FREE_SHIPPING_THRESHOLD = 15000
 export const TIENDA_SHIPPING_FLAT_RATE = 150
 
 const roundToCurrency = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 
-export function calculateRegularUnitPrice(cost: number | null | undefined, fallbackPrice = 0): number {
+export function calculateRegularUnitPrice(
+  cost: number | null | undefined,
+  fallbackPrice = 0,
+  marginPercent: number = TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT,
+): number {
+  const normalizedMarginPercent = Number.isFinite(marginPercent) && marginPercent >= 0
+    ? marginPercent
+    : TIENDA_DEFAULT_SOCIO_MARGIN_PERCENT
+  const marginRate = normalizedMarginPercent / 100
+
   if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) {
-    return roundToCurrency(cost * (1 + TIENDA_MARGIN_RATE))
+    return roundToCurrency(cost * (1 + marginRate))
   }
 
   if (typeof fallbackPrice === 'number' && Number.isFinite(fallbackPrice) && fallbackPrice > 0) {

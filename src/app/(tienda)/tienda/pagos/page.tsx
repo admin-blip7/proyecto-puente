@@ -1,4 +1,5 @@
 import { Shield, Lock, CreditCard, Building2, Check, Clock, AlertCircle, Smartphone } from 'lucide-react'
+import { TIENDA_SUPPORT_WHATSAPP_URL } from '@/lib/tiendaContact'
 
 export const metadata = {
   title: 'Pagos Seguros - 22 Electronic',
@@ -269,7 +270,7 @@ export default function PagosPage() {
               </p>
               <div className="flex flex-wrap gap-4">
                 <a 
-                  href="https://wa.me/525512345678" 
+                  href={TIENDA_SUPPORT_WHATSAPP_URL}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-full text-sm font-bold uppercase tracking-widest hover:bg-green-600 transition-colors"

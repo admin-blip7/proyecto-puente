@@ -1,5 +1,8 @@
 import { Truck, Package, Clock, Check, Shield, Crown, MapPin, Box } from 'lucide-react'
-import { TIENDA_FREE_SHIPPING_THRESHOLD, TIENDA_SOCIO_PACKAGE_QTY } from '@/lib/tiendaPricing'
+import {
+  TIENDA_FREE_SHIPPING_THRESHOLD,
+  TIENDA_SOCIO_PACKAGE_QTY,
+} from '@/lib/tiendaPricing'
 
 export const metadata = {
   title: 'Politica de Envios - 22 Electronic',
@@ -136,10 +139,12 @@ export default function EnviosPage() {
               <div className="bg-accent/20 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Crown className="h-5 w-5 text-accent" />
-                  <span className="font-semibold text-sm">Precio base</span>
+                  <span className="font-semibold text-sm">Precio mayoreo</span>
                 </div>
-                <p className="text-2xl font-bold text-accent">Costo + 15%</p>
-                <p className="text-xs text-muted-foreground">El descuento socio se calcula sobre ese precio base en tienda en linea</p>
+                <p className="text-2xl font-bold text-accent">Calculado por categoria</p>
+                <p className="text-xs text-muted-foreground">
+                  El precio socio de tienda se determina automaticamente por categoria y se aplica solo en paquetes exactos.
+                </p>
               </div>
             </div>
 

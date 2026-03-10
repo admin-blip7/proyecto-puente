@@ -527,10 +527,8 @@
 /* 8) iOS: utilidades generales y mejoras para móviles */
 html,
 body {
-  height: 100%;
   -webkit-text-size-adjust: 100%;
   scrollbar-gutter: stable both-edges;
-  /* Asegurar scroll en móviles - Solo cuando no sea tienda */
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }

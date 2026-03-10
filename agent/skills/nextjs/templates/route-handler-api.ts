@@ -13,14 +13,14 @@ import { cookies, headers } from 'next/headers'
 // ============================================================================
 
 // GET /api/posts
-export async function GET() {
+export async function GET_Examples() {
   const posts = await fetch('https://api.example.com/posts').then(r => r.json())
 
   return NextResponse.json(posts)
 }
 
 // POST /api/posts
-export async function POST(request: Request) {
+export async function POST_Example(request: Request) {
   const body = await request.json()
 
   const post = await fetch('https://api.example.com/posts', {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
 // File: app/api/posts/[id]/route.ts
 
-export async function GET(
+export async function GET_PostDetail(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -361,33 +361,5 @@ export async function RATE_LIMITED() {
   return NextResponse.json({ message: 'Success' })
 }
 
-/**
- * Summary:
- *
- * Route Handlers (app/api/*/route.ts):
- * 1. ✅ Support all HTTP methods (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
- * 2. ✅ Await params in Next.js 16
- * 3. ✅ Access cookies with await cookies()
- * 4. ✅ Access headers with await headers()
- * 5. ✅ Use NextResponse.json() for JSON responses
- * 6. ✅ Return Response or NextResponse
- *
- * Common patterns:
- * - CRUD operations (GET, POST, PATCH, DELETE)
- * - Query parameters with searchParams
- * - Authentication with cookies
- * - Webhooks with signature verification
- * - Streaming responses (SSE, WebSocket)
- * - File uploads with FormData
- * - CORS configuration
- * - Error handling
- * - Rate limiting
- *
- * Best practices:
- * - Use try/catch for error handling
- * - Return appropriate HTTP status codes
- * - Validate input data
- * - Set secure cookie options in production
- * - Add rate limiting for public endpoints
- * - Use CORS headers when needed
- */
+
+
