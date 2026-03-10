@@ -148,6 +148,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## POS / Navegacion
 ### Completados
 
+- [x] **Consolidación de rama feature en `main` (cierre local de rama)** (10-Mar-2026, Codex)
+  - Se consolidaron cambios pendientes en commit de seguridad antes de fusionar para evitar pérdida de trabajo.
+  - `main` quedó actualizado localmente al commit `8a3ded7` vía fast-forward.
+  - Rama local `feature/rama-supabase` eliminada para dejar solo `main` en entorno local.
+  - Nota operativa: el push de `main` a `origin/main` quedó pendiente por bloqueo/hang de red en este entorno.
+
 - [x] **Historial de corte por sucursal con zona horaria configurable** (10-Mar-2026, Codex)
   - NUEVO: `src/lib/branchTimeZone.ts` con utilidades para validar zona IANA y agrupar fechas por zona (`yyyy-MM-dd`).
   - ACTUALIZADO: `src/components/admin/finance/cash-history/CashHistoryClient.tsx` para que el historial de cortes use la zona de la sucursal seleccionada en filtros, agrupado diario y fecha/hora mostrada.

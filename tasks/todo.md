@@ -1,3 +1,30 @@
+# TODO - Cerrar rama de trabajo y consolidar avances en main
+
+## Plan
+- [x] Verificar estado real de rama actual, divergencia con `main` y cambios pendientes sin commit.
+- [x] Consolidar avances pendientes en commit explícito para evitar pérdida de trabajo.
+- [x] Integrar `main` en la rama de trabajo y resolver conflictos preservando avances de la rama feature.
+- [x] Fusionar a `main` en modo seguro (`--ff-only`) y validar hash final.
+- [x] Eliminar rama local feature para dejar solo `main`.
+- [x] Documentar resultados y estado remoto.
+
+## Review
+- Estado inicial:
+  - Rama activa: `feature/rama-supabase`.
+  - Worktree con cambios masivos pendientes (tracked/untracked), incluyendo artefactos `.next-dev`.
+- Consolidación:
+  - Commit creado en feature: `9a8d45f` (`chore: consolidate pending advances before merge to main`) para no perder trabajo.
+- Integración con main:
+  - Se ejecutó merge de `main` en feature con conflictos extensivos (principalmente artefactos binarios/cache y `add/add`).
+  - Resolución aplicada conservando estado de feature (ours) y cierre de merge en commit: `8a3ded7`.
+- Fusión final:
+  - `main` actualizado por fast-forward a `8a3ded7`.
+  - Validación de seguridad: `main` y `feature/rama-supabase` quedaron en el mismo hash antes de borrar rama.
+  - Rama local eliminada: `feature/rama-supabase`.
+- Estado remoto:
+  - `origin/main` permaneció en `ffad422`; el `git push origin main` quedó bloqueado/hang en este entorno y no completó.
+  - Resultado: integración local completa y segura; push remoto pendiente.
+
 # TODO - Historial de corte por zona horaria de sucursal
 
 ## Plan
