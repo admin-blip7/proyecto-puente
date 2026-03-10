@@ -158,7 +158,7 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
   - Se consolidaron cambios pendientes en commit de seguridad antes de fusionar para evitar pérdida de trabajo.
   - `main` quedó actualizado localmente al commit `8a3ded7` vía fast-forward.
   - Rama local `feature/rama-supabase` eliminada para dejar solo `main` en entorno local.
-  - Nota operativa: el push de `main` a `origin/main` quedó pendiente por bloqueo/hang de red en este entorno.
+  - Estado actual: `main` quedó sincronizada con `origin/main` tras completar push exitoso (incluyendo commits posteriores de documentación y hotfix de deploy).
 
 - [x] **Historial de corte por sucursal con zona horaria configurable** (10-Mar-2026, Codex)
   - NUEVO: `src/lib/branchTimeZone.ts` con utilidades para validar zona IANA y agrupar fechas por zona (`yyyy-MM-dd`).
