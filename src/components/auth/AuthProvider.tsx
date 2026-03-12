@@ -84,6 +84,34 @@ const buildUserProfile = (user: User | null): UserProfile | null => {
   };
 };
 
+// Función para crear perfil si no existe
+const ensureProfileExists = async (user: User | null) => {
+  if (!user || !supabase) return;
+  
+  try {
+    // Verificar si el perfil existe
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (!existingProfile) {
+      // Crear perfil automáticamente
+      const metadata = user.user_metadata ?? {};
+      await supabase.from('profiles').insert({
+        id: user.id,
+        email: user.email,
+        name: metadata.name || metadata.full_name || user.email?.split('@')[0] || 'Usuario',
+        role: metadata.role || 'staff'
+      });
+      log.info('Profile auto-created for user:', user.id);
+    }
+  } catch (error) {
+    log.error('Error ensuring profile exists:', error);
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -161,6 +189,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const supabaseUser = currentSession?.user ?? null;
           syncAdminAccessCookie(currentSession);
           setUser(supabaseUser);
+          
+          // Crear perfil si no existe
+          if (supabaseUser) {
+            await ensureProfileExists(supabaseUser);
+          }
+          
           setUserProfile(buildUserProfile(supabaseUser));
           setConnectionError(false);
 
@@ -193,10 +227,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let authChangeTimeout: NodeJS.Timeout;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       clearTimeout(authChangeTimeout);
-      authChangeTimeout = setTimeout(() => {
+      authChangeTimeout = setTimeout(async () => {
         const supabaseUser = newSession?.user ?? null;
         syncAdminAccessCookie(newSession ?? null);
         setUser(supabaseUser);
+        
+        // Crear perfil si no existe
+        if (supabaseUser) {
+          await ensureProfileExists(supabaseUser);
+        }
+        
         setUserProfile(buildUserProfile(supabaseUser));
         setConnectionError(false);
 
