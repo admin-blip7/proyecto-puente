@@ -3,10 +3,7 @@ export const dynamic = "force-dynamic";
 import SalesHistoryClient from "@/components/admin/sales/SalesHistoryClient";
 import { Sale, Product } from "@/types";
 import { isToday } from 'date-fns';
-import LeftSidebar from "@/components/shared/LeftSidebar";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
+import { AdminPageLayout } from "@/components/shared/AdminPageLayout";
 import { getSales } from "@/lib/services/salesService";
 import { getProducts } from "@/lib/services/productService";
 
@@ -40,31 +37,13 @@ export default async function SalesPage() {
     const { dailyCost, dailyProfit } = calculateDailySummary(initialSales, products);
 
     return (
-        <div className="flex h-screen w-full flex-row">
-            <div className="hidden md:flex">
-                <LeftSidebar />
-            </div>
-            <div className="absolute top-4 left-4 z-50 md:hidden">
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" size="icon">
-                            <Menu className="h-6 w-6" />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-[280px] border-r-0">
-                        <SheetTitle className="sr-only">Sales Menu</SheetTitle>
-                        <LeftSidebar />
-                    </SheetContent>
-                </Sheet>
-            </div>
-            <main className="flex-1 overflow-y-auto w-full md:overflow-hidden p-4 md:p-6 md:pt-12">
-                <SalesHistoryClient
-                    initialSales={initialSales}
-                    products={products}
-                    dailyCost={dailyCost}
-                    dailyProfit={dailyProfit}
-                />
-            </main>
-        </div>
+        <AdminPageLayout title="Ventas">
+            <SalesHistoryClient
+                initialSales={initialSales}
+                products={products}
+                dailyCost={dailyCost}
+                dailyProfit={dailyProfit}
+            />
+        </AdminPageLayout>
     )
 }

@@ -1,34 +1,13 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Menu, Smartphone, Settings } from "lucide-react";
-import LeftSidebar from "@/components/shared/LeftSidebar";
+import { Smartphone, Settings } from "lucide-react";
+import { AdminPageLayout } from "@/components/shared/AdminPageLayout";
 import DiagnosticScanner from "@/components/admin/diagnostico/DiagnosticScanner";
 import SetupGuide from "@/components/admin/diagnostico/SetupGuide";
 
 export default function DiagnosticoPage() {
   return (
-    <div className="flex h-screen w-full flex-row">
-      <div className="hidden md:flex">
-        <LeftSidebar />
-      </div>
-
-      {/* Mobile sidebar */}
-      <div className="absolute top-4 left-4 z-50 md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-[280px] border-r-0">
-            <SheetTitle className="sr-only">Admin Menu</SheetTitle>
-            <LeftSidebar />
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4">
+    <AdminPageLayout title="Diagnóstico">
+      <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Smartphone className="h-6 w-6" />
@@ -59,7 +38,7 @@ export default function DiagnosticoPage() {
             <SetupGuide />
           </TabsContent>
         </Tabs>
-      </main>
-    </div>
-  );
+      </div>
+    </AdminPageLayout>
+  )
 }
