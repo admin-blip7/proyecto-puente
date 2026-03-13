@@ -22,29 +22,85 @@ import AppPreferencesSettingsClient from "@/components/admin/settings/AppPrefere
 import NotificacionesSettingsClient from "@/components/admin/settings/NotificacionesSettingsClient";
 import { getBranchesWithNotificaciones } from "@/lib/services/masterService";
 
+// Default values for settings
+const defaultTicketSettings = {
+  paperWidth: 80,
+  fontStyle: { bold: false, italic: false },
+  header: {
+    showLogo: true,
+    logoUrl: "",
+    show: { storeName: true, address: true, phone: true, rfc: false, website: false },
+    storeName: "Mi Tienda",
+    address: "",
+    phone: "",
+    rfc: "",
+    website: "",
+  },
+  body: { showQuantity: true, showUnitPrice: false, showTotal: true, fontSize: "sm" },
+  footer: {
+    showSubtotal: true,
+    showTaxes: true,
+    showDiscounts: true,
+    thankYouMessage: "¡Gracias por tu compra!",
+    additionalInfo: "",
+    showQrCode: false,
+    qrCodeUrl: "",
+  },
+};
+
+const defaultLabelSettings = {
+  width: 51,
+  height: 102,
+  orientation: 'vertical',
+  fontSize: 9,
+  barcodeHeight: 30,
+  includeLogo: false,
+  logoUrl: "",
+  storeName: "Mi Tienda",
+  content: { showProductName: true, showSku: true, showPrice: true, showStoreName: false },
+};
+
+const defaultDiscountSettings = { discounts: [] };
+const defaultPrintRoutingSettings = { useQzTray: false, ticketPrinterName: "", labelPrinterName: "" };
+const defaultAppPreferences = { currency: "MXN", language: "es", locale: "es-MX" };
+
 export default async function SettingsPage(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     const searchParams = await props.searchParams;
     const tab = typeof searchParams.tab === 'string' ? searchParams.tab : 'general';
 
-    const [
-        initialTicketSettings,
-        initialLabelSettings,
-        initialCategories,
-        initialDiscountSettings,
-        initialPrintRoutingSettings,
-        initialAppPreferences,
-        initialBranchesWithNotificaciones,
-    ] = await Promise.all([
-        getTicketSettings(),
-        getLabelSettings("product"),
-        import("@/lib/services/categoryService").then(m => m.getProductCategories()),
-        getDiscountSettings(),
-        getPrintRoutingSettings(),
-        getAppPreferences(),
-        getBranchesWithNotificaciones(),
-    ]);
+    // Fetch settings with fallbacks to prevent page from hanging
+    let initialTicketSettings = defaultTicketSettings;
+    let initialLabelSettings = defaultLabelSettings;
+    let initialCategories: any[] = [];
+    let initialDiscountSettings = defaultDiscountSettings;
+    let initialPrintRoutingSettings = defaultPrintRoutingSettings;
+    let initialAppPreferences = defaultAppPreferences;
+    let initialBranchesWithNotificaciones: any[] = [];
+
+    try {
+        const results = await Promise.allSettled([
+            getTicketSettings(),
+            getLabelSettings("product"),
+            import("@/lib/services/categoryService").then(m => m.getProductCategories()),
+            getDiscountSettings(),
+            getPrintRoutingSettings(),
+            getAppPreferences(),
+            getBranchesWithNotificaciones(),
+        ]);
+
+        // Extract successful results, use defaults for failed ones
+        if (results[0].status === 'fulfilled') initialTicketSettings = results[0].value;
+        if (results[1].status === 'fulfilled') initialLabelSettings = results[1].value;
+        if (results[2].status === 'fulfilled') initialCategories = results[2].value;
+        if (results[3].status === 'fulfilled') initialDiscountSettings = results[3].value;
+        if (results[4].status === 'fulfilled') initialPrintRoutingSettings = results[4].value;
+        if (results[5].status === 'fulfilled') initialAppPreferences = results[5].value;
+        if (results[6].status === 'fulfilled') initialBranchesWithNotificaciones = results[6].value;
+    } catch (error) {
+        console.error("Error loading settings:", error);
+    }
 
     return (
         <SettingsLayoutWithMobile
