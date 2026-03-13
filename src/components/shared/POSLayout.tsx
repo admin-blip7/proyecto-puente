@@ -1,3 +1,5 @@
+"use client";
+
 import POSClient from '@/components/pos/POSClient';
 import { Product } from '@/types';
 import LeftSidebar from '@/components/shared/LeftSidebar';
