@@ -186,35 +186,45 @@ export default function LeftSidebar() {
         if (item.subItems) {
             return (
                 <Collapsible key={item.label} className="w-full relative">
-                    <CollapsibleTrigger asChild>
-                        <div
+                    <div className="w-[90%] mx-auto flex items-center">
+                        <Link
+                            href={item.href}
                             className={cn(
-                                "w-[90%] mx-auto h-12 rounded-xl flex items-center justify-between px-4 transition-all group relative cursor-pointer",
+                                "flex-1 h-12 rounded-l-xl flex items-center justify-start px-4 transition-all group relative cursor-pointer",
                                 isActive(item.href)
                                     ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/30 font-medium"
                                     : "text-gray-400 hover:text-white hover:bg-sidebar-hover font-medium"
                             )}
                         >
-                            <div className="flex items-center">
-                                <item.icon className={cn("w-6 h-6 flex-shrink-0", isActive(item.href) && "fill-current")} />
-                                <span className="ml-3 text-sm">{item.label}</span>
-                            </div>
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="w-4 h-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                            <item.icon className={cn("w-6 h-6 flex-shrink-0", isActive(item.href) && "fill-current")} />
+                            <span className="ml-3 text-sm">{item.label}</span>
+                        </Link>
+                        <CollapsibleTrigger asChild>
+                            <button
+                                className={cn(
+                                    "h-12 px-3 rounded-r-xl transition-all cursor-pointer",
+                                    isActive(item.href)
+                                        ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/30 font-medium"
+                                        : "text-gray-400 hover:text-white hover:bg-sidebar-hover font-medium"
+                                )}
                             >
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </div>
-                    </CollapsibleTrigger>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-4 h-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                                >
+                                    <path d="m6 9 6 6 6-6" />
+                                </svg>
+                            </button>
+                        </CollapsibleTrigger>
+                    </div>
                     <CollapsibleContent className="space-y-1 mt-1 overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         {item.subItems.map((sub: any) => (
                             <Link
