@@ -30,10 +30,9 @@ import {
     Folder,
     ChartBarVertical01,
     ChevronRight,
-    Bell,
-    Eye
+    Bell
 } from "react-coolicons";
-import { Building2 as BuildingIcon, Globe, X as XIcon, Truck, Percent } from "lucide-react";
+import { Building2 as BuildingIcon, Globe, X as XIcon, Truck, Percent, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/hooks";
 import { useBranch } from "@/contexts/BranchContext";
