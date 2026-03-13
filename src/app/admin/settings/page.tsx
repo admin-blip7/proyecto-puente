@@ -1,3 +1,5 @@
+"use client";
+
 import LeftSidebar from "@/components/shared/LeftSidebar";
 import MobileSidebar from "@/components/shared/MobileSidebar";
 import { Button } from "@/components/ui/button";

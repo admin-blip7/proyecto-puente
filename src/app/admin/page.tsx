@@ -1,3 +1,5 @@
+"use client";
+
 import { Header } from "@/components/shared/Header";
 import InventoryClient from "@/components/admin/InventoryClient";
 import { Product } from "@/types";
