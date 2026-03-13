@@ -1,11 +1,7 @@
-import POSClient from '@/components/pos/POSClient';
 import { Product } from '@/types';
-import LeftSidebar from '@/components/shared/LeftSidebar';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
 import { getProducts } from '@/lib/services/productService';
 import { getProductCategories } from '@/lib/services/categoryService';
+import { POSLayoutWithMobile } from '@/components/shared/POSLayout';
 
 // Force dynamic rendering to avoid build-time data fetching issues
 export const dynamic = 'force-dynamic';
@@ -17,26 +13,6 @@ export default async function POSPage() {
   ]);
 
   return (
-    <div className="flex h-screen w-full bg-background">
-      <div className="hidden md:flex">
-        <LeftSidebar />
-      </div>
-      <div className="absolute top-4 left-4 z-50 md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-[280px] border-r-0">
-            <SheetTitle className="sr-only">Main Menu</SheetTitle>
-            <LeftSidebar />
-          </SheetContent>
-        </Sheet>
-      </div>
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <POSClient initialProducts={initialProducts} initialCategories={initialCategories} />
-      </main>
-    </div>
+    <POSLayoutWithMobile initialProducts={initialProducts} initialCategories={initialCategories} />
   );
-} 
+}

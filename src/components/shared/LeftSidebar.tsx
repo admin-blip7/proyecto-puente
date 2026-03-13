@@ -252,7 +252,7 @@ export default function LeftSidebar() {
     };
 
     return (
-        <aside className="hidden md:flex w-full md:w-64 flex-shrink-0 flex-col bg-sidebar-bg/95 md:bg-sidebar-bg backdrop-blur-xl text-white z-30 shadow-2xl items-center py-6 md:py-6 transition-all duration-300 h-screen overflow-hidden">
+        <aside className="w-full md:w-64 flex-shrink-0 flex flex-col bg-sidebar-bg/95 md:bg-sidebar-bg backdrop-blur-xl text-white z-30 shadow-2xl items-center py-6 md:py-6 transition-all duration-300 h-screen overflow-hidden">
             <div className="mb-8 flex-shrink-0 w-full px-4 flex justify-center">
                 <DropdownMenu>
                     <DropdownMenuTrigger className="outline-none w-full max-w-[90%] mx-auto flex items-center justify-start gap-3 p-2 rounded-xl ring-1 ring-blue-500/20 hover:ring-blue-500/50 bg-white/5 hover:bg-white/10 transition-all cursor-pointer shadow-lg hover:shadow-blue-500/20">
