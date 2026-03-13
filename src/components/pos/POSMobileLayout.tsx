@@ -45,6 +45,12 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   // During SSR or before hydration, use desktop layout to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
   
+  // ============ MOBILE POS STATE - MUST BE BEFORE CONDITIONAL RETURN ============
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
+  
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -53,12 +59,6 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   if (!mounted || !isMobile) {
     return <POSClient initialProducts={initialProducts} initialCategories={initialCategories} />;
   }
-
-  // ============ MOBILE POS UI ============
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [showCart, setShowCart] = useState(false);
 
   // Filtrar productos
   const filteredProducts = useMemo(() => {
