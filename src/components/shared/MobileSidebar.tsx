@@ -6,28 +6,34 @@ import { usePathname, useRouter } from "next/navigation";
 import {
     House01,
     Archive,
+    DownloadPackage,
     ShoppingBag01,
     EditPencil01,
     ShieldCheck as CoolShieldCheck,
     Tag as CoolTag,
+    CreditCard01,
     Users as CoolUsers,
     CarAuto,
+    UserCheck as CoolUserCheck,
     Mobile,
+    Bulb,
     Settings as CoolSettings,
+    LogOut,
     ChartLine,
     CreditCard02,
     FileDocument,
     Clock,
+    ShieldWarning,
     ShoppingBag02,
     Printer,
     TicketVoucher,
-    UserCheck,
-    Bulb,
-    LogOut,
+    Folder,
+    ChartBarVertical01,
     ChevronRight,
-    Bell
+    Bell,
+    Eye
 } from "react-coolicons";
-import { Building2 as BuildingIcon, Globe, X as XIcon, Truck } from "lucide-react";
+import { Building2 as BuildingIcon, Globe, X as XIcon, Truck, Percent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/hooks";
 import { useBranch } from "@/contexts/BranchContext";
@@ -36,6 +42,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ModeToggle } from "@/components/mode-toggle";
 
 interface MobileSidebarProps {
     isOpen: boolean;
@@ -50,6 +62,8 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
     const [routesToday, setRoutesToday] = useState(0);
 
     const isSocio = userProfile?.role === "Socio";
+    const isAdmin = userProfile?.role === "Admin";
+    const canSwitchBranch = isSocio && availableBranches.length > 1;
 
     // Get user initials for avatar
     const getInitials = (name?: string) => {
@@ -63,25 +77,58 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
         return "Seleccionar sucursal";
     }, [isSocio, selectedBranch?.name]);
 
-    // Mobile-optimized navigation - essential items only
+    // ALL navigation items - same as desktop
     const mainItems = [
-        { label: "🏠 POS", href: "/pos", icon: House01, active: pathname === "/pos" },
+        { label: "🏠 POS", href: "/pos", icon: House01 },
     ];
 
-    const quickActions = [
+    const operationsItems = [
+        { label: "Dashboard Socio", href: "/socio/dashboard", icon: BuildingIcon },
         { label: "📦 Inventario", href: "/admin", icon: Archive },
+        { label: "📋 Kardex", href: "/admin/kardex", icon: FileDocument },
+        { label: "📥 Entrada Stock", href: "/admin/stock-entry", icon: DownloadPackage },
+        { label: "🛒 Quick PO", href: "/admin/inventory/quick-po-intake", icon: ShoppingBag02 },
         { label: "💰 Ventas", href: "/admin/sales", icon: ShoppingBag01 },
         { label: "🔧 Reparaciones", href: "/admin/repairs", icon: EditPencil01 },
         { label: "📱 Diagnóstico", href: "/admin/diagnostico", icon: Mobile },
+        { label: "🛡️ Garantías", href: "/admin/warranties", icon: CoolShieldCheck },
         { label: "🚚 Rutas", href: "/admin/delivery/routes", icon: Truck, badge: routesToday },
+        { label: "🏷️ Etiquetas", href: "/admin/labels", icon: CoolTag },
     ];
 
-    const settingsItems = [
+    const managementItems = [
+        { label: "👥 CRM", href: "/admin/crm", icon: CoolUsers },
+        { label: "🚚 Proveedores", href: "/admin/suppliers", icon: CarAuto },
+        { label: "🤝 Consignaciones", href: "/admin/consignors", icon: CoolUserCheck },
+        { label: "📱 Compatibilidad", href: "/admin/compatibility", icon: Mobile },
+        { label: "💡 Inteligencia", href: "/admin/intelligence", icon: Bulb },
+    ];
+
+    const masterAdminItems = [
+        { label: "📊 Inventario Global", href: "/admin/inventario-global", icon: ChartBarVertical01 },
+        { label: "👁️ Auditoría", href: "/admin/auditoria-productos", icon: Eye },
+        { label: "% Mayoreo Config", href: "/pos/mayoreo-config", icon: Percent },
+    ];
+
+    const financeSubItems = [
+        { label: "📊 Resumen", href: "/admin/finance", icon: ChartLine },
+        { label: "💳 Cuentas", href: "/admin/finance/accounts", icon: CreditCard02 },
+        { label: "📦 Activos", href: "/admin/finance/assets", icon: DownloadPackage },
+        { label: "📄 Balance", href: "/admin/finance/balance-sheet", icon: FileDocument },
+        { label: "⏰ Historial Caja", href: "/admin/finance/cash-history", icon: Clock },
+        { label: "📁 Categorías", href: "/admin/finance/categories", icon: Folder },
+        { label: "⚠️ Deudas", href: "/admin/finance/debts", icon: ShieldWarning },
+        { label: "💸 Gastos", href: "/admin/finance/expenses", icon: ShoppingBag02 },
+    ];
+
+    const settingsSubItems = [
         { label: "⚙️ Configuración", href: "/admin/settings", icon: CoolSettings },
         { label: "👥 Usuarios", href: "/admin/usuarios", icon: CoolUsers },
-        { label: "🖨️ Impresión", href: "/admin/settings?tab=printers", icon: Printer },
+        { label: "🖨️ Reimprimir", href: "/admin/labels", icon: Printer },
         { label: "🎫 Tickets", href: "/admin/settings?tab=tickets", icon: TicketVoucher },
         { label: "🏷️ Etiquetas", href: "/admin/settings?tab=labels", icon: CoolTag },
+        { label: "🖨️ Impresoras", href: "/admin/settings?tab=printers", icon: Printer },
+        { label: "📁 Categorías", href: "/admin/settings?tab=categories", icon: Folder },
     ];
 
     useEffect(() => {
@@ -99,11 +146,16 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
         onClose();
     };
 
+    const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/");
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 md:hidden">
-            <div className="fixed left-0 top-0 bottom-0 w-[85vw] max-w-[320px] bg-background animate-in slide-in-from-left">
+        <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={onClose}>
+            <div 
+                className="fixed left-0 top-0 bottom-0 w-[85vw] max-w-[320px] bg-background animate-in slide-in-from-left"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b bg-primary/5">
                     <div className="flex items-center gap-3">
@@ -129,9 +181,8 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                 </div>
 
                 <ScrollArea className="h-[calc(100vh-80px)]">
-                    {/* Quick Access */}
+                    {/* POS / Main */}
                     <div className="p-3">
-                        <p className="text-xs font-medium text-muted-foreground px-3 mb-2">ACCESO RÁPIDO</p>
                         <div className="space-y-1">
                             {mainItems.map((item) => (
                                 <button
@@ -140,12 +191,16 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                                     className={cn(
                                         "w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left transition-colors",
                                         "min-h-[52px] touch-manipulation",
-                                        pathname === item.href 
+                                        isActive(item.href) 
                                             ? "bg-primary text-primary-foreground" 
                                             : "hover:bg-muted"
                                     )}
                                 >
-                                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                                    {typeof item.icon === "string" ? (
+                                        <span className="text-lg">{item.icon}</span>
+                                    ) : (
+                                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                                    )}
                                     <span className="font-medium">{item.label}</span>
                                 </button>
                             ))}
@@ -158,20 +213,24 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                     <div className="p-3">
                         <p className="text-xs font-medium text-muted-foreground px-3 mb-2">OPERACIONES</p>
                         <div className="space-y-1">
-                            {quickActions.map((item) => (
+                            {operationsItems.map((item) => (
                                 <button
                                     key={item.href}
                                     onClick={() => handleNavigation(item.href)}
                                     className={cn(
                                         "w-full flex items-center justify-between px-4 py-3.5 rounded-lg text-left transition-colors",
                                         "min-h-[52px] touch-manipulation",
-                                        pathname === item.href || pathname.startsWith(item.href + "/")
+                                        isActive(item.href) 
                                             ? "bg-primary text-primary-foreground" 
                                             : "hover:bg-muted"
                                     )}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                                        {typeof item.icon === "string" ? (
+                                            <span className="text-lg">{item.icon}</span>
+                                        ) : (
+                                            <item.icon className="h-5 w-5 flex-shrink-0" />
+                                        )}
                                         <span className="font-medium">{item.label}</span>
                                     </div>
                                     {item.badge && item.badge > 0 && (
@@ -179,7 +238,6 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                                             {item.badge}
                                         </span>
                                     )}
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                 </button>
                             ))}
                         </div>
@@ -187,38 +245,168 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
 
                     <Separator className="my-2" />
 
-                    {/* Settings */}
-                    <div className="p-3 pb-8">
-                        <p className="text-xs font-medium text-muted-foreground px-3 mb-2">CONFIGURACIÓN</p>
+                    {/* Management */}
+                    <div className="p-3">
+                        <p className="text-xs font-medium text-muted-foreground px-3 mb-2">GESTIÓN</p>
                         <div className="space-y-1">
-                            {settingsItems.map((item) => (
+                            {managementItems.map((item) => (
                                 <button
                                     key={item.href}
                                     onClick={() => handleNavigation(item.href)}
                                     className={cn(
-                                        "w-full flex items-center justify-between px-4 py-3.5 rounded-lg text-left transition-colors",
+                                        "w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left transition-colors",
                                         "min-h-[52px] touch-manipulation",
-                                        pathname === item.href || pathname.includes(item.href.split('?')[0])
+                                        isActive(item.href) 
                                             ? "bg-primary text-primary-foreground" 
                                             : "hover:bg-muted"
                                     )}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    {typeof item.icon === "string" ? (
+                                        <span className="text-lg">{item.icon}</span>
+                                    ) : (
                                         <item.icon className="h-5 w-5 flex-shrink-0" />
-                                        <span className="font-medium">{item.label}</span>
-                                    </div>
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <span className="font-medium">{item.label}</span>
                                 </button>
                             ))}
                         </div>
+                    </div>
 
-                        {/* Logout */}
+                    {/* Master Admin Only */}
+                    {isAdmin && masterAdminItems.length > 0 && (
+                        <>
+                            <Separator className="my-2" />
+                            <div className="p-3">
+                                <p className="text-xs font-medium text-muted-foreground px-3 mb-2">ADMIN MASTER</p>
+                                <div className="space-y-1">
+                                    {masterAdminItems.map((item) => (
+                                        <button
+                                            key={item.href}
+                                            onClick={() => handleNavigation(item.href)}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left transition-colors",
+                                                "min-h-[52px] touch-manipulation",
+                                                isActive(item.href) 
+                                                    ? "bg-primary text-primary-foreground" 
+                                                    : "hover:bg-muted"
+                                            )}
+                                        >
+                                            {typeof item.icon === "string" ? (
+                                                <span className="text-lg">{item.icon}</span>
+                                            ) : (
+                                                <item.icon className="h-5 w-5 flex-shrink-0" />
+                                            )}
+                                            <span className="font-medium">{item.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <Separator className="my-2" />
+
+                    {/* Finanzas - Collapsible */}
+                    <div className="p-3">
+                        <Collapsible>
+                            <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center justify-between px-4 py-3.5 rounded-lg hover:bg-muted min-h-[52px]">
+                                    <div className="flex items-center gap-3">
+                                        <CreditCard01 className="h-5 w-5" />
+                                        <span className="font-medium">💰 Finanzas</span>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-1 mt-1">
+                                {financeSubItems.map((item) => (
+                                    <button
+                                        key={item.href}
+                                        onClick={() => handleNavigation(item.href)}
+                                        className={cn(
+                                            "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors",
+                                            "min-h-[48px] touch-manipulation ml-4",
+                                            isActive(item.href) 
+                                                ? "bg-primary/10 text-primary" 
+                                                : "hover:bg-muted"
+                                        )}
+                                    >
+                                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                                        <span className="text-sm">{item.label}</span>
+                                    </button>
+                                ))}
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </div>
+
+                    {/* Configuración - Collapsible */}
+                    <div className="p-3">
+                        <Collapsible>
+                            <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center justify-between px-4 py-3.5 rounded-lg hover:bg-muted min-h-[52px]">
+                                    <div className="flex items-center gap-3">
+                                        <CoolSettings className="h-5 w-5" />
+                                        <span className="font-medium">⚙️ Configuración</span>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-1 mt-1">
+                                {settingsSubItems.map((item) => (
+                                    <button
+                                        key={item.href}
+                                        onClick={() => handleNavigation(item.href)}
+                                        className={cn(
+                                            "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors",
+                                            "min-h-[48px] touch-manipulation ml-4",
+                                            isActive(item.href) 
+                                                ? "bg-primary/10 text-primary" 
+                                                : "hover:bg-muted"
+                                        )}
+                                    >
+                                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                                        <span className="text-sm">{item.label}</span>
+                                    </button>
+                                ))}
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </div>
+
+                    <Separator className="my-2" />
+
+                    {/* Theme Toggle */}
+                    <div className="p-3">
+                        <div className="flex items-center justify-between px-4 py-3.5 rounded-lg hover:bg-muted min-h-[52px]">
+                            <div className="flex items-center gap-3">
+                                <div className="h-5 w-5 flex items-center justify-center">
+                                    <ModeToggle />
+                                </div>
+                                <span className="font-medium">🎨 Tema Visual</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Branch Switch */}
+                    {canSwitchBranch && (
+                        <div className="p-3">
+                            <button
+                                onClick={() => handleNavigation("/socio/seleccionar-sucursal")}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left hover:bg-muted min-h-[52px]"
+                            >
+                                <BuildingIcon className="h-5 w-5" />
+                                <span className="font-medium">Cambiar Sucursal</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Logout */}
+                    <div className="p-3 pb-8">
                         <button
                             onClick={() => {
                                 signOut();
                                 onClose();
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left text-red-500 hover:bg-red-50 mt-4 min-h-[52px]"
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-lg text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-950 min-h-[52px]"
                         >
                             <LogOut className="h-5 w-5" />
                             <span className="font-medium">Cerrar Sesión</span>
