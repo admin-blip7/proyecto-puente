@@ -45,8 +45,14 @@ const resolveRole = (user: User | null): string => {
 
   const metadataRole = String(user.user_metadata?.role ?? "").toLowerCase();
   const appRole = String(user.app_metadata?.role ?? "").toLowerCase();
+  const normalizedRole = metadataRole || appRole;
+
+  if (normalizedRole === "master admin") {
+    return "admin";
+  }
+
   // Default to "admin" if no role is explicitly set (matches client-side AuthProvider behavior)
-  return metadataRole || appRole || "admin";
+  return normalizedRole || "admin";
 };
 
 const getAuthenticatedUser = async (): Promise<User | null> => {

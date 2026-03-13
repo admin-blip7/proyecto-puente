@@ -1,3 +1,60 @@
+# TODO - Corregir navegación mobile y acceso a configuraciones en POS/mayoreo
+
+## Plan
+- [x] Revisar la ruta `/pos/mayoreo-config`, el sidebar compartido y la navegación de configuración en POS.
+- [x] Corregir el menú mobile de `mayoreo-config` para que use un drawer con ancho útil y no una versión comprimida.
+- [x] Corregir el item padre `Configuración` para que navegue realmente a `/admin/settings` sin perder el submenú.
+- [x] Alinear la validación server-side de mayoreo con roles admin reales, incluyendo `Master Admin`.
+- [x] Validar sintaxis de archivos tocados y respuesta local del servidor.
+
+## Review
+- Hallazgos raíz:
+  - `src/app/(pos)/pos/mayoreo-config/page.tsx` usaba `SheetContent` con `w-24`, lo que comprimía el sidebar en mobile y daba la impresión de menú no adaptado.
+  - `src/components/shared/LeftSidebar.tsx` renderizaba `Configuración` como trigger de colapsable, pero no como enlace navegable; por eso no se podía entrar al panel principal de configuración desde el POS.
+  - `src/app/(pos)/pos/mayoreo-config/page.tsx` y `src/lib/services/wholesaleProfitService.ts` aceptaban solo `admin`; si el usuario venía como `Master Admin`, el servidor podía rechazar el acceso aunque la UI mostrara opciones de admin.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx`
+  - El drawer mobile ahora usa `w-[280px] border-r-0 p-0`, consistente con el POS principal.
+  - ACTUALIZADO: `src/components/shared/LeftSidebar.tsx`
+  - Los items con submenú ahora separan navegación y expansión:
+    - clic en el cuerpo del item => navega al `href` padre
+    - clic en el chevron => abre/cierra subitems
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx` y `src/lib/services/wholesaleProfitService.ts`
+  - Normalización de rol ajustada para mapear `master admin` a `admin` en la protección server-side de mayoreo.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/components/shared/LeftSidebar.tsx`
+    - `src/app/(pos)/pos/mayoreo-config/page.tsx`
+    - `src/lib/services/wholesaleProfitService.ts`
+  - `npm run dev` levantó correctamente en `http://localhost:9003`.
+  - `curl -I` local respondió `200` para:
+    - `/pos`
+    - `/pos/mayoreo-config`
+    - `/admin/settings`
+
+# TODO - Crear agentes expertos de SEO y UI/UX mobile
+
+## Plan
+- [x] Revisar la estructura actual de agentes/skills del proyecto para reutilizar el formato existente.
+- [x] Crear un agente reusable de SEO con alcance claro para metadata, indexacion, schema y e-commerce.
+- [x] Crear un agente reusable de UI/UX mobile con foco mobile-first, tactilidad y responsive.
+- [x] Documentar el alta en `tasks/todo.md` y `project_context.md`.
+
+## Review
+- Estructura usada:
+  - Se reutilizo `agent/skills/` como ubicacion local de agentes del proyecto.
+- Agentes creados:
+  - NUEVO: `agent/skills/seo-expert/SKILL.md`
+  - NUEVO: `agent/skills/seo-expert/AGENTS.md`
+  - NUEVO: `agent/skills/ui-ux-mobile-specialist/SKILL.md`
+  - NUEVO: `agent/skills/ui-ux-mobile-specialist/AGENTS.md`
+- Alcance definido:
+  - `seo-expert`: SEO tecnico y on-page para Next.js/e-commerce, incluyendo metadata, canonical, schema.org, enlazado interno y validacion.
+  - `ui-ux-mobile-specialist`: UX mobile-first, responsive, tactilidad, legibilidad, formularios y conversion en smartphone.
+- Reglas del proyecto respetadas:
+  - Ambos agentes referencian la base visual del proyecto (`index.html` / HTML de referencia).
+  - Ambos incluyen la regla de usar BAML si el trabajo involucra workflows o generacion de IA.
+
 # TODO - Fix deploy Netlify por RESEND_API_KEY faltante
 
 ## Plan

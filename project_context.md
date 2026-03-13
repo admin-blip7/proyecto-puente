@@ -11,6 +11,17 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Corrección POS: menú mobile de mayoreo + acceso a Configuración** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx` para que el drawer mobile use un ancho real de sidebar (`w-[280px]`) y no una versión comprimida.
+  - ACTUALIZADO: `src/components/shared/LeftSidebar.tsx` para separar navegación del item padre y expansión del submenú; ahora `Configuración` sí entra a `/admin/settings` y el chevron controla los subitems.
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx` y `src/lib/services/wholesaleProfitService.ts` para aceptar `Master Admin` como admin válido en la protección server-side de mayoreo.
+  - VALIDADO: transpile TS OK en archivos tocados, `npm run dev` levantó local y `curl -I` respondió `200` para `/pos`, `/pos/mayoreo-config` y `/admin/settings`.
+
+- [x] **Creación de agentes expertos: SEO y UI/UX mobile** (14-Mar-2026, Codex)
+  - NUEVO: `agent/skills/seo-expert/SKILL.md` y `agent/skills/seo-expert/AGENTS.md` para un agente especializado en SEO técnico y on-page para Next.js/e-commerce.
+  - NUEVO: `agent/skills/ui-ux-mobile-specialist/SKILL.md` y `agent/skills/ui-ux-mobile-specialist/AGENTS.md` para un agente especializado en experiencia mobile-first, responsive y conversión en smartphone.
+  - Ambos agentes quedaron alineados con reglas del proyecto: referencia a `index.html`/HTML base para UI pública y uso de BAML en workflows o generaciones de IA.
+
 - [x] **Home tienda 100% funcional: redes reales + soporte por WhatsApp** (10-Mar-2026, Codex)
   - NUEVO: `src/lib/tiendaContact.ts` para centralizar enlaces oficiales de portada (`instagram`, `tiktok`) y WhatsApp de soporte (`2224219292`) con helper `buildWhatsappUrl`.
   - ACTUALIZADO: `src/components/tienda/layout/TiendaFooter.tsx` reemplazando placeholders `#` por enlaces funcionales (Instagram/TikTok/WhatsApp), agregando WhatsApp en bloque de ayuda y corrigiendo rutas rotas del footer (`/tienda/ofertas`, `/tienda/nuevos`, `/tienda/faq`, `/tienda/contacto`).

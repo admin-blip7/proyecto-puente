@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-03-14 - Navegación POS mobile y parents con submenú
+- Si una vista del POS crea su propio `Sheet` móvil, no usar anchos mínimos tipo `w-24` para un sidebar completo; debe reutilizar el ancho funcional del menú principal para no romper la experiencia mobile.
+- En sidebars con items que tienen `subItems`, no convertir el item padre en un trigger no navegable si también tiene `href`; separar explícitamente acción de navegar y acción de expandir.
+- Si la UI expone privilegios de admin, la validación server-side debe normalizar también variantes reales del rol como `Master Admin` para evitar permisos aparentes que luego fallan al entrar.
+
 ## 2026-03-10 - Evitar fallos de build por secretos faltantes (Resend/SDKs)
 - No instanciar clientes de terceros que requieren API key (ej. `new Resend(...)`) en scope de módulo dentro de rutas o servicios importados en build.
 - Mover la inicialización al flujo de ejecución (`handler`/función) y devolver error controlado cuando falte la variable de entorno.

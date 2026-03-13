@@ -31,7 +31,7 @@ import {
     Folder,
     ChartBarVertical01
 } from "react-coolicons";
-import { Building2, Globe, Eye, Truck, Percent } from "lucide-react";
+import { Building2, ChevronDown, Globe, Eye, Truck, Percent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -184,44 +184,36 @@ export default function LeftSidebar() {
         );
 
         if (item.subItems) {
+            const hasActiveSubItem = item.subItems.some((sub: any) => pathname === sub.href);
+
             return (
-                <Collapsible key={item.label} className="w-full relative">
-                    <div className="w-[90%] mx-auto flex items-center">
+                <Collapsible
+                    key={item.label}
+                    className="w-full relative"
+                    defaultOpen={hasActiveSubItem}
+                >
+                    <div
+                        className={cn(
+                            "w-[90%] mx-auto h-12 rounded-xl flex items-center overflow-hidden transition-all group",
+                            isActive(item.href)
+                                ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/30 font-medium"
+                                : "text-gray-400 hover:text-white hover:bg-sidebar-hover font-medium"
+                        )}
+                    >
                         <Link
                             href={item.href}
-                            className={cn(
-                                "flex-1 h-12 rounded-l-xl flex items-center justify-start px-4 transition-all group relative cursor-pointer",
-                                isActive(item.href)
-                                    ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/30 font-medium"
-                                    : "text-gray-400 hover:text-white hover:bg-sidebar-hover font-medium"
-                            )}
+                            className="flex min-w-0 flex-1 items-center px-4"
                         >
                             <item.icon className={cn("w-6 h-6 flex-shrink-0", isActive(item.href) && "fill-current")} />
-                            <span className="ml-3 text-sm">{item.label}</span>
+                            <span className="ml-3 truncate text-sm">{item.label}</span>
                         </Link>
                         <CollapsibleTrigger asChild>
                             <button
-                                className={cn(
-                                    "h-12 px-3 rounded-r-xl transition-all cursor-pointer",
-                                    isActive(item.href)
-                                        ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/30 font-medium"
-                                        : "text-gray-400 hover:text-white hover:bg-sidebar-hover font-medium"
-                                )}
+                                type="button"
+                                aria-label={`Mostrar submenú de ${item.label}`}
+                                className="flex h-full w-12 flex-shrink-0 items-center justify-center border-l border-white/10 transition-colors hover:bg-black/10"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="w-4 h-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
-                                >
-                                    <path d="m6 9 6 6 6-6" />
-                                </svg>
+                                <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                             </button>
                         </CollapsibleTrigger>
                     </div>
