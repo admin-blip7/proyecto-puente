@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Product, CartItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,8 +42,15 @@ const getCategoryIcon = (category: string) => {
 export default function POSMobileLayout({ initialProducts, initialCategories = [], onMenuOpen }: POSMobileLayoutProps) {
   const isMobile = useIsMobile();
 
-  // Desktop: usar POSClient normal
-  if (!isMobile) {
+  // During SSR or before hydration, use desktop layout to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Desktop: usar POSClient normal (also during SSR)
+  if (!mounted || !isMobile) {
     return <POSClient initialProducts={initialProducts} initialCategories={initialCategories} />;
   }
 
