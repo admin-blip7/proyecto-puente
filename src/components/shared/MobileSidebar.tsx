@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { 
-    House01, 
-    Archive, 
-    ShoppingBag01, 
+import {
+    House01,
+    Archive,
+    ShoppingBag01,
     EditPencil01,
     ShieldCheck as CoolShieldCheck,
     Tag as CoolTag,
@@ -21,16 +21,13 @@ import {
     ShoppingBag02,
     Printer,
     TicketVoucher,
-    Building2,
-    Truck,
     UserCheck,
     Bulb,
     LogOut,
-    X,
     ChevronRight,
     Bell
 } from "react-coolicons";
-import { Building2 as BuildingIcon, Globe, X as XIcon } from "lucide-react";
+import { Building2 as BuildingIcon, Globe, X as XIcon, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/hooks";
 import { useBranch } from "@/contexts/BranchContext";
