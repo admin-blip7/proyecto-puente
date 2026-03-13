@@ -56,20 +56,29 @@ export async function POST(req: NextRequest) {
       difference: sessionRaw.difference,
     };
 
-    // 3. Get sales for this session
+    // 3. Get sales for this session (with items)
     const { data: salesRaw = [] } = await supabase
       .from('sales')
-      .select('*')
+      .select('*, sale_items(*)')
       .eq('session_id', sessionId);
 
     // Convert sales from snake_case to camelCase
     const sales = salesRaw.map((s: Record<string, unknown>) => ({
       id: s.id,
       saleId: s.sale_number,
-      items: [], // Not needed for email summary
+      items: Array.isArray((s as Record<string, unknown>).sale_items) 
+        ? ((s as Record<string, unknown>).sale_items as Record<string, unknown>[]).map((item: Record<string, unknown>) => ({
+            productId: item.product_id,
+            name: item.product_name || 'Producto',
+            quantity: item.quantity,
+            priceAtSale: item.unit_price,
+          }))
+        : [],
       totalAmount: s.total_amount,
       paymentMethod: s.payment_method,
       status: s.status,
+      cashierName: s.cashier_name,
+      createdAt: s.created_at,
     }));
 
     // 4. Build email
