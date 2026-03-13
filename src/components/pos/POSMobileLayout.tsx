@@ -8,15 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { 
-  Search, ShoppingCart, QrCode, History, 
-  Plus, Minus, Trash2, CreditCard, Banknote, Menu, Bell,
+  Search, ShoppingCart, QrCode, 
+  Plus, Minus, Trash2, CreditCard, Banknote, Menu,
   Smartphone, Headphones, Zap, Wrench, Grid, Battery, 
   Wifi, Laptop, Monitor, Package
 } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import POSClient from "./POSClient";
 import { ProductCategory } from "@/lib/services/categoryService";
+import CheckoutDialog from "./CheckoutDialog";
+import { useAuth } from "@/lib/hooks";
+import { useToast } from "@/hooks/use-toast";
 
 interface POSMobileLayoutProps {
   initialProducts: Product[];
@@ -33,14 +36,24 @@ const getCategoryIcon = (category: string) => {
   if (lower.includes('reparacion') || lower.includes('servicio')) return <Wrench className="w-4 h-4" />;
   if (lower.includes('funda') || lower.includes('case')) return <Grid className="w-4 h-4" />;
   if (lower.includes('bateria')) return <Battery className="w-4 h-4" />;
-  if (lower.includes('internet') || lower.includes('wifi')) return <Wifi className="w-4 h-4" />;
+  if (lower.includes('internet') || lower.includes('wifi')) return <Wifi className="w-4 w-4" />;
   if (lower.includes('computo') || lower.includes('laptop')) return <Laptop className="w-4 h-4" />;
   if (lower.includes('pantalla')) return <Monitor className="w-4 h-4" />;
   return <Package className="w-4 h-4" />;
 };
 
+// Helper to get product image URL
+const getProductImage = (product: Product): string | null => {
+  if (product.imageUrls && product.imageUrls.length > 0) {
+    return product.imageUrls[0];
+  }
+  return null;
+};
+
 export default function POSMobileLayout({ initialProducts, initialCategories = [], onMenuOpen }: POSMobileLayoutProps) {
   const isMobile = useIsMobile();
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
 
   // During SSR or before hydration, use desktop layout to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
@@ -50,6 +63,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
+  const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -84,7 +98,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   }, [initialProducts]);
 
   // Cart helpers
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Desktop: usar POSClient normal (also during SSR)
@@ -95,21 +109,26 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
 
   const addToCart = (product: Product) => {
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item =>
-          item.product.id === product.id
+          item.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      // Add as CartItem (Product with quantity)
+      return [...prev, { ...product, quantity: 1 }];
+    });
+    toast({
+      title: "Agregado",
+      description: `${product.name} agregado al carrito`,
     });
   };
 
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
+      if (item.id === productId) {
         const newQty = item.quantity + delta;
         return newQty > 0 ? { ...item, quantity: newQty } : item;
       }
@@ -118,7 +137,21 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   };
 
   const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+    setCart(prev => prev.filter(item => item.id !== productId));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  const handleCheckoutSuccess = async () => {
+    clearCart();
+    setShowCart(false);
+    setCheckoutOpen(false);
+    toast({
+      title: "Venta completada",
+      description: "La venta se registró correctamente",
+    });
   };
 
   return (
@@ -175,40 +208,43 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
       {/* Products Grid - 2 columns for easy thumb reach */}
       <ScrollArea className="flex-1 pb-20">
         <div className="grid grid-cols-2 gap-3 p-3">
-          {filteredProducts.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => addToCart(product)}
-              className="flex flex-col items-start p-3 bg-card rounded-xl border text-left transition-all active:scale-[0.98] active:bg-muted touch-manipulation min-h-[160px]"
-            >
-              {/* Product Image or Placeholder */}
-              <div className="w-full aspect-square bg-muted rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                {product.image_url ? (
-                  <img 
-                    src={product.image_url} 
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <Package className="h-10 w-10 text-muted-foreground/50" />
+          {filteredProducts.map((product) => {
+            const imageUrl = getProductImage(product);
+            return (
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
+                className="flex flex-col items-start p-3 bg-card rounded-xl border text-left transition-all active:scale-[0.98] active:bg-muted touch-manipulation min-h-[160px]"
+              >
+                {/* Product Image or Placeholder */}
+                <div className="w-full aspect-square bg-muted rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                  {imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Package className="h-10 w-10 text-muted-foreground/50" />
+                  )}
+                </div>
+                
+                {/* Product Info */}
+                <p className="text-sm font-medium line-clamp-2 leading-tight min-h-[40px]">
+                  {product.name}
+                </p>
+                <p className="text-lg font-bold text-primary mt-auto">
+                  {formatCurrency(product.price)}
+                </p>
+                {product.stock !== undefined && product.stock <= 5 && (
+                  <Badge variant="destructive" className="mt-1 text-[10px] px-1.5 py-0">
+                    Low: {product.stock}
+                  </Badge>
                 )}
-              </div>
-              
-              {/* Product Info */}
-              <p className="text-sm font-medium line-clamp-2 leading-tight min-h-[40px]">
-                {product.name}
-              </p>
-              <p className="text-lg font-bold text-primary mt-auto">
-                {formatCurrency(product.price)}
-              </p>
-              {product.stock !== undefined && product.stock <= 5 && (
-                <Badge variant="destructive" className="mt-1 text-[10px] px-1.5 py-0">
-                  Low: {product.stock}
-                </Badge>
-              )}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
         
         {filteredProducts.length === 0 && (
@@ -251,80 +287,104 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
             
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-3">
-                {cart.map((item) => (
-                  <div 
-                    key={item.product.id}
-                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl"
-                  >
-                    {/* Product mini image */}
-                    <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                      {item.product.image_url ? (
-                        <img 
-                          src={item.product.image_url}
-                          alt={item.product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-7 w-7 text-muted-foreground" />
-                      )}
-                    </div>
-                    
-                    {/* Product info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm line-clamp-1">{item.product.name}</p>
-                      <p className="text-primary font-bold">{formatCurrency(item.product.price)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Subtotal: {formatCurrency(item.product.price * item.quantity)}
-                      </p>
-                    </div>
-                    
-                    {/* Quantity controls */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 rounded-full"
-                        onClick={() => updateQuantity(item.product.id, -1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center font-bold text-lg">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10 rounded-full"
-                        onClick={() => updateQuantity(item.product.id, 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    {/* Remove */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 text-destructive hover:bg-destructive/10 shrink-0"
-                      onClick={() => removeFromCart(item.product.id)}
+                {cart.map((item) => {
+                  const itemImageUrl = getProductImage(item);
+                  return (
+                    <div 
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl"
                     >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </div>
-                ))}
+                      {/* Product mini image */}
+                      <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                        {itemImageUrl ? (
+                          <img 
+                            src={itemImageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="h-7 w-7 text-muted-foreground" />
+                        )}
+                      </div>
+                      
+                      {/* Product info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm line-clamp-1">{item.name}</p>
+                        <p className="text-primary font-bold">{formatCurrency(item.price)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Subtotal: {formatCurrency(item.price * item.quantity)}
+                        </p>
+                      </div>
+                      
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 rounded-full"
+                          onClick={() => updateQuantity(item.id, -1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-bold text-lg">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 rounded-full"
+                          onClick={() => updateQuantity(item.id, 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      {/* Remove */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             </ScrollArea>
             
             {/* Payment buttons */}
             <div className="p-4 border-t bg-background space-y-3">
-              <Button className="w-full h-14 text-lg font-semibold rounded-xl" size="lg">
+              <Button 
+                className="w-full h-14 text-lg font-semibold rounded-xl" 
+                size="lg"
+                onClick={() => {
+                  setShowCart(false);
+                  setCheckoutOpen(true);
+                }}
+              >
                 <CreditCard className="mr-2 h-5 w-5" />
                 Cobrar {formatCurrency(cartTotal)}
               </Button>
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="h-12 rounded-xl">
+                <Button 
+                  variant="outline" 
+                  className="h-12 rounded-xl"
+                  onClick={() => {
+                    setShowCart(false);
+                    setCheckoutOpen(true);
+                  }}
+                >
                   <Banknote className="mr-2 h-4 w-4" />
                   Efectivo
                 </Button>
-                <Button variant="outline" className="h-12 rounded-xl">
+                <Button 
+                  variant="outline" 
+                  className="h-12 rounded-xl"
+                  onClick={() => {
+                    setShowCart(false);
+                    setCheckoutOpen(true);
+                  }}
+                >
                   <CreditCard className="mr-2 h-4 w-4" />
                   Tarjeta
                 </Button>
@@ -333,6 +393,16 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
           </SheetContent>
         </Sheet>
       </div>
+
+      {/* Checkout Dialog */}
+      <CheckoutDialog
+        isOpen={isCheckoutOpen}
+        onOpenChange={setCheckoutOpen}
+        cartItems={cart}
+        totalAmount={cartTotal}
+        onSuccessfulSale={handleCheckoutSuccess}
+        activeSessionId={undefined}
+      />
     </div>
   );
 }
