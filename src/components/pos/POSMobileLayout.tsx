@@ -45,7 +45,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   // During SSR or before hydration, use desktop layout to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
   
-  // ============ MOBILE POS STATE - MUST BE BEFORE CONDITIONAL RETURN ============
+  // ============ ALL HOOKS MUST BE BEFORE CONDITIONAL RETURN ============
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -55,12 +55,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
     setMounted(true);
   }, []);
 
-  // Desktop: usar POSClient normal (also during SSR)
-  if (!mounted || !isMobile) {
-    return <POSClient initialProducts={initialProducts} initialCategories={initialCategories} />;
-  }
-
-  // Filtrar productos
+  // Filtrar productos - useMemo MUST be before conditional return
   const filteredProducts = useMemo(() => {
     let filtered = initialProducts;
     
@@ -82,7 +77,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
     return filtered.slice(0, 30); // Limitar para performance mobile
   }, [initialProducts, selectedCategory, searchQuery]);
 
-  // Categorías únicas
+  // Categorías únicas - useMemo MUST be before conditional return
   const categories = useMemo(() => {
     const cats = new Set(initialProducts.map(p => p.category).filter(Boolean));
     return ["all", ...Array.from(cats)];
@@ -91,6 +86,12 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   // Cart helpers
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Desktop: usar POSClient normal (also during SSR)
+  // IMPORTANT: All hooks (useState, useEffect, useMemo, useCallback) must be ABOVE this line
+  if (!mounted || !isMobile) {
+    return <POSClient initialProducts={initialProducts} initialCategories={initialCategories} />;
+  }
 
   const addToCart = (product: Product) => {
     setCart(prev => {
