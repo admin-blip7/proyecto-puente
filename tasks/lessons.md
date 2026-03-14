@@ -18,6 +18,10 @@
 - Si el sistema imprime etiquetas `CODE128`/`EAN13`, no confiar solo en autodetección genérica del lector; configurar `POSSIBLE_FORMATS` explícitos mejora mucho la lectura real.
 - Para barcodes 1D finos en cámara móvil, `TRY_HARDER` y un intervalo de reintento más corto suelen ser necesarios aunque la cámara ya esté funcionando.
 
+## 2026-03-14 - UX de escáner: cámara activa no basta
+- Si el usuario ve solo el video, interpreta que el lector no está trabajando aunque sí esté decodificando en background.
+- Un escáner mobile debe mostrar recuadro, barrido visual y copy corto de alineación para comunicar claramente dónde poner el código.
+
 ## 2026-03-10 - Evitar fallos de build por secretos faltantes (Resend/SDKs)
 - No instanciar clientes de terceros que requieren API key (ej. `new Resend(...)`) en scope de módulo dentro de rutas o servicios importados en build.
 - Mover la inicialización al flujo de ejecución (`handler`/función) y devolver error controlado cuando falte la variable de entorno.

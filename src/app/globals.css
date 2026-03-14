@@ -672,3 +672,22 @@ body {
   height: 300px !important;
   object-fit: cover !important;
 }
+
+@keyframes scanner-sweep {
+  0% {
+    transform: translateY(-18px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(18px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-18px);
+    opacity: 0.4;
+  }
+}
+
+.scanner-scan-line {
+  animation: scanner-sweep 1.7s ease-in-out infinite;
+}

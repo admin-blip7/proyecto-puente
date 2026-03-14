@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Camera, Flashlight, Loader2, RefreshCcw } from "lucide-react";
+import { Camera, Flashlight, Loader2, RefreshCcw, ScanLine } from "lucide-react";
 
 interface CodeScannerDialogProps {
   open: boolean;
@@ -231,7 +231,31 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
               </div>
             ) : null}
             <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted autoPlay playsInline />
+            {open && !error ? (
+              <>
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/35" />
+                <div className="pointer-events-none absolute left-1/2 top-1/2 w-[78%] max-w-[430px] -translate-x-1/2 -translate-y-1/2">
+                  <div className="relative h-28 rounded-2xl border border-white/45 bg-black/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.18)] backdrop-blur-[1px] sm:h-32">
+                    <div className="scanner-scan-line absolute inset-x-3 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-lime-300 to-transparent shadow-[0_0_12px_rgba(163,230,53,0.9)]" />
+                    <div className="absolute left-0 top-0 h-6 w-6 rounded-tl-2xl border-l-4 border-t-4 border-lime-300" />
+                    <div className="absolute right-0 top-0 h-6 w-6 rounded-tr-2xl border-r-4 border-t-4 border-lime-300" />
+                    <div className="absolute bottom-0 left-0 h-6 w-6 rounded-bl-2xl border-b-4 border-l-4 border-lime-300" />
+                    <div className="absolute bottom-0 right-0 h-6 w-6 rounded-br-2xl border-b-4 border-r-4 border-lime-300" />
+                  </div>
+                  <div className="mt-3 flex items-center justify-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
+                    <ScanLine className="h-3.5 w-3.5 text-lime-300" />
+                    <span>Buscando código dentro del recuadro</span>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
+
+          {!error ? (
+            <p className="text-center text-xs text-muted-foreground">
+              Coloca el código horizontalmente, llena el recuadro con las barras y evita acercarlo demasiado.
+            </p>
+          ) : null}
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">

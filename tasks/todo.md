@@ -1,3 +1,28 @@
+# TODO - Hacer visible el estado de lectura del escáner POS
+
+## Plan
+- [x] Revisar la UI actual del escáner para identificar por qué parece solo una cámara.
+- [x] Agregar guía visual de encuadre y estado activo de búsqueda sobre el video.
+- [x] Añadir una animación ligera de barrido que comunique que el lector está analizando el frame.
+- [x] Validar sintaxis del componente.
+
+## Review
+- Hallazgo principal:
+  - Aunque la cámara ya estaba activa, la UI no mostraba recuadro, línea de lectura ni estado visual de búsqueda.
+  - En la práctica parecía una vista previa de cámara y no un escáner funcional.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx`
+  - Se añadió overlay visual con:
+    - recuadro de enfoque para el barcode
+    - línea animada de barrido
+    - esquinas destacadas
+    - badge de estado `Buscando código dentro del recuadro`
+    - texto breve de instrucción de uso
+  - ACTUALIZADO: `src/app/globals.css`
+  - Nueva animación `scanner-sweep` para la línea de lectura.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en `src/components/pos/CodeScannerDialog.tsx`.
+
 # TODO - Ajustar lector POS para formatos reales de código de barras
 
 ## Plan

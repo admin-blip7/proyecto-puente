@@ -11,6 +11,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **UI del escáner POS con guía visual de lectura** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` con overlay visual de escaneo: recuadro, corners, línea animada de barrido, badge de estado y texto de alineación.
+  - ACTUALIZADO: `src/app/globals.css` con la animación `scanner-sweep`.
+  - OBJETIVO: que el usuario perciba claramente que el lector está buscando el código y dónde colocarlo dentro de cámara.
+  - VALIDADO: transpile TS OK en `src/components/pos/CodeScannerDialog.tsx`.
+
 - [x] **Ajuste del lector POS para etiquetas CODE128/EAN** (14-Mar-2026, Codex)
   - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` para configurar hints explícitos de ZXing con formatos reales del proyecto (`CODE_128`, `EAN_13`, `EAN_8`, `UPC_A`, `UPC_E`, `CODE_39`, `CODABAR`, `ITF`, `QR_CODE`).
   - ACTIVADO: `DecodeHintType.TRY_HARDER` para mejorar detección de códigos 1D en cámara móvil.
