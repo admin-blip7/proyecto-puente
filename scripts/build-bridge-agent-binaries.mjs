@@ -57,6 +57,14 @@ if (os.platform() === "darwin") {
   );
   fs.chmodSync(path.join(macosDir, "DiagnosticoBridgeAgent"), 0o755);
 
+  // Sign the app bundle itself so macOS treats it as a coherent bundle
+  // instead of a loose executable dropped into Contents/MacOS.
+  execFileSync(
+    "codesign",
+    ["--force", "--deep", "--sign", "-", path.join(srcDir, "DiagnosticoBridgeAgent.app")],
+    { stdio: "inherit" }
+  );
+
   execSync(
     `hdiutil create -volname "DiagnosticoBridgeAgent" -srcfolder "${srcDir}" -ov -format UDZO -o "${dmgPath}"`,
     { stdio: "inherit" }

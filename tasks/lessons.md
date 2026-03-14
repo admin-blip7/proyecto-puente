@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-03-15 - App macOS en DMG marcada como dañada
+- No asumir que un `.dmg` válido implica que el `.app` interno abrirá bien en macOS.
+- Cuando empaquete un `.app` manualmente, firmar el bundle completo con `codesign --force --deep --sign - <App.app>` antes de crear el DMG.
+- Verificar siempre 3 niveles en macOS: `hdiutil verify`, `hdiutil attach` y `codesign/spctl` sobre el `.app` dentro del volumen montado.
+
 ## 2026-03-14 - Escaneo POS con código inexistente
 - Si el lector encuentra un barcode que no existe en inventario, no cerrar el flujo con un toast destructivo como único resultado.
 - En POS, un código nuevo debe ofrecer una salida operativa inmediata: crear producto con SKU precargado o asociar el barcode a un producto existente.

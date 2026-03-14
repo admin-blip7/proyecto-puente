@@ -1,3 +1,23 @@
+# TODO - Corregir DMG del bridge agent marcado como corrupto en macOS
+
+## Plan
+- [x] Verificar si el `DiagnosticoBridgeAgent.dmg` está realmente corrupto o si el problema ocurre al abrir el `.app` interno.
+- [x] Ajustar el build del bundle macOS para firmar el `.app` completo antes de generar el DMG.
+- [x] Regenerar el artefacto y validar checksum/montaje local.
+
+## Review
+- Hallazgo principal:
+  - El `.dmg` no estaba corrupto: `hdiutil verify` y `hdiutil attach` pasaban correctamente.
+  - El problema estaba en la presentación del `.app` descargado desde internet; macOS puede marcarlo como “dañado” cuando el bundle no está empaquetado/firmado correctamente o cuando falta notarización de Developer ID.
+- Cambios aplicados:
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs`
+  - El build ahora ejecuta `codesign --force --deep --sign - DiagnosticoBridgeAgent.app` antes de crear `DiagnosticoBridgeAgent.dmg`.
+  - Regenerado: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+- Verificación técnica:
+  - `hdiutil verify iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg` => válido.
+  - `hdiutil attach ...` => volumen montable correctamente.
+  - `codesign -dv` sobre `/Volumes/DiagnosticoBridgeAgent/DiagnosticoBridgeAgent.app` => bundle ejecutable firmado ad-hoc.
+
 # TODO - Empaquetar el agente bridge como binarios nativos por sistema operativo
 
 ## Plan
