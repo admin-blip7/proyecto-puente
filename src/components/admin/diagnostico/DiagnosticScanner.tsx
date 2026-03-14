@@ -461,9 +461,13 @@ export default function DiagnosticScanner() {
       const res = await fetch("/api/diagnostics/bridge/status", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          setBridgeError("Tu sesión no tiene permisos para bridge. Cierra sesión, entra de nuevo y abre /admin/diagnostico.");
+        }
         setBridgeAgents([]);
         return;
       }
+      setBridgeError(null);
       setBridgeAgents(Array.isArray(data.agents) ? data.agents.filter((agent: BridgeAgentStatus) => agent.online) : []);
     } catch {
       setBridgeAgents([]);
@@ -482,6 +486,9 @@ export default function DiagnosticScanner() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new Error("No autorizado para vincular el agente. Inicia sesión como Admin y vuelve a intentar.");
+        }
         throw new Error(data.error || "No se pudo vincular el agente local");
       }
       setPairingState("paired");
@@ -497,11 +504,14 @@ export default function DiagnosticScanner() {
     fetchDevices();
     fetchBridgeStatus();
     pollingRef.current = setInterval(() => {
-      fetchDevices();
       fetchBridgeStatus();
+      // Si ya hay bridge online y el scanner local está offline (Netlify), evita ruido 503 en consola.
+      if (!(bridgeAgents.length > 0 && serviceOnline === false)) {
+        fetchDevices();
+      }
     }, 4000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [fetchBridgeStatus, fetchDevices]);
+  }, [bridgeAgents.length, fetchBridgeStatus, fetchDevices, serviceOnline]);
 
   useEffect(() => {
     const pairingCode = searchParams.get("pair")?.trim();

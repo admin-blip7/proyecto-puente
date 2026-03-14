@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-03-15 - Bridge auth en Netlify no debe depender solo de metadata de Auth
+- No asumir que `user_metadata.role` o `app_metadata.role` siempre llega en todos los entornos de despliegue.
+- Para endpoints críticos de admin (bridge/pairing), usar fallback de rol en tabla `profiles` y manejar claims legacy sin rol explícito.
+- Cuando el scanner local no existe en hosting, reducir polling de endpoints USB locales para evitar ruido masivo de `503`.
+
 ## 2026-03-15 - Instaladores multi-host no deben hardcodear dominio
 - Si el mismo DMG se distribuye desde varios hosts (dominio propio y Netlify), no hardcodear `appUrl` en el launcher.
 - En macOS, aprovechar `com.apple.metadata:kMDItemWhereFroms` para inferir origen de descarga y usar ese host automáticamente.

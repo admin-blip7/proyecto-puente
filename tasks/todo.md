@@ -1,3 +1,30 @@
+# TODO - Hotfix Netlify bridge: evitar `forbidden` falso y ruido de scanner local offline
+
+## Plan
+- [x] Revisar por qué `/api/diagnostics/bridge/status` y `/api/diagnostics/bridge/pair/complete` devolvían `403` en Netlify.
+- [x] Ajustar validación de `requireDiagnosticsAdminUser` para entornos donde el rol no llega en auth metadata.
+- [x] Mejorar mensajes de UI para 401/403 en pairing/bridge y reducir polling de `/api/diagnostics/devices` cuando bridge remoto ya está activo.
+- [x] Validar transpile de archivos modificados.
+
+## Review
+- Hallazgo principal:
+  - En Netlify había sesiones válidas que no traían rol admin en auth metadata, por lo que bridge devolvía `forbidden` aunque el usuario sí operaba como admin en la app.
+  - En paralelo, el scanner seguía sondeando `/api/diagnostics/devices` (servidor sin USB) y llenaba consola con `503`.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/lib/diagnostics/bridge.ts`.
+  - `requireDiagnosticsAdminUser` ahora:
+    - mantiene validación por metadata cuando existe,
+    - agrega fallback a `profiles.role`,
+    - y contempla compatibilidad legacy cuando no hay rol explícito en claims.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`.
+  - UI ahora muestra mensaje claro para 401/403 (sesión/permisos) en bridge/pairing.
+  - Polling evita seguir pegándole a `/api/diagnostics/devices` cuando bridge está online y scanner local está offline (caso hosting).
+- Verificación técnica:
+  - `typescript.transpileModule` OK en:
+    - `src/lib/diagnostics/bridge.ts`
+    - `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+  - `npm run lint` focalizado no se pudo ejecutar por comando/script no disponible en este entorno (`Invalid project directory .../lint`).
+
 # TODO - Auto-detección de dominio en DMG para pairing (Netlify/producción)
 
 ## Plan

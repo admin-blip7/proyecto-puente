@@ -11,6 +11,18 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Hotfix Netlify diagnóstico bridge: corregido `forbidden` falso y ruido `503` del scanner local** (15-Mar-2026, Codex)
+  - REPORTE: en hosting se veía `Scanner offline` con múltiples errores `403` (`bridge/status`, `pair/complete`) y `503` (`devices`).
+  - CAUSA RAÍZ:
+    - validación bridge dependía solo de rol en auth metadata (inconsistente entre entornos),
+    - polling continuaba consultando scanner USB local en hosting aunque bridge remoto ya estaba online.
+  - ACTUALIZADO: `src/lib/diagnostics/bridge.ts`
+    - `requireDiagnosticsAdminUser` con fallback a `profiles.role` y compatibilidad para sesiones legacy sin rol explícito.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - mensajes claros en UI para 401/403 (sesión/permisos),
+    - reducción de polling de `/api/diagnostics/devices` cuando bridge está activo y el scanner local está offline.
+  - VALIDADO: transpile TS OK en ambos archivos.
+
 - [x] **DMG del bridge agent ahora detecta automáticamente el host de instalación (incluye Netlify)** (15-Mar-2026, Codex)
   - CAUSA RAÍZ: el launcher tenía `appUrl` hardcodeado a `https://22electronicgroup.com`, por lo que instalaciones desde Netlify quedaban vinculadas al entorno incorrecto.
   - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para leer `com.apple.metadata:kMDItemWhereFroms` y extraer el `origin` de descarga del `.app`.
