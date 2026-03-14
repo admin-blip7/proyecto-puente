@@ -92,12 +92,7 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
       // Configuration optimized for mobile
       const config = {
         fps: 10,
-        qrbox: function(viewfinderWidth: number, viewfinderHeight: number) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const qrboxSize = Math.floor(minEdge * 0.6);
-          return { width: qrboxSize, height: qrboxSize };
-        },
-        aspectRatio: 1.0,
+        qrbox: { width: 200, height: 200 },
         disableFlip: false,
         formatsToSupport: [
           0,  // QR Code
@@ -118,8 +113,11 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
       if (deviceId) {
         cameraConfig = { deviceId: { exact: deviceId } };
       } else {
-        cameraConfig = { facingMode: { exact: "environment" } };
+        // For iOS/Safari, facingMode works better
+        cameraConfig = { facingMode: "environment" };
       }
+
+      console.log("Starting scanner with config:", cameraConfig);
 
       await scanner.start(
         cameraConfig,
@@ -294,14 +292,14 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
         </DialogHeader>
         
         {/* Scanner container - fixed size for mobile */}
-        <div className="relative bg-black w-full" style={{ minHeight: "300px" }}>
+        <div className="relative bg-black w-full overflow-hidden" style={{ height: "300px" }}>
           <div 
             ref={containerRef}
             id={containerId}
-            className="w-full h-full min-h-[300px]"
+            className="scanner-container"
             style={{ 
               width: "100%", 
-              minHeight: "300px",
+              height: "300px",
               position: "relative"
             }}
           />

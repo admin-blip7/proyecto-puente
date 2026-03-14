@@ -646,3 +646,29 @@ body {
     overflow: hidden;
   }
 }
+
+/* Barcode Scanner Styles */
+.scanner-container video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.scanner-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+}
+
+.scanner-container > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#barcode-scanner-container video,
+#barcode-scanner-container canvas {
+  width: 100% !important;
+  height: 300px !important;
+  object-fit: cover !important;
+}
