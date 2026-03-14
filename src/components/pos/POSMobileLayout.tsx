@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import POSClient from "./POSClient";
 import { ProductCategory } from "@/lib/services/categoryService";
 import CheckoutDialog from "./CheckoutDialog";
+import CodeScannerDialog from "./CodeScannerDialog";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
 
@@ -64,6 +65,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
+  const [isScannerOpen, setScannerOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -154,6 +156,32 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
     });
   };
 
+  // Handle scanned barcode/QR
+  const handleScannedCode = (code: string) => {
+    const normalized = code.trim().toLowerCase();
+    
+    // Find product by SKU, ID, or barcode
+    const product = initialProducts.find(p => 
+      p.sku?.toLowerCase() === normalized ||
+      p.id?.toLowerCase() === normalized ||
+      p.barcode?.toLowerCase() === normalized
+    );
+    
+    if (product) {
+      addToCart(product);
+      toast({
+        title: "Producto encontrado",
+        description: `${product.name} agregado al carrito`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No encontrado",
+        description: `No se encontró producto con código: ${code}`,
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Mobile Header - Fixed */}
@@ -174,7 +202,12 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
             />
           </div>
           
-          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-11 w-11 shrink-0"
+            onClick={() => setScannerOpen(true)}
+          >
             <QrCode className="h-5 w-5" />
           </Button>
         </div>
@@ -402,6 +435,13 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
         totalAmount={cartTotal}
         onSuccessfulSale={handleCheckoutSuccess}
         activeSessionId={undefined}
+      />
+
+      {/* Barcode/QR Scanner Dialog */}
+      <CodeScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setScannerOpen}
+        onResult={handleScannedCode}
       />
     </div>
   );
