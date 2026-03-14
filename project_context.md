@@ -11,6 +11,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Corrección de descarga macOS: el botón viejo bajaba JSON en vez de un DMG real** (15-Mar-2026, Codex)
+  - VERIFICADO: `/Users/brayan/Downloads/DiagnosticoiPhone-3.dmg` no era una imagen de disco; `file` lo reportó como `JSON data`.
+  - CAUSA RAÍZ: la guía seguía enlazando `?file=installer-dmg`, endpoint que intenta generar el DMG en runtime y falla en producción fuera de macOS.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` para apuntar el botón principal de macOS a `?file=bridge-agent-dmg`, que sí entrega un DMG precompilado real.
+  - VALIDADO: `curl -I https://22electronicgroup.com/api/diagnostics/download?file=bridge-agent-dmg` respondió `200` con `content-type: application/x-apple-diskimage`.
+
 - [x] **Alineación del DMG del bridge agent con el DMG funcional del usuario** (15-Mar-2026, Codex)
   - VERIFICADO: el archivo funcional `/Users/brayan/Downloads/DiagnosticoiPhone-2.dmg` usa un `.app` cuyo ejecutable es un `shell script` y no tiene firma.
   - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para que `DiagnosticoBridgeAgent.dmg` siga ese mismo patrón en macOS.

@@ -273,17 +273,17 @@ export default function SetupGuide() {
             </div>
 
             <a
-              href="/api/diagnostics/download?file=installer-dmg"
-              download="DiagnosticoiPhone.dmg"
+              href="/api/diagnostics/download?file=bridge-agent-dmg"
+              download="DiagnosticoBridgeAgent.dmg"
               className="inline-flex items-center gap-2.5 rounded-xl bg-primary px-8 py-4 text-primary-foreground font-semibold text-base shadow-lg hover:bg-primary/90 active:scale-95 transition-all"
             >
               <Download className="h-5 w-5" />
-              Descargar DiagnosticoiPhone.dmg
+              Descargar DiagnosticoBridgeAgent.dmg
             </a>
 
             <div className="space-y-0.5 text-xs text-muted-foreground">
-              <p className="font-medium">DiagnosticoiPhone.dmg · macOS 12+</p>
-              <p>Descarga · Doble clic · Instalar · Listo</p>
+              <p className="font-medium">DiagnosticoBridgeAgent.dmg · macOS 12+</p>
+              <p>Descarga · Doble clic · Instalar bridge local · Listo</p>
             </div>
           </div>
         </CardContent>

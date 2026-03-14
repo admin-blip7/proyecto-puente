@@ -1,3 +1,21 @@
+# TODO - Corregir enlace roto que descargaba JSON con extensión .dmg
+
+## Plan
+- [x] Inspeccionar el archivo descargado por el usuario para verificar si era un DMG real o una respuesta de error.
+- [x] Identificar qué enlace de la guía seguía apuntando al endpoint roto.
+- [x] Reemplazar el enlace por el DMG precompilado correcto del bridge agent.
+
+## Review
+- Hallazgo principal:
+  - El archivo descargado por el usuario no era un `.dmg` válido; era una respuesta JSON de error guardada como `.dmg`.
+  - La causa fue que la guía seguía ofreciendo el enlace viejo `?file=installer-dmg`, que intenta generar un DMG en runtime y falla en producción porque ese endpoint requiere macOS en el servidor.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - El botón principal de macOS ahora descarga `?file=bridge-agent-dmg`, que sí sirve un DMG precompilado y no depende de generar la imagen en el servidor.
+- Verificación técnica:
+  - `file /Users/brayan/Downloads/DiagnosticoiPhone-3.dmg` => `JSON data` (confirmó el fallo real).
+  - `curl -I https://22electronicgroup.com/api/diagnostics/download?file=bridge-agent-dmg` => `200` con `content-type: application/x-apple-diskimage`.
+
 # TODO - Alinear el DMG del bridge agent con el patrón del DMG funcional del usuario
 
 ## Plan
