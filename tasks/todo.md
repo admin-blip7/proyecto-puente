@@ -1,3 +1,30 @@
+# TODO - Alinear el DMG del bridge agent con el patrón del DMG funcional del usuario
+
+## Plan
+- [x] Comparar el DMG funcional del usuario con el `DiagnosticoBridgeAgent.dmg` del proyecto para detectar diferencias reales de empaquetado.
+- [x] Cambiar el build macOS para usar el mismo patrón funcional (`.app` con launcher script, sin firma) en lugar de un binario bundle.
+- [x] Regenerar el DMG y validar que el `.app` interno quede como script sin firma.
+
+## Review
+- Hallazgo principal:
+  - El DMG funcional del usuario no usa un binario Mach-O dentro del `.app`; usa un `shell script` como ejecutable del bundle.
+  - El DMG del proyecto seguía fallando porque, aunque el volumen montaba bien, el patrón interno del `.app` no coincidía con el que ya estaba probado en la Mac del usuario.
+- Cambios aplicados:
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs`
+  - El build de macOS ahora genera `DiagnosticoBridgeAgent.app` con launcher tipo script:
+    - instala/verifica Homebrew
+    - instala/verifica Node
+    - instala/verifica `libimobiledevice` y `usbmuxd`
+    - descarga `bridge-agent.mjs`
+    - lanza el agente en Terminal
+  - ELIMINADO del flujo macOS: firma ad-hoc del bundle.
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+- Verificación técnica:
+  - El `.app` interno del nuevo DMG quedó como:
+    - `Bourne-Again shell script text executable`
+    - `code object is not signed at all`
+  - Eso replica el patrón observado en `/Users/brayan/Downloads/DiagnosticoiPhone-2.dmg`, que sí funciona en la Mac del usuario.
+
 # TODO - Corregir DMG del bridge agent marcado como corrupto en macOS
 
 ## Plan

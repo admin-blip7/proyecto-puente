@@ -11,6 +11,15 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Alineación del DMG del bridge agent con el DMG funcional del usuario** (15-Mar-2026, Codex)
+  - VERIFICADO: el archivo funcional `/Users/brayan/Downloads/DiagnosticoiPhone-2.dmg` usa un `.app` cuyo ejecutable es un `shell script` y no tiene firma.
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para que `DiagnosticoBridgeAgent.dmg` siga ese mismo patrón en macOS.
+  - EL NUEVO `.app` interno:
+    - es `Bourne-Again shell script text executable`
+    - no está firmado
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+  - OBJETIVO: replicar el patrón que ya está probado como funcional en la Mac del usuario.
+
 - [x] **Corrección del build DMG del bridge agent en macOS** (15-Mar-2026, Codex)
   - VERIFICADO: `DiagnosticoBridgeAgent.dmg` no estaba corrupto; `hdiutil verify` y `hdiutil attach` responden OK.
   - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para firmar el bundle completo `DiagnosticoBridgeAgent.app` con `codesign --force --deep --sign -` antes de crear el DMG.

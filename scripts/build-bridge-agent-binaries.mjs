@@ -113,12 +113,6 @@ open -a Terminal "$SCRIPT"
   fs.writeFileSync(path.join(macosDir, "DiagnosticoBridgeAgent"), launcherScript);
   fs.chmodSync(path.join(macosDir, "DiagnosticoBridgeAgent"), 0o755);
 
-  execFileSync(
-    "codesign",
-    ["--force", "--sign", "-", path.join(srcDir, "DiagnosticoBridgeAgent.app")],
-    { stdio: "inherit" }
-  );
-
   execSync(
     `hdiutil create -volname "DiagnosticoBridgeAgent" -srcfolder "${srcDir}" -ov -format UDZO -o "${dmgPath}"`,
     { stdio: "inherit" }
