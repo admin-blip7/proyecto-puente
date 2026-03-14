@@ -51,17 +51,71 @@ if (os.platform() === "darwin") {
 </plist>`
   );
 
-  fs.copyFileSync(
-    path.join(distDir, "bridge-agent-macos-arm64"),
-    path.join(macosDir, "DiagnosticoBridgeAgent")
-  );
+  const launcherScript = `#!/bin/bash
+set -e
+
+APP_URL_DEFAULT="https://22electronicgroup.com"
+WORKDIR="$HOME/.22electronic-diagnostics-agent"
+mkdir -p "$WORKDIR"
+LAUNCHER="$WORKDIR/bridge-agent.mjs"
+
+osascript -e 'display dialog "DiagnosticoBridgeAgent\\n\\nInstalara o verificara automaticamente:\\n\\n  - Homebrew (si falta)\\n  - Node.js\\n  - libimobiledevice\\n  - usbmuxd\\n\\nDespues abrira el agente local en Terminal.\\n\\n¿Continuar?" buttons {"Cancelar", "Instalar"} default button "Instalar" with icon note' >/dev/null 2>&1 || exit 0
+
+SCRIPT=$(mktemp /tmp/diag_bridge_install_XXXXX.sh)
+cat > "$SCRIPT" <<'INSTALLEOF'
+#!/bin/bash
+set -e
+
+APP_URL_DEFAULT="https://22electronicgroup.com"
+WORKDIR="$HOME/.22electronic-diagnostics-agent"
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
+
+clear
+echo "============================================================"
+echo "  DiagnosticoBridgeAgent - Instalando"
+echo "============================================================"
+echo ""
+
+echo "[1/4] Verificando Homebrew..."
+if ! command -v brew >/dev/null 2>&1; then
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+if [ -f "/opt/homebrew/bin/brew" ]; then eval "$(/opt/homebrew/bin/brew shellenv)"; fi
+if [ -f "/usr/local/bin/brew" ]; then eval "$(/usr/local/bin/brew shellenv)"; fi
+echo "  + Homebrew listo"
+
+echo "[2/4] Verificando Node.js..."
+if ! command -v node >/dev/null 2>&1; then
+  brew install node
+fi
+echo "  + Node listo: $(node -v)"
+
+echo "[3/4] Verificando libimobiledevice + usbmuxd..."
+brew install libimobiledevice usbmuxd 2>/dev/null || brew upgrade libimobiledevice usbmuxd 2>/dev/null || true
+echo "  + Dependencias USB listas"
+
+echo "[4/4] Descargando agente..."
+curl -fsSL "$APP_URL_DEFAULT/api/diagnostics/download?file=bridge-agent-js" -o bridge-agent.mjs
+chmod +x bridge-agent.mjs
+echo "  + Agente descargado en $WORKDIR/bridge-agent.mjs"
+echo ""
+echo "El agente pedira URL, token y nombre solo en el primer arranque."
+echo "Luego guardara la configuracion y arrancara automaticamente."
+echo ""
+node bridge-agent.mjs
+INSTALLEOF
+
+chmod +x "$SCRIPT"
+open -a Terminal "$SCRIPT"
+`;
+
+  fs.writeFileSync(path.join(macosDir, "DiagnosticoBridgeAgent"), launcherScript);
   fs.chmodSync(path.join(macosDir, "DiagnosticoBridgeAgent"), 0o755);
 
-  // Sign the app bundle itself so macOS treats it as a coherent bundle
-  // instead of a loose executable dropped into Contents/MacOS.
   execFileSync(
     "codesign",
-    ["--force", "--deep", "--sign", "-", path.join(srcDir, "DiagnosticoBridgeAgent.app")],
+    ["--force", "--sign", "-", path.join(srcDir, "DiagnosticoBridgeAgent.app")],
     { stdio: "inherit" }
   );
 
