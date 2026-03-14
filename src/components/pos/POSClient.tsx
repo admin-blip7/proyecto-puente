@@ -794,7 +794,7 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
                 </button>
               ))}
 
-              <div className="ml-auto relative hidden sm:block">
+              <div className="ml-auto relative hidden sm:flex items-center gap-2">
                 <span className="absolute left-3 top-2.5 text-gray-400">
                   <Search className="w-5 h-5" />
                 </span>
@@ -805,6 +805,15 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="shrink-0"
+                  onClick={() => setScannerOpen(true)}
+                  title="Escanear código"
+                >
+                  <QrCode className="w-5 h-5" />
+                </Button>
               </div>
               <div className="sm:hidden ml-auto">
                 <Button variant="ghost" size="icon" onClick={() => setShowBuscadorCompatibilidad(true)}>
