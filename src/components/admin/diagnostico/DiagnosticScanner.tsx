@@ -73,6 +73,13 @@ interface DeviceResult {
 }
 
 interface AddedDevice { product_id: string; product_name: string; }
+interface BridgeAgentStatus {
+  id: string;
+  name: string;
+  platform?: string | null;
+  online: boolean;
+  last_seen_at?: string | null;
+}
 
 // ── Helpers UI ──────────────────────────────────────────────────────────────
 
@@ -417,6 +424,9 @@ export default function DiagnosticScanner() {
   const [missingTools, setMissingTools] = useState<string[]>([]);
   const [deviceUdids, setDeviceUdids] = useState<string[]>([]);
   const [deviceResults, setDeviceResults] = useState<Record<string, DeviceResult>>({});
+  const [bridgeAgents, setBridgeAgents] = useState<BridgeAgentStatus[]>([]);
+  const [bridgeScanning, setBridgeScanning] = useState(false);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [scanningAll, setScanningAll] = useState(false);
   const [scanningDevice, setScanningDevice] = useState<Record<string, boolean>>({});
   const [addedDevices, setAddedDevices] = useState<Record<string, AddedDevice>>({});
@@ -442,15 +452,97 @@ export default function DiagnosticScanner() {
     }
   }, []);
 
+  const fetchBridgeStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/diagnostics/bridge/status", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) {
+        setBridgeAgents([]);
+        return;
+      }
+      setBridgeAgents(Array.isArray(data.agents) ? data.agents.filter((agent: BridgeAgentStatus) => agent.online) : []);
+    } catch {
+      setBridgeAgents([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDevices();
-    pollingRef.current = setInterval(fetchDevices, 4000);
+    fetchBridgeStatus();
+    pollingRef.current = setInterval(() => {
+      fetchDevices();
+      fetchBridgeStatus();
+    }, 4000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [fetchDevices]);
+  }, [fetchBridgeStatus, fetchDevices]);
+
+  const mergeResults = useCallback((results: DeviceResult[]) => {
+    const mapped: Record<string, DeviceResult> = {};
+    for (const result of results) {
+      mapped[result.udid] = result;
+    }
+    setDeviceResults((p) => ({ ...p, ...mapped }));
+    setDeviceUdids((p) => Array.from(new Set([...p, ...results.map((item) => item.udid)])));
+  }, []);
+
+  const waitForBridgeJob = useCallback(async (jobId: string) => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < 90_000) {
+      const res = await fetch(`/api/diagnostics/bridge/jobs/${jobId}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudo consultar el job del agente local");
+      }
+
+      if (data.job?.status === "completed") {
+        return data.job;
+      }
+
+      if (data.job?.status === "failed" || data.job?.status === "expired") {
+        throw new Error(data.job?.error || "El agente local no pudo completar el diagnóstico");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    throw new Error("El agente local tardó demasiado en responder");
+  }, []);
+
+  const runBridgeJob = useCallback(async (mode: "scan_all" | "scan_device", targetUdid?: string) => {
+    setBridgeScanning(true);
+    setBridgeError(null);
+    try {
+      const createRes = await fetch("/api/diagnostics/bridge/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          targetUdid,
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData.job?.id) {
+        throw new Error(createData.error || "No se pudo crear el job de diagnóstico");
+      }
+
+      const job = await waitForBridgeJob(createData.job.id);
+      const results = Array.isArray(job.result?.results) ? job.result.results : [];
+      mergeResults(results);
+    } catch (error) {
+      setBridgeError(error instanceof Error ? error.message : "No se pudo ejecutar el agente local");
+    } finally {
+      setBridgeScanning(false);
+    }
+  }, [mergeResults, waitForBridgeJob]);
 
   const scanDevice = useCallback(async (udid: string) => {
     setScanningDevice((p) => ({ ...p, [udid]: true }));
     try {
+      if (!serviceOnline && bridgeAgents.length > 0) {
+        await runBridgeJob("scan_device", udid);
+        return;
+      }
       const res = await fetch(`/api/diagnostics/scan?udid=${udid}`, { cache: "no-store" });
       const data = await res.json();
       if (res.status === 503 || data.error === "service_offline") {
@@ -463,11 +555,15 @@ export default function DiagnosticScanner() {
     } finally {
       setScanningDevice((p) => ({ ...p, [udid]: false }));
     }
-  }, []);
+  }, [bridgeAgents.length, runBridgeJob, serviceOnline]);
 
   const scanAll = useCallback(async () => {
     setScanningAll(true);
     try {
+      if (!serviceOnline && bridgeAgents.length > 0) {
+        await runBridgeJob("scan_all");
+        return;
+      }
       const res = await fetch("/api/diagnostics/scan", { cache: "no-store" });
       const data = await res.json();
       if (res.status === 503 || data.error === "service_offline") {
@@ -476,13 +572,12 @@ export default function DiagnosticScanner() {
         return;
       }
       setServiceOnline(true);
-      const m: Record<string, DeviceResult> = {};
-      for (const r of data.results ?? []) m[r.udid] = r;
-      setDeviceResults((p) => ({ ...p, ...m }));
+      mergeResults(data.results ?? []);
     } finally { setScanningAll(false); }
-  }, []);
+  }, [bridgeAgents.length, mergeResults, runBridgeJob, serviceOnline]);
 
   const allUdids = Array.from(new Set([...deviceUdids, ...Object.keys(deviceResults)]));
+  const bridgeActive = bridgeAgents.length > 0;
 
   return (
     <div className="space-y-4">
@@ -498,18 +593,35 @@ export default function DiagnosticScanner() {
             {serviceOnline === null ? "Conectando..."
               : serviceOnline
                 ? `Scanner local activo · ${deviceUdids.length} dispositivo${deviceUdids.length !== 1 ? "s" : ""} conectado${deviceUdids.length !== 1 ? "s" : ""}`
-                : "Scanner offline — ve a la pestaña Configuración"}
+                : bridgeActive
+                  ? `Scanner local offline · agente web activo (${bridgeAgents[0]?.name ?? "agente local"})`
+                  : "Scanner offline — ve a la pestaña Configuración"}
           </span>
         </div>
-        {serviceOnline && deviceUdids.length > 0 && (
-          <Button size="sm" onClick={scanAll} disabled={scanningAll}>
-            {scanningAll ? <Loader className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-            Escanear todos
+        {(serviceOnline || bridgeActive) && (
+          <Button size="sm" onClick={scanAll} disabled={scanningAll || bridgeScanning}>
+            {(scanningAll || bridgeScanning) ? <Loader className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            {bridgeActive && !serviceOnline ? "Diagnosticar con agente local" : "Escanear todos"}
           </Button>
         )}
       </div>
 
-      {serviceOnline === false && (
+      {bridgeActive && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+          <p className="font-medium">Agente local conectado</p>
+          <p className="mt-1">
+            {bridgeAgents[0]?.name ?? "Agente local"} está listo para diagnosticar el iPhone conectado en esa PC/Mac.
+          </p>
+        </div>
+      )}
+
+      {bridgeError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+          {bridgeError}
+        </div>
+      )}
+
+      {serviceOnline === false && !bridgeActive && (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           <WifiOff className="h-8 w-8 mx-auto mb-2" />
           <p className="font-medium">Scanner no disponible</p>
@@ -527,6 +639,14 @@ export default function DiagnosticScanner() {
           <Smartphone className="h-8 w-8 mx-auto mb-2" />
           <p className="font-medium">Sin dispositivos conectados</p>
           <p className="text-sm mt-1">Conecta un iPhone por USB y acepta el par en el dispositivo.</p>
+        </div>
+      )}
+
+      {!serviceOnline && bridgeActive && allUdids.length === 0 && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          <Smartphone className="h-8 w-8 mx-auto mb-2" />
+          <p className="font-medium">Agente local listo</p>
+          <p className="text-sm mt-1">Conecta el iPhone en la PC/Mac del agente y pulsa <strong>Diagnosticar con agente local</strong>.</p>
         </div>
       )}
 

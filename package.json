@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "clean:cache": "node scripts/clear-cache.js",
+    "diagnostics:build-agents": "node scripts/build-bridge-agent-binaries.mjs",
     "images:backfill": "npx tsx scripts/optimize-product-images.ts",
     "supabase:storage": "node scripts/configure-supabase-storage.mjs",
     "supabase:crm-migrate": "node scripts/apply-crm-migrations-client.js",

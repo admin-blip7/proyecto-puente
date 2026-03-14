@@ -1,5 +1,10 @@
 # Lessons
 
+## 2026-03-14 - Escaneo POS con código inexistente
+- Si el lector encuentra un barcode que no existe en inventario, no cerrar el flujo con un toast destructivo como único resultado.
+- En POS, un código nuevo debe ofrecer una salida operativa inmediata: crear producto con SKU precargado o asociar el barcode a un producto existente.
+- Desktop y mobile deben compartir la misma lógica de matching de códigos para evitar que un barcode funcione distinto según el layout.
+
 ## 2026-03-14 - Navegación POS mobile y parents con submenú
 - Si una vista del POS crea su propio `Sheet` móvil, no usar anchos mínimos tipo `w-24` para un sidebar completo; debe reutilizar el ancho funcional del menú principal para no romper la experiencia mobile.
 - En sidebars con items que tienen `subItems`, no convertir el item padre en un trigger no navegable si también tiene `href`; separar explícitamente acción de navegar y acción de expandir.

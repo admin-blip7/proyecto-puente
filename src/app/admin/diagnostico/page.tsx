@@ -16,6 +16,10 @@ export default function DiagnosticoPage() {
           <p className="text-muted-foreground text-sm mt-1">
             Conecta iPhones por USB para leer diagnósticos y agregarlos al inventario automáticamente.
           </p>
+          <p className="text-xs text-muted-foreground mt-2 max-w-3xl">
+            Este módulo no puede correr como web pura desde el navegador del cliente: el acceso al iPhone
+            depende de herramientas locales (`libimobiledevice` + `usbmuxd`) en la máquina que tiene el USB conectado.
+          </p>
         </div>
 
         <Tabs defaultValue="scanner">

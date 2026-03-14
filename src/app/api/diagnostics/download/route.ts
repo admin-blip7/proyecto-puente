@@ -30,6 +30,110 @@ done
 echo ""
 echo "Listo. Abre /admin/diagnostico en tu app."`;
 
+function quoteShell(value: string): string {
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function buildBridgeAgentMacScript(appOrigin: string, token: string, agentName: string): string {
+  return [
+    "#!/bin/bash",
+    "set -e",
+    "",
+    "clear",
+    'echo "============================================================"',
+    'echo "  Diagnóstico iPhone - Agente local bridge"',
+    'echo "============================================================"',
+    'echo ""',
+    'if ! command -v node >/dev/null 2>&1; then',
+    '  echo "Node.js 18+ no está instalado."',
+    '  echo "Instálalo y vuelve a ejecutar este archivo."',
+    '  read -r -p "Presiona Enter para cerrar..." _',
+    "  exit 1",
+    "fi",
+    'for tool in idevice_id ideviceinfo idevicediagnostics idevicepair; do',
+    '  if ! command -v "$tool" >/dev/null 2>&1; then',
+    '    echo "Falta $tool. Instala libimobiledevice primero."',
+    '    read -r -p "Presiona Enter para cerrar..." _',
+    "    exit 1",
+    "  fi",
+    "done",
+    "",
+    'WORKDIR="$HOME/.22electronic-diagnostics-agent"',
+    'mkdir -p "$WORKDIR"',
+    'cd "$WORKDIR"',
+    `curl -fsSL ${quoteShell(`${appOrigin}/api/diagnostics/download?file=bridge-agent-js`)} -o bridge-agent.mjs`,
+    `export DIAG_AGENT_URL=${quoteShell(appOrigin)}`,
+    `export DIAG_AGENT_TOKEN=${quoteShell(token)}`,
+    `export DIAG_AGENT_NAME=${quoteShell(agentName)}`,
+    'echo "Iniciando agente local..."',
+    'node bridge-agent.mjs',
+  ].join("\n");
+}
+
+function buildBridgeAgentLinuxScript(appOrigin: string, token: string, agentName: string): string {
+  return [
+    "#!/usr/bin/env bash",
+    "set -e",
+    "",
+    'if ! command -v node >/dev/null 2>&1; then',
+    '  echo "Node.js 18+ no está instalado."',
+    "  exit 1",
+    "fi",
+    'for tool in idevice_id ideviceinfo idevicediagnostics idevicepair; do',
+    '  if ! command -v "$tool" >/dev/null 2>&1; then',
+    '    echo "Falta $tool. Instala libimobiledevice primero."',
+    "    exit 1",
+    "  fi",
+    "done",
+    'WORKDIR="$HOME/.22electronic-diagnostics-agent"',
+    'mkdir -p "$WORKDIR"',
+    'cd "$WORKDIR"',
+    `curl -fsSL ${quoteShell(`${appOrigin}/api/diagnostics/download?file=bridge-agent-js`)} -o bridge-agent.mjs`,
+    `export DIAG_AGENT_URL=${quoteShell(appOrigin)}`,
+    `export DIAG_AGENT_TOKEN=${quoteShell(token)}`,
+    `export DIAG_AGENT_NAME=${quoteShell(agentName)}`,
+    'node bridge-agent.mjs',
+  ].join("\n");
+}
+
+function escapePowerShell(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function buildBridgeAgentWindowsScript(appOrigin: string, token: string, agentName: string): string {
+  return [
+    '$ErrorActionPreference = "Stop"',
+    'Write-Host "Diagnóstico iPhone - Agente local bridge"',
+    'if (-not (Get-Command node -ErrorAction SilentlyContinue)) {',
+    '  Write-Host "Node.js 18+ no está instalado."',
+    "  exit 1",
+    "}",
+    '$required = @("idevice_id","ideviceinfo","idevicediagnostics","idevicepair")',
+    'foreach ($tool in $required) {',
+    '  if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {',
+    '    Write-Host "Falta $tool. Instala libimobiledevice primero."',
+    "    exit 1",
+    "  }",
+    "}",
+    '$workdir = Join-Path $HOME ".22electronic-diagnostics-agent"',
+    'New-Item -ItemType Directory -Force -Path $workdir | Out-Null',
+    'Set-Location $workdir',
+    `Invoke-WebRequest -Uri '${escapePowerShell(`${appOrigin}/api/diagnostics/download?file=bridge-agent-js`)}' -OutFile 'bridge-agent.mjs'`,
+    `$env:DIAG_AGENT_URL='${escapePowerShell(appOrigin)}'`,
+    `$env:DIAG_AGENT_TOKEN='${escapePowerShell(token)}'`,
+    `$env:DIAG_AGENT_NAME='${escapePowerShell(agentName)}'`,
+    'node .\\bridge-agent.mjs',
+  ].join("\r\n");
+}
+
+function readNativeBridgeAsset(filename: string): Buffer | null {
+  const assetPath = path.join(process.cwd(), "iphone-diagnostic-service", "dist", filename);
+  if (!fs.existsSync(assetPath)) {
+    return null;
+  }
+  return fs.readFileSync(assetPath);
+}
+
 function resolveAppUrl(req: NextRequest): string {
   const host = req.headers.get("host");
   if (!host) return DEFAULT_APP_URL;
@@ -174,6 +278,113 @@ function buildDmg(appUrl: string): string {
 export async function GET(req: NextRequest) {
   const file = req.nextUrl.searchParams.get("file");
   const appUrl = resolveAppUrl(req);
+  const appOrigin = appUrl.replace(/\/admin\/diagnostico$/, "");
+  const token = req.nextUrl.searchParams.get("token") ?? "";
+  const name = req.nextUrl.searchParams.get("name") ?? "Agente Recepción";
+
+  if (file === "bridge-agent-js") {
+    const agentPath = path.join(process.cwd(), "iphone-diagnostic-service", "bridge-agent.mjs");
+    const content = fs.readFileSync(agentPath);
+
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="bridge-agent.mjs"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-dmg") {
+    const content = readNativeBridgeAsset("DiagnosticoBridgeAgent.dmg");
+    if (!content) {
+      return NextResponse.json({ error: "DMG del bridge agent no disponible en este entorno" }, { status: 404 });
+    }
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/x-apple-diskimage",
+        "Content-Disposition": 'attachment; filename="DiagnosticoBridgeAgent.dmg"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-exe") {
+    const content = readNativeBridgeAsset("bridge-agent-win-x64.exe");
+    if (!content) {
+      return NextResponse.json({ error: "EXE del bridge agent no disponible en este entorno" }, { status: 404 });
+    }
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.microsoft.portable-executable",
+        "Content-Disposition": 'attachment; filename="DiagnosticoBridgeAgent.exe"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-linux-bin") {
+    const content = readNativeBridgeAsset("bridge-agent-linux-x64");
+    if (!content) {
+      return NextResponse.json({ error: "Binario Linux del bridge agent no disponible en este entorno" }, { status: 404 });
+    }
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": 'attachment; filename="DiagnosticoBridgeAgent.run"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-mac") {
+    if (!token) {
+      return NextResponse.json({ error: "Falta token para generar el instalador del agente" }, { status: 400 });
+    }
+    const content = Buffer.from(buildBridgeAgentMacScript(appOrigin, token, name), "utf-8");
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": 'attachment; filename="DiagnosticoBridgeAgent.command"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-linux") {
+    if (!token) {
+      return NextResponse.json({ error: "Falta token para generar el instalador del agente" }, { status: 400 });
+    }
+    const content = Buffer.from(buildBridgeAgentLinuxScript(appOrigin, token, name), "utf-8");
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/x-sh",
+        "Content-Disposition": 'attachment; filename="diagnostico-bridge-agent.sh"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
+
+  if (file === "bridge-agent-ps1") {
+    if (!token) {
+      return NextResponse.json({ error: "Falta token para generar el instalador del agente" }, { status: 400 });
+    }
+    const content = Buffer.from(buildBridgeAgentWindowsScript(appOrigin, token, name), "utf-8");
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="DiagnosticoBridgeAgent.ps1"',
+        "Content-Length": String(content.length),
+      },
+    });
+  }
 
   if (file === "installer-dmg") {
     try {
@@ -230,7 +441,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "Archivo no valido", allowed: ["installer-dmg", "installer-mac", "install"] },
+    { error: "Archivo no valido", allowed: ["bridge-agent-js", "bridge-agent-dmg", "bridge-agent-exe", "bridge-agent-linux-bin", "bridge-agent-mac", "bridge-agent-linux", "bridge-agent-ps1", "installer-dmg", "installer-mac", "install"] },
     { status: 400 }
   );
 }

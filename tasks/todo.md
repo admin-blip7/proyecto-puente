@@ -1,3 +1,186 @@
+# TODO - Empaquetar el agente bridge como binarios nativos por sistema operativo
+
+## Plan
+- [x] Hacer que el agente guarde configuración local y pueda arrancar sin variables de entorno en cada ejecución.
+- [x] Crear pipeline de build para binarios nativos macOS, Windows y Linux.
+- [x] Exponer descargas reales `.dmg`, `.exe` y binario Linux desde la guía.
+- [x] Validar sintaxis de los archivos tocados y confirmar artefactos generados.
+
+## Review
+- Hallazgo principal:
+  - Los scripts descargables reducían fricción, pero no cumplían la expectativa de “doble clic” real por sistema operativo.
+  - Para resolverlo, el agente necesitaba dos capacidades nuevas:
+    - configuración persistida localmente en primer arranque
+    - empaquetado nativo por plataforma
+- Cambios aplicados:
+  - ACTUALIZADO: `iphone-diagnostic-service/bridge-agent.mjs`
+  - El agente ahora guarda `appUrl`, `agentToken` y `agentName` en `~/.22electronic-diagnostics-agent/config.json`.
+  - Si no existe configuración, la pide una sola vez en el primer arranque y luego queda persistida.
+  - NUEVO: `scripts/build-bridge-agent-binaries.mjs`
+  - Script para compilar binarios con `pkg`:
+    - macOS arm64
+    - Windows x64 `.exe`
+    - Linux x64
+  - El mismo script genera `DiagnosticoBridgeAgent.dmg` en macOS.
+  - ACTUALIZADO: `package.json`
+  - Nuevo script `npm run diagnostics:build-agents`.
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts`
+  - Nuevas descargas nativas:
+    - `?file=bridge-agent-dmg`
+    - `?file=bridge-agent-exe`
+    - `?file=bridge-agent-linux-bin`
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - La guía ahora prioriza descargas nativas reales (`.dmg`, `.exe`, Linux) y deja scripts manuales como fallback.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/app/api/diagnostics/download/route.ts`
+    - `src/components/admin/diagnostico/SetupGuide.tsx`
+  - `node --check` OK:
+    - `scripts/build-bridge-agent-binaries.mjs`
+    - `iphone-diagnostic-service/bridge-agent.mjs`
+  - Artefactos generados en `iphone-diagnostic-service/dist/`:
+    - `DiagnosticoBridgeAgent.dmg`
+    - `bridge-agent-win-x64.exe`
+    - `bridge-agent-linux-x64`
+    - `bridge-agent-macos-arm64`
+
+# TODO - Agregar instaladores descargables para el agente local de diagnóstico
+
+## Plan
+- [x] Extender `/api/diagnostics/download` para generar instaladores del bridge agent para macOS, Linux y Windows con token y URL preconfigurados.
+- [x] Integrar botones de descarga en la guía de `/admin/diagnostico` cuando el token del agente ya fue generado.
+- [x] Validar sintaxis de los archivos tocados.
+
+## Review
+- Hallazgo principal:
+  - El bridge ya funcionaba, pero obligaba al usuario a copiar y pegar comandos con variables de entorno.
+  - Eso seguía siendo fricción innecesaria para recepción o sucursales donde solo se necesita descargar, abrir y dejar corriendo el agente.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts`
+  - Nuevos archivos descargables:
+    - `?file=bridge-agent-mac`
+    - `?file=bridge-agent-linux`
+    - `?file=bridge-agent-ps1`
+  - Los instaladores quedan preconfigurados con:
+    - URL actual de la app
+    - token del agente
+    - nombre del agente
+  - Cada script valida `node` y `idevice_*`, descarga `bridge-agent.mjs` y arranca el loop del agente.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - Ahora, tras generar token, la guía muestra botones de descarga directos para macOS, Linux y Windows además de los comandos manuales.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/app/api/diagnostics/download/route.ts`
+    - `src/components/admin/diagnostico/SetupGuide.tsx`
+  - Verificación estática adicional: markers de `bridge-agent-mac`, `bridge-agent-linux` y `bridge-agent-ps1` presentes en la route.
+
+# TODO - Implementar agente local para diagnóstico iPhone desde web remota
+
+## Plan
+- [x] Diseñar y crear la persistencia del bridge de diagnóstico (agentes + jobs) para que la web pueda pedir escaneos a una PC local.
+- [x] Implementar rutas API seguras para registrar agente, consultar estado, crear jobs y recibir resultados del agente local.
+- [x] Reutilizar el parseo actual de `libimobiledevice` para aceptar salidas crudas enviadas por el agente y no duplicar lógica de diagnóstico.
+- [x] Crear el agente local liviano en Node y exponer descarga/instrucciones desde `/admin/diagnostico`.
+- [x] Integrar el flujo en la UI de diagnóstico para lanzar escaneos remotos y mostrar resultados.
+- [x] Validar sintaxis de archivos tocados y documentar resultado.
+
+## Review
+- Hallazgo principal:
+  - La web remota no podía acceder al USB del cliente, pero tampoco era necesario duplicar toda la lógica de diagnóstico en el agente local.
+  - La solución más estable fue separar responsabilidades:
+    - la web crea jobs y consume resultados
+    - el agente local solo ejecuta `idevice_*` y sube salidas crudas
+    - el servidor sigue siendo la fuente única de parseo y persistencia
+- Cambios aplicados:
+  - NUEVO: `supabase/migrations/20260314000003_create_diagnostics_bridge.sql`
+  - Se agregaron tablas `diagnostics_bridge_agents` y `diagnostics_bridge_jobs` para registrar agentes locales y jobs de diagnóstico remoto.
+  - NUEVO: `src/lib/diagnostics/bridge.ts`
+  - Helper server-side para autenticar admins, crear agentes, crear jobs, heartbeat, claim y completar jobs.
+  - NUEVAS rutas API:
+    - `src/app/api/diagnostics/bridge/status/route.ts`
+    - `src/app/api/diagnostics/bridge/agents/route.ts`
+    - `src/app/api/diagnostics/bridge/jobs/route.ts`
+    - `src/app/api/diagnostics/bridge/jobs/[jobId]/route.ts`
+    - `src/app/api/diagnostics/bridge/agent/jobs/next/route.ts`
+    - `src/app/api/diagnostics/bridge/agent/jobs/[jobId]/complete/route.ts`
+  - ACTUALIZADO: `src/lib/diagnostics/libimobiledevice.ts`
+  - Se exportó `scanDeviceFromRaw(...)` y se refactorizó el parseo para aceptar salidas crudas del agente local sin duplicar reglas de batería/storage/modelo.
+  - NUEVO: `iphone-diagnostic-service/bridge-agent.mjs`
+  - Agente Node 18+ que hace polling al backend, ejecuta `idevice_id`, `ideviceinfo`, `idevicediagnostics` y entrega resultados del job.
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts`
+  - Se añadió descarga del agente vía `?file=bridge-agent-js`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - Ahora permite generar token del agente y muestra comandos listos para macOS/Linux y Windows PowerShell.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+  - El scanner detecta agentes online, lanza jobs remotos cuando el scanner local está offline y muestra resultados en la misma UI.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en helpers, rutas API y componentes tocados.
+  - `node --check iphone-diagnostic-service/bridge-agent.mjs` OK.
+  - `npm run typecheck` sigue fallando por errores previos ajenos en `src/components/products/ProductDetailModern.tsx`; no provienen de este cambio.
+
+# TODO - Verificar viabilidad de diagnóstico iPhone 100% web sin instalación local
+
+## Plan
+- [x] Revisar la implementación actual de `/admin/diagnostico` y confirmar si depende de binarios locales o de capacidades nativas del navegador.
+- [x] Verificar la viabilidad técnica de usar `libimobiledevice` directamente desde una web sin instalar nada en la PC del usuario.
+- [x] Ajustar la UI/documentación del módulo para dejar explícita la limitación real y evitar falsas expectativas.
+- [x] Validar sintaxis de los archivos tocados.
+
+## Review
+- Hallazgo principal:
+  - El flujo actual no es web puro. `src/app/api/diagnostics/devices/route.ts` y `src/app/api/diagnostics/scan/route.ts` ejecutan `idevice_*` desde Node usando `src/lib/diagnostics/libimobiledevice.ts`.
+  - Eso significa que el diagnóstico depende de binarios locales y del acceso USB de la máquina donde corre la app; una página web abierta en el navegador del cliente no puede reemplazar ese acceso.
+  - A nivel de plataforma, `libimobiledevice` no corre dentro del navegador y las APIs web que podrían parecer cercanas (`WebUSB`, `Web Serial`) no resuelven este caso para iPhone + Safari.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/admin/diagnostico/page.tsx`
+  - Se añadió una nota visible aclarando que el módulo requiere herramientas locales en la máquina con el iPhone conectado.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - Se agregó un bloque explícito indicando que no existe modo “solo web” para este flujo y que el botón `Diagnosticar` depende de `libimobiledevice` + `usbmuxd` instalados localmente.
+  - Se añadió una nota final sobre la limitación arquitectónica del navegador para este caso.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/app/admin/diagnostico/page.tsx`
+    - `src/components/admin/diagnostico/SetupGuide.tsx`
+
+# TODO - Resolver códigos escaneados no registrados en POS
+
+## Plan
+- [x] Unificar la lógica de búsqueda de producto por código escaneado para desktop y mobile.
+- [x] Mostrar un diálogo de resolución cuando el código no exista, con opciones para crear producto nuevo o asociarlo a uno existente.
+- [x] Implementar una API segura para guardar el barcode escaneado en un producto existente.
+- [x] Prellenar el campo `SKU` al navegar a alta de producto desde el escáner.
+- [x] Validar sintaxis de los archivos tocados.
+
+## Review
+- Hallazgo principal:
+  - El POS detectaba que el código no existía, pero se quedaba solo en un toast destructivo.
+  - Eso cortaba el flujo operativo justo en el momento donde el usuario necesitaba resolver el barcode nuevo.
+- Cambios aplicados:
+  - NUEVO: `src/lib/pos/scannedCode.ts`
+  - Se centralizó la lógica de búsqueda por SKU, ID, barcode en atributos, IMEI y serial para reutilizarla en desktop y mobile.
+  - NUEVO: `src/components/pos/ScannedCodeResolutionDialog.tsx`
+  - Se agregó un diálogo de resolución con dos caminos:
+    - crear un producto nuevo con SKU precargado
+    - asociar el código escaneado a un producto existente
+  - ACTUALIZADO: `src/components/pos/POSClient.tsx`
+  - ACTUALIZADO: `src/components/pos/POSMobileLayout.tsx`
+  - Ambos flujos del POS ahora:
+    - cierran el scanner cuando detectan un código
+    - abren el diálogo de resolución si el producto no existe
+    - permiten guardar el barcode en un producto existente sin salir del POS
+  - NUEVO: `src/app/api/products/assign-scanned-code/route.ts`
+  - Se creó una route API para persistir el barcode escaneado en el producto seleccionado de forma server-side.
+  - ACTUALIZADO: `src/components/admin/inventory/AddProductForm.tsx`
+  - El alta de producto ahora toma `?sku=` desde la URL y precarga el campo con un aviso visual cuando viene del escáner POS.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/lib/pos/scannedCode.ts`
+    - `src/components/pos/ScannedCodeResolutionDialog.tsx`
+    - `src/app/api/products/assign-scanned-code/route.ts`
+    - `src/components/pos/POSClient.tsx`
+    - `src/components/pos/POSMobileLayout.tsx`
+    - `src/components/admin/inventory/AddProductForm.tsx`
+
 # TODO - Hacer visible el estado de lectura del escáner POS
 
 ## Plan

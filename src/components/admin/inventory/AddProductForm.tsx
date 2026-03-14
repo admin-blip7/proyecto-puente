@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Product, Consignor, ownershipTypes } from "@/types";
 import { addProduct } from "@/lib/services/productService";
 import { useToast } from "@/hooks/use-toast";
@@ -54,10 +54,19 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
   const [formData, setFormData] = useState(initialFormData);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const prefilledSku = searchParams.get("sku")?.trim() ?? "";
 
   useEffect(() => {
     getProductCategories().then(setCategories);
   }, []);
+  useEffect(() => {
+    if (!prefilledSku) return;
+    setFormData((prev) => {
+      if (prev.sku.trim()) return prev;
+      return { ...prev, sku: prefilledSku };
+    });
+  }, [prefilledSku]);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -169,6 +178,11 @@ export default function AddProductForm({ consignors, allProducts }: AddProductFo
             <Card>
               <CardHeader><CardTitle>Información General</CardTitle></CardHeader>
               <CardContent className="space-y-4 px-2 sm:px-6">
+                {prefilledSku ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    SKU precargado desde el escáner POS. Puedes completar el resto del producto y guardar.
+                  </div>
+                ) : null}
                 <div>
                   <Label htmlFor="name" className="text-sm sm:text-base">Nombre del Producto</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="text-base" />

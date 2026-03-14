@@ -11,11 +11,59 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Empaquetado nativo del agente bridge para Apple `.dmg`, Windows `.exe` y Linux** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `iphone-diagnostic-service/bridge-agent.mjs` para guardar configuración local en `~/.22electronic-diagnostics-agent/config.json` y pedir `URL + token + nombre` solo en el primer arranque.
+  - NUEVO: `scripts/build-bridge-agent-binaries.mjs` para compilar binarios nativos con `pkg` y generar `DiagnosticoBridgeAgent.dmg` en macOS.
+  - ACTUALIZADO: `package.json` con script `diagnostics:build-agents`.
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts` para servir descargas nativas reales:
+    - `bridge-agent-dmg`
+    - `bridge-agent-exe`
+    - `bridge-agent-linux-bin`
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` para priorizar binarios nativos por sistema operativo y dejar scripts manuales como fallback.
+  - ARTEFACTOS GENERADOS en `iphone-diagnostic-service/dist/`:
+    - `DiagnosticoBridgeAgent.dmg`
+    - `bridge-agent-win-x64.exe`
+    - `bridge-agent-linux-x64`
+    - `bridge-agent-macos-arm64`
+  - VALIDADO: transpile TS OK en route/UI y `node --check` OK en el agente y script de build.
+
+- [x] **Instaladores descargables para agente local de diagnóstico** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts` para generar instaladores preconfigurados del bridge agent en macOS (`bridge-agent-mac`), Linux (`bridge-agent-linux`) y Windows PowerShell (`bridge-agent-ps1`).
+  - Los instaladores incluyen URL de la app, token del agente y nombre del agente; además validan `node` + `idevice_*`, descargan `bridge-agent.mjs` y arrancan el loop local.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` para mostrar botones de descarga directa por sistema operativo después de generar el token.
+  - VALIDADO: transpile TS OK en `src/app/api/diagnostics/download/route.ts` y `src/components/admin/diagnostico/SetupGuide.tsx`.
+
+- [x] **Agente local bridge para diagnóstico iPhone desde web remota** (14-Mar-2026, Codex)
+  - NUEVO: migración `supabase/migrations/20260314000003_create_diagnostics_bridge.sql` con tablas `diagnostics_bridge_agents` y `diagnostics_bridge_jobs`.
+  - NUEVO: `src/lib/diagnostics/bridge.ts` para autenticar admin, registrar agentes, crear jobs, tomar jobs por token y completar resultados.
+  - NUEVAS rutas API de bridge en `src/app/api/diagnostics/bridge/**` para estado, alta de agente, creación/consulta de jobs y polling del agente local.
+  - ACTUALIZADO: `src/lib/diagnostics/libimobiledevice.ts` para aceptar salidas crudas del agente (`scanDeviceFromRaw`) y mantener el parseo centralizado en servidor.
+  - NUEVO: `iphone-diagnostic-service/bridge-agent.mjs`, agente Node 18+ que ejecuta `idevice_*` localmente y sincroniza diagnósticos con la web.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` con generación de token y comandos para iniciar el agente.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx` para disparar diagnósticos remotos cuando el scanner local del hosting está offline.
+  - ACTUALIZADO: `src/app/api/diagnostics/download/route.ts` para descargar `bridge-agent.mjs`.
+  - VALIDADO: `typescript.transpileModule` OK en archivos tocados y `node --check iphone-diagnostic-service/bridge-agent.mjs` OK.
+  - NOTA: `npm run typecheck` sigue fallando por errores previos en `src/components/products/ProductDetailModern.tsx`, no por el bridge.
+
+- [x] **Resolución POS para códigos escaneados no registrados** (14-Mar-2026, Codex)
+  - NUEVO: `src/lib/pos/scannedCode.ts` para centralizar el matching de códigos escaneados por `sku`, `id`, `attributes.barcode`, `imei` y `serial`.
+  - NUEVO: `src/components/pos/ScannedCodeResolutionDialog.tsx` con dos salidas operativas cuando el barcode no existe: crear producto nuevo o asociarlo a uno existente.
+  - ACTUALIZADO: `src/components/pos/POSClient.tsx` y `src/components/pos/POSMobileLayout.tsx` para cerrar el escáner tras leer un código y abrir el flujo de resolución si no hay coincidencia.
+  - NUEVO: `src/app/api/products/assign-scanned-code/route.ts` para guardar server-side el barcode escaneado en el producto seleccionado.
+  - ACTUALIZADO: `src/components/admin/inventory/AddProductForm.tsx` para precargar `SKU` desde `?sku=` al llegar desde el lector POS.
+  - VALIDADO: transpile TS OK en helper, diálogo, route API, POS desktop, POS mobile y formulario de alta.
+
 - [x] **UI del escáner POS con guía visual de lectura** (14-Mar-2026, Codex)
   - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` con overlay visual de escaneo: recuadro, corners, línea animada de barrido, badge de estado y texto de alineación.
   - ACTUALIZADO: `src/app/globals.css` con la animación `scanner-sweep`.
   - OBJETIVO: que el usuario perciba claramente que el lector está buscando el código y dónde colocarlo dentro de cámara.
   - VALIDADO: transpile TS OK en `src/components/pos/CodeScannerDialog.tsx`.
+
+- [x] **Verificación de arquitectura: diagnóstico iPhone no puede ser 100% web sin instalación local** (14-Mar-2026, Codex)
+  - VERIFICADO: el flujo de `/admin/diagnostico` usa `src/lib/diagnostics/libimobiledevice.ts`, que ejecuta `idevice_id`, `ideviceinfo`, `idevicediagnostics` e `idevicepair` desde rutas Next (`/api/diagnostics/devices` y `/api/diagnostics/scan`).
+  - CONCLUSIÓN: no es viable que el usuario solo abra la web y pulse `Diagnosticar` sin instalar nada en la PC que tiene conectado el iPhone; el navegador no puede sustituir el acceso USB nativo requerido por `libimobiledevice`.
+  - ACTUALIZADO: `src/app/admin/diagnostico/page.tsx` y `src/components/admin/diagnostico/SetupGuide.tsx` para dejar explícita esta limitación en la UI.
+  - VALIDADO: transpile TS OK en ambos archivos.
 
 - [x] **Ajuste del lector POS para etiquetas CODE128/EAN** (14-Mar-2026, Codex)
   - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` para configurar hints explícitos de ZXing con formatos reales del proyecto (`CODE_128`, `EAN_13`, `EAN_8`, `UPC_A`, `UPC_E`, `CODE_39`, `CODABAR`, `ITF`, `QR_CODE`).

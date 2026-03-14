@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Product, CartItem, CashSession, ClientProfile, Expense, Sale, Income } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProductCard from "./ProductCard";
@@ -41,7 +42,9 @@ import { formatCurrency } from "@/lib/utils";
 import BuscadorCompatibilidad from "./BuscadorCompatibilidad";
 import { getProducts } from "@/lib/services/productService";
 import CodeScannerDialog from "./CodeScannerDialog";
+import ScannedCodeResolutionDialog from "./ScannedCodeResolutionDialog";
 import { routePdfToPrinter } from "@/lib/printing/printRouter";
+import { findProductByScannedCode } from "@/lib/pos/scannedCode";
 
 import { getReadyRepairs } from "@/lib/services/repairService";
 import { RepairOrder } from "@/types";
@@ -77,6 +80,7 @@ interface POSClientProps {
 export default function POSClient({ initialProducts, initialCategories = [] }: POSClientProps) {
   const { toast } = useToast();
   const { userProfile } = useAuth();
+  const router = useRouter();
   const printOperationRef = useRef({ isActive: false });
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -92,11 +96,21 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
   const [lastClosedSession, setLastClosedSession] = useState<CashSession | null>(null);
   const [showBuscadorCompatibilidad, setShowBuscadorCompatibilidad] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
+  const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
+  const [isResolutionOpen, setResolutionOpen] = useState(false);
+  const [isAssociatingCode, setIsAssociatingCode] = useState(false);
   const [showRepairsDialog, setShowRepairsDialog] = useState(false);
 
   const [showDailySales, setShowDailySales] = useState(false);
   const [showRecargasDialog, setShowRecargasDialog] = useState(false);
   const lastScanRef = useRef<{ code: string; ts: number } | null>(null);
+
+  const handleResolutionOpenChange = useCallback((open: boolean) => {
+    setResolutionOpen(open);
+    if (!open && !isAssociatingCode) {
+      setUnrecognizedCode(null);
+    }
+  }, [isAssociatingCode]);
 
   // Derive unique categories with counts
   const categories = useMemo(() => {
@@ -565,59 +579,78 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
 
   // Create a DOM element directly for printing
 
+  const handleCreateProductFromScan = useCallback(() => {
+    if (!unrecognizedCode) return;
+    setResolutionOpen(false);
+    setUnrecognizedCode(null);
+    router.push(`/admin/inventory/add?sku=${encodeURIComponent(unrecognizedCode)}`);
+  }, [router, unrecognizedCode]);
 
+  const handleAssociateCodeToProduct = useCallback(
+    async (product: Product) => {
+      if (!unrecognizedCode) return;
+      setIsAssociatingCode(true);
 
+      try {
+        const response = await fetch("/api/products/assign-scanned-code", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.id,
+            scannedCode: unrecognizedCode,
+          }),
+        });
 
-  const sanitize = (s: string) => s.toLowerCase().replace(/[\s\-_.]/g, "");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            typeof payload?.error === "string"
+              ? payload.error
+              : "No se pudo asociar el código."
+          );
+        }
 
-  const tryFindProductByCode = (codeRaw: string): Product | undefined => {
-    const code = codeRaw.trim();
-    const lower = code.toLowerCase();
-    const sanitized = sanitize(code);
+        setProducts((currentProducts) =>
+          currentProducts.map((currentProduct) =>
+            currentProduct.id === product.id
+              ? {
+                  ...currentProduct,
+                  sku:
+                    typeof payload?.sku === "string" && payload.sku.trim()
+                      ? payload.sku
+                      : currentProduct.sku,
+                  attributes: {
+                    ...(currentProduct.attributes ?? {}),
+                    barcode: unrecognizedCode,
+                  },
+                }
+              : currentProduct
+          )
+        );
 
-    // Direct exact matches first
-    let match = products.find(p => p.sku?.trim().toLowerCase() === lower || p.id?.toLowerCase() === lower || p.id === code);
-    if (match) return match;
-
-    // Sanitized compare (ignoring separators)
-    match = products.find(p => sanitize(p.sku || "") === sanitized || sanitize(p.id || "") === sanitized);
-    if (match) return match;
-
-    // Try to parse common patterns like SKU:xxxx or id=xxxx from QR text
-    const skuMatch = code.match(/sku\s*[:=]\s*([A-Za-z0-9\-_.]+)/i);
-    if (skuMatch?.[1]) {
-      const m = products.find(p => p.sku?.trim().toLowerCase() === skuMatch[1].toLowerCase());
-      if (m) return m;
-    }
-    const idMatch = code.match(/id\s*[:=]\s*([A-Za-z0-9\-_.]+)/i);
-    if (idMatch?.[1]) {
-      const m = products.find(p => p.id?.trim().toLowerCase() === idMatch[1].toLowerCase());
-      if (m) return m;
-    }
-
-    // Optional: custom attributes (barcode, imei, serial)
-    try {
-      match = products.find((p) => {
-        const attr = (p as any).attributes;
-        if (!attr) return false;
-
-        const barcode = attr.barcode || attr.code;
-        if (typeof barcode === 'string' && sanitize(barcode) === sanitized) return true;
-
-        const imei = attr.imei;
-        if (typeof imei === 'string' && sanitize(imei) === sanitized) return true;
-
-        const serial = attr.serial;
-        if (typeof serial === 'string' && sanitize(serial) === sanitized) return true;
-
-        return false;
-      }) || undefined;
-    } catch {
-      // ignore
-    }
-
-    return match;
-  };
+        setResolutionOpen(false);
+        setUnrecognizedCode(null);
+        toast({
+          title: "Código asociado",
+          description: `${unrecognizedCode} ahora pertenece a ${product.name}.`,
+        });
+      } catch (error) {
+        toast({
+          title: "No se pudo asociar",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Ocurrió un problema al guardar el código.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsAssociatingCode(false);
+      }
+    },
+    [toast, unrecognizedCode]
+  );
 
   const handleScannedCode = (raw: string) => {
     const now = Date.now();
@@ -628,9 +661,12 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
     }
     lastScanRef.current = { code: normalized, ts: now };
 
-    const product = tryFindProductByCode(normalized);
+    setScannerOpen(false);
+
+    const product = findProductByScannedCode(products, normalized);
     if (!product) {
-      toast({ title: "Código no reconocido", description: `No encontramos un producto para: ${normalized}`, variant: "destructive" });
+      setUnrecognizedCode(normalized);
+      setResolutionOpen(true);
       return;
     }
 
@@ -910,6 +946,15 @@ export default function POSClient({ initialProducts, initialCategories = [] }: P
         open={isScannerOpen}
         onOpenChange={setScannerOpen}
         onResult={handleScannedCode}
+      />
+      <ScannedCodeResolutionDialog
+        open={isResolutionOpen}
+        scannedCode={unrecognizedCode}
+        products={products}
+        isSaving={isAssociatingCode}
+        onOpenChange={handleResolutionOpenChange}
+        onCreateNew={handleCreateProductFromScan}
+        onAssociate={handleAssociateCodeToProduct}
       />
       <CloseCashDrawerDialog
         isOpen={isClosingDrawer}

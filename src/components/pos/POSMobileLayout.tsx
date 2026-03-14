@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Product, CartItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,8 +20,10 @@ import POSClient from "./POSClient";
 import { ProductCategory } from "@/lib/services/categoryService";
 import CheckoutDialog from "./CheckoutDialog";
 import CodeScannerDialog from "./CodeScannerDialog";
+import ScannedCodeResolutionDialog from "./ScannedCodeResolutionDialog";
 import { useAuth } from "@/lib/hooks";
 import { useToast } from "@/hooks/use-toast";
+import { findProductByScannedCode } from "@/lib/pos/scannedCode";
 
 interface POSMobileLayoutProps {
   initialProducts: Product[];
@@ -55,6 +58,7 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   const isMobile = useIsMobile();
   const { userProfile } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   // During SSR or before hydration, use desktop layout to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
@@ -62,18 +66,33 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
   // ============ ALL HOOKS MUST BE BEFORE CONDITIONAL RETURN ============
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [isCheckoutOpen, setCheckoutOpen] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
+  const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
+  const [isResolutionOpen, setResolutionOpen] = useState(false);
+  const [isAssociatingCode, setIsAssociatingCode] = useState(false);
   
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    setProducts(initialProducts);
+  }, [initialProducts]);
+
+  const handleResolutionOpenChange = useCallback((open: boolean) => {
+    setResolutionOpen(open);
+    if (!open && !isAssociatingCode) {
+      setUnrecognizedCode(null);
+    }
+  }, [isAssociatingCode]);
+
   // Filtrar productos - useMemo MUST be before conditional return
   const filteredProducts = useMemo(() => {
-    let filtered = initialProducts;
+    let filtered = products;
     
     if (selectedCategory !== "all") {
       filtered = filtered.filter(p => 
@@ -91,13 +110,13 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
     }
     
     return filtered.slice(0, 30); // Limitar para performance mobile
-  }, [initialProducts, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery]);
 
   // Categorías únicas - useMemo MUST be before conditional return
   const categories = useMemo(() => {
-    const cats = new Set(initialProducts.map(p => p.category).filter(Boolean));
+    const cats = new Set(products.map(p => p.category).filter(Boolean));
     return ["all", ...Array.from(cats)];
-  }, [initialProducts]);
+  }, [products]);
 
   // Cart helpers
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -127,6 +146,79 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
       description: `${product.name} agregado al carrito`,
     });
   };
+
+  const handleCreateProductFromScan = useCallback(() => {
+    if (!unrecognizedCode) return;
+    setResolutionOpen(false);
+    setUnrecognizedCode(null);
+    router.push(`/admin/inventory/add?sku=${encodeURIComponent(unrecognizedCode)}`);
+  }, [router, unrecognizedCode]);
+
+  const handleAssociateCodeToProduct = useCallback(
+    async (product: Product) => {
+      if (!unrecognizedCode) return;
+      setIsAssociatingCode(true);
+
+      try {
+        const response = await fetch("/api/products/assign-scanned-code", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.id,
+            scannedCode: unrecognizedCode,
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            typeof payload?.error === "string"
+              ? payload.error
+              : "No se pudo asociar el código."
+          );
+        }
+
+        setProducts((currentProducts) =>
+          currentProducts.map((currentProduct) =>
+            currentProduct.id === product.id
+              ? {
+                  ...currentProduct,
+                  sku:
+                    typeof payload?.sku === "string" && payload.sku.trim()
+                      ? payload.sku
+                      : currentProduct.sku,
+                  attributes: {
+                    ...(currentProduct.attributes ?? {}),
+                    barcode: unrecognizedCode,
+                  },
+                }
+              : currentProduct
+          )
+        );
+
+        setResolutionOpen(false);
+        setUnrecognizedCode(null);
+        toast({
+          title: "Código asociado",
+          description: `${unrecognizedCode} ahora pertenece a ${product.name}.`,
+        });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "No se pudo asociar",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Ocurrió un problema al guardar el código.",
+        });
+      } finally {
+        setIsAssociatingCode(false);
+      }
+    },
+    [toast, unrecognizedCode]
+  );
 
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
@@ -158,14 +250,9 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
 
   // Handle scanned barcode/QR
   const handleScannedCode = (code: string) => {
-    const normalized = code.trim().toLowerCase();
-    
-    // Find product by SKU, ID, or barcode
-    const product = initialProducts.find(p => 
-      p.sku?.toLowerCase() === normalized ||
-      p.id?.toLowerCase() === normalized ||
-      p.barcode?.toLowerCase() === normalized
-    );
+    const normalized = code.trim();
+    setScannerOpen(false);
+    const product = findProductByScannedCode(products, normalized);
     
     if (product) {
       addToCart(product);
@@ -174,11 +261,8 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
         description: `${product.name} agregado al carrito`,
       });
     } else {
-      toast({
-        variant: "destructive",
-        title: "No encontrado",
-        description: `No se encontró producto con código: ${code}`,
-      });
+      setUnrecognizedCode(normalized);
+      setResolutionOpen(true);
     }
   };
 
@@ -442,6 +526,15 @@ export default function POSMobileLayout({ initialProducts, initialCategories = [
         open={isScannerOpen}
         onOpenChange={setScannerOpen}
         onResult={handleScannedCode}
+      />
+      <ScannedCodeResolutionDialog
+        open={isResolutionOpen}
+        scannedCode={unrecognizedCode}
+        products={products}
+        isSaving={isAssociatingCode}
+        onOpenChange={handleResolutionOpenChange}
+        onCreateNew={handleCreateProductFromScan}
+        onAssociate={handleAssociateCodeToProduct}
       />
     </div>
   );

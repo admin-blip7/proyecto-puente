@@ -23,6 +23,16 @@ interface CommandResult {
   stderr: string;
 }
 
+export interface RawDeviceScanPayload {
+  udid: string;
+  info_stdout?: string;
+  info_stderr?: string;
+  battery_ioreg_stdout?: string;
+  battery_domain_stdout?: string;
+  disk_usage_xml_stdout?: string;
+  disk_usage_stdout?: string;
+}
+
 interface ToolCache {
   checkedAt: number;
   missingTools: string[];
@@ -246,33 +256,31 @@ function bytesToGb(value: number | undefined, decimals = 0): number | undefined 
   return Math.round(gb * factor) / factor;
 }
 
-async function getDiskUsageBytes(udid: string): Promise<{
+function getDiskUsageBytesFromOutputs(input: {
+  diskUsageXmlStdout?: string;
+  diskUsageStdout?: string;
+}): {
   totalDiskBytes?: number;
   totalDataCapacityBytes?: number;
   totalDataAvailableBytes?: number;
   amountDataAvailableBytes?: number;
-}> {
-  const xmlResult = await runCommand("ideviceinfo", [
-    "-u",
-    udid,
-    "-q",
-    "com.apple.disk_usage",
-    "-x",
-  ]);
+} {
+  const diskUsageXmlStdout = input.diskUsageXmlStdout ?? "";
+  const diskUsageStdout = input.diskUsageStdout ?? "";
 
-  if (xmlResult.ok && xmlResult.stdout.includes("<plist")) {
-    const totalDiskBytes = pickPlistNumber(xmlResult.stdout, [
+  if (diskUsageXmlStdout.includes("<plist")) {
+    const totalDiskBytes = pickPlistNumber(diskUsageXmlStdout, [
       "TotalDiskCapacity",
       "AmountTotalDiskCapacity",
     ]);
-    const totalDataCapacityBytes = pickPlistNumber(xmlResult.stdout, [
+    const totalDataCapacityBytes = pickPlistNumber(diskUsageXmlStdout, [
       "TotalDataCapacity",
       "AmountDataCapacity",
     ]);
-    const totalDataAvailableBytes = pickPlistNumber(xmlResult.stdout, [
+    const totalDataAvailableBytes = pickPlistNumber(diskUsageXmlStdout, [
       "TotalDataAvailable",
     ]);
-    const amountDataAvailableBytes = pickPlistNumber(xmlResult.stdout, [
+    const amountDataAvailableBytes = pickPlistNumber(diskUsageXmlStdout, [
       "AmountDataAvailable",
     ]);
 
@@ -291,12 +299,9 @@ async function getDiskUsageBytes(udid: string): Promise<{
     }
   }
 
-  const parsed = await getCommandMap("ideviceinfo", [
-    "-u",
-    udid,
-    "-q",
-    "com.apple.disk_usage",
-  ]);
+  const parsed = diskUsageStdout.trim()
+    ? parseKeyValueOutput(diskUsageStdout)
+    : null;
 
   return {
     totalDiskBytes:
@@ -308,6 +313,33 @@ async function getDiskUsageBytes(udid: string): Promise<{
     amountDataAvailableBytes:
       pickNumber(parsed, ["AmountDataAvailable"]) ?? undefined,
   };
+}
+
+async function getDiskUsageBytes(udid: string): Promise<{
+  totalDiskBytes?: number;
+  totalDataCapacityBytes?: number;
+  totalDataAvailableBytes?: number;
+  amountDataAvailableBytes?: number;
+}> {
+  const xmlResult = await runCommand("ideviceinfo", [
+    "-u",
+    udid,
+    "-q",
+    "com.apple.disk_usage",
+    "-x",
+  ]);
+
+  const plainResult = await runCommand("ideviceinfo", [
+    "-u",
+    udid,
+    "-q",
+    "com.apple.disk_usage",
+  ]);
+
+  return getDiskUsageBytesFromOutputs({
+    diskUsageXmlStdout: xmlResult.stdout,
+    diskUsageStdout: plainResult.stdout,
+  });
 }
 
 function extractPlistPrimitive(plistXml: string, keyPath: string): Primitive | undefined {
@@ -440,56 +472,53 @@ function buildDeviceReadError(stderr: string): string {
   return `No se pudo leer el dispositivo. Acepta 'Confiar' en el iPhone y reintenta. (${clean})`;
 }
 
-async function readBatteryInfo(
-  udid: string
-): Promise<{ battery?: BatteryInfo; batteryGenuineApple?: boolean | null }> {
-  const ioregResult = await runCommand("idevicediagnostics", [
-    "-u",
-    udid,
-    "ioregentry",
-    "AppleSmartBattery",
-  ]);
+function readBatteryInfoFromOutputs(input: {
+  udid: string;
+  batteryIoregStdout?: string;
+  batteryDomainStdout?: string;
+}): { battery?: BatteryInfo; batteryGenuineApple?: boolean | null } {
+  const ioregStdout = input.batteryIoregStdout ?? "";
 
-  if (ioregResult.ok && ioregResult.stdout.includes("<plist")) {
-    const cycleCount = pickPlistNumber(ioregResult.stdout, [
+  if (ioregStdout.includes("<plist")) {
+    const cycleCount = pickPlistNumber(ioregStdout, [
       "IORegistry.BatteryData.CycleCount",
       "IORegistry.CycleCount",
       "IORegistry.BatteryCycleCount",
     ]);
 
-    const designMah = pickPlistNumber(ioregResult.stdout, [
+    const designMah = pickPlistNumber(ioregStdout, [
       "IORegistry.BatteryData.DesignCapacity",
       "IORegistry.DesignCapacity",
     ]);
 
-    const fullChargeMah = pickPlistNumber(ioregResult.stdout, [
+    const fullChargeMah = pickPlistNumber(ioregStdout, [
       "IORegistry.AppleRawMaxCapacity",
       "IORegistry.NominalChargeCapacity",
       "IORegistry.FullChargeCapacity",
     ]);
 
-    const currentPct = pickPlistNumber(ioregResult.stdout, [
+    const currentPct = pickPlistNumber(ioregStdout, [
       "IORegistry.CurrentCapacity",
       "IORegistry.BatteryCurrentCapacity",
     ]);
 
-    const voltageMv = pickPlistNumber(ioregResult.stdout, [
+    const voltageMv = pickPlistNumber(ioregStdout, [
       "IORegistry.Voltage",
       "IORegistry.AppleRawBatteryVoltage",
     ]);
 
-    const temperatureRaw = pickPlistNumber(ioregResult.stdout, [
+    const temperatureRaw = pickPlistNumber(ioregStdout, [
       "IORegistry.Temperature",
       "IORegistry.VirtualTemperature",
     ]);
 
-    const batteryHealthMetric = pickPlistNumber(ioregResult.stdout, [
+    const batteryHealthMetric = pickPlistNumber(ioregStdout, [
       "IORegistry.BatteryData.BatteryHealthMetric",
       "IORegistry.MaximumCapacityPercent",
       "IORegistry.BatteryHealth",
     ]);
 
-    const batteryGenuineApple = pickPlistBoolean(ioregResult.stdout, [
+    const batteryGenuineApple = pickPlistBoolean(ioregStdout, [
       "IORegistry.BatteryIsGenuineApple",
       "IORegistry.BatteryData.BatteryIsGenuineApple",
     ]);
@@ -522,13 +551,13 @@ async function readBatteryInfo(
         batteryGenuineApple:
           batteryGenuineApple === undefined ? null : batteryGenuineApple,
       };
-      batteryCache.set(udid, value);
+      batteryCache.set(input.udid, value);
       return value;
     }
   }
 
-  const ioreg = ioregResult.ok && ioregResult.stdout.trim()
-    ? parseKeyValueOutput(ioregResult.stdout)
+  const ioreg = ioregStdout.trim()
+    ? parseKeyValueOutput(ioregStdout)
     : null;
 
   const batteryGenuineApple = pickBoolean(ioreg, ["BatteryIsGenuineApple"]);
@@ -565,12 +594,9 @@ async function readBatteryInfo(
     };
   }
 
-  const batteryDomain = await getCommandMap("ideviceinfo", [
-    "-u",
-    udid,
-    "-q",
-    "com.apple.mobile.battery",
-  ]);
+  const batteryDomain = input.batteryDomainStdout?.trim()
+    ? parseKeyValueOutput(input.batteryDomainStdout)
+    : null;
 
   const fallbackHealth = pickNumber(batteryDomain, [
     "MaximumCapacity",
@@ -596,11 +622,11 @@ async function readBatteryInfo(
       batteryGenuineApple:
         batteryGenuineApple === undefined ? null : batteryGenuineApple,
     };
-    batteryCache.set(udid, value);
+    batteryCache.set(input.udid, value);
     return value;
   }
 
-  const cached = batteryCache.get(udid);
+  const cached = batteryCache.get(input.udid);
   if (cached) {
     return cached;
   }
@@ -610,6 +636,30 @@ async function readBatteryInfo(
     batteryGenuineApple:
       batteryGenuineApple === undefined ? null : batteryGenuineApple,
   };
+}
+
+async function readBatteryInfo(
+  udid: string
+): Promise<{ battery?: BatteryInfo; batteryGenuineApple?: boolean | null }> {
+  const ioregResult = await runCommand("idevicediagnostics", [
+    "-u",
+    udid,
+    "ioregentry",
+    "AppleSmartBattery",
+  ]);
+
+  const batteryDomainResult = await runCommand("ideviceinfo", [
+    "-u",
+    udid,
+    "-q",
+    "com.apple.mobile.battery",
+  ]);
+
+  return readBatteryInfoFromOutputs({
+    udid,
+    batteryIoregStdout: ioregResult.stdout,
+    batteryDomainStdout: batteryDomainResult.stdout,
+  });
 }
 
 export async function checkDiagnosticsEnvironment(
@@ -660,6 +710,123 @@ export async function scanDevice(udid: string): Promise<DeviceResult> {
   const fallbackAvailableBytes = amountDataAvailableBytes ?? totalDataAvailableBytes;
 
   // En iOS recientes, TotalDataCapacity alinea mejor con "iPhone Storage > used".
+  const usedFromDataCapacity =
+    totalDataCapacityBytes !== undefined && totalDataCapacityBytes > 0
+      ? totalDiskBytes !== undefined
+        ? Math.min(totalDataCapacityBytes, totalDiskBytes)
+        : totalDataCapacityBytes
+      : undefined;
+
+  const usedDataBytes =
+    usedFromDataCapacity ??
+    (totalDiskBytes !== undefined && fallbackAvailableBytes !== undefined
+      ? Math.max(totalDiskBytes - fallbackAvailableBytes, 0)
+      : undefined);
+  const availableDataBytes =
+    totalDiskBytes !== undefined && usedDataBytes !== undefined
+      ? Math.max(totalDiskBytes - usedDataBytes, 0)
+      : fallbackAvailableBytes;
+
+  const storageGb = bytesToGb(totalDiskBytes);
+  const usedGb = bytesToGb(usedDataBytes, 1);
+  const availableGb = bytesToGb(availableDataBytes, 1);
+
+  let partsStatus: "no_alerts" | "replacement_detected" | "unknown" = "unknown";
+  if (batteryInfo.batteryGenuineApple === false) {
+    partsStatus = "replacement_detected";
+  } else if (batteryInfo.battery) {
+    partsStatus = "no_alerts";
+  }
+
+  return {
+    udid,
+    paired: true,
+    error: null,
+    model_id: productType || undefined,
+    model_name: modelName,
+    hardware_model: pickString(info, ["HardwareModel"]),
+    model_number: pickString(info, ["ModelNumber"]),
+    serial_number: pickString(info, ["SerialNumber"]),
+    ios_version: pickString(info, ["ProductVersion"]),
+    build_version: pickString(info, ["BuildVersion"]),
+    baseband_version: pickString(info, ["BasebandVersion"]),
+    firmware_version: pickString(info, ["FirmwareVersion"]),
+    imei: pickString(info, ["InternationalMobileEquipmentIdentity"]),
+    imei2: pickString(info, ["InternationalMobileEquipmentIdentity2"]),
+    meid: pickString(info, ["MEID"]),
+    iccid: pickString(info, ["ICCID"]),
+    phone_number: pickString(info, ["PhoneNumber"]),
+    carrier: pickString(info, ["CarrierName", "SIMCarrierNetwork"]),
+    mcc: pickString(info, ["MobileCountryCode"]),
+    mnc: pickString(info, ["MobileNetworkCode"]),
+    cpu_arch: pickString(info, ["CPUArchitecture"]),
+    ram_gb: IPHONE_RAM_GB[productType],
+    chip_id: pickString(info, ["ChipID"]),
+    board_id: pickString(info, ["BoardId"]),
+    color: pickString(info, ["DeviceColor"]),
+    color_marketing: pickString(info, ["DeviceEnclosureColor"]),
+    storage_gb: storageGb,
+    used_gb: usedGb,
+    available_gb: availableGb,
+    activation_state: activationState,
+    icloud_locked: activationState !== "Activated" && activationState !== "",
+    wifi_mac: pickString(info, ["WiFiAddress"]),
+    bluetooth_mac: pickString(info, ["BluetoothAddress"]),
+    ethernet_mac: pickString(info, ["EthernetAddress"]),
+    battery: batteryInfo.battery,
+    battery_genuine_apple: batteryInfo.batteryGenuineApple,
+    parts_status: partsStatus,
+    parts_note:
+      partsStatus === "replacement_detected"
+        ? "Se detectó alerta de batería por USB. Valida en Ajustes > General > Acerca de > Piezas y servicio."
+        : partsStatus === "no_alerts"
+          ? "Sin alertas de piezas cambiadas detectables por USB."
+          : "No fue posible verificar piezas por USB. Revísalo en Ajustes > General > Acerca de > Piezas y servicio.",
+  };
+}
+
+export function scanDeviceFromRaw(input: RawDeviceScanPayload): DeviceResult {
+  const udid = input.udid?.trim();
+  if (!udid) {
+    return {
+      udid: "",
+      paired: false,
+      error: "El agente local no envió un UDID válido.",
+    };
+  }
+
+  if (!input.info_stdout?.trim()) {
+    return {
+      udid,
+      paired: false,
+      error: buildDeviceReadError(input.info_stderr ?? ""),
+    };
+  }
+
+  const info = parseKeyValueOutput(input.info_stdout);
+  const batteryInfo = readBatteryInfoFromOutputs({
+    udid,
+    batteryIoregStdout: input.battery_ioreg_stdout,
+    batteryDomainStdout: input.battery_domain_stdout,
+  });
+  const diskUsage = getDiskUsageBytesFromOutputs({
+    diskUsageXmlStdout: input.disk_usage_xml_stdout,
+    diskUsageStdout: input.disk_usage_stdout,
+  });
+
+  const productType = pickString(info, ["ProductType"]) ?? "";
+  const modelName = IPHONE_MODELS[productType] ?? (productType || "Modelo desconocido");
+  const activationState = pickString(info, ["ActivationState"]) ?? "Unknown";
+
+  const totalDiskBytes = diskUsage.totalDiskBytes ?? pickNumber(info, ["TotalDiskCapacity"]);
+  const totalDataCapacityBytes =
+    diskUsage.totalDataCapacityBytes ?? pickNumber(info, ["TotalDataCapacity"]);
+  const totalDataAvailableBytes =
+    diskUsage.totalDataAvailableBytes ?? pickNumber(info, ["TotalDataAvailable"]);
+  const amountDataAvailableBytes =
+    diskUsage.amountDataAvailableBytes ?? pickNumber(info, ["AmountDataAvailable"]);
+  const fallbackAvailableBytes = amountDataAvailableBytes ?? totalDataAvailableBytes;
+
   const usedFromDataCapacity =
     totalDataCapacityBytes !== undefined && totalDataCapacityBytes > 0
       ? totalDiskBytes !== undefined
