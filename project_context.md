@@ -11,6 +11,18 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Corrección del lector de código de barras en POS** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` para evitar reinicios cruzados del escáner al abrir el diálogo, refrescar cámaras o cambiar `selectedDeviceId`.
+  - NUEVO FLUJO: se usa un token interno (`startRequestRef`) para invalidar arranques obsoletos y evitar que callbacks async viejos rompan el stream actual.
+  - AJUSTE: listado de cámaras prioriza `BrowserCodeReader.listVideoInputDevices()` de `@zxing/browser`.
+  - VALIDADO: transpile TS OK en `src/components/pos/CodeScannerDialog.tsx`.
+
+- [x] **Corrección real del menú mobile de mayoreo y acceso a Configuración** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx` para usar `AdminPageLayout` en vez de un `Sheet` propio con `LeftSidebar`, unificando la experiencia mobile con el layout actual del sistema.
+  - ACTUALIZADO: `src/components/shared/MobileSidebar.tsx` para que los padres `Finanzas` y `Configuración` naveguen a sus páginas principales y dejen la expansión del submenú en un control separado.
+  - MEJORA UX: los submenús de `Finanzas` y `Configuración` ahora abren automáticamente cuando hay un subitem activo.
+  - VALIDADO: transpile TS OK en `src/app/(pos)/pos/mayoreo-config/page.tsx` y `src/components/shared/MobileSidebar.tsx`.
+
 - [x] **Corrección POS: menú mobile de mayoreo + acceso a Configuración** (14-Mar-2026, Codex)
   - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx` para que el drawer mobile use un ancho real de sidebar (`w-[280px]`) y no una versión comprimida.
   - ACTUALIZADO: `src/components/shared/LeftSidebar.tsx` para separar navegación del item padre y expansión del submenú; ahora `Configuración` sí entra a `/admin/settings` y el chevron controla los subitems.

@@ -29,7 +29,6 @@ import {
     TicketVoucher,
     Folder,
     ChartBarVertical01,
-    ChevronRight,
     Bell
 } from "react-coolicons";
 import { Building2 as BuildingIcon, Globe, X as XIcon, Truck, Percent, Eye } from "lucide-react";
@@ -146,6 +145,8 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
     };
 
     const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/");
+    const financeActive = financeSubItems.some((item) => pathname === item.href);
+    const settingsActive = settingsSubItems.some((item) => pathname === item.href);
 
     if (!isOpen) return null;
 
@@ -307,16 +308,35 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
 
                     {/* Finanzas - Collapsible */}
                     <div className="p-3">
-                        <Collapsible>
-                            <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center justify-between px-4 py-3.5 rounded-lg hover:bg-muted min-h-[52px]">
+                        <Collapsible defaultOpen={financeActive}>
+                            <div
+                                className={cn(
+                                    "flex min-h-[52px] overflow-hidden rounded-lg",
+                                    isActive("/admin/finance")
+                                        ? "bg-primary text-primary-foreground"
+                                        : "hover:bg-muted"
+                                )}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleNavigation("/admin/finance")}
+                                    className="flex flex-1 items-center gap-3 px-4 py-3.5 text-left"
+                                >
                                     <div className="flex items-center gap-3">
                                         <CreditCard01 className="h-5 w-5" />
                                         <span className="font-medium">💰 Finanzas</span>
                                     </div>
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                            </CollapsibleTrigger>
+                                </button>
+                                <CollapsibleTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label="Mostrar submenú de Finanzas"
+                                        className="flex w-12 items-center justify-center border-l border-border/50"
+                                    >
+                                        <span className="text-sm transition-transform data-[state=open]:rotate-90">›</span>
+                                    </button>
+                                </CollapsibleTrigger>
+                            </div>
                             <CollapsibleContent className="space-y-1 mt-1">
                                 {financeSubItems.map((item) => (
                                     <button
@@ -340,16 +360,35 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
 
                     {/* Configuración - Collapsible */}
                     <div className="p-3">
-                        <Collapsible>
-                            <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center justify-between px-4 py-3.5 rounded-lg hover:bg-muted min-h-[52px]">
+                        <Collapsible defaultOpen={settingsActive}>
+                            <div
+                                className={cn(
+                                    "flex min-h-[52px] overflow-hidden rounded-lg",
+                                    isActive("/admin/settings")
+                                        ? "bg-primary text-primary-foreground"
+                                        : "hover:bg-muted"
+                                )}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleNavigation("/admin/settings")}
+                                    className="flex flex-1 items-center gap-3 px-4 py-3.5 text-left"
+                                >
                                     <div className="flex items-center gap-3">
                                         <CoolSettings className="h-5 w-5" />
                                         <span className="font-medium">⚙️ Configuración</span>
                                     </div>
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                            </CollapsibleTrigger>
+                                </button>
+                                <CollapsibleTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label="Mostrar submenú de Configuración"
+                                        className="flex w-12 items-center justify-center border-l border-border/50"
+                                    >
+                                        <span className="text-sm transition-transform data-[state=open]:rotate-90">›</span>
+                                    </button>
+                                </CollapsibleTrigger>
+                            </div>
                             <CollapsibleContent className="space-y-1 mt-1">
                                 {settingsSubItems.map((item) => (
                                     <button

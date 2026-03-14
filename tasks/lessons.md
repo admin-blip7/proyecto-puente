@@ -5,6 +5,15 @@
 - En sidebars con items que tienen `subItems`, no convertir el item padre en un trigger no navegable si también tiene `href`; separar explícitamente acción de navegar y acción de expandir.
 - Si la UI expone privilegios de admin, la validación server-side debe normalizar también variantes reales del rol como `Master Admin` para evitar permisos aparentes que luego fallan al entrar.
 
+## 2026-03-14 - Identificar la fuente real del menú mobile
+- Antes de corregir navegación mobile, verificar qué componente controla realmente esa vista (`LeftSidebar`, `MobileSidebar`, `AdminPageLayout`, etc.); en este proyecto varias pantallas ya migraron a layouts nuevos y una corrección en el sidebar equivocado no arregla el comportamiento visible.
+- Si una página especial del POS/admin todavía monta su propio menú móvil, conviene integrarla al layout compartido en vez de mantener un sidebar paralelo.
+
+## 2026-03-14 - Escáner ZXing en diálogos React
+- No mezclar en el mismo ciclo de apertura `startScanner()` y cambios de estado que reconfiguren la cámara (`selectedDeviceId`, refresh de devices), porque eso puede abortar el stream mientras ZXing todavía monta el video.
+- Para escáneres de cámara en React, usar un token/counter de solicitud activa ayuda a ignorar respuestas async obsoletas y evita que un arranque viejo vuelva a tocar el estado después de un stop/restart.
+- Cuando `@zxing/browser` ya expone `BrowserCodeReader.listVideoInputDevices()`, preferirlo sobre flujos manuales inconsistentes para listar cámaras del escáner.
+
 ## 2026-03-10 - Evitar fallos de build por secretos faltantes (Resend/SDKs)
 - No instanciar clientes de terceros que requieren API key (ej. `new Resend(...)`) en scope de módulo dentro de rutas o servicios importados en build.
 - Mover la inicialización al flujo de ejecución (`handler`/función) y devolver error controlado cuando falte la variable de entorno.

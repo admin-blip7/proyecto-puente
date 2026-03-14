@@ -1,10 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Menu } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-import LeftSidebar from "@/components/shared/LeftSidebar";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { AdminPageLayout } from "@/components/shared/AdminPageLayout";
 import { getProductCategories } from "@/lib/services/categoryService";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { getWholesaleProfitSettings } from "@/lib/services/wholesaleProfitService";
@@ -62,30 +59,12 @@ export default async function MayoreoConfigPage() {
   ]);
 
   return (
-    <div className="flex h-screen w-full bg-background">
-      <div className="hidden md:flex">
-        <LeftSidebar />
-      </div>
-      <div className="absolute left-4 top-4 z-50 md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] border-r-0 p-0">
-            <SheetTitle className="sr-only">Mayoreo Menu</SheetTitle>
-            <LeftSidebar />
-          </SheetContent>
-        </Sheet>
-      </div>
-      <main className="flex-1 overflow-auto p-4 md:p-6 md:pt-12">
+    <AdminPageLayout title="Configuración Mayoreo">
         <WholesaleConfigClient
           initialCategories={initialCategories}
           initialSettings={initialSettings}
           updatedBy={resolveUpdatedBy(user)}
         />
-      </main>
-    </div>
+    </AdminPageLayout>
   );
 }

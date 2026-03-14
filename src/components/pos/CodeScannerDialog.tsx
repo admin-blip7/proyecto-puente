@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Camera, Flashlight, Loader2, RefreshCcw, SwitchCamera, X } from "lucide-react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Camera, Flashlight, Loader2, RefreshCcw } from "lucide-react";
 
 interface CodeScannerDialogProps {
   open: boolean;
@@ -13,404 +13,244 @@ interface CodeScannerDialogProps {
 }
 
 export default function CodeScannerDialog({ open, onOpenChange, onResult }: CodeScannerDialogProps) {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const controlsRef = useRef<any | null>(null);
+  const startRequestRef = useRef(0);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [cameraStarted, setCameraStarted] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
 
-  // Stop everything
-  const stopAll = useCallback(async () => {
-    // Stop html5-qrcode scanner
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (e) {}
-      scannerRef.current = null;
+  const getDefaultDeviceId = useCallback((inputs: MediaDeviceInfo[]): string | undefined => {
+    if (inputs.length === 0) return undefined;
+    // Prefer back camera on mobile
+    const backLike = inputs.find((d) => /back|rear|environment/i.test(d.label));
+    if (backLike) return backLike.deviceId;
+    // Otherwise prefer the last device (often back on mobile)
+    return inputs[inputs.length - 1]?.deviceId;
+  }, []);
+
+  const stopScanner = useCallback(() => {
+    try {
+      if (controlsRef.current && typeof controlsRef.current.stop === "function") {
+        controlsRef.current.stop();
+      }
+    } catch (e) {
+      // ignore
     }
-    
-    // Stop video stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    controlsRef.current = null;
+
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
     }
-    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    
     setTorchOn(false);
-    setIsReady(false);
-    setCameraStarted(false);
+    setTorchSupported(false);
   }, []);
 
-  // Get available cameras
-  const getDevices = useCallback(async () => {
+  const listVideoDevices = useCallback(async (): Promise<MediaDeviceInfo[]> => {
+    const zxing: any = await import("@zxing/browser");
+    if (typeof zxing.BrowserCodeReader?.listVideoInputDevices === "function") {
+      return zxing.BrowserCodeReader.listVideoInputDevices();
+    }
+
+    return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+  }, []);
+
+  const applyTorch = useCallback(async (on: boolean) => {
     try {
-      // First request permission
-      await navigator.mediaDevices.getUserMedia({ video: true });
-      
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
-      setDevices(videoDevices);
-      
-      // Find back camera
-      const backCamera = videoDevices.find(d => 
-        /back|rear|environment|trasera|posterior/i.test(d.label)
-      );
-      
-      return { videoDevices, backCamera };
-    } catch (err) {
-      console.error("Error getting devices:", err);
-      return { videoDevices: [], backCamera: null };
+      const stream = videoRef.current?.srcObject as MediaStream | undefined;
+      const track = stream?.getVideoTracks()?.[0];
+      // Some browsers support torch via constraints
+      const capabilities = (track as any)?.getCapabilities?.();
+      if (track && capabilities && (capabilities as any).torch) {
+        await track.applyConstraints({ advanced: [{ torch: on }] as any });
+        setTorchOn(on);
+      }
+    } catch (e) {
+      // torch not supported
     }
   }, []);
 
-  // Start camera directly with getUserMedia (more reliable on iOS)
-  const startCameraDirect = useCallback(async (deviceId?: string) => {
+  const updateTorchSupport = () => {
+    try {
+      const stream = videoRef.current?.srcObject as MediaStream | null;
+      const track = stream?.getVideoTracks()?.[0];
+      const caps = (track as any)?.getCapabilities?.();
+      setTorchSupported(!!(caps && (caps as any).torch));
+    } catch {
+      setTorchSupported(false);
+    }
+  };
+
+  const startScanner = useCallback(async (preferredDeviceId?: string) => {
+    stopScanner();
+    const requestId = ++startRequestRef.current;
     setLoading(true);
     setError(null);
-    
+
     try {
-      await stopAll();
-      
-      // Get devices first
-      const { videoDevices, backCamera } = await getDevices();
-      
-      // Build constraints
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      };
-      
-      // Use specific device if provided
-      if (deviceId) {
-        constraints.video = { 
-          deviceId: { exact: deviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        };
-      } else if (backCamera) {
-        constraints.video = { 
-          deviceId: { exact: backCamera.deviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        };
+      if (!videoRef.current) {
+        throw new Error("Video element not ready");
       }
-      
-      console.log("Starting camera with constraints:", constraints);
-      
-      // Get stream
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      
-      // Attach to video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().then(() => {
-          console.log("Video playing");
-          setCameraStarted(true);
-        }).catch(err => {
-          console.error("Error playing video:", err);
-        });
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("MediaDevices API unavailable");
       }
-      
-      // Now start scanner on the video element
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait for video to be ready
-      
-      // Create scanner and scan from video
-      const scanner = new Html5Qrcode("scanner-video-container");
-      scannerRef.current = scanner;
-      
-      // Scan from video stream
-      await scanner.start(
-        stream,
-        {
-          fps: 10,
-          qrbox: { width: 200, height: 200 },
-        },
-        (decodedText) => {
-          // Success!
-          if (navigator.vibrate) navigator.vibrate(100);
-          onResult(decodedText);
-          onOpenChange(false);
-        },
-        () => {
-          // Ignore scan errors
+
+      // Dynamic import to avoid SSR issues
+      const zxing: any = await import("@zxing/browser");
+      const reader = new zxing.BrowserMultiFormatReader();
+
+      const allDevices = await listVideoDevices();
+      if (requestId !== startRequestRef.current) return;
+
+      setDevices(allDevices);
+      const startWithDevice = preferredDeviceId || getDefaultDeviceId(allDevices);
+      setSelectedDeviceId(startWithDevice);
+
+      const onDecode = (result: any, err: any) => {
+        if (result) {
+          const text = result.getText ? result.getText() : String(result);
+          stopScanner();
+          onResult(text);
         }
-      );
-      
-      setIsReady(true);
-      setSelectedDeviceId(deviceId || backCamera?.deviceId || videoDevices[0]?.deviceId);
-      
-    } catch (err: any) {
-      console.error("Camera error:", err);
-      
-      if (err?.name === "NotAllowedError") {
-        setError("Permiso de cámara denegado. Ve a Configuración > Safari > Cámara y permite el acceso.");
-      } else if (err?.name === "NotFoundError") {
-        setError("No se encontró cámara en este dispositivo.");
-      } else if (err?.name === "NotReadableError") {
-        setError("La cámara está siendo usada por otra app. Cierra otras apps que usen la cámara.");
-      } else if (err?.name === "OverconstrainedError") {
-        // Try again without constraints
-        setError("Intentando con cámara frontal...");
-        setTimeout(() => startCameraDirectFallback(), 100);
+        // Ignore NotFoundException errors to continue scanning
+      };
+
+      controlsRef.current = await reader.decodeFromVideoDevice(startWithDevice, videoRef.current, onDecode);
+
+      if (requestId !== startRequestRef.current) {
+        try {
+          controlsRef.current?.stop?.();
+        } catch {
+          // Ignore cleanup failures from stale starts.
+        }
         return;
+      }
+
+      // After starting, check torch support
+      updateTorchSupport();
+    } catch (e: any) {
+      if (requestId !== startRequestRef.current) return;
+
+      if (e?.name === "NotAllowedError") {
+        setError("Permiso de cámara denegado. Concede acceso desde la configuración del navegador.");
+      } else if (e?.name === "NotFoundError") {
+        setError("No se encontró ninguna cámara disponible.");
+      } else if (e?.name === "AbortError") {
+        // Ignore transient aborts caused by teardown/restart.
+        setError(null);
       } else {
-        setError(`Error de cámara: ${err?.message || 'Desconocido'}`);
+        setError("No se pudo iniciar el escáner de códigos.");
       }
     } finally {
-      setLoading(false);
-    }
-  }, [getDevices, stopAll, onResult, onOpenChange]);
-
-  // Fallback without constraints
-  const startCameraDirectFallback = useCallback(async () => {
-    try {
-      await stopAll();
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-      
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraStarted(true);
+      if (requestId === startRequestRef.current) {
+        setLoading(false);
       }
-      
-      const scanner = new Html5Qrcode("scanner-video-container");
-      scannerRef.current = scanner;
-      
-      await scanner.start(
-        stream,
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        (decodedText) => {
-          if (navigator.vibrate) navigator.vibrate(100);
-          onResult(decodedText);
-          onOpenChange(false);
-        },
-        () => {}
-      );
-      
-      setIsReady(true);
-      setError(null);
-      
-    } catch (err: any) {
-      setError(`Error: ${err?.message}`);
     }
-  }, [stopAll, onResult, onOpenChange]);
+  }, [getDefaultDeviceId, listVideoDevices, onResult, stopScanner]);
 
-  // Toggle flashlight
-  const toggleTorch = async () => {
-    if (!streamRef.current) return;
-    
-    const track = streamRef.current.getVideoTracks()[0];
-    if (!track) return;
-    
+  const refreshDevices = useCallback(async () => {
     try {
-      const capabilities = track.getCapabilities?.();
-      if (capabilities && 'torch' in capabilities) {
-        await track.applyConstraints({
-          advanced: [{ torch: !torchOn } as any]
-        });
-        setTorchOn(!torchOn);
-      }
-    } catch (err) {
-      console.log("Torch not supported");
+      const all = await listVideoDevices();
+      setDevices(all);
+      setSelectedDeviceId((current) => current || getDefaultDeviceId(all));
+    } catch (e) {
+      // ignore
     }
-  };
+  }, [getDefaultDeviceId, listVideoDevices]);
 
-  // Switch camera
-  const switchCamera = async () => {
-    if (devices.length < 2) return;
-    
-    const currentIndex = devices.findIndex(d => d.deviceId === selectedDeviceId);
-    const nextIndex = (currentIndex + 1) % devices.length;
-    const nextDeviceId = devices[nextIndex].deviceId;
-    
-    setSelectedDeviceId(nextDeviceId);
-    await startCameraDirect(nextDeviceId);
-  };
-
-  // Handle open/close
+  // Start/stop on open change
   useEffect(() => {
     if (open) {
-      const timer = setTimeout(() => {
-        startCameraDirect();
-      }, 200);
-      return () => clearTimeout(timer);
+      void startScanner();
     } else {
-      stopAll();
+      startRequestRef.current += 1;
+      stopScanner();
     }
-  }, [open, startCameraDirect, stopAll]);
-
-  // Cleanup
-  useEffect(() => {
+    // Stop on unmount
     return () => {
-      stopAll();
+      startRequestRef.current += 1;
+      stopScanner();
     };
-  }, [stopAll]);
+  }, [open, startScanner, stopScanner]);
+
+  const handleDeviceChange = useCallback(
+    async (id: string) => {
+      setSelectedDeviceId(id);
+      await startScanner(id || undefined);
+    },
+    [startScanner]
+  );
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) stopAll();
-      onOpenChange(isOpen);
-    }}>
-      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl h-[85vh] p-0">
         <DialogHeader className="p-4 pb-2">
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
-            Escáner de códigos
-          </DialogTitle>
+          <DialogTitle>Escáner de códigos</DialogTitle>
           <DialogDescription>
             {error ? (
               <span className="text-destructive">{error}</span>
             ) : (
-              "Apunta al código de barras o QR"
+              <span>Apunta la cámara al código de barras o QR para agregar productos al carrito.</span>
             )}
           </DialogDescription>
         </DialogHeader>
-        
-        {/* Scanner container */}
-        <div 
-          id="scanner-video-container"
-          className="relative bg-black w-full"
-          style={{ height: "300px" }}
-        >
-          {/* Video element - direct camera feed */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-            style={{ 
-              width: "100%", 
-              height: "300px",
-              display: cameraStarted ? "block" : "none"
-            }}
-          />
-          
-          {/* Scanning overlay */}
-          {cameraStarted && (
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div 
-                className="border-2 border-white/70 rounded-lg"
-                style={{ 
-                  width: "200px", 
-                  height: "200px",
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)"
-                }}
-              />
-            </div>
-          )}
-          
-          {/* Loading overlay */}
-          {loading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20">
-              <Loader2 className="h-10 w-10 animate-spin text-white mb-3" />
-              <p className="text-white text-sm">Iniciando cámara...</p>
-            </div>
-          )}
-          
-          {/* Error overlay */}
-          {error && !loading && !cameraStarted && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 z-20">
-              <Camera className="h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-white text-center text-sm mb-4">{error}</p>
-              <Button 
-                variant="outline" 
-                className="bg-white text-black"
-                onClick={() => startCameraDirect()}
-              >
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Reintentar
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        {/* Controls */}
-        <div className="p-3 border-t bg-background flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {devices.length > 1 && (
+        <div className="flex-1 p-4 pt-0 flex flex-col gap-3 overflow-hidden">
+          <div className="relative rounded-md overflow-hidden bg-black aspect-video sm:aspect-[4/3]">
+            {!open || error ? (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                <Camera className="h-8 w-8 mr-2" />
+                {error ? "Cámara no disponible" : "Esperando cámara..."}
+              </div>
+            ) : null}
+            <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted autoPlay playsInline />
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <select
-                className="text-xs border rounded px-2 py-1.5 bg-background max-w-[120px] truncate"
+                className="max-w-full sm:max-w-md truncate border rounded-md px-2 py-2 bg-background"
                 value={selectedDeviceId || ""}
-                onChange={(e) => {
-                  setSelectedDeviceId(e.target.value);
-                  startCameraDirect(e.target.value);
-                }}
-                disabled={loading}
+                onChange={(e) => handleDeviceChange(e.target.value)}
               >
+                <option value="">Cámara predeterminada</option>
                 {devices.map((d) => (
                   <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Cámara`}
+                    {d.label || `Cámara ${d.deviceId.slice(-4)}`}
                   </option>
                 ))}
               </select>
-            )}
-            
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => startCameraDirect()}
-              title="Reiniciar cámara"
-              disabled={loading}
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {devices.length > 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={switchCamera}
-                title="Cambiar cámara"
-                disabled={loading || !cameraStarted}
-              >
-                <SwitchCamera className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={refreshDevices} title="Actualizar cámaras">
+                <RefreshCcw className="h-4 w-4" />
               </Button>
-            )}
-            
-            <Button
-              variant={torchOn ? "default" : "outline"}
-              size="sm"
-              onClick={toggleTorch}
-              title={torchOn ? "Apagar linterna" : "Encender linterna"}
-              disabled={loading || !cameraStarted}
-            >
-              <Flashlight className={`h-4 w-4 ${torchOn ? "text-yellow-400" : ""}`} />
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-4 w-4 mr-1" />
-              Cerrar
-            </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!torchSupported}
+                onClick={() => applyTorch(!torchOn)}
+                title={torchSupported ? (torchOn ? "Apagar linterna" : "Encender linterna") : "Linterna no soportada"}
+              >
+                <Flashlight className="h-4 w-4 mr-2" /> {torchOn ? "Linterna ON" : "Linterna OFF"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => startScanner(selectedDeviceId)} disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Reiniciar
+              </Button>
+            </div>
           </div>
         </div>
+        <DialogFooter className="p-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

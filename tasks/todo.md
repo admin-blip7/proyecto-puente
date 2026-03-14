@@ -1,3 +1,60 @@
+# TODO - Corregir inicio del lector de código de barras en POS
+
+## Plan
+- [x] Revisar el flujo de inicialización del escáner y las llamadas a `@zxing/browser`.
+- [x] Eliminar reinicios cruzados al abrir el diálogo y al refrescar/seleccionar cámara.
+- [x] Endurecer el manejo de streams/cancelación para evitar `AbortError` y estados stale.
+- [x] Validar sintaxis del componente actualizado.
+
+## Review
+- Hallazgo raíz:
+  - `src/components/pos/CodeScannerDialog.tsx` iniciaba el escáner al abrir el diálogo y, en paralelo, refrescaba dispositivos/cambiaba `selectedDeviceId`, lo que recreaba `startScanner` y disparaba nuevos ciclos de `useEffect`.
+  - Ese patrón reiniciaba la cámara mientras ZXing todavía montaba el stream, provocando errores encadenados como:
+    - `cameraIdOrConfig ... found 0 keys`
+    - `AbortError`
+    - `NotFoundError`
+- Cambios aplicados:
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx`
+  - Se agregó `startRequestRef` para invalidar arranques obsoletos y evitar que respuestas async viejas reescriban el estado actual.
+  - `startScanner` ahora:
+    - detiene primero el scanner anterior;
+    - lista cámaras con `BrowserCodeReader.listVideoInputDevices()` cuando está disponible;
+    - arranca un único stream activo por intento;
+    - ignora abortos transitorios de reinicio/cierre.
+  - El `useEffect` de apertura ahora depende solo de `open`; ya no se vuelve a disparar por el cambio interno de `selectedDeviceId`.
+  - El cambio de cámara quedó encapsulado en `handleDeviceChange`, sin crear un ciclo de reinicio extra.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en `src/components/pos/CodeScannerDialog.tsx`.
+
+# TODO - Corregir MobileSidebar real de mayoreo/configuración en POS
+
+## Plan
+- [x] Verificar qué menú mobile usa realmente `/pos/mayoreo-config` después de los cambios recientes de layout.
+- [x] Unificar `mayoreo-config` con el layout mobile estándar del admin/POS para evitar un sidebar paralelo.
+- [x] Corregir `MobileSidebar` para que los padres `Finanzas` y `Configuración` naveguen al `href` principal y mantengan expansión separada.
+- [x] Validar sintaxis de los archivos tocados.
+
+## Review
+- Hallazgo raíz:
+  - El menú mobile que se estaba mostrando ya no dependía principalmente de `LeftSidebar`, sino de `MobileSidebar` a través de los layouts nuevos.
+  - `src/app/(pos)/pos/mayoreo-config/page.tsx` seguía montando un `Sheet` propio con `LeftSidebar`, por eso en mobile esta vista usaba un menú distinto al resto del sistema.
+  - `src/components/shared/MobileSidebar.tsx` seguía teniendo `Configuración` y `Finanzas` solo como triggers de colapsable; el padre no navegaba a la página principal.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/(pos)/pos/mayoreo-config/page.tsx`
+  - La página ahora usa `AdminPageLayout` y hereda el mismo `MobileSidebar`/header mobile que el resto de páginas administrativas.
+  - ACTUALIZADO: `src/components/shared/MobileSidebar.tsx`
+  - `Finanzas`:
+    - tap en el cuerpo principal => navega a `/admin/finance`
+    - tap en el control lateral => expande/colapsa subitems
+  - `Configuración`:
+    - tap en el cuerpo principal => navega a `/admin/settings`
+    - tap en el control lateral => expande/colapsa subitems
+  - Se añadieron `defaultOpen` para abrir automáticamente cada submenú cuando un subitem está activo.
+- Verificación técnica:
+  - `typescript.transpileModule` OK:
+    - `src/app/(pos)/pos/mayoreo-config/page.tsx`
+    - `src/components/shared/MobileSidebar.tsx`
+
 # TODO - Corregir navegación mobile y acceso a configuraciones en POS/mayoreo
 
 ## Plan
