@@ -1,3 +1,50 @@
+# TODO - Eliminar prompt de token del agente y asociar diagnósticos a la cuenta que escanea
+
+## Plan
+- [x] Diseñar un flujo de pairing automático del agente local sin pedir token manual al usuario.
+- [x] Persistir la asociación del agente con la cuenta autenticada y del diagnóstico con el usuario que lanzó el escaneo.
+- [x] Actualizar el agente y la UI de `/admin/diagnostico` para completar el pairing desde la web.
+- [x] Validar sintaxis de archivos tocados y documentar el resultado.
+
+## Review
+- Hallazgo principal:
+  - El prompt de token en consola era una fricción innecesaria y además rompía la expectativa de instalador “doble clic”.
+  - La forma correcta de quitarlo sin perder control era pasar a un pairing web:
+    - el agente se instala y arranca solo;
+    - abre `/admin/diagnostico?pair=...`;
+    - la cuenta autenticada completa el vínculo;
+    - los jobs y diagnósticos quedan amarrados al usuario que los lanzó.
+- Cambios aplicados:
+  - NUEVA migración: `supabase/migrations/20260315000001_bridge_pairing_and_diagnostic_ownership.sql`
+  - Se agregaron:
+    - `diagnostics_bridge_pairings`
+    - `machine_id` en `diagnostics_bridge_agents`
+    - `scanned_by_user_id`, `bridge_job_id`, `bridge_agent_id` en `device_diagnostics`
+  - ACTUALIZADO: `src/lib/diagnostics/bridge.ts`
+  - Nuevo flujo de pairing y regeneración de token por máquina si el agente ya estaba vinculado.
+  - NUEVAS rutas:
+    - `src/app/api/diagnostics/bridge/pair/start/route.ts`
+    - `src/app/api/diagnostics/bridge/pair/status/route.ts`
+    - `src/app/api/diagnostics/bridge/pair/complete/route.ts`
+  - ACTUALIZADO: `iphone-diagnostic-service/bridge-agent.mjs`
+  - El agente ya no pide token ni nombre en consola:
+    - usa URL por defecto
+    - genera `machineId`
+    - abre la web para completar pairing
+    - guarda config local cuando recibe el token de vínculo
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+  - Ahora completa pairing automáticamente si la URL trae `?pair=...`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`
+  - Se eliminó la sección de token manual; el flujo queda centrado en descargar/abrir el instalador.
+  - ACTUALIZADO: `src/lib/diagnostics/persistence.ts`, `src/app/api/diagnostics/scan/route.ts` y `src/app/api/diagnostics/bridge/agent/jobs/[jobId]/complete/route.ts`
+  - Los diagnósticos ahora se persisten con usuario/agent/job cuando vienen desde la web autenticada o desde un bridge job.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en helpers, rutas y componentes tocados.
+  - `node --check` OK en:
+    - `iphone-diagnostic-service/bridge-agent.mjs`
+    - `scripts/build-bridge-agent-binaries.mjs`
+  - DMG regenerado tras actualizar el launcher del agente.
+
 # TODO - Corregir enlace roto que descargaba JSON con extensión .dmg
 
 ## Plan

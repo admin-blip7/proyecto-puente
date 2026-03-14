@@ -33,10 +33,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const status = body?.status === "failed" ? "failed" : "completed";
     const normalizedResult = status === "completed" ? normalizeResult(body?.result ?? {}) : undefined;
 
-    if (normalizedResult?.results?.length) {
-      await persistScannedDevices(normalizedResult.results);
-    }
-
     const job = await completeBridgeJob({
       agent,
       jobId,
@@ -44,6 +40,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       result: normalizedResult ?? null,
       error: typeof body?.error === "string" ? body.error : null,
     });
+
+    if (normalizedResult?.results?.length) {
+      await persistScannedDevices(normalizedResult.results, {
+        scannedByUserId: job.requested_by,
+        bridgeJobId: job.id,
+        bridgeAgentId: agent.id,
+      });
+    }
 
     return NextResponse.json({ job });
   } catch (error) {

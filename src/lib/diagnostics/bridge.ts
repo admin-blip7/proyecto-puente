@@ -37,6 +37,23 @@ export interface DiagnosticsBridgeJobRow {
   updated_at: string;
 }
 
+export interface DiagnosticsBridgePairingRow {
+  id: string;
+  machine_id: string;
+  pairing_code: string;
+  agent_name: string;
+  platform: string | null;
+  status: "pending" | "paired" | "expired";
+  user_id: string | null;
+  agent_id: string | null;
+  issued_token: string | null;
+  expires_at: string;
+  paired_at: string | null;
+  consumed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 function getRoleFromUser(user: any): string {
   return String(
     user?.user_metadata?.role ??
@@ -75,6 +92,7 @@ export async function createBridgeAgentForUser(input: {
   userId: string;
   name: string;
   platform?: string | null;
+  machineId?: string | null;
 }) {
   const token = randomBytes(24).toString("hex");
   const supabase = getSupabaseServerClient();
@@ -83,6 +101,7 @@ export async function createBridgeAgentForUser(input: {
     user_id: input.userId,
     name: input.name.trim() || "Agente local",
     platform: input.platform?.trim() || null,
+    machine_id: input.machineId?.trim() || null,
     token_hash: hashAgentToken(token),
     token_last4: token.slice(-4),
     active: true,
@@ -99,6 +118,179 @@ export async function createBridgeAgentForUser(input: {
   }
 
   return { agent: data as DiagnosticsBridgeAgentRow, token };
+}
+
+function generatePairingCode() {
+  return randomBytes(4).toString("hex").toUpperCase();
+}
+
+export async function startBridgePairing(input: {
+  machineId: string;
+  agentName: string;
+  platform?: string | null;
+}) {
+  const supabase = getSupabaseServerClient();
+  const machineId = input.machineId.trim();
+  const agentName = input.agentName.trim() || "Agente local";
+
+  const { data: existingAgent } = await supabase
+    .from("diagnostics_bridge_agents")
+    .select("*")
+    .eq("machine_id", machineId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (existingAgent) {
+    const token = randomBytes(24).toString("hex");
+    await supabase
+      .from("diagnostics_bridge_agents")
+      .update({
+        token_hash: hashAgentToken(token),
+        token_last4: token.slice(-4),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existingAgent.id);
+
+    return {
+      status: "paired" as const,
+      pairing: null,
+      token,
+      pairedAgent: existingAgent as DiagnosticsBridgeAgentRow,
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from("diagnostics_bridge_pairings")
+    .update({ status: "expired", updated_at: nowIso })
+    .eq("machine_id", machineId)
+    .eq("status", "pending");
+
+  const pairingCode = generatePairingCode();
+  const { data, error } = await supabase
+    .from("diagnostics_bridge_pairings")
+    .insert({
+      machine_id: machineId,
+      pairing_code: pairingCode,
+      agent_name: agentName,
+      platform: input.platform?.trim() || null,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "pairing_start_failed");
+  }
+
+  return {
+    status: "pending" as const,
+    pairing: data as DiagnosticsBridgePairingRow,
+    token: null,
+    pairedAgent: null,
+  };
+}
+
+export async function getBridgePairingStatus(input: {
+  machineId: string;
+  pairingCode: string;
+}) {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("diagnostics_bridge_pairings")
+    .select("*")
+    .eq("machine_id", input.machineId)
+    .eq("pairing_code", input.pairingCode)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "pairing_not_found");
+  }
+
+  const pairing = data as DiagnosticsBridgePairingRow;
+  const expired = new Date(pairing.expires_at).getTime() < Date.now();
+  if (expired && pairing.status === "pending") {
+    await supabase
+      .from("diagnostics_bridge_pairings")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .eq("id", pairing.id);
+    return {
+      pairing: { ...pairing, status: "expired" as const },
+      token: null,
+    };
+  }
+
+  return {
+    pairing,
+    token: pairing.status === "paired" ? pairing.issued_token : null,
+  };
+}
+
+export async function completeBridgePairingForUser(input: {
+  userId: string;
+  pairingCode: string;
+}) {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("diagnostics_bridge_pairings")
+    .select("*")
+    .eq("pairing_code", input.pairingCode)
+    .eq("status", "pending")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "pairing_not_found");
+  }
+
+  const pairing = data as DiagnosticsBridgePairingRow;
+  if (new Date(pairing.expires_at).getTime() < Date.now()) {
+    await supabase
+      .from("diagnostics_bridge_pairings")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .eq("id", pairing.id);
+    throw new Error("pairing_expired");
+  }
+
+  const { agent, token } = await createBridgeAgentForUser({
+    userId: input.userId,
+    name: pairing.agent_name,
+    platform: pairing.platform,
+    machineId: pairing.machine_id,
+  });
+
+  const { data: updated, error: updateError } = await supabase
+    .from("diagnostics_bridge_pairings")
+    .update({
+      status: "paired",
+      user_id: input.userId,
+      agent_id: agent.id,
+      issued_token: token,
+      paired_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", pairing.id)
+    .select("*")
+    .single();
+
+  if (updateError || !updated) {
+    throw new Error(updateError?.message || "pairing_complete_failed");
+  }
+
+  return {
+    pairing: updated as DiagnosticsBridgePairingRow,
+    agent,
+  };
+}
+
+export async function consumePairingToken(pairingId: string) {
+  const supabase = getSupabaseServerClient();
+  await supabase
+    .from("diagnostics_bridge_pairings")
+    .update({
+      issued_token: null,
+      consumed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", pairingId);
 }
 
 export async function getBridgeAgentsForUser(userId: string) {

@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 
-import { execFile } from "node:child_process";
+import { exec, execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import readline from "node:readline/promises";
 import { promisify } from "node:util";
 import os from "node:os";
 
 const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
 const POLL_INTERVAL_MS = Number(process.env.DIAG_AGENT_POLL_MS || 3000);
 const MAX_BUFFER = 1024 * 1024;
 const CONFIG_DIR = path.join(os.homedir(), ".22electronic-diagnostics-agent");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 const DEFAULT_AGENT_NAME = `${os.hostname()} (${os.platform()})`;
+const DEFAULT_APP_URL = "https://22electronicgroup.com";
 
 const REQUIRED_TOOLS = [
   "idevice_id",
@@ -34,38 +36,81 @@ function writeConfigFile(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
-async function promptForConfig(existingConfig = {}) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const appUrlInput = await rl.question(`URL de la app [${existingConfig.appUrl || "https://22electronicgroup.com"}]: `);
-  const tokenInput = await rl.question(`Token del agente${existingConfig.agentToken ? " [guardado]" : ""}: `);
-  const nameInput = await rl.question(`Nombre del agente [${existingConfig.agentName || DEFAULT_AGENT_NAME}]: `);
-  await rl.close();
-
-  return {
-    appUrl: (appUrlInput || existingConfig.appUrl || "https://22electronicgroup.com").replace(/\/$/, ""),
-    agentToken: tokenInput || existingConfig.agentToken || "",
-    agentName: nameInput || existingConfig.agentName || DEFAULT_AGENT_NAME,
-  };
+async function openInBrowser(url) {
+  try {
+    if (process.platform === "darwin") {
+      await execAsync(`open "${url}"`);
+      return;
+    }
+    if (process.platform === "win32") {
+      await execAsync(`start "" "${url}"`);
+      return;
+    }
+    await execAsync(`xdg-open "${url}"`);
+  } catch {
+    // noop
+  }
 }
 
 async function resolveConfig() {
   const fileConfig = readConfigFile();
   let config = {
-    appUrl: (process.env.DIAG_AGENT_URL || fileConfig.appUrl || "").replace(/\/$/, ""),
+    appUrl: (process.env.DIAG_AGENT_URL || fileConfig.appUrl || DEFAULT_APP_URL).replace(/\/$/, ""),
     agentToken: process.env.DIAG_AGENT_TOKEN || fileConfig.agentToken || "",
     agentName: process.env.DIAG_AGENT_NAME || fileConfig.agentName || DEFAULT_AGENT_NAME,
+    machineId: process.env.DIAG_AGENT_MACHINE_ID || fileConfig.machineId || randomUUID(),
   };
 
-  if (!config.appUrl || !config.agentToken) {
-    config = await promptForConfig(config);
+  if (!config.agentToken) {
+    console.log("[bridge-agent] iniciando pairing automatico...");
+    const startRes = await fetch(`${config.appUrl}/api/diagnostics/bridge/pair/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        machineId: config.machineId,
+        agentName: config.agentName,
+        platform: process.platform,
+      }),
+    });
+    const startData = await startRes.json().catch(() => ({}));
+    if (!startRes.ok) {
+      throw new Error(startData.error || "No se pudo iniciar el pairing del agente");
+    }
+
+    if (startData.status === "paired" && startData.token) {
+      config.agentToken = startData.token;
+      writeConfigFile(config);
+      return config;
+    }
+
+    const pairingCode = startData.pairing?.pairing_code;
+    if (!pairingCode) {
+      throw new Error("No se recibió código de pairing");
+    }
+
+    const pairingUrl = `${config.appUrl}/admin/diagnostico?pair=${encodeURIComponent(pairingCode)}`;
+    console.log(`[bridge-agent] vincula esta computadora desde tu cuenta en: ${pairingUrl}`);
+    await openInBrowser(pairingUrl);
+
+    const startedAt = Date.now();
+    while (!config.agentToken && Date.now() - startedAt < 10 * 60 * 1000) {
+      await sleep(2000);
+      const statusRes = await fetch(`${config.appUrl}/api/diagnostics/bridge/pair/status?machineId=${encodeURIComponent(config.machineId)}&code=${encodeURIComponent(pairingCode)}`);
+      const statusData = await statusRes.json().catch(() => ({}));
+      if (!statusRes.ok) {
+        continue;
+      }
+      if (statusData.pairing?.status === "expired") {
+        throw new Error("El pairing del agente expiró. Abre de nuevo la app para reintentar.");
+      }
+      if (statusData.token) {
+        config.agentToken = statusData.token;
+      }
+    }
   }
 
-  if (!config.appUrl || !config.agentToken) {
-    throw new Error("Configura DIAG_AGENT_URL y DIAG_AGENT_TOKEN antes de continuar.");
+  if (!config.agentToken) {
+    throw new Error("No se pudo vincular el agente local con tu cuenta.");
   }
 
   writeConfigFile(config);

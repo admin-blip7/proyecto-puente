@@ -11,6 +11,21 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Eliminación del prompt de token y asociación de diagnósticos a la cuenta autenticada** (15-Mar-2026, Codex)
+  - NUEVA migración `supabase/migrations/20260315000001_bridge_pairing_and_diagnostic_ownership.sql`:
+    - tabla `diagnostics_bridge_pairings`
+    - columna `machine_id` en `diagnostics_bridge_agents`
+    - columnas `scanned_by_user_id`, `bridge_job_id`, `bridge_agent_id` en `device_diagnostics`
+  - ACTUALIZADO: `src/lib/diagnostics/bridge.ts` con flujo de pairing automático y regeneración de token por máquina.
+  - NUEVAS rutas API de pairing:
+    - `src/app/api/diagnostics/bridge/pair/start/route.ts`
+    - `src/app/api/diagnostics/bridge/pair/status/route.ts`
+    - `src/app/api/diagnostics/bridge/pair/complete/route.ts`
+  - ACTUALIZADO: `iphone-diagnostic-service/bridge-agent.mjs` para eliminar prompts de token/manuales y vincularse desde la web.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx` para completar pairing automáticamente con `?pair=...`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` para dejar el flujo en “descargar > abrir > vincular cuenta”.
+  - ACTUALIZADO: persistencia de diagnóstico para guardar usuario/job/agente en historial.
+  - VALIDADO: transpile TS OK y `node --check` OK; DMG regenerado.
 - [x] **Corrección de descarga macOS: el botón viejo bajaba JSON en vez de un DMG real** (15-Mar-2026, Codex)
   - VERIFICADO: `/Users/brayan/Downloads/DiagnosticoiPhone-3.dmg` no era una imagen de disco; `file` lo reportó como `JSON data`.
   - CAUSA RAÍZ: la guía seguía enlazando `?file=installer-dmg`, endpoint que intenta generar el DMG en runtime y falla en producción fuera de macOS.

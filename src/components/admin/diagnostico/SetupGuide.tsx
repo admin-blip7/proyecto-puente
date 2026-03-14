@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Terminal,
   Monitor,
@@ -66,75 +65,6 @@ function Step({
 }
 
 export default function SetupGuide() {
-  const [agentToken, setAgentToken] = useState("");
-  const [agentName, setAgentName] = useState("Agente Recepción");
-  const [generatingAgent, setGeneratingAgent] = useState(false);
-  const [agentError, setAgentError] = useState<string | null>(null);
-  const [appOrigin, setAppOrigin] = useState("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setAppOrigin(window.location.origin);
-    }
-  }, []);
-
-  const generateAgentToken = async () => {
-    setGeneratingAgent(true);
-    setAgentError(null);
-
-    try {
-      const res = await fetch("/api/diagnostics/bridge/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: agentName,
-          platform: typeof navigator !== "undefined" ? navigator.platform : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.token) {
-        throw new Error(data.error || "No se pudo generar el token del agente");
-      }
-      setAgentToken(data.token);
-    } catch (error) {
-      setAgentError(error instanceof Error ? error.message : "No se pudo generar el token del agente");
-    } finally {
-      setGeneratingAgent(false);
-    }
-  };
-
-  const macBridgeCommand = appOrigin && agentToken
-    ? [
-        `curl -fsSL "${appOrigin}/api/diagnostics/download?file=bridge-agent-js" -o bridge-agent.mjs`,
-        `export DIAG_AGENT_URL="${appOrigin}"`,
-        `export DIAG_AGENT_TOKEN="${agentToken}"`,
-        `export DIAG_AGENT_NAME="${agentName}"`,
-        "node bridge-agent.mjs",
-      ].join("\n")
-    : "";
-
-  const windowsBridgeCommand = appOrigin && agentToken
-    ? [
-        `Invoke-WebRequest -Uri "${appOrigin}/api/diagnostics/download?file=bridge-agent-js" -OutFile "bridge-agent.mjs"`,
-        `$env:DIAG_AGENT_URL="${appOrigin}"`,
-        `$env:DIAG_AGENT_TOKEN="${agentToken}"`,
-        `$env:DIAG_AGENT_NAME="${agentName}"`,
-        "node .\\bridge-agent.mjs",
-      ].join("\n")
-    : "";
-
-  const bridgeMacDownload = appOrigin && agentToken
-    ? `/api/diagnostics/download?file=bridge-agent-mac&token=${encodeURIComponent(agentToken)}&name=${encodeURIComponent(agentName)}`
-    : "";
-
-  const bridgeLinuxDownload = appOrigin && agentToken
-    ? `/api/diagnostics/download?file=bridge-agent-linux&token=${encodeURIComponent(agentToken)}&name=${encodeURIComponent(agentName)}`
-    : "";
-
-  const bridgeWindowsDownload = appOrigin && agentToken
-    ? `/api/diagnostics/download?file=bridge-agent-ps1&token=${encodeURIComponent(agentToken)}&name=${encodeURIComponent(agentName)}`
-    : "";
-
   return (
     <div className="space-y-6 max-w-2xl">
       <Card className="border-sky-200 dark:border-sky-900">
@@ -147,93 +77,48 @@ export default function SetupGuide() {
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
             Este agente corre en la PC/Mac que tiene conectado el iPhone, hace el diagnóstico por USB y
-            sincroniza los resultados con esta web. Requiere <strong>Node 18+</strong> y
-            <strong> libimobiledevice</strong> instalados localmente.
+            sincroniza los resultados con esta web. Ya no necesitas capturar token manual.
+            Solo descarga el instalador, ábrelo y la misma web vincula esa computadora con tu cuenta.
           </p>
 
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Nombre del agente</label>
-            <input
-              value={agentName}
-              onChange={(event) => setAgentName(event.target.value)}
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              placeholder="Agente Recepción"
-            />
+          <div className="grid gap-2 md:grid-cols-3">
+            <a
+              href="/api/diagnostics/download?file=bridge-agent-dmg"
+              download="DiagnosticoBridgeAgent.dmg"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Apple .dmg
+            </a>
+            <a
+              href="/api/diagnostics/download?file=bridge-agent-exe"
+              download="DiagnosticoBridgeAgent.exe"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Windows .exe
+            </a>
+            <a
+              href="/api/diagnostics/download?file=bridge-agent-linux-bin"
+              download="DiagnosticoBridgeAgent.run"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Linux
+            </a>
           </div>
 
-          <Button onClick={generateAgentToken} disabled={generatingAgent}>
-            {generatingAgent ? "Generando..." : "Generar token del agente"}
-          </Button>
-
-          {agentError && (
-            <p className="text-sm text-red-600">{agentError}</p>
-          )}
-
-          {agentToken && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
-                Token generado. Guárdalo ahora: por seguridad solo se muestra en esta pantalla. Los binarios nativos te lo pedirán una sola vez en el primer arranque y luego lo guardarán localmente.
-              </div>
-              <div className="grid gap-2 md:grid-cols-3">
-                <a
-                  href="/api/diagnostics/download?file=bridge-agent-dmg"
-                  download="DiagnosticoBridgeAgent.dmg"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Apple .dmg
-                </a>
-                <a
-                  href="/api/diagnostics/download?file=bridge-agent-exe"
-                  download="DiagnosticoBridgeAgent.exe"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Windows .exe
-                </a>
-                <a
-                  href="/api/diagnostics/download?file=bridge-agent-linux-bin"
-                  download="DiagnosticoBridgeAgent.run"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Linux
-                </a>
-              </div>
-              <div className="grid gap-2 md:grid-cols-3">
-                <a
-                  href={bridgeMacDownload}
-                  download="DiagnosticoBridgeAgent.command"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 font-medium hover:bg-muted transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  macOS
-                </a>
-                <a
-                  href={bridgeLinuxDownload}
-                  download="diagnostico-bridge-agent.sh"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 font-medium hover:bg-muted transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Linux
-                </a>
-                <a
-                  href={bridgeWindowsDownload}
-                  download="DiagnosticoBridgeAgent.ps1"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 font-medium hover:bg-muted transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Windows
-                </a>
-              </div>
-              <CodeBlock code={agentToken} label="Token del agente" />
-              <p className="text-xs text-muted-foreground">
-                Si prefieres cero terminal, descarga el binario nativo de tu sistema. Si quieres control manual o necesitas pasar variables listas, usa los scripts de abajo.
-              </p>
-              <CodeBlock code={macBridgeCommand} label="macOS / Linux" />
-              <CodeBlock code={windowsBridgeCommand} label="Windows PowerShell" />
-            </div>
-          )}
+          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100">
+            Flujo nuevo:
+            <br />
+            1. Abres el instalador en la PC con el iPhone.
+            <br />
+            2. El agente abre `/admin/diagnostico` en tu navegador.
+            <br />
+            3. La web vincula esa computadora con tu cuenta.
+            <br />
+            4. Cada diagnóstico queda asociado al usuario que lo lanzó y se guarda en historial.
+          </div>
         </CardContent>
       </Card>
 

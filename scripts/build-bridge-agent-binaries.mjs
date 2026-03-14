@@ -100,8 +100,8 @@ curl -fsSL "$APP_URL_DEFAULT/api/diagnostics/download?file=bridge-agent-js" -o b
 chmod +x bridge-agent.mjs
 echo "  + Agente descargado en $WORKDIR/bridge-agent.mjs"
 echo ""
-echo "El agente pedira URL, token y nombre solo en el primer arranque."
-echo "Luego guardara la configuracion y arrancara automaticamente."
+echo "El agente abrira la web y se vinculara con tu cuenta sin pedir token manual."
+echo "Despues guardara la configuracion y arrancara automaticamente."
 echo ""
 node bridge-agent.mjs
 INSTALLEOF

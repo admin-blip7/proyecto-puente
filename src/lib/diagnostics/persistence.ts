@@ -18,10 +18,22 @@ interface PersistedDiagnosticRow {
   battery_cycle_count: number | null;
   battery_full_charge_capacity: number | null;
   battery_design_capacity: number | null;
+  scanned_by_user_id: string | null;
+  bridge_job_id: string | null;
+  bridge_agent_id: string | null;
   raw_data: DeviceResult;
 }
 
-function toDiagnosticRow(device: DeviceResult): PersistedDiagnosticRow | null {
+interface PersistDiagnosticContext {
+  scannedByUserId?: string | null;
+  bridgeJobId?: string | null;
+  bridgeAgentId?: string | null;
+}
+
+function toDiagnosticRow(
+  device: DeviceResult,
+  context: PersistDiagnosticContext
+): PersistedDiagnosticRow | null {
   if (device.error || !device.udid) {
     return null;
   }
@@ -43,13 +55,19 @@ function toDiagnosticRow(device: DeviceResult): PersistedDiagnosticRow | null {
     battery_cycle_count: device.battery?.cycle_count ?? null,
     battery_full_charge_capacity: device.battery?.full_charge_mah ?? null,
     battery_design_capacity: device.battery?.design_mah ?? null,
+    scanned_by_user_id: context.scannedByUserId ?? null,
+    bridge_job_id: context.bridgeJobId ?? null,
+    bridge_agent_id: context.bridgeAgentId ?? null,
     raw_data: device,
   };
 }
 
-export async function persistScannedDevices(devices: DeviceResult[]): Promise<void> {
+export async function persistScannedDevices(
+  devices: DeviceResult[],
+  context: PersistDiagnosticContext = {}
+): Promise<void> {
   const rows = devices
-    .map(toDiagnosticRow)
+    .map((device) => toDiagnosticRow(device, context))
     .filter((row): row is PersistedDiagnosticRow => row !== null);
 
   if (rows.length === 0) {

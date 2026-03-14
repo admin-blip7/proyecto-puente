@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -420,6 +421,7 @@ function DeviceCard({
 // ── Scanner principal ────────────────────────────────────────────────────────
 
 export default function DiagnosticScanner() {
+  const searchParams = useSearchParams();
   const [serviceOnline, setServiceOnline] = useState<boolean | null>(null);
   const [missingTools, setMissingTools] = useState<string[]>([]);
   const [deviceUdids, setDeviceUdids] = useState<string[]>([]);
@@ -427,6 +429,8 @@ export default function DiagnosticScanner() {
   const [bridgeAgents, setBridgeAgents] = useState<BridgeAgentStatus[]>([]);
   const [bridgeScanning, setBridgeScanning] = useState(false);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [pairingState, setPairingState] = useState<"idle" | "pairing" | "paired" | "error">("idle");
+  const [pairingMessage, setPairingMessage] = useState<string | null>(null);
   const [scanningAll, setScanningAll] = useState(false);
   const [scanningDevice, setScanningDevice] = useState<Record<string, boolean>>({});
   const [addedDevices, setAddedDevices] = useState<Record<string, AddedDevice>>({});
@@ -466,6 +470,29 @@ export default function DiagnosticScanner() {
     }
   }, []);
 
+  const completePairing = useCallback(async (pairingCode: string) => {
+    setPairingState("pairing");
+    setPairingMessage("Vinculando esta computadora local con tu cuenta...");
+
+    try {
+      const res = await fetch("/api/diagnostics/bridge/pair/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pairingCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "No se pudo vincular el agente local");
+      }
+      setPairingState("paired");
+      setPairingMessage(`Agente vinculado: ${data.pairing?.agent_name ?? "Agente local"}`);
+      fetchBridgeStatus();
+    } catch (error) {
+      setPairingState("error");
+      setPairingMessage(error instanceof Error ? error.message : "No se pudo vincular el agente local");
+    }
+  }, [fetchBridgeStatus]);
+
   useEffect(() => {
     fetchDevices();
     fetchBridgeStatus();
@@ -475,6 +502,14 @@ export default function DiagnosticScanner() {
     }, 4000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [fetchBridgeStatus, fetchDevices]);
+
+  useEffect(() => {
+    const pairingCode = searchParams.get("pair")?.trim();
+    if (!pairingCode || pairingState !== "idle") {
+      return;
+    }
+    completePairing(pairingCode);
+  }, [completePairing, pairingState, searchParams]);
 
   const mergeResults = useCallback((results: DeviceResult[]) => {
     const mapped: Record<string, DeviceResult> = {};
@@ -612,6 +647,18 @@ export default function DiagnosticScanner() {
           <p className="mt-1">
             {bridgeAgents[0]?.name ?? "Agente local"} está listo para diagnosticar el iPhone conectado en esa PC/Mac.
           </p>
+        </div>
+      )}
+
+      {pairingMessage && (
+        <div className={`rounded-lg border p-3 text-sm ${
+          pairingState === "error"
+            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+            : pairingState === "paired"
+              ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-100"
+              : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+        }`}>
+          {pairingMessage}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import {
   scanAllDevices,
   scanDevice,
 } from "@/lib/diagnostics/libimobiledevice";
+import { requireDiagnosticsAdminUser } from "@/lib/diagnostics/bridge";
 import { persistScannedDevices } from "@/lib/diagnostics/persistence";
 
 export const runtime = "nodejs";
@@ -11,6 +12,14 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const udid = req.nextUrl.searchParams.get("udid");
   const env = await checkDiagnosticsEnvironment();
+  let scannedByUserId: string | null = null;
+
+  try {
+    const user = await requireDiagnosticsAdminUser();
+    scannedByUserId = user.id;
+  } catch {
+    scannedByUserId = null;
+  }
 
   if (!env.ready) {
     return NextResponse.json(
@@ -21,11 +30,11 @@ export async function GET(req: NextRequest) {
 
   if (!udid) {
     const data = await scanAllDevices();
-    await persistScannedDevices(data.results);
+    await persistScannedDevices(data.results, { scannedByUserId });
     return NextResponse.json(data);
   }
 
   const data = await scanDevice(udid);
-  await persistScannedDevices([data]);
+  await persistScannedDevices([data], { scannedByUserId });
   return NextResponse.json(data);
 }
