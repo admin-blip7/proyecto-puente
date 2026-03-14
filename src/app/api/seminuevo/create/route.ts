@@ -3,9 +3,9 @@ import { createProductFromDiagnostic } from '@/lib/services/productService';
 import { z } from 'zod';
 
 const CreateSeminuevoSchema = z.object({
-    diagnosticId: z.string().uuid(),
-    price: z.number().min(0),
-    cost: z.number().min(0),
+    diagnosticId: z.string().min(1),
+    price: z.coerce.number().min(0),
+    cost: z.coerce.number().min(0),
     ownershipType: z.enum(['Propio', 'Consigna']),
     consignorId: z.string().optional(),
     notes: z.string().optional(),

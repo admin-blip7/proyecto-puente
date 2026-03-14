@@ -1,5 +1,13 @@
 # Lessons
 
+## 2026-03-15 - Seminuevos: no asumir que el frontend envía UUID de diagnóstico
+- Si una acción UI de diagnóstico envía `udid`, no validar estrictamente `diagnosticId` como UUID sin fallback.
+- En backend de alta desde diagnóstico, aceptar UUID o UDID y resolver el registro más reciente para evitar `400` falsos.
+
+## 2026-03-15 - Reutilización de imágenes en Stock Entry
+- Antes de disparar búsqueda/descarga de imagen, sugerir una foto ya existente cuando el modelo normalizado coincide.
+- Esto reduce ruido operativo y evita repetir trabajo para el mismo modelo de producto.
+
 ## 2026-03-15 - Bridge auth en Netlify no debe depender solo de metadata de Auth
 - No asumir que `user_metadata.role` o `app_metadata.role` siempre llega en todos los entornos de despliegue.
 - Para endpoints críticos de admin (bridge/pairing), usar fallback de rol en tabla `profiles` y manejar claims legacy sin rol explícito.

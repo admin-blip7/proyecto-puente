@@ -65,6 +65,26 @@ interface StockEntryClientProps {
 type QuickUpdateImageFilter = "all" | "missing" | "with";
 type QuickUpdateCategoryFilter = "all" | "missing";
 
+const COLOR_TOKENS = [
+    "negro", "blanco", "azul", "rojo", "verde", "gris", "plata", "dorado", "gold", "silver",
+    "graphite", "midnight", "starlight", "purple", "pink", "yellow", "orange", "naranja", "titanio"
+];
+
+function normalizeModelKey(name: string): string {
+    return (name || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\([^)]*\)/g, " ")
+        .replace(/\b\d{2,4}\s?(gb|tb)\b/g, " ")
+        .replace(/\b(seminuevo|reacondicionado|usado)\b/g, " ")
+        .replace(new RegExp(`\\b(${COLOR_TOKENS.join("|")})\\b`, "g"), " ")
+        .replace(/\b[a-z0-9]{10,}\b/g, " ")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 export default function StockEntryClient({ allProducts: initialProducts, labelSettings }: StockEntryClientProps) {
     const [entryList, setEntryList] = useState<StockEntryItem[]>([]);
     // Removed allProducts state in favor of server-side search
@@ -161,6 +181,18 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         } catch (error) {
             console.error("Error updating image", error);
             toast({ variant: "destructive", title: "Error", description: "Falló la carga de imagen." });
+        }
+    };
+
+    const handleApplySuggestedImageInQuickUpdate = async (product: Product, suggestedUrl: string) => {
+        try {
+            const currentImages = product.imageUrls || [];
+            const nextImages = [suggestedUrl, ...currentImages.filter(url => url !== suggestedUrl)];
+            await handleDirectUpdate(product, { imageUrls: nextImages });
+            toast({ title: "Imagen sugerida aplicada", description: "Se reutilizó la foto de un modelo existente." });
+        } catch (error) {
+            console.error("Error applying suggested image", error);
+            toast({ variant: "destructive", title: "Error", description: "No se pudo aplicar la imagen sugerida." });
         }
     };
 
@@ -464,6 +496,29 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
         }
         return map;
     }, [quickUpdateResults]);
+
+    const modelImageSuggestions = useMemo(() => {
+        const suggestions = new Map<string, string>();
+        const sources = [...initialProducts, ...quickUpdateResults];
+
+        for (const product of sources) {
+            const firstImage = product.imageUrls?.[0];
+            if (!firstImage) continue;
+            const key = normalizeModelKey(product.name || "");
+            if (!key || suggestions.has(key)) continue;
+            suggestions.set(key, firstImage);
+        }
+
+        return suggestions;
+    }, [initialProducts, quickUpdateResults]);
+
+    const getSuggestedImageForName = useCallback((name: string, currentImage?: string) => {
+        const key = normalizeModelKey(name);
+        if (!key) return undefined;
+        const suggested = modelImageSuggestions.get(key);
+        if (!suggested || suggested === currentImage) return undefined;
+        return suggested;
+    }, [modelImageSuggestions]);
 
     const selectedQuickUpdateProducts = useMemo(() => {
         if (!isQuickUpdateMode || selectedItems.size === 0) return [];
@@ -1370,12 +1425,16 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                             itemName={item.name}
                                                             itemCategory={item.category || ''}
                                                             imageUrl={item.imageUrls?.[0]}
+                                                            suggestedImageUrl={getSuggestedImageForName(item.name, item.imageUrls?.[0])}
                                                             onImageUrlChange={() => { }}
                                                             onImageFileChange={(file) => {
                                                                 if (file) handleQuickUpdateImage(item, file);
                                                             }}
                                                             onOptimizedChange={() => { }}
                                                             onProcessingChange={() => { }}
+                                                            onUseSuggestedImage={(url) => {
+                                                                handleApplySuggestedImageInQuickUpdate(item, url);
+                                                            }}
                                                             onSearchClick={() => {
                                                                 setCurrentItemForImage(item.id);
                                                                 setShowImageSearch(true);
@@ -1660,12 +1719,22 @@ export default function StockEntryClient({ allProducts: initialProducts, labelSe
                                                                 itemCategory={item.category}
                                                                 imageFile={item.imageFile}
                                                                 imageUrl={item.imageUrl}
+                                                                suggestedImageUrl={getSuggestedImageForName(item.name, item.imageUrl)}
                                                                 isImageProcessing={item.isImageProcessing}
                                                                 hasOptimizedImage={item.hasOptimizedImage}
                                                                 onImageFileChange={(file) => handleUpdateItem(item.id, 'imageFile', file)}
                                                                 onImageUrlChange={(url) => handleUpdateItem(item.id, 'imageUrl', url)}
                                                                 onProcessingChange={(processing) => handleUpdateItem(item.id, 'isImageProcessing', processing)}
                                                                 onOptimizedChange={(optimized) => handleUpdateItem(item.id, 'hasOptimizedImage', optimized)}
+                                                                onUseSuggestedImage={(url) => {
+                                                                    handleUpdateItem(item.id, 'imageFile', undefined);
+                                                                    handleUpdateItem(item.id, 'imageUrl', url);
+                                                                    handleUpdateItem(item.id, 'hasOptimizedImage', false);
+                                                                    toast({
+                                                                        title: "Imagen sugerida aplicada",
+                                                                        description: "Se reutilizó la foto de un modelo ya existente."
+                                                                    });
+                                                                }}
                                                                 onSearchClick={() => {
                                                                     setCurrentItemForImage(item.id);
                                                                     setShowImageSearch(true);

@@ -435,6 +435,7 @@ export default function DiagnosticScanner() {
   const [scanningDevice, setScanningDevice] = useState<Record<string, boolean>>({});
   const [addedDevices, setAddedDevices] = useState<Record<string, AddedDevice>>({});
   const [modalDevice, setModalDevice] = useState<DeviceResult | null>(null);
+  const [disableHostedScannerPolling, setDisableHostedScannerPolling] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchDevices = useCallback(async () => {
@@ -445,7 +446,17 @@ export default function DiagnosticScanner() {
         setServiceOnline(false);
         setMissingTools(Array.isArray(data.missing_tools) ? data.missing_tools : []);
         setDeviceUdids([]);
+        if (typeof window !== "undefined") {
+          const host = window.location.hostname.toLowerCase();
+          const isHosted = host !== "localhost" && host !== "127.0.0.1";
+          if (isHosted) {
+            setDisableHostedScannerPolling(true);
+          }
+        }
         return;
+      }
+      if (disableHostedScannerPolling) {
+        setDisableHostedScannerPolling(false);
       }
       setServiceOnline(true);
       setMissingTools([]);
@@ -454,7 +465,7 @@ export default function DiagnosticScanner() {
       setServiceOnline(false);
       setMissingTools([]);
     }
-  }, []);
+  }, [disableHostedScannerPolling]);
 
   const fetchBridgeStatus = useCallback(async () => {
     try {
@@ -506,12 +517,12 @@ export default function DiagnosticScanner() {
     pollingRef.current = setInterval(() => {
       fetchBridgeStatus();
       // Si ya hay bridge online y el scanner local está offline (Netlify), evita ruido 503 en consola.
-      if (!(bridgeAgents.length > 0 && serviceOnline === false)) {
+      if (!(bridgeAgents.length > 0 && serviceOnline === false) && !disableHostedScannerPolling) {
         fetchDevices();
       }
     }, 4000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [bridgeAgents.length, fetchBridgeStatus, fetchDevices, serviceOnline]);
+  }, [bridgeAgents.length, disableHostedScannerPolling, fetchBridgeStatus, fetchDevices, serviceOnline]);
 
   useEffect(() => {
     const pairingCode = searchParams.get("pair")?.trim();

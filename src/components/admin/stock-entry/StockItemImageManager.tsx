@@ -19,6 +19,8 @@ interface StockItemImageManagerProps {
     onProcessingChange: (processing: boolean) => void;
     onOptimizedChange: (optimized: boolean) => void;
     onSearchClick: () => void;
+    suggestedImageUrl?: string;
+    onUseSuggestedImage?: (url: string) => void;
 }
 
 export function StockItemImageManager({
@@ -32,7 +34,9 @@ export function StockItemImageManager({
     onImageUrlChange,
     onProcessingChange,
     onOptimizedChange,
-    onSearchClick
+    onSearchClick,
+    suggestedImageUrl,
+    onUseSuggestedImage
 }: StockItemImageManagerProps) {
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -183,6 +187,7 @@ export function StockItemImageManager({
 
     // Determine what to show
     const displayImage = imageUrl || previewUrl;
+    const canUseSuggested = Boolean(suggestedImageUrl && !displayImage && !isImageProcessing);
 
     return (
         <div className="flex flex-col items-center gap-2">
@@ -287,6 +292,18 @@ export function StockItemImageManager({
                     </Button>
                 )}
             </div>
+
+            {canUseSuggested && suggestedImageUrl && onUseSuggestedImage && (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[10px]"
+                    onClick={() => onUseSuggestedImage(suggestedImageUrl)}
+                >
+                    Usar foto sugerida
+                </Button>
+            )}
         </div>
     );
 }

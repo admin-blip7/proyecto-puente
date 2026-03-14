@@ -11,6 +11,17 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Hotfix diagnóstico Netlify (`503/400`) + sugerencia de foto por modelo en Stock Entry** (15-Mar-2026, Codex)
+  - CORREGIDO: `POST /api/seminuevo/create` ya no falla con `400` cuando el frontend manda UDID.
+    - `src/app/api/seminuevo/create/route.ts` ahora acepta `diagnosticId` como string.
+    - `src/lib/services/productService.ts` resuelve diagnóstico por UUID o por UDID (más reciente).
+  - AJUSTADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx` para reducir spam de `503 /api/diagnostics/devices` en hosting (scanner local offline).
+  - NUEVO FLUJO EN STOCK ENTRY:
+    - `src/components/admin/stock-entry/StockEntryClient.tsx` genera sugerencia de foto por modelo normalizado usando imágenes ya existentes.
+    - `src/components/admin/stock-entry/StockItemImageManager.tsx` agrega botón `Usar foto sugerida`.
+  - OBJETIVO: evitar errores al guardar desde diagnóstico y reducir búsquedas/descargas repetidas de la misma foto para modelos ya cargados.
+  - VALIDADO: transpile TS OK en route, servicio y componentes tocados.
+
 - [x] **Hotfix Netlify diagnóstico bridge: corregido `forbidden` falso y ruido `503` del scanner local** (15-Mar-2026, Codex)
   - REPORTE: en hosting se veía `Scanner offline` con múltiples errores `403` (`bridge/status`, `pair/complete`) y `503` (`devices`).
   - CAUSA RAÍZ:

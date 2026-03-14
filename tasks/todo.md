@@ -1,3 +1,37 @@
+# TODO - Hotfix diagnóstico Netlify (503/400) + sugerencia automática de foto por modelo en Stock Entry
+
+## Plan
+- [x] Corregir `400` en `/api/seminuevo/create` cuando el frontend envía UDID en lugar de UUID de diagnóstico.
+- [x] Reducir ruido repetitivo de `503 /api/diagnostics/devices` en hosting sin romper el modo local.
+- [x] Extender el flujo de imagen en Stock Entry para sugerir foto existente de un modelo ya registrado.
+- [x] Validar transpile de archivos modificados.
+
+## Review
+- Hallazgo principal:
+  - El flujo de “Agregar a inventario” desde diagnóstico enviaba `diagnosticId: device.udid`; el endpoint exigía UUID, por eso devolvía `400`.
+  - En hosting, el polling del scanner local seguía golpeando `/api/diagnostics/devices` y generaba spam `503` en consola.
+  - En Stock Entry faltaba reutilización de foto por modelo, forzando búsquedas/descargas repetidas.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/api/seminuevo/create/route.ts`
+    - `diagnosticId` ahora acepta string no vacío y `price/cost` usan coerción numérica.
+  - ACTUALIZADO: `src/lib/services/productService.ts`
+    - `createProductFromDiagnostic` ahora acepta UUID o UDID.
+    - si llega UDID, toma el diagnóstico más reciente (`order scanned_at desc limit 1`).
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - se desactiva polling local de `devices` en host remoto tras detectar `service_offline`, reduciendo ruido `503`.
+  - ACTUALIZADO: `src/components/admin/stock-entry/StockEntryClient.tsx`
+    - nuevo índice de sugerencias de imagen por modelo normalizado.
+    - en modo quick update y en lista de ingreso se ofrece reutilizar foto existente.
+  - ACTUALIZADO: `src/components/admin/stock-entry/StockItemImageManager.tsx`
+    - nuevo botón `Usar foto sugerida` cuando no hay imagen en el item actual.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en:
+    - `src/app/api/seminuevo/create/route.ts`
+    - `src/lib/services/productService.ts`
+    - `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - `src/components/admin/stock-entry/StockEntryClient.tsx`
+    - `src/components/admin/stock-entry/StockItemImageManager.tsx`
+
 # TODO - Hotfix Netlify bridge: evitar `forbidden` falso y ruido de scanner local offline
 
 ## Plan

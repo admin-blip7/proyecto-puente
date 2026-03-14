@@ -632,13 +632,39 @@ export const createProductFromDiagnostic = async (input: {
   notes?: string;
 }): Promise<Product> => {
   const supabase = getSupabaseServerClient();
+  const diagnosticIdOrUdid = input.diagnosticId?.trim();
+  if (!diagnosticIdOrUdid) {
+    throw new Error("Diagnóstico no encontrado");
+  }
 
-  // 1. Obtener diagnóstico
-  const { data: diag, error: diagError } = await supabase
-    .from('device_diagnostics')
-    .select('*')
-    .eq('id', input.diagnosticId)
-    .single();
+  // 1. Obtener diagnóstico (acepta UUID real o UDID del dispositivo)
+  let diag: any = null;
+  let diagError: any = null;
+
+  const looksLikeUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      diagnosticIdOrUdid
+    );
+
+  if (looksLikeUuid) {
+    const byId = await supabase
+      .from("device_diagnostics")
+      .select("*")
+      .eq("id", diagnosticIdOrUdid)
+      .single();
+    diag = byId.data;
+    diagError = byId.error;
+  } else {
+    const byUdid = await supabase
+      .from("device_diagnostics")
+      .select("*")
+      .eq("udid", diagnosticIdOrUdid)
+      .order("scanned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    diag = byUdid.data;
+    diagError = byUdid.error;
+  }
 
   if (diagError || !diag) throw new Error('Diagnóstico no encontrado');
 
