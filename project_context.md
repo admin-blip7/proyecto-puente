@@ -11,6 +11,33 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **DMG del bridge agent ahora detecta automáticamente el host de instalación (incluye Netlify)** (15-Mar-2026, Codex)
+  - CAUSA RAÍZ: el launcher tenía `appUrl` hardcodeado a `https://22electronicgroup.com`, por lo que instalaciones desde Netlify quedaban vinculadas al entorno incorrecto.
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para leer `com.apple.metadata:kMDItemWhereFroms` y extraer el `origin` de descarga del `.app`.
+  - NUEVO FLUJO:
+    - launcher detecta host automático,
+    - lo pasa al script de instalación (`DIAG_BRIDGE_APP_URL`),
+    - y luego al agente (`DIAG_AGENT_URL`) para pairing/polling en el mismo host.
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+  - VALIDADO: script contiene `extract_origin_from_where_froms`, mensaje `App URL detectada para pairing` y exports de URL al agente.
+
+- [x] **Hotfix launcher DMG: resuelto error `mktemp ... File exists` al dar Instalar** (15-Mar-2026, Codex)
+  - REPORTE USUARIO: al ejecutar el `.app` del DMG aparecía `mktemp: mkstemp failed on /tmp/diag_bridge_install_XXXXX.sh: File exists`.
+  - CAUSA RAÍZ: creación de archivo temporal con plantilla fija vulnerable a colisión en entorno macOS del usuario.
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` usando `SCRIPT=$(mktemp -t diag_bridge_install)`.
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+  - VALIDADO: launcher interno del DMG ya contiene el comando corregido.
+
+- [x] **Hotfix del DMG del bridge agent: botón "Instalar" ya no falla en silencio** (15-Mar-2026, Codex)
+  - CAUSA RAÍZ: el launcher del `.app` podía terminar sin abrir nada si fallaba `osascript` al mostrar el diálogo de confirmación.
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs` para agregar fallback sin UI (modo consola), trazas persistentes y mensajes de error visibles.
+  - NUEVO LOGGING:
+    - `~/.22electronic-diagnostics-agent/logs/launcher-*.log`
+    - `~/.22electronic-diagnostics-agent/logs/install-*.log`
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx` con troubleshooting explícito apuntando a la carpeta de logs.
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+  - VALIDADO: `node --check` OK, `npm run diagnostics:build-agents` OK y launcher interno del DMG contiene el fallback + logging.
+
 - [x] **Eliminación del prompt de token y asociación de diagnósticos a la cuenta autenticada** (15-Mar-2026, Codex)
   - NUEVA migración `supabase/migrations/20260315000001_bridge_pairing_and_diagnostic_ownership.sql`:
     - tabla `diagnostics_bridge_pairings`

@@ -282,6 +282,10 @@ export default function SetupGuide() {
               fix: "Faltan herramientas CLI. Instala libimobiledevice y recarga la página.",
             },
             {
+              problem: "Abro el .dmg, doy Instalar y no veo nada",
+              fix: "Revisa los logs del instalador en ~/.22electronic-diagnostics-agent/logs (archivos launcher-*.log e install-*.log).",
+            },
+            {
               problem: "El iPhone no aparece en el scanner",
               fix: "Reconecta el cable USB y acepta 'Confiar en este ordenador' en el iPhone.",
             },

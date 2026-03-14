@@ -56,20 +56,108 @@ set -e
 
 APP_URL_DEFAULT="https://22electronicgroup.com"
 WORKDIR="$HOME/.22electronic-diagnostics-agent"
-mkdir -p "$WORKDIR"
-LAUNCHER="$WORKDIR/bridge-agent.mjs"
+LOG_DIR="$WORKDIR/logs"
+mkdir -p "$LOG_DIR"
 
-osascript -e 'display dialog "DiagnosticoBridgeAgent\\n\\nInstalara o verificara automaticamente:\\n\\n  - Homebrew (si falta)\\n  - Node.js\\n  - libimobiledevice\\n  - usbmuxd\\n\\nDespues abrira el agente local en Terminal.\\n\\n¿Continuar?" buttons {"Cancelar", "Instalar"} default button "Instalar" with icon note' >/dev/null 2>&1 || exit 0
+LAUNCH_LOG="$LOG_DIR/launcher-$(date +%Y%m%d-%H%M%S).log"
+touch "$LAUNCH_LOG"
+exec > >(tee -a "$LAUNCH_LOG") 2>&1
 
-SCRIPT=$(mktemp /tmp/diag_bridge_install_XXXXX.sh)
+echo "============================================================"
+echo "  DiagnosticoBridgeAgent - Launcher"
+echo "  Log: $LAUNCH_LOG"
+echo "============================================================"
+echo ""
+
+APP_EXEC="$0"
+APP_BUNDLE="$(cd "$(dirname "$APP_EXEC")/../../.." && pwd)"
+
+extract_origin_from_where_froms() {
+  local target="$1"
+  local attr_tmp=""
+  local parsed=""
+  local url=""
+  local origin=""
+
+  [ -n "$target" ] || return 1
+  [ -e "$target" ] || return 1
+
+  attr_tmp="$(mktemp -t diag_wherefroms)"
+  if ! xattr -p com.apple.metadata:kMDItemWhereFroms "$target" > "$attr_tmp" 2>/dev/null; then
+    rm -f "$attr_tmp"
+    return 1
+  fi
+
+  parsed="$(/usr/bin/plutil -p "$attr_tmp" 2>/dev/null || true)"
+  rm -f "$attr_tmp"
+  [ -n "$parsed" ] || return 1
+
+  while IFS= read -r line; do
+    url="$(echo "$line" | sed -n 's/.*"\\(https\\?:\\/\\/[^"]*\\)".*/\\1/p')"
+    [ -n "$url" ] || continue
+    origin="$(echo "$url" | sed -n 's#^\\(https\\?://[^/]*\\).*#\\1#p')"
+    if [ -n "$origin" ]; then
+      echo "$origin"
+      return 0
+    fi
+  done <<< "$parsed"
+
+  return 1
+}
+
+DETECTED_ORIGIN="$(extract_origin_from_where_froms "$APP_BUNDLE" || true)"
+if [ -z "$DETECTED_ORIGIN" ]; then
+  DETECTED_ORIGIN="$(extract_origin_from_where_froms "$APP_EXEC" || true)"
+fi
+if [ -n "$DETECTED_ORIGIN" ]; then
+  APP_URL_DEFAULT="$DETECTED_ORIGIN"
+fi
+
+echo "App URL detectada para pairing: $APP_URL_DEFAULT"
+echo ""
+
+BUTTON=""
+if command -v osascript >/dev/null 2>&1; then
+  BUTTON=$(osascript -e 'button returned of (display dialog "DiagnosticoBridgeAgent\\n\\nInstalara o verificara automaticamente:\\n\\n  - Homebrew (si falta)\\n  - Node.js\\n  - libimobiledevice\\n  - usbmuxd\\n\\nDespues abrira el agente local en Terminal.\\n\\n¿Continuar?" buttons {"Cancelar", "Instalar"} default button "Instalar" with icon note)' 2>/dev/null || true)
+fi
+
+if [ "$BUTTON" = "Cancelar" ]; then
+  echo "Instalacion cancelada por el usuario."
+  exit 0
+fi
+
+if [ -z "$BUTTON" ]; then
+  echo "No se pudo mostrar el dialogo grafico; continuando en modo consola."
+fi
+
+SCRIPT=$(mktemp -t diag_bridge_install)
 cat > "$SCRIPT" <<'INSTALLEOF'
 #!/bin/bash
 set -e
 
-APP_URL_DEFAULT="https://22electronicgroup.com"
+APP_URL_DEFAULT="\${DIAG_BRIDGE_APP_URL:-https://22electronicgroup.com}"
 WORKDIR="$HOME/.22electronic-diagnostics-agent"
-mkdir -p "$WORKDIR"
+LOG_DIR="$WORKDIR/logs"
+mkdir -p "$WORKDIR" "$LOG_DIR"
 cd "$WORKDIR"
+
+INSTALL_LOG="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
+touch "$INSTALL_LOG"
+exec > >(tee -a "$INSTALL_LOG") 2>&1
+
+finish() {
+  STATUS=$?
+  echo ""
+  if [ "$STATUS" -eq 0 ]; then
+    echo "Instalacion finalizada correctamente."
+  else
+    echo "ERROR: la instalacion fallo con codigo $STATUS."
+  fi
+  echo "Revisa el log en: $INSTALL_LOG"
+  echo ""
+  read -r -p "Presiona Enter para cerrar..." _
+}
+trap finish EXIT
 
 clear
 echo "============================================================"
@@ -103,11 +191,16 @@ echo ""
 echo "El agente abrira la web y se vinculara con tu cuenta sin pedir token manual."
 echo "Despues guardara la configuracion y arrancara automaticamente."
 echo ""
+export DIAG_AGENT_URL="$APP_URL_DEFAULT"
 node bridge-agent.mjs
 INSTALLEOF
 
 chmod +x "$SCRIPT"
-open -a Terminal "$SCRIPT"
+export DIAG_BRIDGE_APP_URL="$APP_URL_DEFAULT"
+if ! open -a Terminal "$SCRIPT"; then
+  echo "No se pudo abrir Terminal automaticamente."
+  echo "Ejecuta manualmente: $SCRIPT"
+fi
 `;
 
   fs.writeFileSync(path.join(macosDir, "DiagnosticoBridgeAgent"), launcherScript);

@@ -1,5 +1,20 @@
 # Lessons
 
+## 2026-03-15 - Instaladores multi-host no deben hardcodear dominio
+- Si el mismo DMG se distribuye desde varios hosts (dominio propio y Netlify), no hardcodear `appUrl` en el launcher.
+- En macOS, aprovechar `com.apple.metadata:kMDItemWhereFroms` para inferir origen de descarga y usar ese host automáticamente.
+- Propagar el host detectado al instalador y al agente vía variables de entorno para que el pairing ocurra en el mismo entorno web abierto por el usuario.
+
+## 2026-03-15 - mktemp en launchers macOS
+- Evitar `mktemp /tmp/...XXXXX...` en instaladores distribuidos a usuarios; puede fallar con `mkstemp ... File exists` según entorno.
+- Preferir `mktemp -t <prefijo>` en macOS para crear scripts temporales de forma robusta.
+- Si el launcher depende de archivo temporal para abrir Terminal, validar ese paso antes de publicar el DMG.
+
+## 2026-03-15 - Launcher DMG no debe fallar en silencio
+- No usar `osascript ... || exit 0` en launchers de `.app`: si falla la UI, el usuario percibe que el instalador "no hace nada".
+- Todo instalador distribuido en DMG debe tener fallback en consola y logging persistente (`~/.22electronic-diagnostics-agent/logs`) para soporte remoto.
+- Mostrar siempre ruta de log al terminar (éxito o error) para que el usuario pueda compartir diagnóstico real.
+
 ## 2026-03-15 - App macOS en DMG marcada como dañada
 - No asumir que un `.dmg` válido implica que el `.app` interno abrirá bien en macOS.
 - Cuando empaquete un `.app` manualmente, firmar el bundle completo con `codesign --force --deep --sign - <App.app>` antes de crear el DMG.

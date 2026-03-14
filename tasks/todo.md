@@ -1,3 +1,80 @@
+# TODO - Auto-detección de dominio en DMG para pairing (Netlify/producción)
+
+## Plan
+- [x] Detectar automáticamente el origen de descarga del `.app` desde metadatos de cuarentena (`kMDItemWhereFroms`).
+- [x] Pasar ese dominio al instalador en Terminal y al agente (`DIAG_AGENT_URL`) para evitar hardcode de host.
+- [x] Regenerar `DiagnosticoBridgeAgent.dmg` y verificar que el launcher incluya la lógica.
+- [x] Documentar resultado.
+
+## Review
+- Hallazgo principal:
+  - El DMG estaba hardcodeado a `https://22electronicgroup.com`, por eso al instalar desde Netlify el agente quedaba apuntando al host incorrecto.
+- Cambios aplicados:
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs`.
+  - Nuevo flujo en launcher:
+    - intenta leer `com.apple.metadata:kMDItemWhereFroms` del bundle/ejecutable,
+    - extrae origen `https://host`,
+    - usa ese valor como `APP_URL_DEFAULT` para instalación y pairing.
+  - El instalador exporta:
+    - `DIAG_BRIDGE_APP_URL` (launcher -> script temporal)
+    - `DIAG_AGENT_URL` (script temporal -> `bridge-agent.mjs`)
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+- Verificación técnica:
+  - `node --check scripts/build-bridge-agent-binaries.mjs` => OK.
+  - `npm run diagnostics:build-agents` => OK.
+  - Inspección del launcher dentro del DMG confirma presencia de:
+    - `extract_origin_from_where_froms`
+    - `App URL detectada para pairing`
+    - exports `DIAG_BRIDGE_APP_URL` y `DIAG_AGENT_URL`.
+
+# TODO - Hotfix launcher DMG: error mktemp "File exists" al dar Instalar
+
+## Plan
+- [x] Reproducir/confirmar la causa leyendo el error exacto del launcher.
+- [x] Corregir la creación de script temporal en macOS para evitar colisión de `mktemp`.
+- [x] Regenerar `DiagnosticoBridgeAgent.dmg` y validar que el launcher interno traiga el fix.
+- [x] Documentar el resultado.
+
+## Review
+- Hallazgo principal:
+  - El launcher estaba usando `mktemp /tmp/diag_bridge_install_XXXXX.sh`, que en el entorno del usuario disparó `mkstemp failed ... File exists`.
+  - Eso cortaba la ejecución justo al inicio y daba la impresión de que el botón **Instalar** no hacía nada.
+- Cambios aplicados:
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs`.
+  - Reemplazo de creación temporal por `mktemp -t diag_bridge_install` (patrón seguro para macOS).
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+- Verificación técnica:
+  - `node --check scripts/build-bridge-agent-binaries.mjs` => OK.
+  - `npm run diagnostics:build-agents` => OK.
+  - Verificación del launcher dentro del DMG: contiene `SCRIPT=$(mktemp -t diag_bridge_install)`.
+
+# TODO - Hotfix DMG: instalador abre pero no muestra nada al hacer clic en "Instalar"
+
+## Plan
+- [x] Revisar el launcher del `.app` dentro del `DiagnosticoBridgeAgent.dmg` para detectar salidas silenciosas.
+- [x] Corregir el flujo de arranque para que siempre abra Terminal y deje trazas de ejecución en archivo de log.
+- [x] Regenerar `DiagnosticoBridgeAgent.dmg` con el launcher corregido y validar que no falle en silencio.
+- [x] Documentar resultado y validación técnica.
+
+## Review
+- Hallazgo principal:
+  - El launcher del `.app` podía terminar en silencio cuando fallaba `osascript` (diálogo de confirmación), por eso al usuario le parecía que el botón **Instalar** no hacía nada.
+- Cambios aplicados:
+  - ACTUALIZADO: `scripts/build-bridge-agent-binaries.mjs`.
+  - Nuevo comportamiento del launcher:
+    - Si el diálogo falla, continúa en modo consola en vez de salir en silencio.
+    - Registra trazas en `~/.22electronic-diagnostics-agent/logs/launcher-*.log`.
+    - El instalador en Terminal guarda log detallado en `~/.22electronic-diagnostics-agent/logs/install-*.log`.
+    - En error, muestra ruta de log y deja mensaje visible antes de cerrar.
+  - ACTUALIZADO: `src/components/admin/diagnostico/SetupGuide.tsx`.
+  - Se añadió troubleshooting explícito para revisar la carpeta de logs cuando “Instalar” no muestra nada.
+  - REGENERADO: `iphone-diagnostic-service/dist/DiagnosticoBridgeAgent.dmg`.
+- Verificación técnica:
+  - `node --check scripts/build-bridge-agent-binaries.mjs` => OK.
+  - `npm run diagnostics:build-agents` => OK (DMG y binarios regenerados).
+  - Montaje local del DMG + inspección de launcher => contiene fallback y logging nuevo.
+  - `typescript.transpileModule` en `SetupGuide.tsx` => OK.
+
 # TODO - Eliminar prompt de token del agente y asociar diagnósticos a la cuenta que escanea
 
 ## Plan
