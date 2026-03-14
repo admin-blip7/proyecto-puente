@@ -93,6 +93,16 @@ export interface DeviceResult {
   battery_genuine_apple?: boolean | null;
   parts_status?: "no_alerts" | "replacement_detected" | "unknown";
   parts_note?: string;
+  inventory?: {
+    in_inventory: boolean;
+    product_id: string;
+    product_name: string | null;
+    branch_id: string | null;
+    branch_name: string | null;
+    added_at: string | null;
+    added_by_user_id: string | null;
+    added_by_name: string | null;
+  };
 }
 
 let toolCache: ToolCache | null = null;

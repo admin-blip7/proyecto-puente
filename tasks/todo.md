@@ -1,3 +1,106 @@
+# TODO - Inventario: mostrar datos completos de seminuevos creados desde diagnóstico
+
+## Plan
+- [x] Verificar qué datos de diagnóstico se persisten al crear seminuevos.
+- [x] Asegurar mapeo de columnas `condition_grade`, `diagnostic_id` y `cosmetic_notes` en `Product`.
+- [x] Mostrar en Inventario la ficha de seminuevo (grado, serial, IMEI, batería, capacidad, color, iOS).
+- [x] Extender búsqueda de Inventario para localizar por serial/IMEI de seminuevos.
+- [x] Validar transpile de archivos modificados.
+
+## Review
+- Hallazgo principal:
+  - Inventario solo mostraba columnas base; no exponía información de diagnóstico para seminuevos.
+  - Además, el mapeo de `products` no estaba propagando `condition_grade`/`diagnostic_id` hacia el tipo `Product`.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/lib/services/productService.ts`
+    - `mapProduct` ahora incluye `conditionGrade`, `diagnosticId` y `cosmeticNotes`.
+    - `createProductFromDiagnostic` ahora persiste más metadata del diagnóstico en `attributes`:
+      - `model_name`, `storage_gb`, `battery_cycle_count`, `ios_version`, `udid`, `imei2`.
+  - ACTUALIZADO: `src/components/admin/InventoryClient.tsx`
+    - nueva ficha visual para productos `Celular Seminuevo` en mobile y desktop.
+    - nueva columna `Seminuevo (Diagnóstico)` en la tabla desktop.
+    - búsqueda extendida para encontrar seminuevos por serial/IMEI/IMEI2/color/storage/iOS/diagnosticId.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en:
+    - `src/components/admin/InventoryClient.tsx`
+    - `src/lib/services/productService.ts`
+
+# TODO - Hotfix POS: menú Inventario no navega desde POS
+
+## Plan
+- [x] Revisar el flujo de navegación del menú `Inventario` desde el layout del POS.
+- [x] Corregir la página `/admin` para que use patrón compatible con App Router (Server Component).
+- [x] Validar que `/admin` responda correctamente y que el archivo modificado transpile.
+
+## Review
+- Hallazgo principal:
+  - `src/app/admin/page.tsx` estaba declarado como Client Component con `export default async function`, una combinación inválida en Next App Router que puede romper la navegación client-side desde POS.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/app/admin/page.tsx`
+    - Se eliminó `"use client"` y se migró a Server Component.
+    - Se simplificó la vista para reutilizar `AdminPageLayout` + `InventoryClient`.
+    - Se mantuvo carga server-side de productos con `getProducts()` y `dynamic = "force-dynamic"`.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en `src/app/admin/page.tsx`.
+  - `curl -I http://localhost:9003/admin` => `200 OK`.
+
+# TODO - Mostrar en diagnóstico si el equipo ya está en inventario (sucursal/usuario/fecha)
+
+## Plan
+- [x] Enriquecer resultados de escaneo con estado de inventario existente por serial/IMEI/UDID.
+- [x] Persistir metadata de ingreso (usuario/sucursal/fecha) al crear seminuevo desde diagnóstico.
+- [x] Mostrar badge y detalle en tarjeta de diagnóstico: ya en inventario, sucursal, usuario y fecha.
+- [x] Evitar doble alta deshabilitando botón de agregar cuando ya está registrado.
+- [x] Validar transpile de archivos modificados.
+
+## Review
+- Hallazgo principal:
+  - El scanner no diferenciaba entre equipos nuevos y equipos ya ingresados en inventario, ni mostraba trazabilidad de alta.
+- Cambios aplicados:
+  - NUEVO: `src/lib/diagnostics/inventoryStatus.ts`
+    - lookup de vínculo a inventario por serial/IMEI/UDID en `device_diagnostics` + `products`.
+    - resolución de sucursal (`branches`) y usuario (`profiles`) para componer status visible.
+  - ACTUALIZADO: `src/app/api/diagnostics/scan/route.ts`
+    - resultados de scan ahora regresan `inventory` enriquecido.
+  - ACTUALIZADO: `src/app/api/diagnostics/bridge/jobs/[jobId]/route.ts`
+    - jobs completados de bridge también devuelven `inventory` enriquecido en `result.results`.
+  - ACTUALIZADO: `src/app/api/seminuevo/create/route.ts`
+    - al crear desde diagnóstico toma usuario autenticado y metadata de perfil/sucursal para trazabilidad.
+    - fallback de etiqueta `Sucursal / Rol`: `Global / Matriz • Admin` cuando no hay branch seleccionada.
+  - ACTUALIZADO: `src/lib/services/productService.ts`
+    - guarda metadata de ingreso en `products.attributes` (`inventory_created_by_*`, `inventory_branch_*`, `inventory_created_at`).
+    - actualiza `device_diagnostics` con `added_to_inventory_at` y `scanned_by_user_id`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - badge `Ya en inventario`.
+    - bloque con `Producto`, `Sucursal / Rol`, `Ingresó`, `Fecha ingreso`.
+    - botón `Agregar a Inventario` deshabilitado cuando ya está registrado.
+  - ACTUALIZADO: `src/lib/diagnostics/libimobiledevice.ts`
+    - tipo `DeviceResult` extendido con campo opcional `inventory`.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en route/api/helpers/componentes tocados.
+
+# TODO - Hotfix botón "Agregar a Inventario" en diagnóstico no abría modal
+
+## Plan
+- [x] Revisar el flujo del botón `Agregar a Inventario` en `DiagnosticScanner`.
+- [x] Corregir cierre prematuro del `Dialog` en `AddToInventoryModal`.
+- [x] Asegurar que el botón pase siempre el `device` actual del card al modal.
+- [x] Validar transpile de componentes modificados.
+
+## Review
+- Hallazgo principal:
+  - El modal podía cerrarse inmediatamente por `onOpenChange={onClose}` y en algunos casos el botón intentaba abrirlo con referencia `undefined` del mapa.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/components/admin/diagnostico/AddToInventoryModal.tsx`
+    - `Dialog` ahora solo ejecuta `onClose()` cuando `nextOpen` es `false`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - el botón `onAdd` usa el `cardDevice` actual del render, evitando abrir con `undefined`.
+    - texto de estado ajustado para dejar claro que `Scanner local offline` es normal en hosting cuando bridge está activo.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en:
+    - `src/components/admin/diagnostico/AddToInventoryModal.tsx`
+    - `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+
 # TODO - Hotfix diagnóstico Netlify (503/400) + sugerencia automática de foto por modelo en Stock Entry
 
 ## Plan

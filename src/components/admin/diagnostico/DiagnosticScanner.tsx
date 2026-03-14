@@ -71,6 +71,16 @@ interface DeviceResult {
   battery_genuine_apple?: boolean | null;
   parts_status?: "no_alerts" | "replacement_detected" | "unknown";
   parts_note?: string;
+  inventory?: {
+    in_inventory: boolean;
+    product_id: string;
+    product_name: string | null;
+    branch_id: string | null;
+    branch_name: string | null;
+    added_at: string | null;
+    added_by_user_id: string | null;
+    added_by_name: string | null;
+  };
 }
 
 interface AddedDevice { product_id: string; product_name: string; }
@@ -185,6 +195,7 @@ function DeviceCard({
   const storageBar = device.storage_gb && device.used_gb
     ? Math.round((device.used_gb / device.storage_gb) * 100)
     : null;
+  const inventoryStatus = device.inventory?.in_inventory ? device.inventory : null;
 
   return (
     <Card>
@@ -202,6 +213,11 @@ function DeviceCard({
             </div>
           </div>
           <div className="flex gap-1 shrink-0">
+            {inventoryStatus && (
+              <Badge variant="secondary" className="text-xs border-amber-300 text-amber-800 bg-amber-100 dark:border-amber-800 dark:text-amber-100 dark:bg-amber-950/50">
+                Ya en inventario
+              </Badge>
+            )}
             {device.icloud_locked ? (
               <Badge variant="destructive" className="text-xs"><ShieldX className="h-3 w-3 mr-1" />iCloud</Badge>
             ) : device.activation_state === "Activated" ? (
@@ -213,6 +229,19 @@ function DeviceCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {inventoryStatus && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 space-y-1">
+            <p className="font-semibold">Este equipo ya fue agregado al inventario.</p>
+            <Row label="Producto" value={inventoryStatus.product_name ?? inventoryStatus.product_id} />
+            <Row label="Sucursal / Rol" value={inventoryStatus.branch_name ?? inventoryStatus.branch_id ?? "Global / Matriz • Admin"} />
+            <Row label="Ingresó" value={inventoryStatus.added_by_name ?? inventoryStatus.added_by_user_id ?? "No registrado"} />
+            <Row
+              label="Fecha ingreso"
+              value={inventoryStatus.added_at ? new Date(inventoryStatus.added_at).toLocaleString() : "No registrada"}
+            />
+          </div>
+        )}
+
         {device.error && (
           <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950 p-2 text-sm text-red-600">
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -407,7 +436,7 @@ function DeviceCard({
               {scanning ? "Escaneando..." : hasData ? "Re-escanear" : "Escanear"}
             </Button>
             {hasData && !device.error && (
-              <Button size="sm" onClick={onAdd}>
+              <Button size="sm" onClick={onAdd} disabled={!!inventoryStatus}>
                 <Plus className="h-4 w-4 mr-1" />Agregar a Inventario
               </Button>
             )}
@@ -650,7 +679,7 @@ export default function DiagnosticScanner() {
               : serviceOnline
                 ? `Scanner local activo · ${deviceUdids.length} dispositivo${deviceUdids.length !== 1 ? "s" : ""} conectado${deviceUdids.length !== 1 ? "s" : ""}`
                 : bridgeActive
-                  ? `Scanner local offline · agente web activo (${bridgeAgents[0]?.name ?? "agente local"})`
+                  ? `Scanner local offline (normal en hosting) · agente web activo (${bridgeAgents[0]?.name ?? "agente local"})`
                   : "Scanner offline — ve a la pestaña Configuración"}
           </span>
         </div>
@@ -719,16 +748,19 @@ export default function DiagnosticScanner() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {allUdids.map((udid) => (
-          <DeviceCard
-            key={udid}
-            device={deviceResults[udid] ?? { udid, paired: false, error: null }}
-            scanning={!!scanningDevice[udid]}
-            onScan={() => scanDevice(udid)}
-            onAdd={() => setModalDevice(deviceResults[udid])}
-            added={addedDevices[udid]}
-          />
-        ))}
+        {allUdids.map((udid) => {
+          const cardDevice = deviceResults[udid] ?? { udid, paired: false, error: null };
+          return (
+            <DeviceCard
+              key={udid}
+              device={cardDevice}
+              scanning={!!scanningDevice[udid]}
+              onScan={() => scanDevice(udid)}
+              onAdd={() => setModalDevice(cardDevice as DeviceResult)}
+              added={addedDevices[udid]}
+            />
+          );
+        })}
       </div>
 
       {modalDevice && (

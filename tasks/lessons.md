@@ -1,5 +1,15 @@
 # Lessons
 
+## 2026-03-15 - Diagnóstico debe mostrar trazabilidad de inventario, no solo estado técnico
+- Si el usuario gestiona altas desde scanner, cada tarjeta debe indicar claramente si el equipo ya fue ingresado al inventario.
+- Para evitar duplicados, enriquecer scan por serial/IMEI/UDID contra historial `device_diagnostics` y `products`.
+- Mostrar contexto operativo mínimo: sucursal, usuario que ingresó y fecha de ingreso.
+- Si no hay sucursal explícita en metadata/cookie, usar fallback visible de negocio: `Global / Matriz • Admin`.
+
+## 2026-03-15 - Dialog controlado no debe cerrar en cualquier onOpenChange
+- En componentes `Dialog` controlados, no pasar `onOpenChange={onClose}` directo si `onClose` siempre cierra; usar `if (!nextOpen) onClose()`.
+- Si un botón abre modal desde lista mapeada, pasar el objeto renderizado actual en vez de re-leer de un mapa que puede quedar `undefined`.
+
 ## 2026-03-15 - Seminuevos: no asumir que el frontend envía UUID de diagnóstico
 - Si una acción UI de diagnóstico envía `udid`, no validar estrictamente `diagnosticId` como UUID sin fallback.
 - En backend de alta desde diagnóstico, aceptar UUID o UDID y resolver el registro más reciente para evitar `400` falsos.

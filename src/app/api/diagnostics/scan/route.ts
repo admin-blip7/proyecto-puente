@@ -6,6 +6,7 @@ import {
 } from "@/lib/diagnostics/libimobiledevice";
 import { requireDiagnosticsAdminUser } from "@/lib/diagnostics/bridge";
 import { persistScannedDevices } from "@/lib/diagnostics/persistence";
+import { attachInventoryStatusToResults } from "@/lib/diagnostics/inventoryStatus";
 
 export const runtime = "nodejs";
 
@@ -31,10 +32,12 @@ export async function GET(req: NextRequest) {
   if (!udid) {
     const data = await scanAllDevices();
     await persistScannedDevices(data.results, { scannedByUserId });
-    return NextResponse.json(data);
+    const enrichedResults = await attachInventoryStatusToResults(data.results);
+    return NextResponse.json({ ...data, results: enrichedResults });
   }
 
   const data = await scanDevice(udid);
   await persistScannedDevices([data], { scannedByUserId });
-  return NextResponse.json(data);
+  const [enrichedDevice] = await attachInventoryStatusToResults([data]);
+  return NextResponse.json(enrichedDevice ?? data);
 }

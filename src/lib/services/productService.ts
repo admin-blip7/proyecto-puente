@@ -180,6 +180,9 @@ const mapProduct = (row: any, index: number): Product => ({
   category: row?.category ?? undefined,
   attributes: row?.attributes ?? {},
   imageUrls: Array.isArray(row?.image_urls) ? row.image_urls : [],
+  conditionGrade: row?.condition_grade ?? undefined,
+  diagnosticId: row?.diagnostic_id ?? undefined,
+  cosmeticNotes: row?.cosmetic_notes ?? undefined,
   branchId: row?.branch_id ?? undefined,
   partnerId: row?.partner_id ?? undefined,
 });
@@ -630,6 +633,12 @@ export const createProductFromDiagnostic = async (input: {
   ownershipType: 'Propio' | 'Consigna';
   consignorId?: string;
   notes?: string;
+  inventoryContext?: {
+    createdByUserId?: string;
+    createdByName?: string;
+    branchId?: string;
+    branchName?: string;
+  };
 }): Promise<Product> => {
   const supabase = getSupabaseServerClient();
   const diagnosticIdOrUdid = input.diagnosticId?.trim();
@@ -697,12 +706,23 @@ export const createProductFromDiagnostic = async (input: {
     diagnostic_id: diag.id,
     cosmetic_notes: input.notes,
     attributes: {
+      model_name: diag.model_name,
       storage: diag.storage_gb ? `${diag.storage_gb}GB` : undefined,
+      storage_gb: diag.storage_gb,
       color: diag.color,
       battery_health: diag.battery_health_percent,
+      battery_cycle_count: diag.battery_cycle_count,
+      ios_version: diag.ios_version,
+      udid: diag.udid,
       serial: diag.serial_number,
       imei: diag.imei,
+      imei2: diag.imei2,
       is_model_template: false,
+      inventory_created_by_user_id: input.inventoryContext?.createdByUserId,
+      inventory_created_by_name: input.inventoryContext?.createdByName,
+      inventory_branch_id: input.inventoryContext?.branchId,
+      inventory_branch_name: input.inventoryContext?.branchName,
+      inventory_created_at: nowIso(),
     },
     created_at: nowIso(),
   };
@@ -718,7 +738,11 @@ export const createProductFromDiagnostic = async (input: {
   // Actualizar diagnóstico para enlazarlo de vuelta
   await supabase
     .from('device_diagnostics')
-    .update({ product_id: newId })
+    .update({
+      product_id: newId,
+      added_to_inventory_at: nowIso(),
+      scanned_by_user_id: input.inventoryContext?.createdByUserId ?? undefined,
+    })
     .eq('id', diag.id);
 
   // Registrar movimiento

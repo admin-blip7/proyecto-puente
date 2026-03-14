@@ -47,8 +47,6 @@ export default function AddToInventoryModal({ device, open, onClose, onAdded }: 
   const batLabel = device.battery?.health_percent
     ? ` | Bat. ${device.battery.health_percent}%`
     : "";
-  const defaultSku = `IP-${device.serial_number?.slice(-6) ?? "000000"}`;
-
   const [price, setPrice] = useState("");
   const [cost, setCost] = useState("");
   const [ownershipType, setOwnershipType] = useState<"Propio" | "Consigna">("Propio");
@@ -96,7 +94,12 @@ export default function AddToInventoryModal({ device, open, onClose, onAdded }: 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Agregar a Inventario</DialogTitle>

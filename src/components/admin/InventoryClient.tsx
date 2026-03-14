@@ -35,6 +35,48 @@ interface InventoryClientProps {
   initialProducts: Product[];
 }
 
+const asRecord = (value: unknown): Record<string, any> =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+
+const toDisplay = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text.length > 0 ? text : null;
+};
+
+const getSeminuevoDetails = (product: Product) => {
+  if (product.category !== "Celular Seminuevo") return null;
+
+  const attributes = asRecord(product.attributes);
+  const isTemplate = attributes.is_model_template === true;
+  if (isTemplate) return null;
+
+  const storage =
+    toDisplay(attributes.storage) ??
+    (typeof attributes.storage_gb === "number" ? `${attributes.storage_gb}GB` : null);
+  const batteryHealth =
+    typeof attributes.battery_health === "number"
+      ? `${attributes.battery_health}%`
+      : toDisplay(attributes.battery_health);
+  const batteryCycles =
+    typeof attributes.battery_cycle_count === "number"
+      ? String(attributes.battery_cycle_count)
+      : toDisplay(attributes.battery_cycle_count);
+
+  return {
+    grade: toDisplay(product.conditionGrade),
+    serial: toDisplay(attributes.serial),
+    imei: toDisplay(attributes.imei),
+    imei2: toDisplay(attributes.imei2),
+    color: toDisplay(attributes.color),
+    storage,
+    batteryHealth,
+    batteryCycles,
+    iosVersion: toDisplay(attributes.ios_version),
+    diagnosticId: toDisplay(product.diagnosticId),
+  };
+};
+
 export default function InventoryClient({ initialProducts }: InventoryClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -106,9 +148,27 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   const numSelected = selectedProductIds.length;
 
   const filteredProducts = products.filter(product => {
+    const details = getSeminuevoDetails(product);
+    const seminuevoSearchBlob = details
+      ? [
+          details.serial,
+          details.imei,
+          details.imei2,
+          details.color,
+          details.storage,
+          details.batteryHealth,
+          details.iosVersion,
+          details.diagnosticId,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+      : "";
+
     const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      seminuevoSearchBlob.includes(searchTerm.toLowerCase());
 
     const matchesFilter =
       ownershipFilter === "all" ||
@@ -220,6 +280,30 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{product.name}</p>
                           <p className="text-sm text-muted-foreground">{product.sku}</p>
+                          {(() => {
+                            const details = getSeminuevoDetails(product);
+                            if (!details) return null;
+                            return (
+                              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                <p className="font-medium text-foreground">Ficha seminuevo</p>
+                                <p>
+                                  {details.grade ? `Grado ${details.grade}` : "Grado N/D"}
+                                  {details.storage ? ` · ${details.storage}` : ""}
+                                  {details.color ? ` · ${details.color}` : ""}
+                                </p>
+                                {details.serial && <p>Serial: {details.serial}</p>}
+                                {details.imei && <p>IMEI: {details.imei}</p>}
+                                {details.imei2 && <p>IMEI 2: {details.imei2}</p>}
+                                {details.batteryHealth && (
+                                  <p>
+                                    Batería: {details.batteryHealth}
+                                    {details.batteryCycles ? ` · ${details.batteryCycles} ciclos` : ""}
+                                  </p>
+                                )}
+                                {details.iosVersion && <p>iOS: {details.iosVersion}</p>}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEditPage(product.id)}>
@@ -275,6 +359,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                           <ArrowUpDown className="ml-2 h-4 w-4" />
                         </Button>
                       </TableHead>
+                      <TableHead>Seminuevo (Diagnóstico)</TableHead>
                       <TableHead className="text-right">
                         <Button variant="ghost" onClick={() => handleSort('cost')}>
                           Costo
@@ -309,6 +394,31 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>
                           <Badge variant={getOwnershipTypeVariant(product.ownershipType)}>{product.ownershipType}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[260px]">
+                          {(() => {
+                            const details = getSeminuevoDetails(product);
+                            if (!details) return <span className="text-muted-foreground/60">-</span>;
+                            return (
+                              <div className="space-y-1">
+                                <p>
+                                  {details.grade ? `Grado ${details.grade}` : "Grado N/D"}
+                                  {details.storage ? ` · ${details.storage}` : ""}
+                                  {details.color ? ` · ${details.color}` : ""}
+                                </p>
+                                {details.serial && <p className="font-mono">S/N: {details.serial}</p>}
+                                {details.imei && <p className="font-mono">IMEI: {details.imei}</p>}
+                                {details.imei2 && <p className="font-mono">IMEI2: {details.imei2}</p>}
+                                {details.batteryHealth && (
+                                  <p>
+                                    Bat: {details.batteryHealth}
+                                    {details.batteryCycles ? ` · ${details.batteryCycles} ciclos` : ""}
+                                  </p>
+                                )}
+                                {details.iosVersion && <p>iOS: {details.iosVersion}</p>}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">{formatCurrency(product.cost)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>

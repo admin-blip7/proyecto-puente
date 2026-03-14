@@ -11,6 +11,62 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Inventario muestra ficha completa de seminuevos creados desde diagnóstico** (15-Mar-2026, Codex)
+  - REPORTE: en Inventario no se veía la información diagnóstica de equipos seminuevos agregados desde `/admin/diagnostico`.
+  - CAUSA RAÍZ:
+    - la tabla de Inventario solo tenía columnas base,
+    - y el mapeo `mapProduct` no propagaba `condition_grade`/`diagnostic_id`/`cosmetic_notes`.
+  - ACTUALIZADO: `src/lib/services/productService.ts`
+    - `mapProduct` ahora incluye `conditionGrade`, `diagnosticId`, `cosmeticNotes`.
+    - `createProductFromDiagnostic` ahora guarda más metadata de diagnóstico en `attributes` (`model_name`, `storage_gb`, `battery_cycle_count`, `ios_version`, `udid`, `imei2`).
+  - ACTUALIZADO: `src/components/admin/InventoryClient.tsx`
+    - nueva ficha por producto seminuevo en mobile/desktop con:
+      - grado,
+      - serial,
+      - IMEI / IMEI2,
+      - batería + ciclos,
+      - capacidad,
+      - color,
+      - iOS.
+    - nueva columna desktop `Seminuevo (Diagnóstico)`.
+    - búsqueda extendida por campos diagnósticos (serial/IMEI/IMEI2/etc).
+  - VALIDADO: transpile TS OK en archivos tocados.
+
+- [x] **Hotfix POS: menú Inventario vuelve a abrir desde POS** (15-Mar-2026, Codex)
+  - REPORTE: en POS, al pulsar `Inventario` en el menú no navegaba a la vista de inventario.
+  - CAUSA RAÍZ: `src/app/admin/page.tsx` estaba implementado como Client Component `async`, combinación incompatible con App Router que rompe navegación client-side.
+  - ACTUALIZADO: `src/app/admin/page.tsx`
+    - migrado a Server Component,
+    - simplificado con `AdminPageLayout` + `InventoryClient`,
+    - mantiene carga server-side con `getProducts()` y `dynamic = "force-dynamic"`.
+  - VALIDADO: transpile TS OK en la página y `GET /admin` responde `200` en `localhost:9003`.
+
+- [x] **Diagnóstico muestra si el equipo ya está en inventario + sucursal/usuario/fecha de ingreso** (15-Mar-2026, Codex)
+  - NUEVO: `src/lib/diagnostics/inventoryStatus.ts` para resolver estado de inventario por `serial/imei/udid` y anexar metadata de producto/sucursal/usuario.
+  - ACTUALIZADO: `src/app/api/diagnostics/scan/route.ts` para devolver resultados enriquecidos con `inventory`.
+  - ACTUALIZADO: `src/app/api/diagnostics/bridge/jobs/[jobId]/route.ts` para enriquecer también resultados de jobs bridge (`result.results`).
+  - ACTUALIZADO: `src/app/api/seminuevo/create/route.ts` y `src/lib/services/productService.ts` para persistir trazabilidad de alta:
+    - usuario que ingresó,
+    - sucursal/rol (ej. `Global / Matriz • Admin`),
+    - fecha de ingreso (`added_to_inventory_at` + metadata en `products.attributes`).
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - badge `Ya en inventario`,
+    - bloque con `Producto`, `Sucursal`, `Ingresó`, `Fecha ingreso`,
+    - botón `Agregar a Inventario` deshabilitado cuando el equipo ya está registrado.
+  - VALIDADO: transpile TS OK en archivos tocados.
+
+- [x] **Hotfix botón "Agregar a Inventario" en diagnóstico bridge** (15-Mar-2026, Codex)
+  - REPORTE: al pulsar `Agregar a Inventario` no abría modal aunque el diagnóstico sí funcionaba.
+  - CAUSA RAÍZ:
+    - cierre prematuro del diálogo por `onOpenChange={onClose}`,
+    - y apertura basada en referencia potencialmente indefinida en el map de tarjetas.
+  - ACTUALIZADO: `src/components/admin/diagnostico/AddToInventoryModal.tsx`
+    - `Dialog` ahora cierra solo cuando `nextOpen === false`.
+  - ACTUALIZADO: `src/components/admin/diagnostico/DiagnosticScanner.tsx`
+    - `onAdd` ahora abre modal con el `cardDevice` actual del render.
+    - copy de estado mejorado para hosting: `Scanner local offline (normal en hosting) · agente web activo`.
+  - VALIDADO: transpile TS OK en ambos componentes.
+
 - [x] **Hotfix diagnóstico Netlify (`503/400`) + sugerencia de foto por modelo en Stock Entry** (15-Mar-2026, Codex)
   - CORREGIDO: `POST /api/seminuevo/create` ya no falla con `400` cuando el frontend manda UDID.
     - `src/app/api/seminuevo/create/route.ts` ahora acepta `diagnosticId` como string.
