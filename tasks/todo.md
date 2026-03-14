@@ -1,3 +1,32 @@
+# TODO - Ajustar lector POS para formatos reales de código de barras
+
+## Plan
+- [x] Revisar qué formatos de barcode genera realmente el sistema de etiquetas.
+- [x] Ajustar `CodeScannerDialog` para priorizar esos formatos en el lector ZXing.
+- [x] Activar lectura más agresiva para 1D (`TRY_HARDER`) y bajar el intervalo entre intentos.
+- [x] Validar sintaxis del componente.
+
+## Review
+- Hallazgo principal:
+  - El sistema imprime principalmente `CODE128` y también soporta `EAN13`, pero el lector estaba corriendo con configuración genérica.
+  - En mobile, esa configuración genérica puede ver la cámara pero tardar mucho o no estabilizar la decodificación de barras 1D finas.
+- Cambios aplicados:
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx`
+  - Se agregaron hints explícitos para ZXing con los formatos que usa el proyecto:
+    - `CODE_128`
+    - `EAN_13`
+    - `EAN_8`
+    - `UPC_A`
+    - `UPC_E`
+    - `CODE_39`
+    - `CODABAR`
+    - `ITF`
+    - `QR_CODE`
+  - Se habilitó `DecodeHintType.TRY_HARDER`.
+  - Se redujo `delayBetweenScanAttempts` a `120ms` para hacer el barrido más reactivo.
+- Verificación técnica:
+  - `typescript.transpileModule` OK en `src/components/pos/CodeScannerDialog.tsx`.
+
 # TODO - Corregir inicio del lector de código de barras en POS
 
 ## Plan

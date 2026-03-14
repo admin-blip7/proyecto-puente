@@ -14,6 +14,10 @@
 - Para escáneres de cámara en React, usar un token/counter de solicitud activa ayuda a ignorar respuestas async obsoletas y evita que un arranque viejo vuelva a tocar el estado después de un stop/restart.
 - Cuando `@zxing/browser` ya expone `BrowserCodeReader.listVideoInputDevices()`, preferirlo sobre flujos manuales inconsistentes para listar cámaras del escáner.
 
+## 2026-03-14 - Lectura de etiquetas 1D en POS
+- Si el sistema imprime etiquetas `CODE128`/`EAN13`, no confiar solo en autodetección genérica del lector; configurar `POSSIBLE_FORMATS` explícitos mejora mucho la lectura real.
+- Para barcodes 1D finos en cámara móvil, `TRY_HARDER` y un intervalo de reintento más corto suelen ser necesarios aunque la cámara ya esté funcionando.
+
 ## 2026-03-10 - Evitar fallos de build por secretos faltantes (Resend/SDKs)
 - No instanciar clientes de terceros que requieren API key (ej. `new Resend(...)`) en scope de módulo dentro de rutas o servicios importados en build.
 - Mover la inicialización al flujo de ejecución (`handler`/función) y devolver error controlado cuando falte la variable de entorno.

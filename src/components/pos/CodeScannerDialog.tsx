@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Camera, Flashlight, Loader2, RefreshCcw } from "lucide-react";
 
 interface CodeScannerDialogProps {
@@ -13,7 +13,6 @@ interface CodeScannerDialogProps {
 }
 
 export default function CodeScannerDialog({ open, onOpenChange, onResult }: CodeScannerDialogProps) {
-  const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<any | null>(null);
   const startRequestRef = useRef(0);
@@ -23,6 +22,23 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+
+  const buildReaderHints = useCallback(() => {
+    const hints = new Map();
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.ITF,
+      BarcodeFormat.QR_CODE,
+    ]);
+    return hints;
+  }, []);
 
   const getDefaultDeviceId = useCallback((inputs: MediaDeviceInfo[]): string | undefined => {
     if (inputs.length === 0) return undefined;
@@ -106,7 +122,10 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
 
       // Dynamic import to avoid SSR issues
       const zxing: any = await import("@zxing/browser");
-      const reader = new zxing.BrowserMultiFormatReader();
+      const reader = new zxing.BrowserMultiFormatReader(buildReaderHints(), {
+        delayBetweenScanAttempts: 120,
+        delayBetweenScanSuccess: 400,
+      });
 
       const allDevices = await listVideoDevices();
       if (requestId !== startRequestRef.current) return;
@@ -155,7 +174,7 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
         setLoading(false);
       }
     }
-  }, [getDefaultDeviceId, listVideoDevices, onResult, stopScanner]);
+  }, [buildReaderHints, getDefaultDeviceId, listVideoDevices, onResult, stopScanner]);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -199,7 +218,7 @@ export default function CodeScannerDialog({ open, onOpenChange, onResult }: Code
             {error ? (
               <span className="text-destructive">{error}</span>
             ) : (
-              <span>Apunta la cámara al código de barras o QR para agregar productos al carrito.</span>
+              <span>Apunta la cámara al código de barras o QR. El lector está optimizado para etiquetas CODE128 y EAN.</span>
             )}
           </DialogDescription>
         </DialogHeader>

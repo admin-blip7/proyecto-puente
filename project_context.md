@@ -11,6 +11,12 @@ Implementar tienda online 22 Electronic con integración a Supabase existente.
 ## Tienda Online (22 Electronic)
 ### Completados
 
+- [x] **Ajuste del lector POS para etiquetas CODE128/EAN** (14-Mar-2026, Codex)
+  - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` para configurar hints explícitos de ZXing con formatos reales del proyecto (`CODE_128`, `EAN_13`, `EAN_8`, `UPC_A`, `UPC_E`, `CODE_39`, `CODABAR`, `ITF`, `QR_CODE`).
+  - ACTIVADO: `DecodeHintType.TRY_HARDER` para mejorar detección de códigos 1D en cámara móvil.
+  - AJUSTADO: `delayBetweenScanAttempts` a `120ms` para un barrido más reactivo.
+  - VALIDADO: transpile TS OK en `src/components/pos/CodeScannerDialog.tsx`.
+
 - [x] **Corrección del lector de código de barras en POS** (14-Mar-2026, Codex)
   - ACTUALIZADO: `src/components/pos/CodeScannerDialog.tsx` para evitar reinicios cruzados del escáner al abrir el diálogo, refrescar cámaras o cambiar `selectedDeviceId`.
   - NUEVO FLUJO: se usa un token interno (`startRequestRef`) para invalidar arranques obsoletos y evitar que callbacks async viejos rompan el stream actual.
